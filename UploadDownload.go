@@ -220,15 +220,15 @@ func main() {
 //	})
 
 	http.HandleFunc("/downloader.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "downloader.css")
+		http.ServeFile(w, r, "css/downloader.css")
 	})
 
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "style.css")
+		http.ServeFile(w, r, "css/style.css")
 	})
 
 	http.HandleFunc("/NoPreview.png", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "NoPreview.png")
+		http.ServeFile(w, r, "assets/NoPreview.png")
 	})
 
 
@@ -256,7 +256,6 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			dirPath = UploadedFilesDirName + "/."
 		}
 
-		fmt.Println(dirPath)
 		info,err := os.Stat(dirPath)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -307,7 +306,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 
-			tpl,err := template.ParseFiles("Downloader.html")
+			tpl,err := template.ParseFiles("html/Downloader.html")
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -330,7 +329,7 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 
 	//tpl.ExecuteTemplate(w, "Upload", nil)
 
-	tpl,err := template.ParseFiles("Uploader.html")
+	tpl,err := template.ParseFiles("html/Uploader.html")
 	if err != nil {
 		fmt.Println(err)
 		return
