@@ -276,7 +276,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 				if len(pathSplit) < 2 {
 					d.BackPath = "/"
 				} else {
-					d.BackPath = filepath.Join(pathSplit[:len(pathSplit) - 1]...)
+					d.BackPath = "/" + filepath.Join(pathSplit[:len(pathSplit) - 1]...)
 				}
 			}
 
@@ -308,12 +308,14 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 
 			tpl,err := template.ParseFiles("html/Downloader.html")
 			if err != nil {
-				fmt.Println(err)
+				http.Error(w, "Couldnt load page", http.StatusBadRequest)
 				return
 			}
 
 			err = tpl.Execute(w, d)
 			if err != nil {
+				http.Error(w, "Couldnt load page", http.StatusBadRequest)
+				return
 				fmt.Println(err)
 			}
 		} else {
@@ -331,13 +333,14 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 
 	tpl,err := template.ParseFiles("html/Uploader.html")
 	if err != nil {
-		fmt.Println(err)
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
 	}
 
 	err = tpl.Execute(w, nil)
 	if err != nil {
-		fmt.Println(err)
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
 	}
 }
 
@@ -369,7 +372,8 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 		
 		_,err = io.Copy(out, f)
 		if err != nil {
-			fmt.Println("Error saving file:", err)
+			http.Error(w, "Error Saving file", http.StatusBadRequest)
+			return
 		}
 
 		f.Close()
