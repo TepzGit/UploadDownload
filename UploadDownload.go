@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -16,7 +17,15 @@ type DownloadFileDir struct {
 	Path string
 	IsDir bool
 	IsImg bool
+	IsAudio bool
+	IsVid bool
 }
+
+type MakeFolderData struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
 
 var UploadedFilesDirName string = "UploadedFiles"
 
@@ -213,6 +222,8 @@ func main() {
 	http.HandleFunc("/Files/", Downloader)
 	http.HandleFunc("/Uploader", Uploader)
 	http.HandleFunc("/upload", GetUploadData)
+	http.HandleFunc("/makeFolder", makeFolder)
+	http.HandleFunc("/getFolders", getFolders)
 
 //	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
 //		w.Header().Set("Content-Type", "text/css")
@@ -280,7 +291,11 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			ImgExt := []string{".jpg", ".png", ".gif"}
+			Extensions := map[string][]string{
+				"Images": []string{".jpg", ".jpeg", ".png", ".gif"},
+				"Videos": []string{".mp4", ".mkv", ".mov", ".webm"},
+				"Audio": []string{".mp3", ".wav"},
+			}
 
 			files,err := os.ReadDir(dirPath)
 			if err != nil {
@@ -291,10 +306,20 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 
 			for _,file := range files {
 				var isImg bool
-				for _,Ext := range ImgExt {
-					if file.Name()[len(file.Name()) - len(Ext):] == Ext {
-						isImg = true
-						break
+				var isVid bool
+				var isAudio bool
+				for Type,ExtList := range Extensions {
+					for _,Ext := range ExtList {
+						if file.Name()[len(file.Name()) - len(Ext):] == Ext {
+							if Type == "Images" {
+								isImg = true
+							} else if Type == "Videos" {
+								isVid = true
+							} else if Type == "Audio" {
+								isAudio = true
+							}
+							break
+						}
 					}
 				}
 
@@ -303,6 +328,8 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 					Path: strings.Join([]string{path, file.Name()}, "/"),
 					IsDir: file.IsDir(),
 					IsImg: isImg,
+					IsAudio: isAudio,
+					IsVid: isVid,
 				})
 			}
 
@@ -316,7 +343,6 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				http.Error(w, "Couldnt load page", http.StatusBadRequest)
 				return
-				fmt.Println(err)
 			}
 		} else {
 			w.Header().Set("Content-Disposition", "attachment; filename=\""+info.Name()+"\"")
@@ -359,11 +385,12 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No files uploaded", http.StatusBadRequest)
 		return
 	}
+	currentPath := r.FormValue("currentPath")
 
 	os.Mkdir(UploadedFilesDirName, 0755)
 	for _,file := range files {
 		f,_ := file.Open()
-		out, err := os.Create(filepath.Join(UploadedFilesDirName, file.Filename))
+		out, err := os.Create(filepath.Join(UploadedFilesDirName, currentPath, file.Filename))
 		if err != nil {
 			http.Error(w, "Error Downloading File", http.StatusBadRequest)
 			f.Close()
@@ -384,3 +411,73 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/Uploader?success=true", http.StatusSeeOther)
 }
 
+func makeFolder(w http.ResponseWriter, r *http.Request) {
+	var folderData MakeFolderData
+	err := json.NewDecoder(r.Body).Decode(&folderData)
+	if err != nil {
+		http.Error(w, "Not valid folder data", http.StatusBadRequest)
+		return
+	}
+
+	folderName := folderData.Name
+	path := folderData.Path
+
+	pathSplit := strings.Split(path, "/")
+
+	var dirPath string
+	if len(pathSplit) > 2 {
+		dirPath = filepath.Join(append([]string{UploadedFilesDirName}, pathSplit[2:]...)...)
+	} else {
+		dirPath = UploadedFilesDirName + "/."
+	}
+
+	FullPathDir := filepath.Join(dirPath, folderName)
+	err = os.MkdirAll(FullPathDir, 0755)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+    }
+	w.WriteHeader(http.StatusOK)
+}
+
+func getFolders(w http.ResponseWriter, r *http.Request) {
+	var getFolderData struct{
+		CurrentPath string `json:"currentPath"`
+		FolderToGet string `json:"FolderToGet"`
+	}
+
+	var FoldersReturn struct{
+		Folders []string `json:"Folders"`
+		CurrentPath string `json:"CurrentPath"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&getFolderData)
+	if err != nil {
+		http.Error(w, "Not valid folder data", http.StatusBadRequest)
+		return
+	}
+	
+	currentPath := getFolderData.CurrentPath
+	FolderToGet := getFolderData.FolderToGet
+	if currentPath[:1] == "/" {
+		currentPath = "./" + currentPath[1:]
+	}
+
+	Path := filepath.Join(UploadedFilesDirName, currentPath, FolderToGet)
+
+	Dirs, err := os.ReadDir(Path)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for _,Dir := range Dirs {
+		if Dir.IsDir() {
+			FoldersReturn.Folders = append(FoldersReturn.Folders, Dir.Name())
+		}
+	}
+	FoldersReturn.CurrentPath = filepath.Join(currentPath, FolderToGet)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(FoldersReturn)
+}

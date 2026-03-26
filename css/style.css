@@ -17,7 +17,6 @@ body {
 }
 
 
-
 .custom-upload {
     height: 150px;
     font-family: Arial, sans-serif;
@@ -128,6 +127,29 @@ span {
     margin-bottom: 5px;
 }
 
+.UploadExplorer {
+	display: flex;
+	flex-direction: column;
+
+	position: absolute;
+	left: 10%;
+	top: 10%;
+
+	height: 750px;
+	width: 350px;
+
+	background-color: #111111;
+	
+}
+
+.UploadExplorerUploadItem {
+	height: 20px;
+}
+
+.UploadExplorerPreviewImg {
+	height: 100%;
+}
+
 .FileListings {
     background-color: #111111;
     order: 5;
@@ -162,6 +184,7 @@ span {
 }
 
 #labell {
+    font-size: 1rem;
     z-index: 500;
     order: 4;
     color: white;
@@ -171,6 +194,8 @@ span {
     --a: 0deg;
     --l: #0000 0% 70%, #00ff96ff;
     font-size: 20px;
+    margin-left: 5px;
+    margin-bottom: 4px;
 }
 
 #box {
@@ -200,7 +225,7 @@ span {
 .tools {
  display: flex;
  align-items: center;
- padding: 9px;
+ 
 }
 
 .circle {

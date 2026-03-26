@@ -91,6 +91,18 @@
                     Submit
             <input id="submit" type="submit" value="Upload">
             </label>
+
+	    <div class="UploadExplorer">
+		    <input type="hidden" name="currentPath" id="currentPathInput">
+		    <span class="CurrentPath">/</span>
+		    <div class="UploadExplorerUploadItems">
+			    <div onclick="getFolders(this)" class="UploadExplorerUploadItem">
+				    <img class="UploadExplorerPreviewImg" src="https://cdn-icons-png.freepik.com/256/5577/5577723.png" alt="Image">
+				    <span class="filename">.</span>
+			    </div>
+		    </div>
+	    </div>
+
             <div class="filess">
                 <div class="tools">
                     <div class="circle">
@@ -102,11 +114,11 @@
                     <div class="circle">
                     <span class="green box"></span>
                     </div>
+                    <label id="labell">files</label>
                 </div>
-                <label id="labell">files:</label>
-                <div class="FileListings">
-                    
+                
 
+                <div class="FileListings">
                 </div>
             </div>
             <div class="success">
@@ -130,6 +142,58 @@
 			const successShow = document.querySelector('.success');
 			successShow.style.visibility = "visible"
 		}
+
+		async function getFolders(arg) {
+			const UploadExplorer = document.querySelector(".UploadExplorer")
+			const UploadExplorerUploadItems = document.querySelector(".UploadExplorerUploadItems")
+
+			let folderName;
+			if (typeof arg === "string") {
+				folderName = arg;
+			} else {
+				folderName = arg.querySelector(".filename").innerText;
+			}
+
+			const res = await fetch("/getFolders", {
+				method: "POST",
+				body: JSON.stringify({
+					currentPath: UploadExplorer.querySelector(".CurrentPath").innerText,
+					FolderToGet: folderName
+				}),
+				headers: {
+					"Content-type": "application/json; charset=UTF-8"
+				}
+			})
+			if (!res.ok) {
+				console.log("Could Not find folder")
+				return
+			} 
+			const data = await res.json()
+			const Folders = data.Folders
+			const currentPath = data.CurrentPath
+
+			UploadExplorerUploadItems.innerHTML = ""
+			
+			if (Folders != null) {
+				for (let i=0;i<Folders.length;i++) {
+					Folders[i]
+					var item = document.createElement("div")
+					item.className = "UploadExplorerUploadItem"
+					item.onclick = function() { getFolders(this) }
+					item.innerHTML = `
+						<img class="UploadExplorerPreviewImg" src="https://cdn-icons-png.freepik.com/256/5577/5577723.png" alt="Image">
+						<span class="filename">${Folders[i]}</span>
+						`
+					UploadExplorerUploadItems.appendChild(item)
+				}
+			}
+
+			UploadExplorer.querySelector(".CurrentPath").innerText = currentPath
+			UploadExplorer.querySelector("#currentPathInput").value = currentPath
+
+		}
+
+		getFolders(".")
 	</script>
     </body>
 </html>
