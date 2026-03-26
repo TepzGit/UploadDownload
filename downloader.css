@@ -1,0 +1,208 @@
+body{
+    color: rgb(212, 212, 212)!important;
+    background: #000000;
+
+}
+
+.topbar{
+    background: #111111;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-content: center;
+
+
+}
+.upload{
+    font-family: sans-serif ;
+    margin: auto;
+    margin-right: 0px;
+    margin-left: 5px;
+
+
+}
+
+.upload:hover {
+  border-color: rgba(255, 255, 255, 0.623);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.144),
+    rgba(255, 255, 255, 0.247),
+    rgba(255, 255, 255, 0.39)
+  );
+  box-shadow: 0 0px rgba(255, 255, 255, 0.623);
+}
+
+#title{
+
+    font-family: sans-serif ;
+    margin: auto;
+    margin-left: 15px;
+
+}
+
+.items{
+    display: grid;
+    grid-template-columns: repeat(5, minmax(150px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    background-color: #111111;
+    width: calc(100% - 40px);
+    max-width: 1280px;
+    margin: 20px auto;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.item{
+    padding-bottom: 10px;
+    padding-top: 10px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background-color: #1e1e1e;
+    border-radius: 5px;
+    height: 250px;
+    width: 200px;
+}
+
+.filename{
+    overflow: hidden;
+    font-family: sans-serif ;
+    font-size: 1rem;
+    text-align: center;
+    margin: 5px;
+}
+.down {
+  color: rgba(255, 255, 255, 0.692);
+  padding: 10px 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.397);
+  background: rgba(255, 255, 255, 0.068);
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 600;
+  gap: 8px;
+  border-radius: 5px;
+  margin: 0 5px;
+  margin-bottom: 5px;
+  transition: 0.2s;
+  border: 1px solid transparent;
+  width: 80px;
+  height: 20px;
+}
+
+.down:hover {
+  border-color: rgba(255, 255, 255, 0.623);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.144),
+    rgba(255, 255, 255, 0.247),
+    rgba(255, 255, 255, 0.39)
+  );
+  box-shadow: 0 4px rgba(255, 255, 255, 0.623);
+  transform: translateY(-6px);
+}
+
+.down:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+
+.preview{
+
+    border-radius: 5px;
+    height: 150px;
+    width: 150px;
+
+
+
+
+
+}
+
+.filename{
+    font-size: 1rem;
+    text-align: center;
+    margin: 5px;
+}
+
+
+
+.Upload {
+  position: relative;
+  padding: 10px 20px;
+  border-radius: 7px;
+  border: 1px solid #888;
+  font-size: 14px;
+
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd;
+  overflow: hidden;
+  box-shadow: 0 0 0 0 transparent;
+  -webkit-transition: all 0.2s ease-in;
+  -moz-transition: all 0.2s ease-in;
+  transition: all 0.2s ease-in;
+}
+
+.Upload:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+}
+
+.Upload:hover::before {
+  -webkit-animation: sh02 0.5s 0s linear;
+  -moz-animation: sh02 0.5s 0s linear;
+  animation: sh02 0.5s 0s linear;
+}
+
+.Upload::before {
+  content: '';
+  display: block;
+  width: 0px;
+  height: 86%;
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  opacity: 0;
+  background: #fff;
+  box-shadow: 0 0 50px 30px #fff;
+  -webkit-transform: skewX(-20deg);
+  -moz-transform: skewX(-20deg);
+  -ms-transform: skewX(-20deg);
+  -o-transform: skewX(-20deg);
+  transform: skewX(-20deg);
+}
+
+@keyframes sh02 {
+  from {
+    opacity: 0;
+    left: 0%;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    left: 100%;
+  }
+}
+
+.Upload:active {
+  box-shadow: 0 0 0 0 transparent;
+  -webkit-transition: box-shadow 0.2s ease-in;
+  -moz-transition: box-shadow 0.2s ease-in;
+  transition: box-shadow 0.2s ease-in;
+}
