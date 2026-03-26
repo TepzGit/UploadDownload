@@ -276,7 +276,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 				if len(pathSplit) < 2 {
 					d.BackPath = "/"
 				} else {
-					d.BackPath = "/Files/" + filepath.Join(pathSplit[:len(pathSplit) - 1]...)
+					d.BackPath = filepath.Join(pathSplit[:len(pathSplit) - 1]...)
 				}
 			}
 
