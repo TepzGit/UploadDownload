@@ -224,6 +224,8 @@ func main() {
 	http.HandleFunc("/upload", GetUploadData)
 	http.HandleFunc("/makeFolder", makeFolder)
 	http.HandleFunc("/getFolders", getFolders)
+	http.HandleFunc("/search", search)
+	http.HandleFunc("/delete", Delete)
 
 //	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
 //		w.Header().Set("Content-Type", "text/css")
@@ -238,9 +240,15 @@ func main() {
 		http.ServeFile(w, r, "css/style.css")
 	})
 
-	http.HandleFunc("/NoPreview.png", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "assets/NoPreview.png")
-	})
+	assets,_ := os.ReadDir("assets")
+	for _,asset := range assets {
+		assetName := asset.Name()
+		name := assetName
+
+		http.HandleFunc("/" + name, func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "assets/" + name)
+		})
+	}
 
 
 	fmt.Println("Serving on 0.0.0.0:8000")
@@ -480,4 +488,79 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(FoldersReturn)
+}
+
+func search(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	currentPath := r.URL.Query().Get("path")
+
+	pathSplit := strings.Split(currentPath, "/")
+
+	var finalPath string
+	if len(pathSplit) > 2 {
+		finalPath = filepath.Join(append([]string{UploadedFilesDirName}, pathSplit[2:]...)...)
+	} else {
+		finalPath = UploadedFilesDirName + "/."
+	}
+	
+	var results []string
+	if query != "" {
+		results = searchFileFolder(finalPath, query)
+	} else {
+		entries,_ := os.ReadDir(finalPath)
+		for _,entrie := range entries {
+			path := filepath.Join(finalPath, entrie.Name())
+			pathSplit = strings.Split(path, "/")
+			path = "/Files/" + strings.Join(pathSplit[1:], "/")
+
+			results = append(results, path)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(results)
+	if err != nil {
+		http.Error(w, "Failed to encode results", http.StatusInternalServerError)
+		return
+	}
+}
+
+func searchFileFolder(path string, query string) []string {
+	var results []string
+	entries,_ := os.ReadDir(path)
+	
+	for _, entry := range entries {
+		fullPath := filepath.Join(path, entry.Name())
+
+		if entry.IsDir(){
+			results = append(results, searchFileFolder(fullPath, query)...)
+		} else {
+			if strings.Contains(strings.ToLower(entry.Name()), strings.ToLower(query)) {
+				relPath, err := filepath.Rel(UploadedFilesDirName, fullPath)
+				if err != nil {
+					continue
+				}
+
+				publicPath := "/Files/" + relPath
+				results = append(results, publicPath)
+			}
+		}
+	}
+
+	return results
+}
+
+func Delete(w http.ResponseWriter, r *http.Request) {
+	var deleteData struct{
+		Path string `json:"path"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&deleteData)
+	if err != nil {
+		http.Error(w, "Not valid folder data", http.StatusBadRequest)
+		return
+	}
+
+	pathSplit := strings.Split(deleteData.Path, "/")
+	path := filepath.Join(UploadedFilesDirName, strings.Join(pathSplit[4:], "/"))
+	os.Remove(path)
 }

@@ -1,11 +1,21 @@
 <html>
     <head>
         <title>Explorer</title>
+		<link rel="icon" href="https://i.ibb.co/fYVMHYdf/unavngivet.png" type="image/png">
         <link rel="stylesheet" href="/downloader.css">
         <style>
         </style>
+
     </head>
     <body>
+		<div class="page-bg"></div>
+		<div class="particle particle-1"></div>
+		<div class="particle particle-2"></div>
+		<div class="particle particle-3"></div>
+		<div class="particle particle-4"></div>
+		<div class="particle particle-5"></div>
+		<div class="particle particle-6"></div>
+		<div class="animation-wrapper">
         <div class="topbar">
             <h1 id="title">File explorer</h1>
             <a href="/Uploader" class="Upload">Upload</a>
@@ -14,67 +24,106 @@
             {{end}}
         </div>
 
-	<div>
+		
 		<div class="items">
-		{{range .Files}}
-		<div class="item">
-		    {{if .IsDir}}
-		    <img class="preview" src="https://cdn-icons-png.freepik.com/256/5577/5577723.png" alt="no preview available because the file is not an image">
-		    {{else if .IsImg}}
-		    <img class="preview" src="{{.Path}}" alt="Image">
-		    {{else if .IsAudio}}
-		    <img class="preview" src="" alt="Audio">
-		    {{else if .IsVid}}
-		    <img class="preview" src="" alt="Video">
-		    {{else}}
-		    <img class="preview" src="/NoPreview.png" alt="no preview available because the file is not an image">
-		    {{end}}
-		    <span class="filename">{{.Name}}</span>
-		    {{if not .IsDir}}
-		    <a class="down" href="{{.Path}}"
-			>
-			<svg
-			    viewBox="0 0 256 256"
-			    height="32"
-			    width="38"
-			    xmlns="http://www.w3.org/2000/svg"
-			    >
-			    <path
-				d="M74.34 85.66a8 8 0 0 1 11.32-11.32L120 108.69V24a8 8 0 0 1 16 0v84.69l34.34-34.35a8 8 0 0 1 11.32 11.32l-48 48a8 8 0 0 1-11.32 0ZM240 136v64a16 16 0 0 1-16 16H32a16 16 0 0 1-16-16v-64a16 16 0 0 1 16-16h52.4a4 4 0 0 1 2.83 1.17L111 145a24 24 0 0 0 34 0l23.8-23.8a4 4 0 0 1 2.8-1.2H224a16 16 0 0 1 16 16m-40 32a12 12 0 1 0-12 12a12 12 0 0 0 12-12"
-				fill="currentColor"
-				></path>
-			</svg
-			    >
-		    </a>
-		    {{else}}
-		    <a class="down" href="{{.Path}}"
-			>
-			<svg viewBox="0 0 24 24" 
-			    height="32"
-			    width="38" 
-			    fill="currentColor" 
-			    xmlns="http://www.w3.org/2000/svg">
-			    <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-			    <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-			    <g id="SVGRepo_iconCarrier">
-				<path d="M4 6H20M4 12H20M4 18H20" stroke="#d4d4d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-			    </g>
-			</svg>
-		    </a>
-		    {{end}}
+			<div class="buttonbar">
+				<label class="foldbut"  onclick="makeFolder()">Make folder</label>
+				<input type="search" id="search" placeholder="Search files..." oninput="searchFiles(this)">
+			</div>
+			<div id="itemsresults">
+			{{range .Files}}
+				<div class="item">
+					{{if .IsDir}}
+					<img class="preview" src="/foldericon.png" alt="no preview available because the file is not an image">
+					{{else if .IsImg}}
+					<img class="preview" src="{{.Path}}" alt="Image">
+					{{else if .IsAudio}}
+					<img class="preview" src="/audioIcon.png" alt="Audio">
+					{{else if .IsVid}}
+					<img class="preview" src="/videoIcon.png" alt="Video">
+					{{else}}
+					<img class="preview" src="/NoPreview.png" alt="no preview available because the file is not an image">
+					{{end}}
+					<span class="filename">{{.Name}}</span>
+					{{if not .IsDir}}
+					<a class="down" href="{{.Path}}"
+					>
+					<svg
+						viewBox="0 0 256 256"
+						height="32"
+						width="38"
+						xmlns="http://www.w3.org/2000/svg"
+						>
+						<path
+						d="M74.34 85.66a8 8 0 0 1 11.32-11.32L120 108.69V24a8 8 0 0 1 16 0v84.69l34.34-34.35a8 8 0 0 1 11.32 11.32l-48 48a8 8 0 0 1-11.32 0ZM240 136v64a16 16 0 0 1-16 16H32a16 16 0 0 1-16-16v-64a16 16 0 0 1 16-16h52.4a4 4 0 0 1 2.83 1.17L111 145a24 24 0 0 0 34 0l23.8-23.8a4 4 0 0 1 2.8-1.2H224a16 16 0 0 1 16 16m-40 32a12 12 0 1 0-12 12a12 12 0 0 0 12-12"
+						fill="currentColor"
+						></path>
+					</svg
+						>
+					</a>
+					<ul id="contextMenu" class="context-menu">
+						<li onclick="alert('Rename')">Move</li>
+						<li onclick="alert('Rename')">Rename</li>
+						<li onclick="Delete(this)">Delete</li>
+					</ul>
+					{{else}}
+					<a class="down" href="{{.Path}}"
+					>
+					<svg viewBox="0 0 24 24" 
+						height="32"
+						width="38" 
+						fill="currentColor" 
+						xmlns="http://www.w3.org/2000/svg">
+						<g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+						<g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+						<g id="SVGRepo_iconCarrier">
+						<path d="M4 6H20M4 12H20M4 18H20" stroke="#d4d4d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+						</g>
+					</svg>
+					</a>
+					<ul id="contextMenu" class="context-menu">
+						<li onclick="alert('Rename')">Move</li>
+						<li onclick="alert('Rename')">Rename</li>
+						<li onclick="Delete(this)">Delete</li>
+					</ul>
+					{{end}}
+				</div>
+			{{end}}
 		</div>
-		{{end}}
 	</div>
-
-        <button onclick="makeFolder()">Make Folder</button>
+	</div>
 
         <div id="previewModal" class="modal hidden" aria-modal="true" role="dialog">
             <div class="modal-content">
-                <button id="closeModal" class="modal-close" aria-label="Close preview">×</button>
-                <img id="modalImage" src="" alt="Preview image" />
-                <div id="modalName" class="modal-filename"></div>
+					<img id="modalImage" src="" alt="Preview image" />
+					<button id="closeModal" class="modal-close" aria-label="Close preview">×</button>
+					<div id="modalName" class="modal-filename"></div>
+			
             </div>
         </div>
+		<script>
+			// get all items
+			const items = document.querySelectorAll('.item');
+			const contextMenu = document.getElementById('contextMenu');
+
+			// add right-click listener to each item
+			items.forEach(item => {
+				item.addEventListener('contextmenu', (e) => {
+					e.preventDefault(); // prevent default browser menu
+
+					contextMenu.style.top = e.pageY + 'px';
+					contextMenu.style.left = e.pageX + 'px';
+					contextMenu.style.display = 'block';
+				});
+			});
+			
+			// hide menu when clicking anywhere else
+			document.addEventListener('click', () => {
+				contextMenu.style.display = 'none';
+			});
+
+		</script>
+		
         <script>
             function makeFolder() {
             	const Items = document.querySelector(".items")
@@ -121,7 +170,138 @@
 			}
 		})
 		}
-            
+
+
+		function checkFileType(fileName) {
+			const Extensions = {
+			Images: [".jpg", ".jpeg", ".png", ".gif"],
+			Videos: [".mp4", ".mkv", ".mov", ".webm"],
+			Audio: [".mp3", ".wav"]
+			}
+
+			let isImg = false
+			let isVid = false
+			let isAudio = false
+
+			const lowerName = fileName.toLowerCase()
+
+			for (const [type, extList] of Object.entries(Extensions)) {
+				for (const ext of extList) {
+					if (lowerName.endsWith(ext)) {
+						if (type === "Images") isImg = true
+						else if (type === "Videos") isVid = true
+						else if (type === "Audio") isAudio = true
+						break
+					}
+				}
+			}
+
+			return { isImg, isVid, isAudio }
+		}
+
+		async function searchFiles(searchInput) {
+			const value = searchInput.value
+			const res = await fetch(`/search?q=${encodeURIComponent(value)}&path=${window.location.pathname}`)
+			try {
+				results = await res.json()
+				const itemsresult = document.querySelector("#itemsresults")
+				
+				itemsresult.innerHTML = ""
+				console.log(results)
+
+				for (i=0;i<results.length;i++) {
+					let path = results[i]
+					filename = path.split("/")
+					filename = filename[filename.length - 1]
+					let source = ""
+					svg = ""
+					
+					folderSVG = `
+					<a class="down" href="${path}"
+					>
+					<svg viewBox="0 0 24 24" 
+						height="32"
+						width="38" 
+						fill="currentColor" 
+						xmlns="http://www.w3.org/2000/svg">
+						<g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+						<g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+						<g id="SVGRepo_iconCarrier">
+						<path d="M4 6H20M4 12H20M4 18H20" stroke="#d4d4d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+						</g>
+					</svg>
+					</a>
+					`
+					otherSVG = `
+					<a class="down" href="${path}"
+					>
+					<svg
+						viewBox="0 0 256 256"
+						height="32"
+						width="38"
+						xmlns="http://www.w3.org/2000/svg"
+						>
+						<path
+						d="M74.34 85.66a8 8 0 0 1 11.32-11.32L120 108.69V24a8 8 0 0 1 16 0v84.69l34.34-34.35a8 8 0 0 1 11.32 11.32l-48 48a8 8 0 0 1-11.32 0ZM240 136v64a16 16 0 0 1-16 16H32a16 16 0 0 1-16-16v-64a16 16 0 0 1 16-16h52.4a4 4 0 0 1 2.83 1.17L111 145a24 24 0 0 0 34 0l23.8-23.8a4 4 0 0 1 2.8-1.2H224a16 16 0 0 1 16 16m-40 32a12 12 0 1 0-12 12a12 12 0 0 0 12-12"
+						fill="currentColor"
+						></path>
+					</svg>
+					</a>
+					`
+
+					const { isImg, isVid, isAudio } = checkFileType(filename)
+					if (isImg) {
+						source = path
+						svg = otherSVG
+					} else if (isVid) {
+						source = "/videoIcon.png"
+						svg = otherSVG
+
+					} else if (isAudio) {
+						source = "/audioIcon.png"
+						svg = otherSVG
+
+					} else {
+						source = "/foldericon.png"
+						svg = folderSVG
+					}
+					
+					item = document.createElement("div")
+					
+					item.innerHTML = `
+					<div class="item">
+					<img class="preview" src="${source}" alt="no preview available because the file is not an image">
+					<span class="filename">${filename}</span>
+					
+					${svg}
+
+					<ul id="contextMenu" class="context-menu">
+						<li onclick="alert('Open')">Move</li>
+						<li onclick="alert('Rename')">Rename</li>
+						<li onclick="Delete(this)">Delete</li>
+					</ul>
+				</div>
+					`
+					itemsresult.append(item)
+				}
+			} catch (e) {
+				console.log(e)
+			}
+	    }
+
+		function Delete(Button) {
+			DeletePath = Button.parentElement.parentElement.querySelector(".Down").href
+			fetch("/delete", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ path: DeletePath })
+			})
+
+		}
+
+            	
 		const modal = document.getElementById('previewModal');
 		const modalImage = document.getElementById('modalImage');
 		const modalName = document.getElementById('modalName');

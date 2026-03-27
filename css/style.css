@@ -1,13 +1,24 @@
 body {
     background-color: #000000;
 }
-
+@font-face {
+    font-family: 'nerd';
+    src: url('/JetBrainsMono-Regular.ttf') format('truetype');
+}
 
 .main {
     display: flex;
-    margin-top: 10%;
+    margin-top: 5%;
     justify-content: center;
     align-content: center;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;  /* left bigger than right */
+    grid-template-rows: 1fr 1fr;     /* two equal rows */
+    height: 400px; /* or whatever */
+    gap: 25px;
 }
 
 
@@ -19,7 +30,7 @@ body {
 
 .custom-upload {
     height: 150px;
-    font-family: Arial, sans-serif;
+    font-family: nerd, sans-serif ;
     font-size: 25px;
 
   position: relative;
@@ -100,7 +111,7 @@ input {
 }
 
 .custom-upload {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family: nerd, sans-serif ;
     font-size: 25px;
 
     height: 50px !important;
@@ -118,7 +129,7 @@ input {
 
 span {
     color: white;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family: nerd, sans-serif ;
     font-size: 20px;
 }
 
@@ -127,18 +138,86 @@ span {
     margin-bottom: 5px;
 }
 
+
+.backbut {
+  font-family: nerd, sans-serif;
+  display: flex;
+  padding: 10px 20px;
+  border-radius: 7px;
+  border: 1px solid #888;
+  font-size: 14px;
+  height: 20px;
+  width: 40px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd;
+  overflow: hidden;
+  box-shadow: 0 0 0 0 transparent;
+  -webkit-transition: all 0.2s ease-in;
+  -moz-transition: all 0.2s ease-in;
+  transition: all 0.2s ease-in;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+.backbut:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+}
+
+.backbut:hover::before {
+  -webkit-animation: sh02 0.5s 0s linear;
+  -moz-animation: sh02 0.5s 0s linear;
+  animation: sh02 0.5s 0s linear;
+}
+
+.backbut::before {
+  content: '';
+  display: block;
+  width: 0px;
+  height: 86%;
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  opacity: 0;
+  background: #fff;
+  box-shadow: 0 0 50px 30px #fff;
+  -webkit-transform: skewX(-20deg);
+  -moz-transform: skewX(-20deg);
+  -ms-transform: skewX(-20deg);
+  -o-transform: skewX(-20deg);
+  transform: skewX(-20deg);
+}
+
+.filename{
+
+  cursor: pointer!important;
+}
+.filename:hover{
+  color: #d4d4d4;
+  text-decoration: underline;
+  cursor: pointer!important;
+}
+
+
 .UploadExplorer {
+  grid-column: 2;
+  grid-row: 2;
 	display: flex;
 	flex-direction: column;
-
-	position: absolute;
-	left: 10%;
-	top: 10%;
-
-	height: 750px;
+  position: relative;
+	height: 300px;
 	width: 350px;
 
-	background-color: #111111;
+	border: 2px solid #222222;
+  background-color: #111111;
+  padding: 10px;
 	
 }
 
@@ -164,14 +243,14 @@ span {
     text-wrap: inherit;
 }
 .filess{
-    position: absolute;
+    grid-column: 2;
+    grid-row: 1;
     border: 2px solid #222222;
     background-color: #111111;
     padding: 10px;
-    height: 750px;
+    height: 300px;
     width: 350px;
-    top: 10%;
-    right: 10%;
+
 
 }
 #img {
@@ -183,12 +262,20 @@ span {
 
 }
 
+#boxtools{
+
+    left: -134px;
+    top: -13px;
+}
+
+
 #labell {
+    font-family: nerd, sans-serif ;
     font-size: 1rem;
     z-index: 500;
     order: 4;
     color: white;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    
     border: solid 2px #0000;
     --b: 2px;
     --a: 0deg;
@@ -199,13 +286,15 @@ span {
 }
 
 #box {
+    grid-row: 1 / 3;
+    grid-column: 1;
     display: flex;
     flex-direction: column;
     background-color: #111111;
     align-items: center;
     repeating-conic-gradient(from var(--a, 0deg), var(--l, #0000 0% 70%, #00ff96ff)) border-box;
     gap: 20px;
-    
+    height: 620px;
     padding: 25px;
     width: 400px;
     min-height: 500px;
@@ -225,6 +314,7 @@ span {
 .tools {
  display: flex;
  align-items: center;
+ position: relative;
  
 }
 
@@ -276,7 +366,7 @@ span {
 
 
 .filex{
-    font-family: sans-serif ;
+    font-family: nerd, sans-serif ;
     position: absolute;
     top: 15;
     right: 15;
@@ -345,21 +435,22 @@ span {
 }
 
 
-.success {
+#success {
   visibility: hidden;
   position: absolute;
   top: 30px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: nerd, sans-serif ;
   width: 320px;
   padding: 12px;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: start;
-  background: #EDFBD8;
+  background: #090909;
   border-radius: 8px;
   border: 1px solid #84D65A;
   box-shadow: 0px 0px 5px -3px #111;
+  left: 40%;
 }
 
 .success__icon {
