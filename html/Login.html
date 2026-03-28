@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+        <title></title>
+        <meta name="description" content="">
+        <link rel="stylesheet" href="Login.css">
+
+    </head>
+    <body>
+        <div class="container">
+		<input class="inputt" type="password" name="password" value="" placeholder="Wanna try?">
+        </div>
+    </body>
+	
+    <script>
+	    	const input = document.querySelector(".inputt")
+
+		input.addEventListener("keydown", async (e) => {
+			if (e.key === "Enter") {
+				const res = await fetch('/login', {
+					method: "POST",
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						password: input.value,
+					})
+				})
+
+				if (!res.ok) {
+					console.log("Wrong password")
+				} else {
+					window.location.href = "/Files";
+				}
+			}
+		})
+    </script>
+</html>

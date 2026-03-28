@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
 type DownloadFileDir struct {
@@ -28,6 +31,11 @@ type MakeFolderData struct {
 
 
 var UploadedFilesDirName string = "UploadedFiles"
+
+var cookies = map[string]time.Time{}
+var cookiesMu sync.Mutex
+
+var tpl *template.Template
 
 var UploadHTML string = `
 <html>
@@ -206,26 +214,31 @@ span {
 }
 `
 
-var tpl *template.Template
 
 func main() {
 
 	tpl = template.New("root")
 	tpl.New("Upload").Parse(UploadHTML)
 	
+	StartCookieCleaner()
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			http.Redirect(w, r, "/Files", http.StatusSeeOther)
 			return
 		}
 	})
-	http.HandleFunc("/Files/", Downloader)
-	http.HandleFunc("/Uploader", Uploader)
-	http.HandleFunc("/upload", GetUploadData)
-	http.HandleFunc("/makeFolder", makeFolder)
-	http.HandleFunc("/getFolders", getFolders)
-	http.HandleFunc("/search", search)
-	http.HandleFunc("/delete", Delete)
+
+	http.HandleFunc("/Login", Login)
+	http.HandleFunc("/login", LoginData)
+	http.HandleFunc("/Files/", requireLogin(Downloader))
+	http.HandleFunc("/Uploader", requireLogin(Uploader))
+	http.HandleFunc("/upload", requireLogin(GetUploadData))
+	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
+	http.HandleFunc("/getFolders", requireLogin(getFolders))
+	http.HandleFunc("/search", requireLogin(search))
+	http.HandleFunc("/delete", requireLogin(Delete))
+	http.HandleFunc("/rename", requireLogin(Rename))
 
 //	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
 //		w.Header().Set("Content-Type", "text/css")
@@ -238,6 +251,14 @@ func main() {
 
 	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "css/style.css")
+	})
+
+	http.HandleFunc("/Login.css", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "css/Login.css")
+	})
+
+	http.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "js/script.js")
 	})
 
 	assets,_ := os.ReadDir("assets")
@@ -254,6 +275,105 @@ func main() {
 	fmt.Println("Serving on 0.0.0.0:8000")
 	http.ListenAndServe("0.0.0.0:8000", nil)
 }
+
+func Login(w http.ResponseWriter, r *http.Request) {
+	tpl,err := template.ParseFiles("html/Login.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	err = tpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+}
+
+func LoginData(w http.ResponseWriter, r *http.Request) {
+	var password struct{
+		Password string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&password)
+	if err != nil {
+		http.Error(w, "Not valid folder data", http.StatusBadRequest)
+		return
+	}
+
+	if password.Password != "test" {
+		http.Error(w, "Wrong Password", http.StatusBadRequest)
+		return
+	}
+	
+	randomCookie := RandomCharacters()
+
+	cookie := &http.Cookie{
+		Name:  "SessionID",
+		Value: randomCookie,
+		Path:  "/",
+		MaxAge: 86400,
+	}
+
+	http.SetCookie(w, cookie)
+
+	cookies[randomCookie] = time.Now()
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func requireLogin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		SessionId, err := r.Cookie("SessionID")
+		if err != nil || SessionId == nil {
+			http.Redirect(w, r, "/Login", http.StatusSeeOther)
+			return
+		}
+
+		// check if session exists in your map
+		if _, ok := cookies[SessionId.Value]; !ok {
+			http.Redirect(w, r, "/Login", http.StatusSeeOther)
+			return
+		}
+
+		// all good → call the real handler
+		next(w, r)
+	}
+}
+
+func StartCookieCleaner() {
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour)
+
+			maxTimeHours := 24
+			
+			cookiesMu.Lock()
+			for key,value := range cookies {
+				if time.Now().After(value.Add(time.Hour * time.Duration(maxTimeHours))) {
+					delete(cookies, key)
+				}
+			}
+			cookiesMu.Unlock()
+		}
+	}()
+}
+
+func RandomCharacters() string {
+	awailable := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+	
+	rand.Seed(time.Now().UnixNano())
+
+	length := 32
+	s := make([]rune, length)
+	for i:=0;i<length;i++ {
+		s[i] = awailable[rand.Intn(len(awailable))]
+	}
+
+	return string(s)
+}
+
 
 func Downloader(w http.ResponseWriter, r *http.Request) {
 		//fs := http.FileServer(http.Dir("."))
@@ -478,6 +598,10 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	if strings.Contains(Path, "..") || strings.Contains(Path, ".") {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	for _,Dir := range Dirs {
 		if Dir.IsDir() {
@@ -562,5 +686,40 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 
 	pathSplit := strings.Split(deleteData.Path, "/")
 	path := filepath.Join(UploadedFilesDirName, strings.Join(pathSplit[4:], "/"))
-	os.Remove(path)
+	err = os.Remove(path)
+	if err != nil {
+		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func Rename(w http.ResponseWriter, r *http.Request) {
+	var renameData struct{
+		CurrentFilenamePath string `json:"currentFilenamePath"`
+		NewFileName string `json"newFileName"`
+	}
+	err := json.NewDecoder(r.Body).Decode(&renameData)
+	if err != nil {
+		http.Error(w, "Not valid folder data", http.StatusBadRequest)
+		return
+	}
+
+	currentFilePathSplit := strings.Split(renameData.CurrentFilenamePath, "/")
+	currentFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:], "/"))
+	newFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:len(currentFilePathSplit) - 1], "/"), renameData.NewFileName)
+
+	curentFileName := currentFilePathSplit[len(currentFilePathSplit) - 1]
+	if curentFileName != renameData.NewFileName {
+		err := os.Rename(currentFilePath, newFilePath)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Could not rename file/folder", http.StatusInternalServerError)
+			return
+
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

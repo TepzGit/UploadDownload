@@ -1,0 +1,36 @@
+body{
+
+    background-color: black;
+    background-image: url("https://i.pinimg.com/736x/bb/9e/69/bb9e69e54561d73e117d680eb1d5b3a0.jpg");
+    background-size: 679px 978px;
+    background-repeat: no-repeat;
+    background-position-x: right ;
+    background-blend-mode:luminosity;
+
+
+} 
+.inputt{
+    font-family:Georgia, 'Times New Roman', Times, serif;
+    background-color: black;
+    color: rgba(255, 255, 255, 0.382);
+    margin: auto;
+    height: 50px;
+    width: 300px;
+    text-align: center;
+    font-size: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.119);
+    border-radius: 5px;
+
+}
+
+
+.container{
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 90vh;
+
+}
+
+
