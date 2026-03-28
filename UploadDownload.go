@@ -310,7 +310,7 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("No password.txt found")
 		return
 	}
-	passwordd := string(passwordFile)
+	passwordd := strings.TrimSpace(string(passwordFile))
 
 	if password.Password != passwordd {
 		http.Error(w, "Wrong Password", http.StatusBadRequest)
