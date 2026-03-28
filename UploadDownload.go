@@ -304,7 +304,15 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if password.Password != "ihatefuckingniggers" {
+	passwordFile, err := os.ReadFile("password.txt")
+	if err != nil {
+		http.Error(w, "Cant Read Server Password rn", http.StatusBadRequest)
+		fmt.Println("No password.txt found")
+		return
+	}
+	passwordd := string(passwordFile)
+
+	if password.Password != passwordd {
 		http.Error(w, "Wrong Password", http.StatusBadRequest)
 		return
 	}
