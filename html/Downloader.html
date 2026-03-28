@@ -45,7 +45,11 @@
 					{{else}}
 					<img class="preview" src="/NoPreview.png" alt="no preview available because the file is not an image">
 					{{end}}
-					<span class="filename">{{.Name}}</span>
+					<div class="fileinfo" >
+						<span class="filename">{{.Name}}</span>
+						<span class="uploadtime">23/04/08</span>
+						<span class="filesize">420kb</span>
+					</div>
 					{{if not .IsDir}}
 					<a class="down" href="{{.Path}}"
 					>

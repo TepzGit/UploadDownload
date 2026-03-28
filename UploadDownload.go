@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -272,8 +273,9 @@ func main() {
 	}
 
 
-	fmt.Println("Serving on 0.0.0.0:8000")
-	http.ListenAndServe("0.0.0.0:8000", nil)
+        port := 8000
+        fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
+        http.ListenAndServe("0.0.0.0:" + strconv.Itoa(port), nil)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +304,7 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if password.Password != "test" {
+	if password.Password != "ihatefuckingniggers" {
 		http.Error(w, "Wrong Password", http.StatusBadRequest)
 		return
 	}

@@ -48,81 +48,44 @@ body{
         radial-gradient(1px 1px at 90% 60%, white, rgba(255, 255, 255, 0));
     background-repeat: repeat;
     background-size: 200px 200px;
-}
-
-.particle-1 {
-    animation: animParticle 60s linear infinite;
+    background-position: 0 0;
 }
 
 .particle-1::before {
-    animation: animParticleBefore 60s linear infinite;
-}
-
-.particle-2 {
-    animation: animParticle 120s linear infinite;
-    animation-delay: -60s;
+    animation: animParticleBackground 60s linear infinite;
 }
 
 .particle-2::before {
-    animation: animParticleBefore 120s linear infinite;
+    animation: animParticleBackground 120s linear infinite;
     animation-delay: -60s;
 }
 
-.particle-3 {
-    animation: animParticle 180s linear infinite;
-    animation-delay: -120s;
-}
-
 .particle-3::before {
-    animation: animParticleBefore 180s linear infinite;
+    animation: animParticleBackground 180s linear infinite;
     animation-delay: -120s;
-}
-
-.particle-4 {
-    animation: animParticle 200s linear infinite;
-    animation-delay: -180s;
 }
 
 .particle-4::before {
-    animation: animParticleBefore 200s linear infinite;
+    animation: animParticleBackground 200s linear infinite;
     animation-delay: -180s;
 }
 
-.particle-5 {
-    animation: animParticle 150s linear infinite;
-    animation-delay: -90s;
-}
-
 .particle-5::before {
-    animation: animParticleBefore 150s linear infinite;
+    animation: animParticleBackground 150s linear infinite;
     animation-delay: -90s;
-}
-
-.particle-6 {
-    animation: animParticle 170s linear infinite;
-    animation-delay: -140s;
 }
 
 .particle-6::before {
-    animation: animParticleBefore 170s linear infinite;
+    animation: animParticleBackground 170s linear infinite;
     animation-delay: -140s;
 }
 
-@keyframes animParticle {
+@keyframes animParticleBackground {
     from {
-        transform: translateY(0px);
+        background-position: 0 0;
     }
     to {
-        transform: translateY(-2560px);
-    }
-}
-
-@keyframes animParticleBefore {
-    from {
-        transform: translateY(2560px);
-    }
-    to {
-        transform: translateY(0px);
+        background-position: 0 -2000px;
     }
 }
 @font-face {
@@ -131,7 +94,7 @@ body{
 }
 
 .topbar{
-    background: #111111;
+    background: #111111b8;
     height: 60px;
     display: flex;
     justify-content: center;
@@ -331,6 +294,33 @@ body{
     text-align: center;
     margin: 5px;
 }
+
+.uploadtime{
+    overflow: hidden;
+    font-family: nerd, sans-serif ;
+    font-size: 1rem;
+    text-align: center;
+    margin: 5px;
+}
+
+.filesize{
+    overflow: hidden;
+    font-family: nerd, sans-serif ;
+    font-size: 1rem;
+    text-align: center;
+    margin: 5px;
+}
+
+.fileinfo{
+    font-family: nerd, sans-serif ;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+}
+
 .down {
   color: rgba(255, 255, 255, 0.692);
   padding: 10px 15px;
