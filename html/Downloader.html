@@ -36,14 +36,19 @@
 				<div class="item">
 					{{if .IsDir}}
 					<img class="preview" src="/foldericon.png" alt="no preview available because the file is not an image">
+					<input type="hidden" class="TypeOfFileFolder" value="Dir">
 					{{else if .IsImg}}
 					<img class="preview" src="{{.Path}}" alt="Image">
+					<input type="hidden" class="TypeOfFileFolder" value="Image">
 					{{else if .IsAudio}}
 					<img class="preview" src="/audioIcon.png" alt="Audio">
+					<input type="hidden" class="TypeOfFileFolder" value="Audio">
 					{{else if .IsVid}}
 					<img class="preview" src="/videoIcon.png" alt="Video">
+					<input type="hidden" class="TypeOfFileFolder" value="Video">
 					{{else}}
 					<img class="preview" src="/NoPreview.png" alt="no preview available because the file is not an image">
+					<input type="hidden" class="TypeOfFileFolder" value="None">
 					{{end}}
 					<div class="fileinfo" >
 						<span class="filename">{{.Name}}</span>
@@ -100,7 +105,8 @@
 
         <div id="previewModal" class="modal hidden" aria-modal="true" role="dialog">
             <div class="modal-content">
-					<img id="modalImage" src="" alt="Preview image" />
+					<img style="display: none;" id="modalImage" src="" alt="Preview image" />
+					<video style="display: none;" id="modalVideo" src="" alt="Preview Video"></video>
 					<button id="closeModal" class="modal-close" aria-label="Close preview">×</button>
 					<div id="modalName" class="modal-filename"></div>
 			
@@ -187,14 +193,31 @@
 		}
 
 		const modal = document.getElementById('previewModal');
-		const modalImage = document.getElementById('modalImage');
 		const modalName = document.getElementById('modalName');
 		const closeModal = document.getElementById('closeModal');
+		const modalImage = document.getElementById('modalImage');
+		const modalVideo = document.getElementById('modalVideo');
 
 
-		function openPreview(imageSrc, fileName) {
-			modalImage.src = imageSrc;
-			modalImage.alt = fileName;
+		function openPreview(src, backUpPreviewsrc, fileName, type) {
+			if (type == "Video") {
+				modalImage.style.display = "none"
+				modalVideo.style.display = "inline-block"
+				modalVideo.src = src;
+				modalVideo.alt = fileName;
+				
+			} else if (type == "Image") {
+				modalVideo.style.display = "none"
+				modalImage.style.display = "inline-block"
+				modalImage.src = src;
+				modalImage.alt = fileName;
+			} else {
+				modalVideo.style.visibility = "hidden"
+				modalImage.style.visibility = "visible"
+				modalImage.src = backUpPreviewsrc;
+				modalImage.alt = fileName;
+			}
+
 			modalName.textContent = fileName;
 			modal.classList.remove('hidden');
 		}
@@ -207,10 +230,14 @@
 			item.addEventListener('click', (event) => {
 			if (event.target.closest('.down')) return; // don't open modal when download icon clicked
 			if (event.target.closest('.context-menu')) return; 
-			const previewImg = item.querySelector('.preview');
+
+			const typeModal = item.querySelector(".TypeOfFileFolder").value
+			const previewPath = item.querySelector('.down').href;
+			const backUpPreviewsrc = item.querySelector('.preview').src;
 			const filenameEl = item.querySelector('.filename');
-			if (!previewImg || !filenameEl) return;
-			openPreview(previewImg.src, filenameEl.textContent.trim());
+
+			if (!previewPath || !filenameEl) return;
+			openPreview(previewPath, backUpPreviewsrc, filenameEl.textContent.trim(), typeModal);
 			});
 		});
 

@@ -498,7 +498,7 @@ body{
   background: rgba(255, 255, 255, 0.2);
 }
 
-#modalImage {
+#modalImage, #modalVideo {
   max-width: 100%;
   max-height: 70vh;
   border-radius: 8px;

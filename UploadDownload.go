@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type DownloadFileDir struct {
+type FileFolderInfo struct {
 	Name string
 	Path string
 	IsDir bool
@@ -396,14 +396,8 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(path, "downloader.css") {
 			return
 		}
-		pathSplit := strings.Split(path, "/")
 
-		var dirPath string
-		if len(pathSplit) > 2 {
-			dirPath = filepath.Join(append([]string{UploadedFilesDirName}, pathSplit[2:]...)...)
-		} else {
-			dirPath = UploadedFilesDirName + "/."
-		}
+		dirPath := urlPathToFile(path)
 
 		info,err := os.Stat(dirPath)
 		if err != nil {
@@ -415,13 +409,14 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 
 		if info.IsDir() {
 			d := struct{
-				Files []DownloadFileDir
+				Files []FileFolderInfo
 				IsRoot bool
 				BackPath string
 			}{}
 			if path == "/Files/" {
 				d.IsRoot = true
 			} else {
+				pathSplit := strings.Split(path, "/")
 				if len(pathSplit) < 2 {
 					d.BackPath = "/"
 				} else {
@@ -429,46 +424,11 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			Extensions := map[string][]string{
-				"Images": []string{".jpg", ".jpeg", ".png", ".gif"},
-				"Videos": []string{".mp4", ".mkv", ".mov", ".webm"},
-				"Audio": []string{".mp3", ".wav"},
-			}
 
-			files,err := os.ReadDir(dirPath)
-			if err != nil {
+			d.Files = getItemsInPath(w, r, dirPath)
+			if d.Files == nil {
 				http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 				return
-			}
-
-
-			for _,file := range files {
-				var isImg bool
-				var isVid bool
-				var isAudio bool
-				for Type,ExtList := range Extensions {
-					for _,Ext := range ExtList {
-						if file.Name()[len(file.Name()) - len(Ext):] == Ext {
-							if Type == "Images" {
-								isImg = true
-							} else if Type == "Videos" {
-								isVid = true
-							} else if Type == "Audio" {
-								isAudio = true
-							}
-							break
-						}
-					}
-				}
-
-				d.Files = append(d.Files, DownloadFileDir{
-					Name: file.Name(),
-					Path: strings.Join([]string{path, file.Name()}, "/"),
-					IsDir: file.IsDir(),
-					IsImg: isImg,
-					IsAudio: isAudio,
-					IsVid: isVid,
-				})
 			}
 
 			tpl,err := template.ParseFiles("html/Downloader.html")
@@ -657,6 +617,123 @@ func search(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode results", http.StatusInternalServerError)
 		return
 	}
+}
+
+func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) []FileFolderInfo {
+	var Items []FileFolderInfo
+	var ArgNeeded struct{
+		UrlPath string `json:"urlPath"`
+	}
+	
+	var path string
+	if PathString == "" {
+		path = urlPathToFile(ArgNeeded.UrlPath)
+	} else {
+		path = PathString
+	}
+
+	FilesFolders, err := os.ReadDir(path)
+	if err != nil {
+		http.Error(w, "Could not read files from path", http.StatusBadRequest)
+		return nil
+	}
+	
+	for _,file := range FilesFolders {
+		isDir, isImg, isVid, isAudio := checkExtension(file.Name(), file.IsDir())
+
+		Items = append(Items, FileFolderInfo{
+			Name: file.Name(),
+			Path: FilePathToUrl(filepath.Join(path, file.Name())),
+			IsDir: isDir,
+			IsImg: isImg,
+			IsAudio: isAudio,
+			IsVid: isVid,
+		})
+	}
+
+	return Items
+}
+
+func getItemFromPath(w http.ResponseWriter, r *http.Request, PathString string) FileFolderInfo {
+	var Item FileFolderInfo
+	var ArgNeeded struct{
+		UrlPath string `json:"urlPath"`
+	}
+	
+	var path string
+	if PathString == "" {
+		path = urlPathToFile(ArgNeeded.UrlPath)
+	} else {
+		path = PathString
+	}
+
+	file, err := os.Stat(path)
+	if err != nil {
+		http.Error(w, "Could not read files from path", http.StatusBadRequest)
+		return FileFolderInfo{}
+	}
+	
+	isDir, isImg, isVid, isAudio := checkExtension(file.Name(), file.IsDir())
+
+	Item = FileFolderInfo{
+		Name: file.Name(),
+		Path: FilePathToUrl(strings.Join([]string{path, file.Name()}, "/")),
+		IsDir: isDir,
+		IsImg: isImg,
+		IsAudio: isAudio,
+		IsVid: isVid,
+	}
+
+	return Item
+}
+
+func checkExtension(fileName string, isDir bool) (bool, bool, bool, bool) {
+	Extensions := map[string][]string{
+		"Images": []string{".jpg", ".jpeg", ".png", ".gif"},
+		"Videos": []string{".mp4", ".mkv", ".mov", ".webm"},
+		"Audio": []string{".mp3", ".wav"},
+	}
+
+	var isImg bool
+	var isVid bool
+	var isAudio bool
+	if isDir {
+		return isDir, isImg, isVid, isAudio
+	} else {
+		for Type,ExtList := range Extensions {
+			for _,Ext := range ExtList {
+				if fileName[len(fileName) - len(Ext):] == Ext {
+					if Type == "Images" {
+						isImg = true
+					} else if Type == "Videos" {
+						isVid = true
+					} else if Type == "Audio" {
+						isAudio = true
+					}
+					break
+				}
+			}
+		}
+		return isDir, isImg, isVid, isAudio
+	}
+}
+
+func urlPathToFile(urlPath string) string {
+	pathSplit := strings.Split(urlPath, "/")
+
+	var finalPath string
+	if len(pathSplit) > 2 {
+		finalPath = filepath.Join(append([]string{UploadedFilesDirName}, pathSplit[2:]...)...)
+	} else {
+		finalPath = UploadedFilesDirName + "/."
+	}
+	return finalPath
+}
+
+func FilePathToUrl(filePath string) string {
+	pathSplit := strings.Split(filePath, "/")
+	finalPath := "/Files/" + strings.Join(pathSplit[1:], "/")
+	return finalPath
 }
 
 func searchFileFolder(path string, query string) []string {
