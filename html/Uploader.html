@@ -3,6 +3,7 @@
     <title>Upload</title>
     <link rel="icon" href="https://i.ibb.co/fYVMHYdf/unavngivet.png" type="image/png">
     <link rel="stylesheet" href="style.css">
+    <script src="/script.js"></script> 
     <script>
         function listFiles() {
             const fileInput = document.getElementById('file-input');
@@ -14,21 +15,8 @@
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 let size = file.size;
+		size = byteConverter(size)
 
-                if (size > 1000000000) {
-                    size = size / (1000 * 1000 * 1000);
-                    size = Math.round(size).toString() + ' GB';
-                } else if (size > 1000000) {
-                    size = size / (1000 * 1000);
-                    size = Math.round(size).toString() + ' MB';
-                } else if (size > 1000) {
-                    size = size / 1000;
-                    size = Math.round(size).toString() + ' KB';
-                } else {
-                    size = size.toString() + ' bytes';
-                }
-
-                console.log(file);
                 const elem = document.createElement('span');
                 elem.className = 'file-item';
                 elem.innerText = file.name + ' ' + size;

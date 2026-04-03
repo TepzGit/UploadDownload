@@ -1,4 +1,3 @@
-
 function makeFolder() {
 	const Items = document.querySelector(".items")
 	item = document.createElement("div")
@@ -73,6 +72,22 @@ function checkFileType(fileName) {
 	return { isImg, isVid, isAudio }
 }
 
+function byteConverter(size) {
+	if (size > 1000000000) {
+	    size = size / (1000 * 1000 * 1000);
+	    size = Math.round(size).toString() + ' GB';
+	} else if (size > 1000000) {
+	    size = size / (1000 * 1000);
+	    size = Math.round(size).toString() + ' MB';
+	} else if (size > 1000) {
+	    size = size / 1000;
+	    size = Math.round(size).toString() + ' KB';
+	} else {
+	    size = size.toString() + ' bytes';
+	}
+	return size
+}
+
 async function searchFiles(searchInput) {
 	const value = searchInput.value
 	const res = await fetch(`/search?q=${encodeURIComponent(value)}&path=${window.location.pathname}`)
@@ -81,13 +96,10 @@ async function searchFiles(searchInput) {
 		const itemsresult = document.querySelector("#itemsresults")
 		
 		itemsresult.innerHTML = ""
-		console.log(results)
 
 		for (i=0;i<results.length;i++) {
-			let path = results[i]
-			filename = path.split("/")
-			filename = filename[filename.length - 1]
-			let source = ""
+			let entrie = results[i]
+			path = entrie.Path
 			svg = ""
 			
 			folderSVG = `
@@ -123,29 +135,41 @@ async function searchFiles(searchInput) {
 			</a>
 			`
 
-			const { isImg, isVid, isAudio } = checkFileType(filename)
-			if (isImg) {
+			let source = ""
+			if (entrie.IsImg) {
 				source = path
 				svg = otherSVG
-			} else if (isVid) {
+			} else if (entrie.IsVid) {
 				source = "/videoIcon.png"
 				svg = otherSVG
-
-			} else if (isAudio) {
+			} else if (entrie.IsAudio) {
 				source = "/audioIcon.png"
 				svg = otherSVG
-
-			} else {
+			} else if (entrie.IsDir){
 				source = "/foldericon.png"
 				svg = folderSVG
+			} else {
+				source = "/NoPreview.png"
+				svg = otherSVG
 			}
+
+			filename = entrie.Name
+			size = entrie.Size
+
+			const dateObj = new Date(entrie.Date)
+			date = String(dateObj.getDate()).padStart(2, "0") + "/" + String(dateObj.getMonth()).padStart(2, "0") + "/" + String(dateObj.getFullYear())
 			
 			item = document.createElement("div")
 			
 			item.innerHTML = `
 			<div class="item">
 			<img class="preview" src="${source}" alt="no preview available because the file is not an image">
-			<span class="filename">${filename}</span>
+
+			<div class="fileinfo" >
+				<span class="filename">${filename}</span>
+				<span class="uploadtime">${date}</span>
+				<span class="filesize">${byteConverter(size)}</span>
+			</div>
 			
 			${svg}
 

@@ -23,6 +23,8 @@ type FileFolderInfo struct {
 	IsImg bool
 	IsAudio bool
 	IsVid bool
+	Size int
+	Date time.Time
 }
 
 type MakeFolderData struct {
@@ -597,18 +599,11 @@ func search(w http.ResponseWriter, r *http.Request) {
 		finalPath = UploadedFilesDirName + "/."
 	}
 	
-	var results []string
+	var results []FileFolderInfo
 	if query != "" {
 		results = searchFileFolder(finalPath, query)
 	} else {
-		entries,_ := os.ReadDir(finalPath)
-		for _,entrie := range entries {
-			path := filepath.Join(finalPath, entrie.Name())
-			pathSplit = strings.Split(path, "/")
-			path = "/Files/" + strings.Join(pathSplit[1:], "/")
-
-			results = append(results, path)
-		}
+		results = append(results, getItemsInPath(w,r, finalPath)...)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -641,13 +636,20 @@ func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) [
 	for _,file := range FilesFolders {
 		isDir, isImg, isVid, isAudio := checkExtension(file.Name(), file.IsDir())
 
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
 		Items = append(Items, FileFolderInfo{
-			Name: file.Name(),
-			Path: FilePathToUrl(filepath.Join(path, file.Name())),
+			Name: info.Name(),
+			Path: FilePathToUrl(filepath.Join(path, info.Name())),
 			IsDir: isDir,
 			IsImg: isImg,
 			IsAudio: isAudio,
 			IsVid: isVid,
+			Size: int(info.Size()),
+			Date: info.ModTime(),
 		})
 	}
 
@@ -736,8 +738,8 @@ func FilePathToUrl(filePath string) string {
 	return finalPath
 }
 
-func searchFileFolder(path string, query string) []string {
-	var results []string
+func searchFileFolder(path string, query string) []FileFolderInfo {
+	var results []FileFolderInfo
 	entries,_ := os.ReadDir(path)
 	
 	for _, entry := range entries {
@@ -752,8 +754,18 @@ func searchFileFolder(path string, query string) []string {
 					continue
 				}
 
-				publicPath := "/Files/" + relPath
-				results = append(results, publicPath)
+				info, err := entry.Info()
+				if err != nil {
+					continue
+				}
+				var d FileFolderInfo
+				d.Name = info.Name()
+				d.IsDir, d.IsImg, d.IsVid, d.IsAudio = checkExtension(info.Name(), false)
+				d.Path = "/Files/" + relPath 
+				d.Size = int(info.Size())
+				d.Date = info.ModTime()
+			
+				results = append(results, d)
 			}
 		}
 	}

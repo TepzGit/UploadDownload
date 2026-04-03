@@ -4,9 +4,6 @@
 		<link rel="icon" href="https://i.ibb.co/fYVMHYdf/unavngivet.png" type="image/png">
         <link rel="stylesheet" href="/downloader.css">
 	 <script src="/script.js"></script> 
-        <style>
-        </style>
-
     </head>
     <body>
 		<div class="page-bg"></div>
@@ -52,8 +49,10 @@
 					{{end}}
 					<div class="fileinfo" >
 						<span class="filename">{{.Name}}</span>
-						<span class="uploadtime">23/04/08</span>
-						<span class="filesize">420kb</span>
+						{{if not .IsDir}}
+						<span class="uploadtime">{{.Date.Format "02/01/2006"}}</span>
+						<span class="filesize"><script>document.write(byteConverter({{.Size}}))</script></span>
+						{{end}}
 					</div>
 					{{if not .IsDir}}
 					<a class="down" href="{{.Path}}"
@@ -212,8 +211,8 @@
 				modalImage.src = src;
 				modalImage.alt = fileName;
 			} else {
-				modalVideo.style.visibility = "hidden"
-				modalImage.style.visibility = "visible"
+				modalVideo.style.display = "hidden"
+				modalImage.style.display = "inline-block"
 				modalImage.src = backUpPreviewsrc;
 				modalImage.alt = fileName;
 			}
