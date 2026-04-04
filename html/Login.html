@@ -1,39 +1,136 @@
 <!DOCTYPE html>
 <html>
     <head>
-
-        <title></title>
-        <meta name="description" content="">
+        <title>Clock & Weather</title>
+        <meta name="description" content="Clock and weather dashboard with hidden password input.">
         <link rel="stylesheet" href="Login.css">
-
     </head>
     <body>
         <div class="container">
-		<input class="inputt" type="password" name="password" value="" placeholder="Wanna try?">
+            <div class="widget-card">
+                <div class="clock-card" id="clockWidget" tabindex="0">
+                    <div class="clock-title">Current Time</div>
+                    <div class="time" id="timeDisplay">--:--:--</div>
+                    <div class="date" id="dateDisplay">Loading date...</div>
+                    <div class="password-entry" id="passwordEntry">
+                        <input class="password-input" id="passwordInput" type="password" placeholder="Enter password" aria-label="Password">
+                        <div class="password-hint">Press Enter to submit</div>
+                        <div class="password-error" id="passwordError"></div>
+                    </div>
+                </div>
+
+                <div class="weather-card" id="weatherWidget">
+                    <div class="weather-title">Weather</div>
+                    <div class="weather-location" id="weatherLocation">Copenhagen, DK</div>
+                    <div class="weather-temp" id="weatherTemp">--°</div>
+                    <div class="weather-condition" id="weatherCondition">Loading weather…</div>
+                    <div class="weather-wind" id="weatherWind">Wind: -- m/s</div>
+                </div>
+            </div>
         </div>
+
+        <script>
+            const timeDisplay = document.getElementById('timeDisplay')
+            const dateDisplay = document.getElementById('dateDisplay')
+            const clockWidget = document.getElementById('clockWidget')
+            const passwordEntry = document.getElementById('passwordEntry')
+            const passwordInput = document.getElementById('passwordInput')
+            const passwordError = document.getElementById('passwordError')
+            const weatherLocation = document.getElementById('weatherLocation')
+            const weatherTemp = document.getElementById('weatherTemp')
+            const weatherCondition = document.getElementById('weatherCondition')
+
+            function updateClock() {
+                const now = new Date()
+                const hours = String(now.getHours()).padStart(2, '0')
+                const minutes = String(now.getMinutes()).padStart(2, '0')
+                const seconds = String(now.getSeconds()).padStart(2, '0')
+                timeDisplay.textContent = `${hours}:${minutes}:${seconds}`
+                dateDisplay.textContent = now.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                })
+            }
+
+            function togglePasswordInput() {
+                passwordEntry.classList.toggle('visible')
+                if (passwordEntry.classList.contains('visible')) {
+                    passwordInput.focus()
+                }
+            }
+
+            async function submitPassword() {
+                passwordError.textContent = ''
+                const password = passwordInput.value.trim()
+                if (!password) {
+                    passwordError.textContent = 'Password cannot be empty.'
+                    return
+                }
+
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password })
+                })
+
+                if (!res.ok) {
+                    passwordError.textContent = 'Incorrect password. Try again.'
+                } else {
+                    window.location.href = '/Files'
+                }
+            }
+
+            function handleWeatherError(message) {
+                weatherLocation.textContent = message
+                weatherTemp.textContent = '--°'
+                weatherCondition.textContent = 'Unable to fetch weather.'
+                weatherWind.textContent = 'Wind: -- m/s'
+            }
+
+            async function fetchWeather(latitude, longitude) {
+                try {
+                    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=celsius&windspeed_unit=ms`)
+                    if (!response.ok) {
+                        throw new Error('Weather API error')
+                    }
+                    const data = await response.json()
+                    const weather = data.current_weather
+                    if (!weather) {
+                        throw new Error('No weather data')
+                    }
+                    weatherTemp.textContent = `${Math.round(weather.temperature)}°C`
+                    weatherCondition.textContent = `${weather.weathercode === 0 ? 'Clear' : 'Cloudy / Windy'}`
+                    weatherWind.textContent = `Wind: ${weather.windspeed.toFixed(1)} m/s`
+                } catch (error) {
+                    handleWeatherError('Unable to load weather')
+                }
+            }
+
+            function loadWeather() {
+                weatherLocation.textContent = 'Copenhagen, DK'
+                fetchWeather(55.6761, 12.5683)
+            }
+
+            clockWidget.addEventListener('click', togglePasswordInput)
+            clockWidget.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    togglePasswordInput()
+                    event.preventDefault()
+                }
+            })
+
+            passwordInput.addEventListener('keydown', async (event) => {
+                if (event.key === 'Enter') {
+                    await submitPassword()
+                }
+            })
+
+            updateClock()
+            setInterval(updateClock, 1000)
+            loadWeather()
+        </script>
     </body>
-	
-    <script>
-	    	const input = document.querySelector(".inputt")
-
-		input.addEventListener("keydown", async (e) => {
-			if (e.key === "Enter") {
-				const res = await fetch('/login', {
-					method: "POST",
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({
-						password: input.value,
-					})
-				})
-
-				if (!res.ok) {
-					console.log("Wrong password")
-				} else {
-					window.location.href = "/Files";
-				}
-			}
-		})
-    </script>
-</html>

@@ -73,14 +73,15 @@ function checkFileType(fileName) {
 }
 
 function byteConverter(size) {
+	divider = 1024
 	if (size > 1000000000) {
-	    size = size / (1000 * 1000 * 1000);
+	    size = size / (divider * divider * divider);
 	    size = Math.round(size).toString() + ' GB';
 	} else if (size > 1000000) {
-	    size = size / (1000 * 1000);
+	    size = size / (divider * divider);
 	    size = Math.round(size).toString() + ' MB';
 	} else if (size > 1000) {
-	    size = size / 1000;
+	    size = size / divider;
 	    size = Math.round(size).toString() + ' KB';
 	} else {
 	    size = size.toString() + ' bytes';

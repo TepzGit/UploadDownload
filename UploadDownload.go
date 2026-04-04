@@ -236,6 +236,8 @@ func main() {
 	http.HandleFunc("/login", LoginData)
 	http.HandleFunc("/Files/", requireLogin(Downloader))
 	http.HandleFunc("/Uploader", requireLogin(Uploader))
+	http.HandleFunc("/journal", requireLogin(Journal))
+
 	http.HandleFunc("/upload", requireLogin(GetUploadData))
 	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
 	http.HandleFunc("/getFolders", requireLogin(getFolders))
@@ -248,21 +250,20 @@ func main() {
 //		fmt.Fprint(w, styleCSS)
 //	})
 
-	http.HandleFunc("/downloader.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "css/downloader.css")
-	})
-
-	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "css/style.css")
-	})
-
-	http.HandleFunc("/Login.css", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "css/Login.css")
-	})
 
 	http.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "js/script.js")
 	})
+
+	css,_ := os.ReadDir("css")
+	for _,stylefile := range css {
+		cssName := stylefile.Name()
+		name := cssName
+
+		http.HandleFunc("/" + name, func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "css/" + name)
+		})
+	}
 
 	assets,_ := os.ReadDir("assets")
 	for _,asset := range assets {
@@ -294,6 +295,21 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+func Journal(w http.ResponseWriter, r *http.Request) {
+	tpl,err := template.ParseFiles("html/Journal.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	err = tpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+}
+
 
 func LoginData(w http.ResponseWriter, r *http.Request) {
 	var password struct{
@@ -404,7 +420,10 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		info,err := os.Stat(dirPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				http.Error(w, "Cant find folder/file", http.StatusBadRequest)
+				http.Error(w, "Cant find folder/file, it dosent exit", http.StatusBadRequest)
+				return
+			} else {
+				http.Error(w, "Something went wrong when trying to find the folder", http.StatusBadRequest)
 				return
 			}
 		}
@@ -427,8 +446,8 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			}
 
 
-			d.Files = getItemsInPath(w, r, dirPath)
-			if d.Files == nil {
+			d.Files,err = getItemsInPath(w, r, dirPath)
+			if err != nil {
 				http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 				return
 			}
@@ -603,7 +622,12 @@ func search(w http.ResponseWriter, r *http.Request) {
 	if query != "" {
 		results = searchFileFolder(finalPath, query)
 	} else {
-		results = append(results, getItemsInPath(w,r, finalPath)...)
+		FileFolders,err := getItemsInPath(w,r, finalPath)
+		if err != nil {
+			http.Error(w, "Cant find folder/file", http.StatusBadRequest)
+			return
+		}
+		results = append(results, FileFolders...)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -614,7 +638,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) []FileFolderInfo {
+func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) ([]FileFolderInfo, error) {
 	var Items []FileFolderInfo
 	var ArgNeeded struct{
 		UrlPath string `json:"urlPath"`
@@ -630,7 +654,7 @@ func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) [
 	FilesFolders, err := os.ReadDir(path)
 	if err != nil {
 		http.Error(w, "Could not read files from path", http.StatusBadRequest)
-		return nil
+		return Items, fmt.Errorf("Could not read files from path")
 	}
 	
 	for _,file := range FilesFolders {
@@ -653,7 +677,7 @@ func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) [
 		})
 	}
 
-	return Items
+	return Items, nil
 }
 
 func getItemFromPath(w http.ResponseWriter, r *http.Request, PathString string) FileFolderInfo {

@@ -1,36 +1,162 @@
-body{
-
-    background-color: black;
-    background-image: url("https://i.pinimg.com/736x/bb/9e/69/bb9e69e54561d73e117d680eb1d5b3a0.jpg");
-    background-size: 679px 978px;
-    background-repeat: no-repeat;
-    background-position-x: right ;
-    background-blend-mode:luminosity;
-
-
-} 
-.inputt{
-    font-family:Georgia, 'Times New Roman', Times, serif;
-    background-color: black;
-    color: rgba(255, 255, 255, 0.382);
-    margin: auto;
-    height: 50px;
-    width: 300px;
-    text-align: center;
-    font-size: 25px;
-    border: 1px solid rgba(255, 255, 255, 0.119);
-    border-radius: 5px;
-
+@font-face {
+    font-family: 'nerd';
+    src: url('/JetBrainsMono-Regular.ttf') format('truetype');
 }
 
-
-.container{
-
+body {
+    margin: 0;
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 90vh;
+    background: #000;
+    color: #f5f5f5;
+    font-family: nerd, sans-serif ;
+}
 
+
+
+.container {
+    width: 100%;
+    max-width: 560px;
+    padding: 24px;
+}
+
+.widget-card {
+    display: grid;
+    gap: 18px;
+}
+
+.clock-card,
+.weather-card {
+    background: rgba(10, 10, 10, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 28px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 28px 80px rgba(0, 0, 0, 0.55);
+    padding: 28px;
+}
+
+.clock-card {
+    cursor: pointer;
+    transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.clock-card:hover,
+.clock-card:focus-within {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 32px 96px rgba(0, 0, 0, 0.55);
+}
+
+.clock-title,
+.weather-title {
+    font-size: 0.82rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    opacity: 0.66;
+    margin-bottom: 12px;
+    color: #dcdcdc;
+}
+
+.time {
+    font-size: clamp(3rem, 5vw, 5rem);
+    line-height: 0.92;
+    font-weight: 800;
+    color: #ffffff;
+    text-shadow: 0 0 16px rgba(255, 255, 255, 0.14);
+}
+
+.date,
+.weather-location,
+.weather-condition,
+.password-hint,
+.password-error {
+    margin-top: 12px;
+    opacity: 0.82;
+    font-size: 0.96rem;
+}
+
+.date,
+.weather-location {
+    color: #f5f5f5;
+}
+
+.weather-condition,
+.password-hint {
+    color: #bdbdbd;
+}
+
+.password-entry {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.32s ease, max-height 0.32s ease, margin-top 0.32s ease;
+}
+
+.password-entry.visible {
+    opacity: 1;
+    max-height: 180px;
+    margin-top: 20px;
+}
+
+.password-input {
+    width: auto;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 16px;
+    background: rgba(18, 18, 18, 0.95);
+    color: #ffffff;
+    padding: 16px 20px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.password-input::placeholder {
+    color: rgba(255, 255, 255, 0.36);
+}
+
+.password-input:focus {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(26, 26, 26, 0.98);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+.password-hint {
+    font-size: 0.92rem;
+    color: rgba(255, 255, 255, 0.48);
+}
+
+.password-error {
+    color: #ff6f87;
+}
+
+.weather-card {
+    display: grid;
+    gap: 14px;
+}
+
+.weather-temp {
+    font-size: clamp(2.4rem, 4vw, 3.4rem);
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.weather-location {
+    font-weight: 600;
+}
+
+.weather-condition {
+    color: rgba(255, 255, 255, 0.78);
+}
+
+.weather-wind {
+    color: rgba(255, 255, 255, 0.82);
+}
+
+@media (max-width: 520px) {
+    .container {
+        padding: 16px;
+    }
 }
 
 
