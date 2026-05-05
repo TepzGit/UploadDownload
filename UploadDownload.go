@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,23 +41,25 @@ var tpl *template.Template
 
 
 func main() {
-
 	tpl = template.New("root")
+	tpl.New("Upload")
 	
 	StartCookieCleaner()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/Files", http.StatusSeeOther)
+			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
 	})
 
-	http.HandleFunc("/Login", Login)
+	http.HandleFunc("/Main", Main)
 	http.HandleFunc("/login", LoginData)
 	http.HandleFunc("/Files/", requireLogin(Downloader))
 	http.HandleFunc("/Uploader", requireLogin(Uploader))
 	http.HandleFunc("/journal", requireLogin(Journal))
+	http.HandleFunc("/journal/Drug", requireLogin(DrugInfo))
+	http.HandleFunc("/sub", requireLogin(Substance))
 
 	http.HandleFunc("/upload", requireLogin(GetUploadData))
 	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
@@ -103,8 +104,35 @@ func main() {
         http.ListenAndServe("0.0.0.0:" + strconv.Itoa(port), nil)
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
-	tpl,err := template.ParseFiles("html/Login.html")
+func Main(w http.ResponseWriter, r *http.Request) {
+	SessionId, err := r.Cookie("SessionID")
+
+	d := struct{
+		Login bool
+	}{}
+
+	if err == nil && SessionId != nil {
+		_, ok := cookies[SessionId.Value]
+		if ok {
+			d.Login = true	
+		}
+	}
+
+	tpl,err := template.ParseFiles("html/Main.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	err = tpl.Execute(w, d)
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+}
+
+func Substance(w http.ResponseWriter, r*http.Request) {
+	tpl,err := template.ParseFiles("html/sub.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -132,6 +160,19 @@ func Journal(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func DrugInfo(w http.ResponseWriter, r *http.Request) {
+	tpl,err := template.ParseFiles("html/DruginfoPage.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	err = tpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+}
 
 func LoginData(w http.ResponseWriter, r *http.Request) {
 	var password struct{
@@ -177,13 +218,13 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		SessionId, err := r.Cookie("SessionID")
 		if err != nil || SessionId == nil {
-			http.Redirect(w, r, "/Login", http.StatusSeeOther)
+			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
 
 		// check if session exists in your map
 		if _, ok := cookies[SessionId.Value]; !ok {
-			http.Redirect(w, r, "/Login", http.StatusSeeOther)
+			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
 
@@ -191,6 +232,7 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
 
 func StartCookieCleaner() {
 	go func() {
@@ -227,8 +269,6 @@ func RandomCharacters() string {
 
 func Downloader(w http.ResponseWriter, r *http.Request) {
 		//fs := http.FileServer(http.Dir("."))
-		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		fmt.Println("Client IP:", ip, "requested", r.URL.Path)
 
 		path := r.URL.Path
 		path = strings.TrimSuffix(path, "/")
@@ -293,8 +333,6 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 }
 
 func Uploader(w http.ResponseWriter, r *http.Request) {
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	fmt.Println("Client IP:", ip, "requested", r.URL.Path)
 
 	//tpl.ExecuteTemplate(w, "Upload", nil)
 
@@ -312,8 +350,6 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUploadData(w http.ResponseWriter, r *http.Request) {
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	fmt.Println("Client IP:", ip, "requested", r.URL.Path)
 	
 	err := r.ParseMultipartForm(20 << 20)
 	if err != nil {

@@ -34,7 +34,7 @@ function makeFolder() {
 				},
 				body: JSON.stringify({
 					name: filename.innerText,
-					path: window.location.pathname
+					path: decodeURIComponent(window.location.pathname)
 				})
 			})
 			if (!res.ok) {

@@ -5,3 +5,23 @@ body{
 
 }
 
+.Sub{
+    color: white;
+    font-size: 20px;
+    border: 1px solid white;
+    padding: 10px 20px;
+    cursor: pointer;
+    display: inline-block;
+    margin-top: 20px;
+}
+
+.Drugs {
+	display:flex;
+	flex-direction: column;
+	
+}
+
+.Drug {
+	color: white;
+	border: solid 1px white
+}

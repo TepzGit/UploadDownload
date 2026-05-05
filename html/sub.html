@@ -1,0 +1,341 @@
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Substance</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/sub.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    </head>
+    <body>
+
+            <div class="doselist">
+                <div class="titlecon">
+  
+                    <h2 class="dosetitle">Doses:</h2>
+                    
+                </div> 
+                
+                <div class="doses">
+
+                    <label class="dose">pregabalin 300mg</label><label class="dose">pregabalin 300mg</label><label class="dose">pregabalin 300mg</label>
+
+                </div> 
+            </div>
+           <div id="app">
+            <h2 class="title" >Substance Timeline</h2>
+
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input id="input" placeholder="Enter substance (e.g. lsd)" >
+                <button class="searchbtn" onclick="search()">Search</button>
+            </div>
+
+            <div id="dosePanel" >
+                <input id="doseInput" placeholder="Dose (e.g. 300)">
+                <input id="doseStartHour" placeholder="Start hour (e.g. 17)" >
+                <button class="addbtn" onclick="addDose()">Add Dose</button>
+                <button class="resetbtn"  onclick="resetGraph()">Reset</button>
+            </div>
+
+            <p id="status" ></p>
+
+            <div id="multiplierInfo">
+                <h3 class="titlee">Dose Multipliers</h3>
+                <div id="multiplierList" ></div>
+            </div>
+            <div id="myPlot" ></div>
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <div class="bottombar" >
+                <button class="btn" onclick="downloadChart()">Save Data</button>
+                <button class="btn" onclick="addDose()">Back</button>
+            </div>
+        </div>
+
+        <script>
+        let chart;
+        let currentSubstance = null;
+        let currentCommonDose = null;
+        let addedDosesX = []; // Array of {dose, startHour, multiplier}
+        let addedDosesY = []; // Array of {dose, startHour, multiplier}
+
+
+        function fetchGraphQL(query) {
+            const url = "https://api.psychonautwiki.org";
+            return fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query })
+            }).then(r => r.json());
+        }
+
+        async function getData(substanceName) {
+            const query = `
+            {
+                substances(query: "${substanceName}") {
+                    name
+                    roas {
+                        duration {
+                            onset { min units }
+                            comeup { min units }
+                            peak { min units }
+                            offset { min units }
+                        }
+                        dose {
+                            common {
+                                min
+                            }
+                        }
+                    }
+                }
+            }`;
+            return fetchGraphQL(query);
+        }
+
+	function DurationsIntoHour(duration) {
+		if (duration.units == "minutes") {
+			return duration.min / 60
+		} else {
+			return duration.min
+		}
+	}
+
+    var substanceNameI = ""
+
+	let onset = 0
+	let comeup = 0
+	let peak = 0
+	let offset = 0
+
+        async function search() {
+            const substanceName = document.getElementById("input").value.trim();
+            const status = document.getElementById("status");
+
+            if (!substanceName) return;
+
+            status.textContent = "Loading...";
+            const result = await getData(substanceName);
+            console.log("RAW RESPONSE:", result);
+
+            const substance = result?.data?.substances?.[0];
+            if (!substance) {
+                status.textContent = "No data found.";
+                return;
+            }
+
+            const duration = substance.roas?.[0]?.duration;
+            const dosage = substance.roas?.[0]?.dose;
+            substanceNameI = substance.name
+            
+            if (!duration) {
+                status.textContent = "No duration data.";
+                return;
+            }
+
+            const commonDose = dosage?.common?.min;
+            if (!commonDose) {
+                status.textContent = "No common dose data found for this substance.";
+                return;
+            }
+
+            currentSubstance = substance;
+            currentCommonDose = commonDose;
+            addedDoses = [];
+
+            onset = DurationsIntoHour(duration.onset)
+            comeup = DurationsIntoHour(duration.comeup)
+            peak = DurationsIntoHour(duration.peak)
+            offset = DurationsIntoHour(duration.peak)
+
+            status.textContent = `Loaded: ${substance.name} (common dose: ${commonDose})`;
+            document.getElementById("dosePanel").style.display = "flex";
+            document.getElementById("multiplierInfo").style.display = "none";
+            
+            if (chart) chart.destroy();
+        }
+
+	function DurationsIntoPoints(steps = 10) {
+		points = []
+		
+
+		doseStartHour = document.querySelector("#doseStartHour").value
+
+		let currentX = 0
+		if (doseStartHour != "") {
+			currentX = parseFloat(doseStartHour)
+		} else {
+			let now = new Date()
+			currentX = now.getHours() + now.getMinutes() / 60
+		}
+
+        xPoints = []
+        yPoints = []
+		
+		for (i=1;i<=steps;i++) {
+            xPoints.push(currentX + (onset/steps)*i)
+            yPoints.push(0)
+		}
+		currentX += onset
+
+		for (i=1;i<=steps;i++) {
+            xPoints.push(currentX + (comeup/steps)*i)
+            yPoints.push((100/steps)*i)
+		}
+		currentX += comeup
+
+		for (i=1;i<=steps;i++) {
+            xPoints.push(currentX + (peak/steps)*i)
+            yPoints.push(100)
+		}
+		currentX += peak
+
+		for (i=1;i<=steps;i++) {
+			points.push({x: currentX + (offset/steps)*i, y:100-(100/steps)*i})
+            xPoints.push(currentX + (offset/steps)*i)
+            yPoints.push(100-(100/steps)*i)
+		}
+
+		return {xPoints: xPoints, yPoints: yPoints}
+	}
+
+	
+	function addDose() {
+		let {xPoints, yPoints} = DurationsIntoPoints()
+		addedDosesX.push(xPoints)
+		addedDosesY.push(yPoints)
+
+		if (chart) {
+			chart.destroy();
+		}
+		drawChart()
+	}
+	
+    
+	// Points format [{x:0, y: 0}, {x:1, y:1}]
+	function drawChart() {
+        var allX = Array.from(new Set(addedDosesX.flat()));
+
+        function interpolate(xArr, yArr, x) {
+            if (xArr.includes(x)) {
+                return yArr[xArr.indexOf(x)];
+            }
+
+            for (let i = 0; i < xArr.length - 1; i++) {
+                if (x > xArr[i] && x < xArr[i + 1]) {
+                    let slope = (yArr[i + 1] - yArr[i]) / (xArr[i + 1] - xArr[i]);
+                    return yArr[i] + slope * (x - xArr[i]);
+                }
+            }
+
+            return 0;
+        }
+
+        // Step 3: Compute combined Y-values
+        var combinedY = allX.map(x => {
+            let total = 0;
+
+            for (let i = 0; i < addedDosesX.length; i++) {
+                total += interpolate(addedDosesX[i], addedDosesY[i], x);
+            }
+
+            return total;y
+        });
+
+        let minX = Math.floor(Math.min(...allX));
+        let maxX = Math.ceil(Math.max(...allX));
+        let tickVals = [];
+        for (let h = minX; h <= maxX; h++) {
+            tickVals.push(h);
+        }
+
+        let tickText = tickVals.map(x => {
+            let wrapped = x % 24;
+            let hour = Math.floor(wrapped);
+            let min = Math.round((wrapped - hour) * 60);
+            return hour.toString().padStart(2,'0') + ':' + min.toString().padStart(2,'0');
+        });
+
+
+        // Step 4: Plot
+        var trace = {
+            x: allX,
+            y: combinedY,
+            mode: 'lines+markers',
+            type: 'scatter',
+            name: 'Combined Y-values',
+        
+            line: {
+                
+                color: 'rgb(107, 51, 150)',
+                width: 3,
+                dash: 'solid'
+            },
+             marker: {
+                size: 1,
+                color: 'rgb(139, 71, 192)',
+                opacity: 0.5,
+                symbol: 'circle' // square, diamond, cross, etc.
+               
+            },
+            fill: 'tozeroy', // key for filling graph
+            fillcolor: 'rgb(139, 71, 192)', // fill color with transparency
+            
+        };
+        var layout = {
+            title: 'Time',
+            
+            yaxis: { title: 'Intensity' },
+            xaxis: {
+                title: 'Time',
+                tickmode: 'array',
+                tickvals: tickVals,
+                ticktext: tickText
+            },
+            
+            font: {
+                family: 'Arial',
+                size: 12,
+                color: '#fff'
+            },
+
+            paper_bgcolor: '#0a0a0a',
+            plot_bgcolor: '#0a0a0a',
+             
+        };
+        Plotly.newPlot('myPlot', [trace], layout, {modeBarButtonsToRemove: ['zoom2d', 'hoverClosestGl2d', 'hoverClosestPie', 'toggleSpikelines', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}), 
+        {
+            title: 'Combined Graph (Y-values summed)',
+        };
+	}
+    function downloadChart() {
+        data = {
+            DrugName: substanceNameI,
+            Date: "",
+            Doses: [],
+        }
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0'); // months are 0-indexed
+        const day = String(today.getDate()).padStart(2, '0');
+
+        data.Date = `${day}/${month}/${year}`;
+
+        for (let i=0;i<addedDosesX.length;i++) {
+            data.Doses.push({x: addedDosesX[i], y: addedDosesY[i]})
+        }
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${substanceNameI.replace(/\s+/g, "_")}_${day}-${month}-${year}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+    }
+        </script>
+
+    </body>
+</html>

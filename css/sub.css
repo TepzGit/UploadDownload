@@ -1,0 +1,238 @@
+body {
+	background: #000000;
+	font-family: nerd, sans-serif !important;
+}
+@font-face {
+    font-family: 'nerd';
+    src: url('/JetBrainsMono-Regular.ttf') format('truetype');
+}
+#multiplierInfo{
+				background: #2a2a2a;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 15px;
+                display: none;
+}              
+#status{
+font-size: 14px; opacity: 0.7;
+}
+
+
+
+
+@media (max-width: 768px) {
+	#app {
+		display: contents;
+	}
+
+}
+@media (max-width: 768px) {
+    #myPlot {
+		width: 100%!important;
+		height: 40%!important;
+	}
+
+}
+
+
+
+.resetbtn{
+padding:10px 15px;
+                    border:none;
+                    border-radius:8px;
+                    background-color: rgba(10, 10, 10, 0.98);
+					border: 1px solid #8b47c0;
+					box-shadow: 0px 0px 19px -6px #8b47c0;
+                    color:white;
+                    cursor:pointer;
+}                    
+                    
+
+.addbtn{
+                    padding:10px 15px;
+                    border:none;
+                    border-radius:8px;
+                    background-color: rgba(10, 10, 10, 0.98);
+					border: 1px solid #8b47c0;
+					box-shadow: 0px 0px 19px -6px #8b47c0;
+                    color:white;
+                    cursor:pointer;
+}
+#doseStartHour{
+	font-family: nerd, sans-serif ;
+	width:120px; 
+	padding:10px; 
+	border-radius:8px; 
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color:white; 
+	
+}
+#doseInput{
+	font-family: nerd, sans-serif ;
+	flex:1; 
+	padding:10px;
+	border-radius:8px; 
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color:white; 
+	
+}
+#dosePanel{
+	display:none; 
+	gap:10px; 
+	margin-bottom:15px;
+}
+#myPlot{
+
+	width:700px;
+	height:400px;
+}
+#multiplierList{
+	font-size: 14px; 
+	line-height: 1.8;
+}
+.titlee{
+	margin: 0 0 10px 0; color: #8b47c0;
+}
+.searchbtn{
+	font-family: nerd, sans-serif ;
+	padding:10px 15px;
+	border:none;
+	border-radius:8px;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid #8b47c0;
+	box-shadow: 0px 0px 19px -6px #8b47c0;
+	color:white;
+	cursor:pointer;
+}
+.title{
+	font-family: nerd, sans-serif ;
+		}
+
+#input{
+	font-family: nerd, sans-serif ;
+	flex:1;
+	padding:10px;
+	border-radius:8px;
+	border:none;
+	outline:none;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color:white;
+}
+.btn{
+	font-family: nerd, sans-serif ;
+	padding:10px;
+	border-radius:8px;
+	border:none;
+	outline:none;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color:white;
+}
+.bottombar{
+	display: space-between;
+     
+}
+
+#app{
+
+	max-width: 700px;
+	margin: 40px auto;
+	padding: 20px;
+	border-radius: 5px;
+	color: white;
+	font-family: nerd, sans-serif ;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+
+
+
+.doselist {
+  width: 15rem;
+  height: 20rem;
+  position: absolute;
+  left: 2rem;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.dose {
+  font-size: 15px;
+  color: white;
+  padding: 0.5rem;
+  overflow: hidden;
+}
+.dose::before {
+    content: "•";
+    margin-right: 8px;
+}
+.dosetitle {
+  font-size: large;
+  color: white;
+  margin: auto;
+    margin-top: auto;
+    margin-bottom: auto;
+  margin-top: auto;
+  margin-bottom: auto;
+  margin-bottom: 0px;
+  margin-top: 5px;
+  position: absolute;
+  top: -87px;
+  left: 35%;
+}
+.doses {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  height: 75%;
+}
+.titlecon{
+	position: relative;
+	height: 2rem;
+}
+
+@media (max-width: 768px) {
+  .doselist {
+    width: 100%;
+    height: 13rem;
+    position: absolute;
+    justify-content: center;
+	background: rgba(10, 10, 10, 0);
+    border: 1px solid rgba(255, 255, 255, 0);;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    bottom: 0rem;
+    left: 0rem;
+  }
+}
+@media (max-width: 768px) {
+	.dosetitle {
+		visibility: hidden;
+		}
+
+}
+
+@media (max-width: 768px) {
+	.bottombar {
+	display: grid;
+	}
+
+}
+@media (max-width: 768px) {
+	.btn {
+
+		height: 4rem;
+	}
+
+}

@@ -11,8 +11,24 @@
     <body>
         <h1>Journal</h1>
 
-        
+        <label class="Sub" onclick="window.location.pathname='/sub'">Substance</label>
+        <input type="text" placeholder="Search...">
+
+	<div class="Drugs">
+		<div class="Drug" data-drugname="LSD">lsd</div>
+		<div class="Drug" data-drugname="Pregabalin">pregabalin</div>
+	</div>
 
         <script src="" async defer></script>
     </body>
+
+    <script>
+	Drugs = document.querySelectorAll(".Drug")
+
+	Drugs.forEach(item => {
+		item.addEventListener("click", () => {
+			window.location.href = "/journal/Drug?drug=" + item.dataset.drugname
+		});
+	});
+    </script>
 </html>

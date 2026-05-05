@@ -13,8 +13,36 @@ body {
     color: #f5f5f5;
     font-family: nerd, sans-serif ;
 }
+.foldbut {
+  width: 100px;
+  font-family: nerd, sans-serif ;
+  display: inline-block;
+  position: relative;
+  padding: 10px 20px;
+  border-radius: 7px;
+  border: 1px solid #888;
+  font-size: 14px;
 
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd;
+  overflow: hidden;
+  box-shadow: 0 0 0 0 transparent;
+  -webkit-transition: all 0.2s ease-in;
+  -moz-transition: all 0.2s ease-in;
+  transition: all 0.2s ease-in;
+  cursor: pointer;
+  text-decoration: none
+}
 
+.foldbut:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
 
 .container {
     width: 100%;
