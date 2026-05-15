@@ -46,7 +46,14 @@ padding:10px 15px;
                     color:white;
                     cursor:pointer;
 }                    
-                    
+.resetbtn:hover {
+  background-color: rgba(17, 17, 17, 0.98);
+  box-shadow: 0px 0px 22px 0px #8b47c0;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+
+}
 
 .addbtn{
                     padding:10px 15px;
@@ -57,6 +64,14 @@ padding:10px 15px;
 					box-shadow: 0px 0px 19px -6px #8b47c0;
                     color:white;
                     cursor:pointer;
+}
+.addbtn:hover {
+  background-color: rgba(17, 17, 17, 0.98);
+  box-shadow: 0px 0px 22px 0px #8b47c0;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+
 }
 #doseStartHour{
 	font-family: nerd, sans-serif ;
@@ -105,6 +120,17 @@ padding:10px 15px;
 	box-shadow: 0px 0px 19px -6px #8b47c0;
 	color:white;
 	cursor:pointer;
+	-webkit-transition: all 0.2s ease-out;
+  	-moz-transition: all 0.2s ease-out;
+    transition: all 0.2s ease-out;
+}
+.searchbtn:hover {
+  background-color: rgba(17, 17, 17, 0.98);
+  box-shadow: 0px 0px 22px 0px #8b47c0;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+
 }
 .title{
 	font-family: nerd, sans-serif ;
@@ -130,7 +156,21 @@ padding:10px 15px;
 	background-color: rgba(10, 10, 10, 0.98);
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	color:white;
+	font-size: 0.9rem;
+	text-decoration: none;
+	-webkit-transition: all 0.2s ease-out;
+    -moz-transition: all 0.2s ease-out;
+    transition: all 0.2s ease-out;
 }
+.btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+
 .bottombar{
 	display: space-between;
      
@@ -235,4 +275,65 @@ padding:10px 15px;
 		height: 4rem;
 	}
 
+}
+
+#doses {
+  height: auto;
+  margin-bottom: 15px;
+  display: grid;
+  min-height: 7rem;
+  grid-gap: 7px;
+}
+
+#dose:hover .doseT {
+  opacity: 0%;
+}
+#dose:hover .close {
+  opacity: 100%;
+}
+#dose {
+  visibility: visible;
+  height: 2rem;
+  width: 80%;
+  text-align: center;
+  font-size: 18px;
+  padding: 0.3rem;
+  display: grid;
+  margin: auto;
+  align-content: center;
+  border-radius: 8px;
+  outline: none;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  align-content: center;
+  transition: opacity, background, color 0.3s ease;
+}
+
+#drugname {
+  color: #dbadff;
+}
+
+
+#drugdose {
+  color: #b372e5;
+  border-right: 1px solid #292929;
+  border-left: 1px solid #292929;
+}
+
+#consTime {
+  color: #a550e7;
+}
+
+#Close {
+  position: absolute;
+  align-self: center;
+  justify-self: center;
+  opacity: 0%;
+}
+.nick {
+  margin-right: 15px;
+  color: #ad7fff;
 }

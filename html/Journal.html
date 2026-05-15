@@ -9,26 +9,53 @@
         <link rel="stylesheet" href="/journal.css">
     </head>
     <body>
-        <h1>Journal</h1>
+        <div class="cont">
+            <div class="Header">
+                <h1 id="title">Journal</h1>
+                <label class="Sub" onclick="window.location.pathname='/sub'">Substance</label>
+            </div>
 
-        <label class="Sub" onclick="window.location.pathname='/sub'">Substance</label>
-        <input type="text" placeholder="Search...">
+            <input placeholder="Search..." id="search" type="text">
 
-	<div class="Drugs">
-		<div class="Drug" data-drugname="LSD">lsd</div>
-		<div class="Drug" data-drugname="Pregabalin">pregabalin</div>
-	</div>
+        <div class="Drugs">
+            
+            <div class="Drug" data-drugname="LSD">
+                <p class="drugname">LSD</p>  
+                <p class="nick" id="lucy" >Lucy</p>
+            </div>
+            
+            <div class="Drug" data-drugname="Pregabalin">
+                <p class="drugname">Pregabalin</p>  
+                <p class="nick" id="prrprr">PrrPrr</p>
+            </div>
 
-        <script src="" async defer></script>
-    </body>
+            <div class="Drug" data-drugname="Tramadol">
+                <p class="drugname">Tramadol</p>  
+                <p class="nick" id="dol">Dol</p>
+            </div>
 
-    <script>
-	Drugs = document.querySelectorAll(".Drug")
+            <div class="Drug" data-drugname="Lisdexamphetamine">
+                <p class="drugname">Lisdexamphetamine</p> 
+                <p class="nick" id="lisa">Lisa</p> 
+            </div>
+            <div class="bottombar" >
+              
+                <a class="btn" href="/">Back</a>
+            </div>
 
-	Drugs.forEach(item => {
-		item.addEventListener("click", () => {
-			window.location.href = "/journal/Drug?drug=" + item.dataset.drugname
-		});
-	});
-    </script>
+        </div>
+
+            <script src="" async="" defer=""></script>
+        
+
+        <script>
+        Drugs = document.querySelectorAll(".Drug")
+
+        Drugs.forEach(item => {
+            item.addEventListener("click", () => {
+                window.location.href = "/journal/Drug?drug=" + item.dataset.drugname
+            });
+        });
+        </script>
+        </div>
 </html>

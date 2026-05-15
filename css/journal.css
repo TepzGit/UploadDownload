@@ -1,27 +1,143 @@
-body{
-
-    background: black;
-
-
+body {
+	background: #000000;
+	font-family: nerd, sans-serif !important;
 }
-
+@font-face {
+    font-family: 'nerd';
+    src: url('/JetBrainsMono-Regular.ttf') format('truetype');
+}
+.cont {
+  width: 50%;
+  margin: 40px auto;
+  padding: 15px;
+  height: auto;
+  min-height: 10rem;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+}
+#title {
+  color: white;
+}
 .Sub{
     color: white;
-    font-size: 20px;
-    border: 1px solid white;
+    font-size: 18px;
     padding: 10px 20px;
     cursor: pointer;
-    display: inline-block;
     margin-top: 20px;
+    height: 1.5rem;
+    background-color: rgba(10, 10, 10, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border-radius: 5px;
+    -webkit-transition: all 0.2s ease-out;
+    -moz-transition: all 0.2s ease-out;
+    transition: all 0.2s ease-out;
+}
+
+.sub:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+
+#search {
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+  color: white;
+  margin: 5px 0px 15px;
+  height: 2rem;
+  padding: 0.3rem;
 }
 
 .Drugs {
 	display:flex;
 	flex-direction: column;
-	
+	border-top: 2px solid #252525;
+    padding-top: 15px;
+
+	padding: 5px;
+	gap: 7px;
+}
+
+.drugname {
+  margin-left: 15px;
 }
 
 .Drug {
+    display: flex;
+    justify-content: space-between;
 	color: white;
-	border: solid 1px white
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+	height: 3rem;
+	border-radius: 5px;
+
+}
+.Header {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px;
+}
+.nick {
+  margin-right: 15px;
+  
+}
+
+#lucy{  
+    color: #8ebbff;
+
+}
+#prrprr{  
+    color: #ee3515;
+    
+}
+#dol{  
+    color: #5f0000;
+    
+}
+#lisa{  
+    color: #368dff;
+    
+}
+
+.btn{
+	font-family: nerd, sans-serif ;
+	padding:10px;
+	border-radius:8px;
+    width: 4rem;
+    height: 1.1rem;
+	border:none;
+	outline:none;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color:white;
+    font-size: 14px;
+    text-align: center;
+    text-decoration: none;
+    -webkit-transition: all 0.2s ease-out;
+    -moz-transition: all 0.2s ease-out;
+    transition: all 0.2s ease-out;
+}
+.btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+
+.bottombar{
+    margin-top: 25px;
+    
+	display: flex;
+     
 }

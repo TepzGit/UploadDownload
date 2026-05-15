@@ -12,19 +12,7 @@
     </head>
     <body>
 
-            <div class="doselist">
-                <div class="titlecon">
-  
-                    <h2 class="dosetitle">Doses:</h2>
-                    
-                </div> 
-                
-                <div class="doses">
 
-                    <label class="dose">pregabalin 300mg</label><label class="dose">pregabalin 300mg</label><label class="dose">pregabalin 300mg</label>
-
-                </div> 
-            </div>
            <div id="app">
             <h2 class="title" >Substance Timeline</h2>
 
@@ -33,12 +21,12 @@
                 <button class="searchbtn" onclick="search()">Search</button>
             </div>
 
-            <div id="dosePanel" >
-                <input id="doseInput" placeholder="Dose (e.g. 300)">
-                <input id="doseStartHour" placeholder="Start hour (e.g. 17)" >
-                <button class="addbtn" onclick="addDose()">Add Dose</button>
-                <button class="resetbtn"  onclick="resetGraph()">Reset</button>
-            </div>
+               <div id="dosePanel" >
+                    <input id="doseInput" placeholder="Dose (e.g. 300)">
+                    <input id="doseStartHour" placeholder="Start hour (e.g. 17)" >
+                    <button class="addbtn" onclick="addDose()">Add Dose</button>
+                    <button class="resetbtn"  onclick="resetGraph()">Reset</button>
+               </div>
 
             <p id="status" ></p>
 
@@ -48,18 +36,19 @@
             </div>
             <div id="myPlot" ></div>
             <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-            <div class="bottombar" >
-                <button class="btn" onclick="downloadChart()">Save Data</button>
-                <button class="btn" onclick="addDose()">Back</button>
+            <div id="doses">
             </div>
+                <div class="bottombar" >
+                    <button class="btn" onclick="downloadChart()">Save Data</button>
+                    <a class="btn" href="/journal">Back</a>
+                </div>
         </div>
 
         <script>
         let chart;
         let currentSubstance = null;
         let currentCommonDose = null;
-        let addedDosesX = []; // Array of {dose, startHour, multiplier}
-        let addedDosesY = []; // Array of {dose, startHour, multiplier}
+        let addedDoses = []; // Array of {dose, startHour, multiplier}
 
 
         function fetchGraphQL(query) {
@@ -78,10 +67,10 @@
                     name
                     roas {
                         duration {
-                            onset { min units }
-                            comeup { min units }
-                            peak { min units }
-                            offset { min units }
+                            onset { min max units }
+                            comeup { min max units }
+                            peak { min max units }
+                            offset { min max units }
                         }
                         dose {
                             common {
@@ -95,11 +84,16 @@
         }
 
 	function DurationsIntoHour(duration) {
+        let value;
+
 		if (duration.units == "minutes") {
-			return duration.min / 60
+			value = ((duration.min + duration.max) / 2) / 60
 		} else {
-			return duration.min
+			value = ((duration.min + duration.max) / 2)
 		}
+
+        return Math.round(value * 2) / 2;
+        
 	}
 
     var substanceNameI = ""
@@ -147,7 +141,7 @@
             onset = DurationsIntoHour(duration.onset)
             comeup = DurationsIntoHour(duration.comeup)
             peak = DurationsIntoHour(duration.peak)
-            offset = DurationsIntoHour(duration.peak)
+            offset = DurationsIntoHour(duration.offset)
 
             status.textContent = `Loaded: ${substance.name} (common dose: ${commonDose})`;
             document.getElementById("dosePanel").style.display = "flex";
@@ -157,9 +151,6 @@
         }
 
 	function DurationsIntoPoints(steps = 10) {
-		points = []
-		
-
 		doseStartHour = document.querySelector("#doseStartHour").value
 
 		let currentX = 0
@@ -172,75 +163,104 @@
 
         xPoints = []
         yPoints = []
-		
-		for (i=1;i<=steps;i++) {
-            xPoints.push(currentX + (onset/steps)*i)
+        
+        incrementalNum = 0.05
+
+		for (i=incrementalNum;i<=onset + 1e-9;i+=incrementalNum) {
+            xPoints.push(Number(currentX+i).toFixed(2))
             yPoints.push(0)
 		}
 		currentX += onset
 
-		for (i=1;i<=steps;i++) {
-            xPoints.push(currentX + (comeup/steps)*i)
-            yPoints.push((100/steps)*i)
+		for (i=incrementalNum;i<=comeup + 1e-9;i+=incrementalNum) {
+            xPoints.push(Number(currentX+i).toFixed(2))
+            yPoints.push((i/comeup)*100)
+
 		}
 		currentX += comeup
-
-		for (i=1;i<=steps;i++) {
-            xPoints.push(currentX + (peak/steps)*i)
+        
+		for (i=incrementalNum;i<=peak + 1e-9;i+=incrementalNum) {
+            xPoints.push(Number(currentX+i).toFixed(2))
             yPoints.push(100)
 		}
 		currentX += peak
 
-		for (i=1;i<=steps;i++) {
-			points.push({x: currentX + (offset/steps)*i, y:100-(100/steps)*i})
-            xPoints.push(currentX + (offset/steps)*i)
-            yPoints.push(100-(100/steps)*i)
+		for (i=incrementalNum;i<=offset + 1e-9;i+=incrementalNum) {
+            xPoints.push(Number(currentX+i).toFixed(2))
+            yPoints.push((1-(i/offset))*100)
 		}
+
+        xPoints.push(Number(currentX+offset).toFixed(2))
+        yPoints.push(0);
 
 		return {xPoints: xPoints, yPoints: yPoints}
 	}
 
-	
 	function addDose() {
 		let {xPoints, yPoints} = DurationsIntoPoints()
-		addedDosesX.push(xPoints)
-		addedDosesY.push(yPoints)
+        addedDoses.push({
+			x: xPoints,
+			y: yPoints,
+		})
+
+        dosesDiv = document.getElementById("doses")
+        newDoseDiv = document.createElement("div")
+        newDoseDiv.id = "dose"
+        newDoseDiv.innerHTML = `
+        <p id="drugname" class="drugT">${currentSubstance.name}</p>
+        <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value}mg</p>
+        <p id="consTime" class="drugT">${formatTime(document.querySelector("#doseStartHour").value)}</p>
+        <p id="Close" class="closebtn">Close</p>
+        `
+        dosesDiv.appendChild(newDoseDiv)
 
 		if (chart) {
 			chart.destroy();
 		}
 		drawChart()
 	}
+
+    function formatTime(value) {
+        if (value.includes(":")) {
+            return value;
+        }
+
+        let hours = Math.floor(value);
+        let minutes = Math.round((value - hours) * 60);
+
+        // fix rounding overflow (e.g. 1.999 → 2:00)
+        if (minutes === 60) {
+            hours += 1;
+            minutes = 0;
+        }
+
+        return `${hours}:${minutes.toString().padStart(2, "0")}`;
+}
 	
     
 	// Points format [{x:0, y: 0}, {x:1, y:1}]
 	function drawChart() {
-        var allX = Array.from(new Set(addedDosesX.flat()));
-
-        function interpolate(xArr, yArr, x) {
-            if (xArr.includes(x)) {
-                return yArr[xArr.indexOf(x)];
-            }
-
-            for (let i = 0; i < xArr.length - 1; i++) {
-                if (x > xArr[i] && x < xArr[i + 1]) {
-                    let slope = (yArr[i + 1] - yArr[i]) / (xArr[i + 1] - xArr[i]);
-                    return yArr[i] + slope * (x - xArr[i]);
+        var allX = [];
+        addedDoses.forEach(dose => 
+        {
+            dose.x.forEach(x => {
+                if (!allX.includes(x)) {
+                    allX.push(x);
                 }
-            }
-
-            return 0;
+            })
         }
+        );
 
         // Step 3: Compute combined Y-values
-        var combinedY = allX.map(x => {
-            let total = 0;
-
-            for (let i = 0; i < addedDosesX.length; i++) {
-                total += interpolate(addedDosesX[i], addedDosesY[i], x);
-            }
-
-            return total;y
+        var combinedY = [];
+        allX.forEach(x => {
+            yTotal = 0;
+            addedDoses.forEach(dose => {
+                if (dose.x.includes(x)) {
+                    yTotal += dose.y[dose.x.indexOf(x)];
+                }
+            });
+            combinedY.push(yTotal);
         });
 
         let minX = Math.floor(Math.min(...allX));
@@ -256,7 +276,6 @@
             let min = Math.round((wrapped - hour) * 60);
             return hour.toString().padStart(2,'0') + ':' + min.toString().padStart(2,'0');
         });
-
 
         // Step 4: Plot
         var trace = {
@@ -284,7 +303,6 @@
             
         };
         var layout = {
-            title: 'Time',
             
             yaxis: { title: 'Intensity' },
             xaxis: {
@@ -295,7 +313,7 @@
             },
             
             font: {
-                family: 'Arial',
+                family: 'nerd',
                 size: 12,
                 color: '#fff'
             },
@@ -304,6 +322,7 @@
             plot_bgcolor: '#0a0a0a',
              
         };
+
         Plotly.newPlot('myPlot', [trace], layout, {modeBarButtonsToRemove: ['zoom2d', 'hoverClosestGl2d', 'hoverClosestPie', 'toggleSpikelines', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}), 
         {
             title: 'Combined Graph (Y-values summed)',
