@@ -23,7 +23,7 @@
 
                <div id="dosePanel" >
                     <input id="doseInput" placeholder="Dose (e.g. 300)">
-                    <input id="doseStartHour" placeholder="Start hour (e.g. 17)" >
+                    <input id="doseStartHour" type="time" placeholder="Start hour" >
                     <button class="addbtn" onclick="addDose()">Add Dose</button>
                     <button class="resetbtn"  onclick="resetGraph()">Reset</button>
                </div>
@@ -45,6 +45,32 @@
         </div>
 
         <script>
+
+        document.querySelector("#input").addEventListener("input", (e) => {
+            clearTimeout(timeout);
+
+            const value = e.target.value.trim();
+
+            if (value.length < 2) return; // wait for at least 2 chars
+
+            timeout = setTimeout(() => {
+                searchSuggestions(value);
+            }, 200);
+        });
+
+        function searchSuggestions(value) {
+            const gql = `
+            {
+                substances(query: "${query}") {
+                    name
+                }
+            }`;
+
+            fetchGraphQL(gql).then(res => {
+                showSuggestions(res.data.substances);
+            });
+        }
+
         let chart;
         let currentSubstance = null;
         let currentCommonDose = null;
@@ -65,6 +91,7 @@
             {
                 substances(query: "${substanceName}") {
                     name
+
                     roas {
                         duration {
                             onset { min max units }
@@ -73,9 +100,10 @@
                             offset { min max units }
                         }
                         dose {
-                            common {
-                                min
-                            }
+                                units
+                                common {
+                                    min
+                                }
                         }
                     }
                 }
@@ -97,6 +125,7 @@
 	}
 
     var substanceNameI = ""
+    var units = ""
 
 	let onset = 0
 	let comeup = 0
@@ -121,7 +150,7 @@
 
             const duration = substance.roas?.[0]?.duration;
             const dosage = substance.roas?.[0]?.dose;
-            substanceNameI = substance.name
+            units = dosage.units
             
             if (!duration) {
                 status.textContent = "No duration data.";
@@ -161,6 +190,8 @@
 			currentX = now.getHours() + now.getMinutes() / 60
 		}
 
+        intensityMultiplier = document.querySelector("#doseInput").value / currentCommonDose
+
         xPoints = []
         yPoints = []
         
@@ -174,20 +205,20 @@
 
 		for (i=incrementalNum;i<=comeup + 1e-9;i+=incrementalNum) {
             xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push((i/comeup)*100)
+            yPoints.push((i/comeup)*100*intensityMultiplier)
 
 		}
 		currentX += comeup
         
 		for (i=incrementalNum;i<=peak + 1e-9;i+=incrementalNum) {
             xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push(100)
+            yPoints.push(100*intensityMultiplier)
 		}
 		currentX += peak
 
 		for (i=incrementalNum;i<=offset + 1e-9;i+=incrementalNum) {
             xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push((1-(i/offset))*100)
+            yPoints.push((1-(i/offset))*100*intensityMultiplier)
 		}
 
         xPoints.push(Number(currentX+offset).toFixed(2))
@@ -208,17 +239,38 @@
         newDoseDiv.id = "dose"
         newDoseDiv.innerHTML = `
         <p id="drugname" class="drugT">${currentSubstance.name}</p>
-        <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value}mg</p>
+        <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value} ${units}</p>
         <p id="consTime" class="drugT">${formatTime(document.querySelector("#doseStartHour").value)}</p>
-        <p id="Close" class="closebtn">Close</p>
+        <input type="hidden" class="doseNumber" value='${dosesDiv.querySelectorAll(".dose").length+1}'>
+        <div id="delete" onclick="DeleteDose(this)"> 
+        <p class="closebtn">Delete</p> 
+        </div>
         `
         dosesDiv.appendChild(newDoseDiv)
 
 		if (chart) {
-			chart.destroy();
+			Plotly.purge('myPlot');
 		}
 		drawChart()
 	}
+
+    function DeleteDose(button) {
+        doses = button.parentElement.parentElement.querySelectorAll("#dose")
+
+        indexValue = button.parentElement.querySelector(".doseNumber").value;
+        addedDoses.splice(indexValue-1, 1);
+        button.parentElement.remove();
+        
+        if (doses.length == 1) {
+            Plotly.purge('myPlot');;
+            return
+        }
+
+        if (chart) {
+			Plotly.purge('myPlot');;
+		}
+		drawChart()
+    }
 
     function formatTime(value) {
         if (value.includes(":")) {

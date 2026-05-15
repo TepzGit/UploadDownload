@@ -75,7 +75,7 @@ padding:10px 15px;
 }
 #doseStartHour{
 	font-family: nerd, sans-serif ;
-	width:120px; 
+	width: 75px;
 	padding:10px; 
 	border-radius:8px; 
 	background-color: rgba(10, 10, 10, 0.98);
@@ -210,6 +210,9 @@ padding:10px 15px;
   padding: 0.5rem;
   overflow: hidden;
 }
+
+
+
 .dose::before {
     content: "•";
     margin-right: 8px;
@@ -285,12 +288,7 @@ padding:10px 15px;
   grid-gap: 7px;
 }
 
-#dose:hover .doseT {
-  opacity: 0%;
-}
-#dose:hover .close {
-  opacity: 100%;
-}
+
 #dose {
   visibility: visible;
   height: 2rem;
@@ -310,6 +308,15 @@ padding:10px 15px;
   grid-auto-rows: 1fr;
   align-content: center;
   transition: opacity, background, color 0.3s ease;
+}
+
+#dose:hover #delete {
+  opacity: 100%;
+  visibility: visible;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  cursor: pointer
 }
 
 #drugname {
@@ -333,7 +340,38 @@ padding:10px 15px;
   justify-self: center;
   opacity: 0%;
 }
+#delete {
+  opacity: 0%;
+  position: absolute;
+  visibility: collapse;
+  color: white;
+  width: 100%;
+  background: #8b47c0;
+  max-width: 560px;
+  height: 2rem;
+  padding: 0.3rem;
+  border-radius: 8px;
+  text-wrap: unset;
+  display: flex;
+  height: inherit;
+  justify-self: center;
+  align-self: center;
+  justify-content: center;
+  align-content: unsafe;
+  border: 1px solid #6b08cd;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+}
+
+.closebtn {
+  margin: 0;
+  font-size: 15px;
+  height: 18px;
+  align-self: inherit;
+}
 .nick {
   margin-right: 15px;
   color: #ad7fff;
 }
+
