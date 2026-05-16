@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -142,6 +144,12 @@ func main() {
 }
 
 func Main(w http.ResponseWriter, r *http.Request) {
+	ip := r.RemoteAddr
+	if strings.Contains(ip, ":") {
+		ip, _, _ = net.SplitHostPort(ip)
+	}
+	fmt.Printf("[%s] NEUTRAL IP=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
+
 	SessionId, err := r.Cookie("SessionID")
 
 	d := struct{
@@ -214,6 +222,12 @@ func DrugInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginData(w http.ResponseWriter, r *http.Request) {
+	ip := r.RemoteAddr
+	if strings.Contains(ip, ":") {
+		ip, _, _ = net.SplitHostPort(ip)
+	}
+	fmt.Printf("[%s] NEUTRAL IP=%s PATH=%s REASON=LogginIn\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
+
 	type login struct{
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -265,17 +279,27 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 
 func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if strings.Contains(ip, ":") {
+			ip, _, _ = net.SplitHostPort(ip)
+		}
+
 		SessionId, err := r.Cookie("SessionID")
 		if err != nil || SessionId == nil {
+			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=no_cookie\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
 
 		// check if session exists in your map
-		if _, ok := cookies[SessionId.Value]; !ok {
+		d, ok := cookies[SessionId.Value]
+		if !ok {
+			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=invalid_session\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
+
+		fmt.Printf("[%s] ALLOW IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.Username, r.URL.Path)
 
 		// all good → call the real handler
 		next(w, r)
@@ -284,18 +308,26 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 
 func requireAdminLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if strings.Contains(ip, ":") {
+			ip, _, _ = net.SplitHostPort(ip)
+		}
+
 		SessionId, err := r.Cookie("SessionID")
 		if err != nil || SessionId == nil {
+			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=no_cookie\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
 
 		d, ok := cookies[SessionId.Value];
 		if !ok || d.Authority != "Admin" {
+			fmt.Printf("[%s] DENY IP=%s USER=%s PATH=%s REASON=invalid_sessionOrNoAuthority\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
 
+		fmt.Printf("[%s] ALLOW IP=%s USER=%s AUTHORITY=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, d.Authority, r.URL.Path)
 		next(w, r)
 	}
 }
