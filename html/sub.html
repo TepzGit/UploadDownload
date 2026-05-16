@@ -65,13 +65,13 @@
             clearTimeout(timeout);
 
             timeout = setTimeout(() => {
-                searchSuggestions(value);
+                searchSuggestions();
             }, 500);
         });
 
-        function searchSuggestions(value) {
-			currentValue = document.querySelector("#input").value
-            if (currentValue.length < 2) {
+        function searchSuggestions() {
+			value = document.querySelector("#input").value
+            if (value.length < 2) {
                 document.getElementById("sug").style.visibility = "collapse";
                 return;
             }
