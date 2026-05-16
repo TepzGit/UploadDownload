@@ -70,6 +70,12 @@
         });
 
         function searchSuggestions(value) {
+			currentValue = document.querySelector("#input").value
+            if (currentValue.length < 2) {
+                document.getElementById("sug").style.visibility = "collapse";
+                return;
+            }
+
             const gql = `
             {
                 substances(query: "${value}") {
