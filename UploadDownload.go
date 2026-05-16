@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type FileFolderInfo struct {
@@ -31,14 +32,27 @@ type MakeFolderData struct {
 	Path string `json:"path"`
 }
 
+type userMapData map[string]struct{
+	Password string `json:"Password"`
+	OriginalUsername string `json:"OriginalUsername"`
+	Authority string `json:"Authority"`
+}
+
+type cookiesStruct struct{
+	Time time.Time
+	Username string
+	OriginalUsername string
+	Authority string
+}
 
 var UploadedFilesDirName string = "UploadedFiles"
+var LoginDataFileName string = "loginData.json"
 
-var cookies = map[string]time.Time{}
 var cookiesMu sync.Mutex
+var cookies = map[string]cookiesStruct{}
 
+var userLoginDataMap userMapData
 var tpl *template.Template
-
 
 func main() {
 	tpl = template.New("root")
@@ -60,6 +74,8 @@ func main() {
 	http.HandleFunc("/journal", requireLogin(Journal))
 	http.HandleFunc("/journal/Drug", requireLogin(DrugInfo))
 	http.HandleFunc("/sub", requireLogin(Substance))
+	http.HandleFunc("/admin", requireAdminLogin(AdminPanel))
+	http.HandleFunc("/admin/createUser", requireAdminLogin(AdminPanelCreateUser))
 
 	http.HandleFunc("/upload", requireLogin(GetUploadData))
 	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
@@ -67,6 +83,7 @@ func main() {
 	http.HandleFunc("/search", requireLogin(search))
 	http.HandleFunc("/delete", requireLogin(Delete))
 	http.HandleFunc("/rename", requireLogin(Rename))
+	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
 
 //	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
 //		w.Header().Set("Content-Type", "text/css")
@@ -99,9 +116,29 @@ func main() {
 	}
 
 
-        port := 8000
-        fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
-        http.ListenAndServe("0.0.0.0:" + strconv.Itoa(port), nil)
+	loginData, err := os.ReadFile(LoginDataFileName)
+	if err != nil {
+		_,err := os.Create(LoginDataFileName)
+		if err != nil {
+			fmt.Println("Could not create a login database file")
+			return
+		}
+		fmt.Println("Created login database file")
+	} else {
+		err = json.Unmarshal(loginData, &userLoginDataMap)
+		if err != nil && len(loginData) > 0 {
+			fmt.Println("Cant Unmarshal Login Database")
+			return
+		}
+	}
+
+	port := 8000
+	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
+
+	err = http.ListenAndServeTLS("0.0.0.0: " + strconv.Itoa(port), "cert.pem", "key.pem", nil)
+	if err != nil {
+		http.ListenAndServe("0.0.0.0:" + strconv.Itoa(port), nil)
+	}
 }
 
 func Main(w http.ResponseWriter, r *http.Request) {
@@ -109,12 +146,14 @@ func Main(w http.ResponseWriter, r *http.Request) {
 
 	d := struct{
 		Login bool
+		SessionInfo cookiesStruct
 	}{}
 
 	if err == nil && SessionId != nil {
-		_, ok := cookies[SessionId.Value]
+		c, ok := cookies[SessionId.Value]
 		if ok {
 			d.Login = true	
+			d.SessionInfo = c
 		}
 	}
 
@@ -175,25 +214,29 @@ func DrugInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginData(w http.ResponseWriter, r *http.Request) {
-	var password struct{
+	type login struct{
+		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&password)
+	var UserLoginData login
+
+	err := json.NewDecoder(r.Body).Decode(&UserLoginData)
 	if err != nil {
 		http.Error(w, "Not valid folder data", http.StatusBadRequest)
 		return
 	}
 
-	passwordFile, err := os.ReadFile("password.txt")
-	if err != nil {
-		http.Error(w, "Cant Read Server Password rn", http.StatusBadRequest)
-		fmt.Println("No password.txt found")
+
+	d,exists := userLoginDataMap[strings.ToLower(UserLoginData.Username)]
+	password := d.Password
+
+	if !exists {
+		http.Error(w, "User Dosent Exist", http.StatusBadRequest)
 		return
 	}
-	passwordd := strings.TrimSpace(string(passwordFile))
 
-	if password.Password != passwordd {
+	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(UserLoginData.Password)); err != nil {
 		http.Error(w, "Wrong Password", http.StatusBadRequest)
 		return
 	}
@@ -209,10 +252,16 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, cookie)
 
-	cookies[randomCookie] = time.Now()
+	c := cookies[randomCookie]
+	c.Time = time.Now()
+	c.Username = strings.ToLower(UserLoginData.Username)
+	c.OriginalUsername = d.OriginalUsername
+	c.Authority = d.Authority
+	cookies[randomCookie] = c
 
 	w.WriteHeader(http.StatusOK)
 }
+
 
 func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -233,6 +282,24 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func requireAdminLogin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		SessionId, err := r.Cookie("SessionID")
+		if err != nil || SessionId == nil {
+			http.Redirect(w, r, "/Main", http.StatusSeeOther)
+			return
+		}
+
+		d, ok := cookies[SessionId.Value];
+		if !ok || d.Authority != "Admin" {
+			http.Redirect(w, r, "/Main", http.StatusSeeOther)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 
 func StartCookieCleaner() {
 	go func() {
@@ -243,7 +310,7 @@ func StartCookieCleaner() {
 			
 			cookiesMu.Lock()
 			for key,value := range cookies {
-				if time.Now().After(value.Add(time.Hour * time.Duration(maxTimeHours))) {
+				if time.Now().After(value.Time.Add(time.Hour * time.Duration(maxTimeHours))) {
 					delete(cookies, key)
 				}
 			}
@@ -703,4 +770,61 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func AdminPanel(w http.ResponseWriter, r *http.Request) {
+	tpl,err := template.ParseFiles("html/AdminPanel.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	err = tpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+}
+
+func AdminPanelCreateUser(w http.ResponseWriter, r *http.Request) {
+	tpl,err := template.ParseFiles("html/AdminPanelCreateUser.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	err = tpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+}
+
+func AdminPanelCreateUserData(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(1024)
+	if err != nil {
+		http.Error(w, "Cant parse data", http.StatusBadRequest)
+		return
+	}
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	authority := r.FormValue("authority")
+
+	d,exists := userLoginDataMap[strings.ToLower(username)]
+	if exists {
+		http.Error(w, "User already exists", http.StatusBadRequest)
+		return
+	}
+	
+	d.OriginalUsername = username
+	HashedPass,err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Cant hash password", http.StatusBadRequest)
+		return
+	}
+	d.Password = string(HashedPass)
+	d.Authority = authority
+
+	userLoginDataMap[strings.ToLower(username)] = d
+	w.Write([]byte("User Created"))
 }

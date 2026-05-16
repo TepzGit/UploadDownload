@@ -13,7 +13,8 @@
                     <div class="time" id="timeDisplay">--:--:--</div>
                     <div class="date" id="dateDisplay">Loading date...</div>
                     {{if not .Login}}
-                    <div class="password-entry" id="passwordEntry">
+                    <div class="login-entry" id="passwordEntry">
+						<input class="username-input" id="usernameInput" type="username" placeholder="Enter username" aria-label="Username">
                         <input class="password-input" id="passwordInput" type="password" placeholder="Enter password" aria-label="Password">
                         <div class="password-hint">Press Enter to submit</div>
                         <div class="password-error" id="passwordError"></div>
@@ -22,7 +23,9 @@
                 </div>
                 <div class="buts">
                     <label class="foldbut"  onclick="window.location.pathname='/journal'">Journal</label>
-
+					{{if eq .SessionInfo.Authority "Admin"}}
+                    <label class="foldbut" style="color: #ff0000"  onclick="window.location.pathname='/admin'">Admin</label>
+					{{end}}
                     <label class="foldbut"  onclick='window.location.pathname="/Files"'>Files</label>
                 </div>
                 <div class="weather-card" id="weatherWidget">
@@ -48,8 +51,9 @@
             const timeDisplay = document.getElementById('timeDisplay')
             const dateDisplay = document.getElementById('dateDisplay')
             const clockWidget = document.getElementById('clockWidget')
+            const usernameInput = document.getElementById('usernameInput')
+			const passwordInput = document.getElementById('passwordInput')
             const passwordEntry = document.getElementById('passwordEntry')
-            const passwordInput = document.getElementById('passwordInput')
             const passwordError = document.getElementById('passwordError')
             const weatherLocation = document.getElementById('weatherLocation')
             const weatherTemp = document.getElementById('weatherTemp')
@@ -72,15 +76,16 @@
             function togglePasswordInput() {
                 passwordEntry.classList.toggle('visible')
                 if (passwordEntry.classList.contains('visible')) {
-                    passwordInput.focus()
+                    usernameInput.focus()
                 }
             }
 
-            async function submitPassword() {
+            async function submitLogin() {
                 passwordError.textContent = ''
                 const password = passwordInput.value.trim()
-                if (!password) {
-                    passwordError.textContent = 'Password cannot be empty.'
+                const username = usernameInput.value.trim()
+                if (!password || !username) {
+                    passwordError.textContent = 'Username or password cannot be empty.'
                     return
                 }
 
@@ -89,11 +94,11 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ "username": username, "password": password })
                 })
 
                 if (!res.ok) {
-                    passwordError.textContent = 'Incorrect password. Try again.'
+                    passwordError.textContent = 'Incorrect login. Try again.'
                 } else {
                     window.location.reload();
                 }
@@ -131,10 +136,17 @@
             }
 
             if (passwordEntry) {
-                clockWidget.addEventListener('click', togglePasswordInput)                
+				clockWidget.addEventListener('click', () => {
+					if (
+						document.activeElement === usernameInput ||
+						document.activeElement === passwordInput
+					) return;
+
+					togglePasswordInput()
+				})
                 passwordInput.addEventListener('keydown', async (event) => {
                     if (event.key === 'Enter') {
-                        await submitPassword()
+                        await submitLogin()
                     }
                 })   
             }

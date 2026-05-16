@@ -132,20 +132,36 @@ body {
     color: #bdbdbd;
 }
 
-.password-entry {
+.password-input::placeholder, .username-input::placeholder {
+    color: rgba(255, 255, 255, 0.36);
+}
+
+.password-input:focus, .username-input:focus {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(26, 26, 26, 0.98);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+.password-hint {
+    font-size: 0.92rem;
+    color: rgba(255, 255, 255, 0.48);
+}
+
+
+.login-entry {
     opacity: 0;
     max-height: 0;
     overflow: hidden;
     transition: opacity 0.32s ease, max-height 0.32s ease, margin-top 0.32s ease;
 }
 
-.password-entry.visible {
+.login-entry.visible {
     opacity: 1;
     max-height: 180px;
     margin-top: 20px;
 }
 
-.password-input {
+.password-input, .username-input {
     width: auto;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 16px;
@@ -157,11 +173,11 @@ body {
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
-.password-input::placeholder {
+.password-input::placeholder, .username-input::placeholder {
     color: rgba(255, 255, 255, 0.36);
 }
 
-.password-input:focus {
+.password-input:focus .username-input:focus {
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(26, 26, 26, 0.98);
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);

@@ -375,3 +375,53 @@ padding:10px 15px;
   color: #ad7fff;
 }
 
+#sug {
+  visibility: collapse;
+  background: aliceblue;
+    background-color: aliceblue;
+  margin: 5px;
+  min-height: 5rem;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+  border-radius: 8px;
+  display: grid;
+  padding: 5px;
+  display: flex;
+  position: absolute;
+  width: 42.5rem;
+  justify-self: center;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+}
+
+#sugC {
+  display: flex;
+  flex-direction: column;
+}
+
+#sug1:hover{
+  cursor: pointer;
+  color: #989ffd;
+  border-bottom: 2px solid #7982ff;
+}
+
+#sug1 {
+  margin: 0px;
+    margin-top: 0px;
+  margin-left: 5px;
+  margin-top: 5px;
+  border-bottom: 2px solid #434343;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+#sug {
+  color: white;
+}
+
+.Selected {
+	color: #989ffd;
+}

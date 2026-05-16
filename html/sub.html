@@ -20,6 +20,13 @@
                 <input id="input" placeholder="Enter substance (e.g. lsd)" >
                 <button class="searchbtn" onclick="search()">Search</button>
             </div>
+            
+            <div id="sug">
+                <div id="sugC">
+                 </div>
+            </div>
+
+
 
                <div id="dosePanel" >
                     <input id="doseInput" placeholder="Dose (e.g. 300)">
@@ -46,30 +53,88 @@
 
         <script>
 
+        let timeout;
         document.querySelector("#input").addEventListener("input", (e) => {
-            clearTimeout(timeout);
-
             const value = e.target.value.trim();
 
-            if (value.length < 2) return; // wait for at least 2 chars
+            if (value.length < 2) {
+                document.getElementById("sug").style.visibility = "collapse";
+                return;
+            }
+
+            clearTimeout(timeout);
 
             timeout = setTimeout(() => {
                 searchSuggestions(value);
-            }, 200);
+            }, 500);
         });
 
         function searchSuggestions(value) {
             const gql = `
             {
-                substances(query: "${query}") {
+                substances(query: "${value}") {
                     name
                 }
             }`;
 
             fetchGraphQL(gql).then(res => {
+                document.getElementById("sug").style.visibility = "visible";
+                document.getElementById("dosePanel").style.display = "none";
+                document.getElementById("status").textContent = ``;
+
                 showSuggestions(res.data.substances);
             });
         }
+
+        function showSuggestions(substances) {
+            const datalist = document.getElementById("sugC");
+            datalist.innerHTML = ""; 
+
+            substances.forEach(sub => {
+                const option = document.createElement("p");
+                option.textContent = sub.name;
+                option.id = "sug1";
+                datalist.appendChild(option);
+                
+                option.addEventListener("click", (e) => {
+                    const value = option.textContent;
+                    document.getElementById("input").value = value;
+                    search();
+                });
+            });
+
+			let index = -1
+			children = datalist.children
+			document.getElementById("input").addEventListener("keydown", (e) => {
+				for (let i=0;i<children.length;i++) {
+					if (children[i].classList.contains("Selected")) {
+						children[i].classList.remove("Selected")
+					}
+				}
+
+				if (event.key == "ArrowDown") {
+					index += 1
+					if (index > children.length - 1) {
+						index = 0
+					}
+					children[index].classList.add("Selected")
+				}
+
+				if (event.key == "ArrowUp") {
+					index -= 1
+					if (index < 0) {
+						index = children.length - 1
+					}
+					children[index].classList.add("Selected")
+				}
+
+				if (event.key == "Enter") {
+                    document.getElementById("input").value = children[index].textContent;
+                    search();
+				}
+			})
+        }
+
 
         let chart;
         let currentSubstance = null;
@@ -122,21 +187,23 @@
 
         return Math.round(value * 2) / 2;
         
-	}
+		}
 
-    var substanceNameI = ""
-    var units = ""
+		var substanceNameI = ""
+		var units = ""
 
-	let onset = 0
-	let comeup = 0
-	let peak = 0
-	let offset = 0
+		let onset = 0
+		let comeup = 0
+		let peak = 0
+		let offset = 0
 
         async function search() {
             const substanceName = document.getElementById("input").value.trim();
             const status = document.getElementById("status");
 
             if (!substanceName) return;
+
+            document.getElementById("sug").style.visibility = "collapse";
 
             status.textContent = "Loading...";
             const result = await getData(substanceName);
@@ -298,10 +365,22 @@
             dose.x.forEach(x => {
                 if (!allX.includes(x)) {
                     allX.push(x);
-                }
+               }
             })
         }
         );
+
+		allTimeX = []
+		allX.forEach(x => {
+			let num = Number(x) % 24;
+
+			let hours = Math.floor(num);
+			let minutes = Math.round((num - hours) * 60);
+
+			let finalX = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+
+			allTimeX.push(finalX);
+		});
 
         // Step 3: Compute combined Y-values
         var combinedY = [];
@@ -314,6 +393,7 @@
             });
             combinedY.push(yTotal);
         });
+
 
         let minX = Math.floor(Math.min(...allX));
         let maxX = Math.ceil(Math.max(...allX));
@@ -329,6 +409,7 @@
             return hour.toString().padStart(2,'0') + ':' + min.toString().padStart(2,'0');
         });
 
+
         // Step 4: Plot
         var trace = {
             x: allX,
@@ -336,9 +417,11 @@
             mode: 'lines+markers',
             type: 'scatter',
             name: 'Combined Y-values',
+
+			hovertext: allTimeX,
+			hovertemplate: "Time: %{hovertext}<br>Intensity: %{y}<extra></extra>",
         
             line: {
-                
                 color: 'rgb(107, 51, 150)',
                 width: 3,
                 dash: 'solid'
@@ -354,14 +437,22 @@
             fillcolor: 'rgb(139, 71, 192)', // fill color with transparency
             
         };
-        var layout = {
+		
+
+        
+		var layout = {
+			template: "simple_white",
+			margin: { t: 30, r: 20, b: 40, l: 40 },
             
-            yaxis: { title: 'Intensity' },
+            yaxis: {
+				title: 'Intensity',
+			},
+
             xaxis: {
                 title: 'Time',
                 tickmode: 'array',
                 tickvals: tickVals,
-                ticktext: tickText
+                ticktext: tickText,
             },
             
             font: {
