@@ -144,11 +144,6 @@ func main() {
 }
 
 func Main(w http.ResponseWriter, r *http.Request) {
-	ip := r.RemoteAddr
-	if strings.Contains(ip, ":") {
-		ip, _, _ = net.SplitHostPort(ip)
-	}
-	fmt.Printf("[%s] NEUTRAL IP=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
 
 	SessionId, err := r.Cookie("SessionID")
 
@@ -156,6 +151,12 @@ func Main(w http.ResponseWriter, r *http.Request) {
 		Login bool
 		SessionInfo cookiesStruct
 	}{}
+
+	ip := r.RemoteAddr
+	if strings.Contains(ip, ":") {
+		ip, _, _ = net.SplitHostPort(ip)
+	}
+	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.SessionInfo.OriginalUsername, r.URL.Path)
 
 	if err == nil && SessionId != nil {
 		c, ok := cookies[SessionId.Value]
@@ -299,7 +300,7 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		fmt.Printf("[%s] ALLOW IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.Username, r.URL.Path)
+		fmt.Printf("[%s] ALLOW IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
 
 		// all good → call the real handler
 		next(w, r)
