@@ -14,19 +14,48 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
+var schema string = `
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+	originalUsername TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+	pathToProfilePic TEXT NOT NULL,
+	authority TEXT NOT NULL
+);
+
+CREATE TABLE drugs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS doses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    drug_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    unit TEXT NOT NULL,
+    taken_at DATETIME NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(drug_id) REFERENCES drugs(id)
+);
+`
+
 type FileFolderInfo struct {
-	Name string
-	Path string
-	IsDir bool
-	IsImg bool
+	Name    string
+	Path    string
+	IsDir   bool
+	IsImg   bool
 	IsAudio bool
-	IsVid bool
-	Size int
-	Date time.Time
+	IsVid   bool
+	Size    int
+	Date    time.Time
 }
 
 type MakeFolderData struct {
@@ -34,32 +63,27 @@ type MakeFolderData struct {
 	Path string `json:"path"`
 }
 
-type userMapData map[string]struct{
-	Password string `json:"Password"`
-	OriginalUsername string `json:"OriginalUsername"`
-	Authority string `json:"Authority"`
+type cookiesStruct struct {
+	Time             time.Time
+	Username         string
+	OriginalUsername string
+	Authority        string
 }
 
-type cookiesStruct struct{
-	Time time.Time
-	Username string
-	OriginalUsername string
-	Authority string
-}
+var db *sql.DB
 
 var UploadedFilesDirName string = "UploadedFiles"
-var LoginDataFileName string = "loginData.json"
+var DataBaseFileName string = "Database.db"
 
 var cookiesMu sync.Mutex
 var cookies = map[string]cookiesStruct{}
 
-var userLoginDataMap userMapData
 var tpl *template.Template
 
 func main() {
 	tpl = template.New("root")
 	tpl.New("Upload")
-	
+
 	StartCookieCleaner()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +95,7 @@ func main() {
 
 	http.HandleFunc("/Main", Main)
 	http.HandleFunc("/login", LoginData)
+	http.HandleFunc("/Profile", requireLogin(Profile))
 	http.HandleFunc("/Files/", requireLogin(Downloader))
 	http.HandleFunc("/Uploader", requireLogin(Uploader))
 	http.HandleFunc("/journal", requireLogin(Journal))
@@ -85,61 +110,54 @@ func main() {
 	http.HandleFunc("/search", requireLogin(search))
 	http.HandleFunc("/delete", requireLogin(Delete))
 	http.HandleFunc("/rename", requireLogin(Rename))
+	http.HandleFunc("/sub/saveData", requireLogin(saveData))
 	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
 
-//	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
-//		w.Header().Set("Content-Type", "text/css")
-//		fmt.Fprint(w, styleCSS)
-//	})
-
+	//	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
+	//		w.Header().Set("Content-Type", "text/css")
+	//		fmt.Fprint(w, styleCSS)
+	//	})
 
 	http.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "js/script.js")
 	})
 
-	css,_ := os.ReadDir("css")
-	for _,stylefile := range css {
+	css, _ := os.ReadDir("css")
+	for _, stylefile := range css {
 		cssName := stylefile.Name()
 		name := cssName
 
-		http.HandleFunc("/" + name, func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "css/" + name)
+		http.HandleFunc("/"+name, func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "css/"+name)
 		})
 	}
 
-	assets,_ := os.ReadDir("assets")
-	for _,asset := range assets {
+	assets, err := os.ReadDir("assets")
+	if err != nil {
+		panic(err)
+	}
+	for _, asset := range assets {
 		assetName := asset.Name()
 		name := assetName
 
-		http.HandleFunc("/" + name, func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "assets/" + name)
+		http.HandleFunc("/"+name, func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "assets/"+name)
 		})
 	}
 
 
-	loginData, err := os.ReadFile(LoginDataFileName)
+	db, err = sql.Open("sqlite3", DataBaseFileName)
 	if err != nil {
-		_,err := os.Create(LoginDataFileName)
-		if err != nil {
-			fmt.Println("Could not create a login database file")
-			return
-		}
-		fmt.Println("Created login database file")
-	} else {
-		err = json.Unmarshal(loginData, &userLoginDataMap)
-		if err != nil && len(loginData) > 0 {
-			fmt.Println("Cant Unmarshal Login Database")
-			return
-		}
+		panic(err)
 	}
+	db.Exec(schema)
 
 	port := 8000
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
 
-	err = http.ListenAndServeTLS("0.0.0.0: " + strconv.Itoa(port), "cert.pem", "key.pem", nil)
+	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", nil)
 	if err != nil {
-		http.ListenAndServe("0.0.0.0:" + strconv.Itoa(port), nil)
+		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port), nil)
 	}
 }
 
@@ -147,8 +165,8 @@ func Main(w http.ResponseWriter, r *http.Request) {
 
 	SessionId, err := r.Cookie("SessionID")
 
-	d := struct{
-		Login bool
+	d := struct {
+		Login       bool
 		SessionInfo cookiesStruct
 	}{}
 
@@ -161,12 +179,12 @@ func Main(w http.ResponseWriter, r *http.Request) {
 	if err == nil && SessionId != nil {
 		c, ok := cookies[SessionId.Value]
 		if ok {
-			d.Login = true	
+			d.Login = true
 			d.SessionInfo = c
 		}
 	}
 
-	tpl,err := template.ParseFiles("html/Main.html")
+	tpl, err := template.ParseFiles("html/Main.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -179,8 +197,29 @@ func Main(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Substance(w http.ResponseWriter, r*http.Request) {
-	tpl,err := template.ParseFiles("html/sub.html")
+func Profile(w http.ResponseWriter, r *http.Request) {
+	tpl, err := template.ParseFiles("html/profile.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+
+	d := struct {
+		Username string
+	}{}
+
+	userCookie, _ := r.Cookie("SessionID")
+	usernameOfUserLoggedin := cookies[userCookie.Value].Username
+	err = db.QueryRow("SELECT originalUsername FROM users WHERE username = ?", usernameOfUserLoggedin).Scan(&d.Username)
+
+	err = tpl.Execute(w, d)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func Substance(w http.ResponseWriter, r *http.Request) {
+	tpl, err := template.ParseFiles("html/sub.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -194,8 +233,20 @@ func Substance(w http.ResponseWriter, r*http.Request) {
 
 }
 
+func saveData(w http.ResponseWriter, r *http.Request) {
+	Data := struct{
+		DrugName string `json:"DrugName"`
+		Date string `json:"Date"`
+		Doses []struct{
+			Time string `json:"Time"`
+			DoseAmount string `json:"DoseAmount"`
+		} `json:"Doses"`
+	}{}
+
+}
+
 func Journal(w http.ResponseWriter, r *http.Request) {
-	tpl,err := template.ParseFiles("html/Journal.html")
+	tpl, err := template.ParseFiles("html/Journal.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -209,7 +260,7 @@ func Journal(w http.ResponseWriter, r *http.Request) {
 }
 
 func DrugInfo(w http.ResponseWriter, r *http.Request) {
-	tpl,err := template.ParseFiles("html/DruginfoPage.html")
+	tpl, err := template.ParseFiles("html/DruginfoPage.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -229,12 +280,10 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Printf("[%s] NEUTRAL IP=%s PATH=%s REASON=LogginIn\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
 
-	type login struct{
+	var UserLoginData struct{
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-
-	var UserLoginData login
 
 	err := json.NewDecoder(r.Body).Decode(&UserLoginData)
 	if err != nil {
@@ -242,26 +291,30 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
-	d,exists := userLoginDataMap[strings.ToLower(UserLoginData.Username)]
-	password := d.Password
-
-	if !exists {
-		http.Error(w, "User Dosent Exist", http.StatusBadRequest)
-		return
+	var originalUsername string
+	var authority string
+	var password string
+	err = db.QueryRow("select originalUsername,authority,password, from users where username = ?", strings.ToLower(UserLoginData.Username)).Scan(&originalUsername,&authority, &password)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "User Dosent Exist", http.StatusBadRequest)
+			return
+		} else {
+			http.Error(w, "Cat not query from database rn", http.StatusBadRequest)
+		}
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(UserLoginData.Password)); err != nil {
 		http.Error(w, "Wrong Password", http.StatusBadRequest)
 		return
 	}
-	
+
 	randomCookie := RandomCharacters()
 
 	cookie := &http.Cookie{
-		Name:  "SessionID",
-		Value: randomCookie,
-		Path:  "/",
+		Name:   "SessionID",
+		Value:  randomCookie,
+		Path:   "/",
 		MaxAge: 86400,
 	}
 
@@ -270,13 +323,12 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	c := cookies[randomCookie]
 	c.Time = time.Now()
 	c.Username = strings.ToLower(UserLoginData.Username)
-	c.OriginalUsername = d.OriginalUsername
-	c.Authority = d.Authority
+	c.OriginalUsername = originalUsername
+	c.Authority = authority
 	cookies[randomCookie] = c
 
 	w.WriteHeader(http.StatusOK)
 }
-
 
 func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -321,7 +373,7 @@ func requireAdminLogin(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		d, ok := cookies[SessionId.Value];
+		d, ok := cookies[SessionId.Value]
 		if !ok || d.Authority != "Admin" {
 			fmt.Printf("[%s] DENY IP=%s USER=%s PATH=%s REASON=invalid_sessionOrNoAuthority\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
@@ -333,16 +385,15 @@ func requireAdminLogin(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-
 func StartCookieCleaner() {
 	go func() {
 		for {
 			time.Sleep(1 * time.Hour)
 
 			maxTimeHours := 744
-			
+
 			cookiesMu.Lock()
-			for key,value := range cookies {
+			for key, value := range cookies {
 				if time.Now().After(value.Time.Add(time.Hour * time.Duration(maxTimeHours))) {
 					delete(cookies, key)
 				}
@@ -354,81 +405,79 @@ func StartCookieCleaner() {
 
 func RandomCharacters() string {
 	awailable := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
-	
+
 	rand.Seed(time.Now().UnixNano())
 
 	length := 32
 	s := make([]rune, length)
-	for i:=0;i<length;i++ {
+	for i := 0; i < length; i++ {
 		s[i] = awailable[rand.Intn(len(awailable))]
 	}
 
 	return string(s)
 }
 
-
 func Downloader(w http.ResponseWriter, r *http.Request) {
-		//fs := http.FileServer(http.Dir("."))
+	//fs := http.FileServer(http.Dir("."))
 
-		path := r.URL.Path
-		path = strings.TrimSuffix(path, "/")
+	path := r.URL.Path
+	path = strings.TrimSuffix(path, "/")
 
-		if strings.Contains(path, "downloader.css") {
+	if strings.Contains(path, "downloader.css") {
+		return
+	}
+
+	dirPath := urlPathToFile(path)
+
+	info, err := os.Stat(dirPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "Cant find folder/file, it dosent exit", http.StatusBadRequest)
+			return
+		} else {
+			http.Error(w, "Something went wrong when trying to find the folder", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if info.IsDir() {
+		d := struct {
+			Files    []FileFolderInfo
+			IsRoot   bool
+			BackPath string
+		}{}
+		if path == "/Files/" {
+			d.IsRoot = true
+		} else {
+			pathSplit := strings.Split(path, "/")
+			if len(pathSplit) < 2 {
+				d.BackPath = "/"
+			} else {
+				d.BackPath = "/" + filepath.Join(pathSplit[:len(pathSplit)-1]...)
+			}
+		}
+
+		d.Files, err = getItemsInPath(w, r, dirPath)
+		if err != nil {
+			http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 			return
 		}
 
-		dirPath := urlPathToFile(path)
-
-		info,err := os.Stat(dirPath)
+		tpl, err := template.ParseFiles("html/Downloader.html")
 		if err != nil {
-			if os.IsNotExist(err) {
-				http.Error(w, "Cant find folder/file, it dosent exit", http.StatusBadRequest)
-				return
-			} else {
-				http.Error(w, "Something went wrong when trying to find the folder", http.StatusBadRequest)
-				return
-			}
+			http.Error(w, "Couldnt load page", http.StatusBadRequest)
+			return
 		}
 
-		if info.IsDir() {
-			d := struct{
-				Files []FileFolderInfo
-				IsRoot bool
-				BackPath string
-			}{}
-			if path == "/Files/" {
-				d.IsRoot = true
-			} else {
-				pathSplit := strings.Split(path, "/")
-				if len(pathSplit) < 2 {
-					d.BackPath = "/"
-				} else {
-					d.BackPath = "/" + filepath.Join(pathSplit[:len(pathSplit) - 1]...)
-				}
-			}
-
-
-			d.Files,err = getItemsInPath(w, r, dirPath)
-			if err != nil {
-				http.Error(w, "Cant find folder/file", http.StatusBadRequest)
-				return
-			}
-
-			tpl,err := template.ParseFiles("html/Downloader.html")
-			if err != nil {
-				http.Error(w, "Couldnt load page", http.StatusBadRequest)
-				return
-			}
-
-			err = tpl.Execute(w, d)
-			if err != nil {
-				http.Error(w, "Couldnt load page", http.StatusBadRequest)
-				return
-			}
-		} else {
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+info.Name()+"\"")
-			http.ServeFile(w, r, dirPath)
+		err = tpl.Execute(w, d)
+		if err != nil {
+			http.Error(w, "Couldnt load page", http.StatusBadRequest)
+			return
 		}
+	} else {
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+info.Name()+"\"")
+		http.ServeFile(w, r, dirPath)
+	}
 
 }
 
@@ -436,7 +485,7 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 
 	//tpl.ExecuteTemplate(w, "Upload", nil)
 
-	tpl,err := template.ParseFiles("html/Uploader.html")
+	tpl, err := template.ParseFiles("html/Uploader.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -450,7 +499,7 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUploadData(w http.ResponseWriter, r *http.Request) {
-	
+
 	err := r.ParseMultipartForm(20 << 20)
 	if err != nil {
 		http.Error(w, "Error parsing form", http.StatusBadRequest)
@@ -465,16 +514,16 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 	currentPath := r.FormValue("currentPath")
 
 	os.Mkdir(UploadedFilesDirName, 0755)
-	for _,file := range files {
-		f,_ := file.Open()
+	for _, file := range files {
+		f, _ := file.Open()
 		out, err := os.Create(filepath.Join(UploadedFilesDirName, currentPath, file.Filename))
 		if err != nil {
 			http.Error(w, "Error Downloading File", http.StatusBadRequest)
 			f.Close()
 			continue
 		}
-		
-		_,err = io.Copy(out, f)
+
+		_, err = io.Copy(out, f)
 		if err != nil {
 			http.Error(w, "Error Saving file", http.StatusBadRequest)
 			return
@@ -513,19 +562,19 @@ func makeFolder(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-    }
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func getFolders(w http.ResponseWriter, r *http.Request) {
-	var getFolderData struct{
+	var getFolderData struct {
 		CurrentPath string `json:"currentPath"`
 		FolderToGet string `json:"FolderToGet"`
 	}
 
-	var FoldersReturn struct{
-		Folders []string `json:"Folders"`
-		CurrentPath string `json:"CurrentPath"`
+	var FoldersReturn struct {
+		Folders     []string `json:"Folders"`
+		CurrentPath string   `json:"CurrentPath"`
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&getFolderData)
@@ -533,7 +582,7 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not valid folder data", http.StatusBadRequest)
 		return
 	}
-	
+
 	currentPath := getFolderData.CurrentPath
 	FolderToGet := getFolderData.FolderToGet
 	if currentPath[:1] == "/" {
@@ -552,7 +601,7 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _,Dir := range Dirs {
+	for _, Dir := range Dirs {
 		if Dir.IsDir() {
 			FoldersReturn.Folders = append(FoldersReturn.Folders, Dir.Name())
 		}
@@ -575,12 +624,12 @@ func search(w http.ResponseWriter, r *http.Request) {
 	} else {
 		finalPath = UploadedFilesDirName + "/."
 	}
-	
+
 	var results []FileFolderInfo
 	if query != "" {
 		results = searchFileFolder(finalPath, query)
 	} else {
-		FileFolders,err := getItemsInPath(w,r, finalPath)
+		FileFolders, err := getItemsInPath(w, r, finalPath)
 		if err != nil {
 			http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 			return
@@ -598,10 +647,10 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) ([]FileFolderInfo, error) {
 	var Items []FileFolderInfo
-	var ArgNeeded struct{
+	var ArgNeeded struct {
 		UrlPath string `json:"urlPath"`
 	}
-	
+
 	var path string
 	if PathString == "" {
 		path = urlPathToFile(ArgNeeded.UrlPath)
@@ -614,8 +663,8 @@ func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) (
 		http.Error(w, "Could not read files from path", http.StatusBadRequest)
 		return Items, fmt.Errorf("Could not read files from path")
 	}
-	
-	for _,file := range FilesFolders {
+
+	for _, file := range FilesFolders {
 		isDir, isImg, isVid, isAudio := checkExtension(file.Name(), file.IsDir())
 
 		info, err := file.Info()
@@ -624,14 +673,14 @@ func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) (
 		}
 
 		Items = append(Items, FileFolderInfo{
-			Name: info.Name(),
-			Path: FilePathToUrl(filepath.Join(path, info.Name())),
-			IsDir: isDir,
-			IsImg: isImg,
+			Name:    info.Name(),
+			Path:    FilePathToUrl(filepath.Join(path, info.Name())),
+			IsDir:   isDir,
+			IsImg:   isImg,
 			IsAudio: isAudio,
-			IsVid: isVid,
-			Size: int(info.Size()),
-			Date: info.ModTime(),
+			IsVid:   isVid,
+			Size:    int(info.Size()),
+			Date:    info.ModTime(),
 		})
 	}
 
@@ -640,10 +689,10 @@ func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) (
 
 func getItemFromPath(w http.ResponseWriter, r *http.Request, PathString string) FileFolderInfo {
 	var Item FileFolderInfo
-	var ArgNeeded struct{
+	var ArgNeeded struct {
 		UrlPath string `json:"urlPath"`
 	}
-	
+
 	var path string
 	if PathString == "" {
 		path = urlPathToFile(ArgNeeded.UrlPath)
@@ -656,16 +705,16 @@ func getItemFromPath(w http.ResponseWriter, r *http.Request, PathString string) 
 		http.Error(w, "Could not read files from path", http.StatusBadRequest)
 		return FileFolderInfo{}
 	}
-	
+
 	isDir, isImg, isVid, isAudio := checkExtension(file.Name(), file.IsDir())
 
 	Item = FileFolderInfo{
-		Name: file.Name(),
-		Path: FilePathToUrl(strings.Join([]string{path, file.Name()}, "/")),
-		IsDir: isDir,
-		IsImg: isImg,
+		Name:    file.Name(),
+		Path:    FilePathToUrl(strings.Join([]string{path, file.Name()}, "/")),
+		IsDir:   isDir,
+		IsImg:   isImg,
 		IsAudio: isAudio,
-		IsVid: isVid,
+		IsVid:   isVid,
 	}
 
 	return Item
@@ -675,7 +724,7 @@ func checkExtension(fileName string, isDir bool) (bool, bool, bool, bool) {
 	Extensions := map[string][]string{
 		"Images": []string{".jpg", ".jpeg", ".png", ".gif"},
 		"Videos": []string{".mp4", ".mkv", ".mov", ".webm"},
-		"Audio": []string{".mp3", ".wav"},
+		"Audio":  []string{".mp3", ".wav"},
 	}
 
 	var isImg bool
@@ -684,9 +733,9 @@ func checkExtension(fileName string, isDir bool) (bool, bool, bool, bool) {
 	if isDir {
 		return isDir, isImg, isVid, isAudio
 	} else {
-		for Type,ExtList := range Extensions {
-			for _,Ext := range ExtList {
-				if fileName[len(fileName) - len(Ext):] == Ext {
+		for Type, ExtList := range Extensions {
+			for _, Ext := range ExtList {
+				if fileName[len(fileName)-len(Ext):] == Ext {
 					if Type == "Images" {
 						isImg = true
 					} else if Type == "Videos" {
@@ -722,12 +771,12 @@ func FilePathToUrl(filePath string) string {
 
 func searchFileFolder(path string, query string) []FileFolderInfo {
 	var results []FileFolderInfo
-	entries,_ := os.ReadDir(path)
-	
+	entries, _ := os.ReadDir(path)
+
 	for _, entry := range entries {
 		fullPath := filepath.Join(path, entry.Name())
 
-		if entry.IsDir(){
+		if entry.IsDir() {
 			results = append(results, searchFileFolder(fullPath, query)...)
 		} else {
 			if strings.Contains(strings.ToLower(entry.Name()), strings.ToLower(query)) {
@@ -743,10 +792,10 @@ func searchFileFolder(path string, query string) []FileFolderInfo {
 				var d FileFolderInfo
 				d.Name = info.Name()
 				d.IsDir, d.IsImg, d.IsVid, d.IsAudio = checkExtension(info.Name(), false)
-				d.Path = "/Files/" + relPath 
+				d.Path = "/Files/" + relPath
 				d.Size = int(info.Size())
 				d.Date = info.ModTime()
-			
+
 				results = append(results, d)
 			}
 		}
@@ -756,7 +805,7 @@ func searchFileFolder(path string, query string) []FileFolderInfo {
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
-	var deleteData struct{
+	var deleteData struct {
 		Path string `json:"path"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&deleteData)
@@ -777,9 +826,9 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func Rename(w http.ResponseWriter, r *http.Request) {
-	var renameData struct{
+	var renameData struct {
 		CurrentFilenamePath string `json:"currentFilenamePath"`
-		NewFileName string `json"newFileName"`
+		NewFileName         string `json"newFileName"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&renameData)
 	if err != nil {
@@ -789,9 +838,9 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 
 	currentFilePathSplit := strings.Split(renameData.CurrentFilenamePath, "/")
 	currentFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:], "/"))
-	newFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:len(currentFilePathSplit) - 1], "/"), renameData.NewFileName)
+	newFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:len(currentFilePathSplit)-1], "/"), renameData.NewFileName)
 
-	curentFileName := currentFilePathSplit[len(currentFilePathSplit) - 1]
+	curentFileName := currentFilePathSplit[len(currentFilePathSplit)-1]
 	if curentFileName != renameData.NewFileName {
 		err := os.Rename(currentFilePath, newFilePath)
 		if err != nil {
@@ -806,7 +855,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 }
 
 func AdminPanel(w http.ResponseWriter, r *http.Request) {
-	tpl,err := template.ParseFiles("html/AdminPanel.html")
+	tpl, err := template.ParseFiles("html/AdminPanel.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -820,7 +869,7 @@ func AdminPanel(w http.ResponseWriter, r *http.Request) {
 }
 
 func AdminPanelCreateUser(w http.ResponseWriter, r *http.Request) {
-	tpl,err := template.ParseFiles("html/AdminPanelCreateUser.html")
+	tpl, err := template.ParseFiles("html/AdminPanelCreateUser.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -843,21 +892,26 @@ func AdminPanelCreateUserData(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	authority := r.FormValue("authority")
 
-	d,exists := userLoginDataMap[strings.ToLower(username)]
-	if exists {
-		http.Error(w, "User already exists", http.StatusBadRequest)
-		return
+	var exists bool
+	err = db.QueryRow("select exists(select 1 from users where username = ?)", strings.ToLower(username)).Scan(&exists)
+	if err == sql.ErrNoRows {
+		HashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "Cant hash password", http.StatusBadRequest)
+			return
+		}
+		_, err = db.Exec("insert into users (username, originalUsername, password_hash, authority) values (?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), strings.ToLower(authority))
+		if err != nil {
+			http.Error(w, "Could not create user", http.StatusBadRequest)
+			return
+		}
+	} else if err != nil {
+			http.Error(w, "Something went wrong with database, could not check if user exists or not", http.StatusBadRequest)
+			return
+	} else {
+			http.Error(w, "User already exists", http.StatusBadRequest)
+			return
 	}
-	
-	d.OriginalUsername = username
-	HashedPass,err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, "Cant hash password", http.StatusBadRequest)
-		return
-	}
-	d.Password = string(HashedPass)
-	d.Authority = authority
 
-	userLoginDataMap[strings.ToLower(username)] = d
 	w.Write([]byte("User Created"))
 }
