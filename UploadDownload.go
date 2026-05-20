@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE drugs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL
+	name TEXT UNIQUE NOT NULL,
+	unit TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS doses (
@@ -40,10 +41,10 @@ CREATE TABLE IF NOT EXISTS doses (
     user_id INTEGER NOT NULL,
     drug_id INTEGER NOT NULL,
     amount REAL NOT NULL,
-    unit TEXT NOT NULL,
     taken_at DATETIME NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(drug_id) REFERENCES drugs(id)
+    FOREIGN KEY(drug_id) REFERENCES drugs(id),
+	UNIQUE(user_id, drug_id, taken_at)
 );
 `
 
@@ -68,6 +69,7 @@ type cookiesStruct struct {
 	Username         string
 	OriginalUsername string
 	Authority        string
+	UserId int
 }
 
 var db *sql.DB
@@ -204,17 +206,98 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type dose struct{
+			DrugName string
+			Unit string
+			Amount int
+			TimeAgo string
+		}
+
 	d := struct {
 		Username string
+		RecentIntakes []dose
 	}{}
 
 	userCookie, _ := r.Cookie("SessionID")
-	usernameOfUserLoggedin := cookies[userCookie.Value].Username
-	err = db.QueryRow("SELECT originalUsername FROM users WHERE username = ?", usernameOfUserLoggedin).Scan(&d.Username)
+	d.Username = cookies[userCookie.Value].OriginalUsername
+	userId := cookies[userCookie.Value].UserId
 
+	rows,err := db.Query("select drug.name,dose.amount,drug.unit,dose.taken_at from doses dose join drugs drug on dose.drug_id = drug.id where user_id = ? order by dose.taken_at desc LIMIT 10", userId)
+	defer rows.Close()
+
+	for rows.Next() {
+		var dose dose
+		var time time.Time
+
+		err := rows.Scan(&dose.DrugName, &dose.Amount, &dose.Unit, &time)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Something went wrong while getting users intakes", http.StatusInternalServerError)
+			continue
+		}
+		
+		dose.TimeAgo = timeToHowLongAgoString(time)
+		d.RecentIntakes = append(d.RecentIntakes, dose)
+	}
+	err = rows.Err();
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong while getting users intakes", http.StatusInternalServerError)
+		return
+	}
+	
 	err = tpl.Execute(w, d)
 	if err != nil {
 		fmt.Println(err)
+	}
+}
+
+func timeToHowLongAgoString(timeArg time.Time) string {
+	diff := time.Now().Sub(timeArg)
+
+	seconds := int(diff.Seconds())
+	minutes := int(diff.Minutes())
+	hours := int(diff.Hours())
+	days := hours / 24
+	months := days / 30
+	years := days / 365
+
+	switch {
+	case seconds < 60:
+		if seconds == 1 {
+			return "1 second ago"
+		}
+		return fmt.Sprintf("%d seconds ago", seconds)
+
+	case minutes < 60:
+		if minutes == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", minutes)
+
+	case hours < 24:
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+
+	case days < 30:
+		if days == 1 {
+			return "1 day ago"
+		}
+		return fmt.Sprintf("%d days ago", days)
+
+	case months < 12:
+		if months == 1 {
+			return "1 month ago"
+		}
+		return fmt.Sprintf("%d months ago", months)
+
+	default:
+		if years == 1 {
+			return "1 year ago"
+		}
+		return fmt.Sprintf("%d years ago", years)
 	}
 }
 
@@ -236,13 +319,77 @@ func Substance(w http.ResponseWriter, r *http.Request) {
 func saveData(w http.ResponseWriter, r *http.Request) {
 	Data := struct{
 		DrugName string `json:"DrugName"`
-		Date string `json:"Date"`
+		Unit string `json:"Unit"`
 		Doses []struct{
-			Time string `json:"Time"`
+			Time time.Time `json:"Time"`
 			DoseAmount string `json:"DoseAmount"`
 		} `json:"Doses"`
 	}{}
 
+	err := json.NewDecoder(r.Body).Decode(&Data)
+	if err != nil {
+		fmt.Println("Couldnt decode data, something went wrong")
+		http.Error(w, "Couldnt decode data, something went wrong", http.StatusBadRequest)
+		return
+	}
+
+	var drugId int64
+	err = db.QueryRow("select id from drugs where name = ?", strings.ToLower(Data.DrugName)).Scan(&drugId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			drugAddedD,err := db.Exec("insert into drugs (name,unit) values(?, ?)", strings.ToLower(Data.DrugName), strings.ToLower(Data.Unit))
+			if err != nil {
+				fmt.Println(err)
+			}
+			drugIdFromAdded, err := drugAddedD.LastInsertId()
+			if err != nil {
+				fmt.Println(err)
+			}
+			drugId = drugIdFromAdded
+		} else {
+			fmt.Println(err)
+			http.Error(w, "Something went wrong with database, could not check if drug exists or not", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	SessionId, err := r.Cookie("SessionID")
+	userId := cookies[SessionId.Value].UserId
+
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+		return
+	}
+	stmt, err := tx.Prepare(
+		"INSERT OR IGNORE INTO doses (user_id, drug_id, amount, taken_at) VALUES (?, ?, ?, ?)",
+	)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+		return
+	}
+	defer stmt.Close()
+
+	for _,dose := range Data.Doses {
+		_,err = stmt.Exec(userId, drugId, dose.DoseAmount, dose.Time)
+		if err != nil {
+			fmt.Println(err)
+			tx.Rollback()
+			http.Error(w, "Could not add dose to database", http.StatusBadRequest)
+			return
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
+		return
+	}
+	
+	w.WriteHeader(200)
 }
 
 func Journal(w http.ResponseWriter, r *http.Request) {
@@ -294,13 +441,15 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	var originalUsername string
 	var authority string
 	var password string
-	err = db.QueryRow("select originalUsername,authority,password, from users where username = ?", strings.ToLower(UserLoginData.Username)).Scan(&originalUsername,&authority, &password)
+	var userId int
+	err = db.QueryRow("select originalUsername,authority,password_hash,id from users where username = ?", strings.ToLower(UserLoginData.Username)).Scan(&originalUsername,&authority, &password, &userId)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "User Dosent Exist", http.StatusBadRequest)
 			return
 		} else {
-			http.Error(w, "Cat not query from database rn", http.StatusBadRequest)
+			http.Error(w, "Can not query from database rn", http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -324,7 +473,8 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	c.Time = time.Now()
 	c.Username = strings.ToLower(UserLoginData.Username)
 	c.OriginalUsername = originalUsername
-	c.Authority = authority
+	c.Authority = strings.ToLower(authority)
+	c.UserId = userId
 	cookies[randomCookie] = c
 
 	w.WriteHeader(http.StatusOK)
@@ -374,7 +524,7 @@ func requireAdminLogin(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		d, ok := cookies[SessionId.Value]
-		if !ok || d.Authority != "Admin" {
+		if !ok || strings.ToLower(d.Authority) != "admin" {
 			fmt.Printf("[%s] DENY IP=%s USER=%s PATH=%s REASON=invalid_sessionOrNoAuthority\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
@@ -525,7 +675,7 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 
 		_, err = io.Copy(out, f)
 		if err != nil {
-			http.Error(w, "Error Saving file", http.StatusBadRequest)
+			http.Error(w, "Error Saving file", http.StatusInternalServerError)
 			return
 		}
 
@@ -894,23 +1044,27 @@ func AdminPanelCreateUserData(w http.ResponseWriter, r *http.Request) {
 
 	var exists bool
 	err = db.QueryRow("select exists(select 1 from users where username = ?)", strings.ToLower(username)).Scan(&exists)
-	if err == sql.ErrNoRows {
-		HashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-		if err != nil {
-			http.Error(w, "Cant hash password", http.StatusBadRequest)
-			return
-		}
-		_, err = db.Exec("insert into users (username, originalUsername, password_hash, authority) values (?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), strings.ToLower(authority))
-		if err != nil {
-			http.Error(w, "Could not create user", http.StatusBadRequest)
-			return
-		}
-	} else if err != nil {
-			http.Error(w, "Something went wrong with database, could not check if user exists or not", http.StatusBadRequest)
-			return
-	} else {
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong with database, could not check if user exists or not", http.StatusInternalServerError)
+		return
+	}
+
+	if exists {
 			http.Error(w, "User already exists", http.StatusBadRequest)
 			return
+	}
+
+	HashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Cant hash password", http.StatusBadRequest)
+		return
+	}
+	_, err = db.Exec("insert into users (username, originalUsername, password_hash, pathToProfilePic, authority) values (?, ?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), "/profiles/Default/default.png", strings.ToLower(authority))
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Could not create user", http.StatusBadRequest)
+		return
 	}
 
 	w.Write([]byte("User Created"))

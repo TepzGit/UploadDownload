@@ -46,7 +46,7 @@
             <div id="doses">
             </div>
                 <div class="bottombar" >
-                    <button class="btn" onclick="downloadChart()">Save Data</button>
+                    <button class="btn" onclick="saveChart()">Save Data</button>
                     <a class="btn" href="/journal">Back</a>
                 </div>
         </div>
@@ -307,12 +307,24 @@
 		})
 
         dosesDiv = document.getElementById("doses")
+		time = document.querySelector("#doseStartHour").value
+
+		if (time == "") {
+			const now = new Date();
+			const hours = String(now.getHours()).padStart(2, "0");
+			const minutes = String(now.getMinutes()).padStart(2, "0");
+
+			time = `${hours}:${minutes}`;
+		} else {
+			time = formatTime(time)
+		}
+
         newDoseDiv = document.createElement("div")
         newDoseDiv.id = "dose"
         newDoseDiv.innerHTML = `
         <p id="drugname" class="drugT">${currentSubstance.name}</p>
         <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value} ${units}</p>
-        <p id="consTime" class="drugT">${formatTime(document.querySelector("#doseStartHour").value)}</p>
+        <p id="consTime" class="drugT">${time}</p>
         <input type="hidden" class="doseNumber" value='${dosesDiv.querySelectorAll(".dose").length+1}'>
         <div id="delete" onclick="DeleteDose(this)"> 
         <p class="closebtn">Delete</p> 
@@ -476,32 +488,44 @@
             title: 'Combined Graph (Y-values summed)',
         };
 	}
-    function downloadChart() {
+    async function saveChart() {
         data = {
             DrugName: currentSubstance.name,
-            Date: "",
+			Unit: units,
             Doses: [],
         }
         
         const today = new Date();
         const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0'); // months are 0-indexed
+        const month = String(today.getMonth() + 1).padStart(2, '0');
         const day = String(today.getDate()).padStart(2, '0');
 
-        data.Date = `${day}/${month}/${year}`;
-
         doses = document.querySelector("#doses").querySelectorAll("#dose")
-        console.log(doses)
         for (let i=0;i<doses.length;i++) {
             dose = doses[i]
+			hourMin = dose.querySelector("#consTime").textContent
+			const DateTaken = new Date(`${year}-${month}-${day}T${hourMin}:00`);
+
             data.Doses.push({
-                Time: dose.querySelector("#consTime").textContent,
-                DoseAmount: dose.querySelector("#drugdose").textContent,
+				Time: DateTaken.toISOString(),
+                DoseAmount: dose.querySelector("#drugdose").textContent.trim().split(" ")[0],
             })
         }
 
         const json = JSON.stringify(data, null, 2);
-        const blob = new Blob([json], { type: "application/json" });
+
+		const res = await fetch("/sub/saveData", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: json
+		})
+
+		if (res.ok) {
+			console.log("Succesfully saved data to acc")
+			//Item.remove()
+		}
     }
         </script>
 
