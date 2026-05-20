@@ -23,7 +23,7 @@
                 </div>
                 <div class="buts">
                     <label class="foldbut"  onclick="window.location.pathname='/journal'">Journal</label>
-					{{if eq .SessionInfo.Authority "Admin"}}
+					{{if eq .SessionInfo.Authority "admin"}}
                     <label class="foldbut" style="color: #ff0000"  onclick="window.location.pathname='/admin'">Admin</label>
 					{{end}}
                     <label class="foldbut"  onclick='window.location.pathname="/Files"'>Files</label>
