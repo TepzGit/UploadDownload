@@ -195,7 +195,6 @@
         
 		}
 
-		var substanceNameI = ""
 		var units = ""
 
 		let onset = 0
@@ -479,10 +478,11 @@
 	}
     function downloadChart() {
         data = {
-            DrugName: substanceNameI,
+            DrugName: currentSubstance.name,
             Date: "",
             Doses: [],
         }
+        
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0'); // months are 0-indexed
@@ -490,18 +490,18 @@
 
         data.Date = `${day}/${month}/${year}`;
 
-        for (let i=0;i<addedDosesX.length;i++) {
-            data.Doses.push({x: addedDosesX[i], y: addedDosesY[i]})
+        doses = document.querySelector("#doses").querySelectorAll("#dose")
+        console.log(doses)
+        for (let i=0;i<doses.length;i++) {
+            dose = doses[i]
+            data.Doses.push({
+                Time: dose.querySelector("#consTime").textContent,
+                DoseAmount: dose.querySelector("#drugdose").textContent,
+            })
         }
+
         const json = JSON.stringify(data, null, 2);
         const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${substanceNameI.replace(/\s+/g, "_")}_${day}-${month}-${year}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-
     }
         </script>
 
