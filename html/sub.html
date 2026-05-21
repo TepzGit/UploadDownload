@@ -1,6 +1,4 @@
-
-<html>
-    <head>
+<html><head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>Substance</title>
@@ -9,47 +7,82 @@
         <link rel="stylesheet" href="/sub.css">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    </head>
+    <style id="plotly.js-style-global"></style></head>
     <body>
 
 
-           <div id="app">
-            <h2 class="title" >Substance Timeline</h2>
+           
+<div id="cont">
+    <div id="sidebar">
+  
+<div id="sideheader">
+  
+<h1 id="xentara">Xentara</h1>
+    <div id="butcont">
+        <a href="/Profile" id="but">
+
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M16 9C16 11.2091 14.2091 13 12 13C9.79086 13 8 11.2091 8 9C8 6.79086 9.79086 5 12 5C14.2091 5 16 6.79086 16 9ZM14 9C14 10.1046 13.1046 11 12 11C10.8954 11 10 10.1046 10 9C10 7.89543 10.8954 7 12 7C13.1046 7 14 7.89543 14 9Z" fill="currentColor"></path>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12C23 5.92487 18.0751 1 12 1ZM3 12C3 14.0902 3.71255 16.014 4.90798 17.5417C6.55245 15.3889 9.14627 14 12.0645 14C14.9448 14 17.5092 15.3531 19.1565 17.4583C20.313 15.9443 21 14.0524 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12ZM12 21C9.84977 21 7.87565 20.2459 6.32767 18.9878C7.59352 17.1812 9.69106 16 12.0645 16C14.4084 16 16.4833 17.1521 17.7538 18.9209C16.1939 20.2191 14.1881 21 12 21Z" fill="currentColor"></path>
+            </svg>
+        </a>
+
+    </div>
+</div>
+  <div id="contt">
+
+        <a href="/journal" id="option">Journal</a>
+        <a href="/Files/" id="option">Files</a>
+        <a href="/" id="option">Home</a>
+        </div>
+
+    </div>
+      <div id="plot">
+
+        <div id="plotdiv">
+  <div id="myPlot" class="js-plotly-plot"></div>
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            </div>
+
+    </div>
+    <div id="app">
+            <h2 class="title">Substance Timeline</h2>
 
             <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <input id="input" placeholder="Enter substance (e.g. lsd)" >
+                <input id="input" placeholder="Enter substance (e.g. lsd)">
                 <button class="searchbtn" onclick="search()">Search</button>
             </div>
             
-            <div id="sug">
+            <div id="sug" style="visibility: collapse;">
                 <div id="sugC">
                  </div>
             </div>
 
 
 
-               <div id="dosePanel" >
+               <div id="dosePanel" style="display: flex;">
                     <input id="doseInput" placeholder="Dose (e.g. 300)">
-                    <input id="doseStartHour" type="time" placeholder="Start hour" >
+                    <input id="doseStartHour" type="time" placeholder="Start hour">
                     <button class="addbtn" onclick="addDose()">Add Dose</button>
-                    <button class="resetbtn"  onclick="resetGraph()">Reset</button>
+                    <button class="resetbtn" onclick="resetGraph()">Reset</button>
                </div>
 
-            <p id="status" ></p>
+            <p id="status">Loaded: Pregabalin (common dose: 225)</p>
 
-            <div id="multiplierInfo">
+            <div id="multiplierInfo" style="display: none;">
                 <h3 class="titlee">Dose Multipliers</h3>
-                <div id="multiplierList" ></div>
+                <div id="multiplierList"></div>
             </div>
-            <div id="myPlot" ></div>
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
             <div id="doses">
-            </div>
-                <div class="bottombar" >
+        </div>
+            <div class="bottombar">
                     <button class="btn" onclick="saveChart()">Save Data</button>
                     <a class="btn" href="/journal">Back</a>
                 </div>
-        </div>
+            </div>
+                
+        
+</div>
 
         <script>
 
@@ -145,7 +178,7 @@
         let chart;
         let currentSubstance = null;
         let currentCommonDose = null;
-        let addedDoses = []; // Array of {dose, startHour, multiplier}
+        let addedDoses = []; 
 
 
         function fetchGraphQL(query) {
@@ -364,7 +397,7 @@
         let hours = Math.floor(value);
         let minutes = Math.round((value - hours) * 60);
 
-        // fix rounding overflow (e.g. 1.999 → 2:00)
+        
         if (minutes === 60) {
             hours += 1;
             minutes = 0;
@@ -374,7 +407,7 @@
 }
 	
     
-	// Points format [{x:0, y: 0}, {x:1, y:1}]
+	
 	function drawChart() {
         var allX = [];
         addedDoses.forEach(dose => 
@@ -399,7 +432,7 @@
 			allTimeX.push(finalX);
 		});
 
-        // Step 3: Compute combined Y-values
+        
         var combinedY = [];
         allX.forEach(x => {
             yTotal = 0;
@@ -427,7 +460,7 @@
         });
 
 
-        // Step 4: Plot
+        
         var trace = {
             x: allX,
             y: combinedY,
@@ -440,18 +473,18 @@
         
             line: {
                 color: 'rgb(107, 51, 150)',
-                width: 3,
+                width: 5,
                 dash: 'solid'
             },
              marker: {
                 size: 1,
                 color: 'rgb(139, 71, 192)',
                 opacity: 0.5,
-                symbol: 'circle' // square, diamond, cross, etc.
+                symbol: 'circle' 
                
             },
-            fill: 'tozeroy', // key for filling graph
-            fillcolor: 'rgb(139, 71, 192)', // fill color with transparency
+            fill: 'tozeroy', 
+            fillcolor: 'rgba(140, 71, 192, 0.47)', 
             
         };
 		
@@ -524,10 +557,10 @@
 
 		if (res.ok) {
 			console.log("Succesfully saved data to acc")
-			//Item.remove()
+			
 		}
     }
         </script>
 
-    </body>
-</html>
+    
+<svg id="js-plotly-tester" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="position: absolute; left: -10000px; top: -10000px; width: 9000px; height: 9000px; z-index: 1;"><path class="js-reference-point" d="M0,0H1V1H0Z" style="stroke-width: 0px; fill: black;"></path></svg></body><style type="text/css"></style></html>
