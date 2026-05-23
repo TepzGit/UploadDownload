@@ -542,6 +542,7 @@
             data.Doses.push({
 				Time: DateTaken.toISOString(),
                 DoseAmount: dose.querySelector("#drugdose").textContent.trim().split(" ")[0],
+                Unit: dose.querySelector("#drugdose").textContent.trim().split(" ")[1],
             })
         }
 
