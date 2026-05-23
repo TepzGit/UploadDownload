@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -14,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"database/sql"
+
 	_ "github.com/mattn/go-sqlite3"
 
 	"golang.org/x/crypto/bcrypt"
@@ -32,8 +34,18 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE drugs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT UNIQUE NOT NULL,
-	unit TEXT NOT NULL
+	name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE drug_method_info (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drug_id INTEGER NOT NULL,
+    method_way STRING NOT NULL,
+    unit TEXT NOT NULL,
+
+    UNIQUE(drug_id, method_way),
+
+    FOREIGN KEY(drug_id) REFERENCES drugs(id)
 );
 
 CREATE TABLE IF NOT EXISTS doses (
@@ -41,10 +53,24 @@ CREATE TABLE IF NOT EXISTS doses (
     user_id INTEGER NOT NULL,
     drug_id INTEGER NOT NULL,
     amount REAL NOT NULL,
+	unit TEXT NOT NULL,
+	method_way STRING NOT NULL, 
     taken_at DATETIME NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(drug_id) REFERENCES drugs(id),
 	UNIQUE(user_id, drug_id, taken_at)
+);
+
+CREATE TABLE IF NOT EXISTS user_drug_color_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    drug_id INTEGER NOT NULL,
+    color TEXT NOT NULL,
+
+    UNIQUE(user_id, drug_id),
+
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(drug_id) REFERENCES drugs(id)
 );
 `
 
@@ -69,7 +95,21 @@ type cookiesStruct struct {
 	Username         string
 	OriginalUsername string
 	Authority        string
-	UserId int
+	UserId           int
+}
+
+type psychonautwikiApiStruct struct {
+	Data struct {
+		Substances []struct {
+			Name string `json:"name"`
+			ROAs []struct {
+				Name string `json:"name"`
+				Dose struct {
+					Units string `json:"units"`
+				} `json:"dose"`
+			} `json:"roas"`
+		} `json:"substances"`
+	} `json:"data"`
 }
 
 var db *sql.DB
@@ -112,6 +152,7 @@ func main() {
 	http.HandleFunc("/search", requireLogin(search))
 	http.HandleFunc("/delete", requireLogin(Delete))
 	http.HandleFunc("/rename", requireLogin(Rename))
+	http.HandleFunc("/journalImport", requireLogin(journalImport))
 	http.HandleFunc("/sub/saveData", requireLogin(saveData))
 	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
 
@@ -147,6 +188,13 @@ func main() {
 		})
 	}
 
+	cookies["test"] = cookiesStruct{
+		Time:             time.Now(),
+		Username:         "test",
+		OriginalUsername: "test",
+		Authority:        "admin",
+		UserId:           1,
+	}
 
 	db, err = sql.Open("sqlite3", DataBaseFileName)
 	if err != nil {
@@ -206,50 +254,354 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type dose struct{
-			DrugName string
-			Unit string
-			Amount int
-			TimeAgo string
-		}
+	type dose struct {
+		DrugName   string
+		Unit       string
+		Amount     int
+		TimeAgo    string
+		Method_way string
+	}
+	type Totals struct {
+		Name        string
+		TotalAmount int
+		Unit        string
+	}
 
 	d := struct {
-		Username string
+		Username      string
 		RecentIntakes []dose
-	}{}
+		Totals        map[string]Totals
+	}{
+		Totals: make(map[string]Totals),
+	}
 
 	userCookie, _ := r.Cookie("SessionID")
 	d.Username = cookies[userCookie.Value].OriginalUsername
 	userId := cookies[userCookie.Value].UserId
 
-	rows,err := db.Query("select drug.name,dose.amount,drug.unit,dose.taken_at from doses dose join drugs drug on dose.drug_id = drug.id where user_id = ? order by dose.taken_at desc LIMIT 10", userId)
+	rows, err := db.Query(`
+	SELECT
+		drug.name,
+		dose.amount,
+		dose.unit,
+		dose.taken_at,
+		dose.method_way
+	FROM doses dose
+	JOIN drugs drug ON dose.drug_id = drug.id
+	WHERE dose.user_id = ?
+	ORDER BY dose.taken_at DESC
+	LIMIT 10;
+	`, userId)
 	defer rows.Close()
 
 	for rows.Next() {
 		var dose dose
-		var time time.Time
+		var ti time.Time
 
-		err := rows.Scan(&dose.DrugName, &dose.Amount, &dose.Unit, &time)
+		err := rows.Scan(&dose.DrugName, &dose.Amount, &dose.Unit, &ti, &dose.Method_way)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Something went wrong while getting users intakes", http.StatusInternalServerError)
 			continue
 		}
-		
-		dose.TimeAgo = timeToHowLongAgoString(time)
+
+		dose.TimeAgo = timeToHowLongAgoString(ti)
 		d.RecentIntakes = append(d.RecentIntakes, dose)
+
+		t := d.Totals[dose.DrugName]
+		t.TotalAmount += dose.Amount
+		t.Unit = dose.Unit
+		t.Name = dose.DrugName
+		d.Totals[dose.DrugName] = t
 	}
-	err = rows.Err();
+	err = rows.Err()
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, "Something went wrong while getting users intakes", http.StatusInternalServerError)
 		return
 	}
-	
+
 	err = tpl.Execute(w, d)
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func journalImport(w http.ResponseWriter, r *http.Request) {
+	var journalData struct {
+		Experiences []struct {
+			Title        string `json:"title"`
+			Text         string `json:"text"`
+			CreationDate int64  `json:"creationDate"`
+			SortDate     int64  `json:"sortDate"`
+			Ingestions   []struct {
+				SubstanceName       string `json:"substanceName"`
+				Time                int64  `json:"time"`
+				ActualTime          time.Time
+				EndTime             *int64  `json:"endTime"`
+				CreationDate        int64   `json:"creationDate"`
+				AdministrationRoute string  `json:"administrationRoute"`
+				Dose                float64 `json:"dose"`
+				IsDoseAnEstimate    bool    `json:"isDoseAndEstimate"`
+				Units               string  `json:"units"`
+				Notes               string  `json:"notes"`
+			}
+		} `json:"experiences"`
+		SubstanceCompanions []struct {
+			SubstanceName string `json:"substanceName"`
+			Color         string `json:"color"`
+		} `json:"substanceCompanions"`
+	}
+
+	json.NewDecoder(r.Body).Decode(&journalData)
+
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+		return
+	}
+	stmt, err := tx.Prepare(
+		"INSERT OR IGNORE INTO doses (user_id, drug_id, amount, taken_at) VALUES (?, ?, ?, ?)",
+	)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+		return
+	}
+	defer stmt.Close()
+
+	tx2, err := db.Begin()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+		return
+	}
+	stmt2, err := tx2.Prepare(
+		"INSERT INTO user_drug_color_settings (user_id, drug_id, color) VALUES (?, ?, ?) ON CONFLICT(user_id, drug_id) DO UPDATE SET color = excluded.color",
+	)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+		return
+	}
+	defer stmt2.Close()
+
+	usercookie, _ := r.Cookie("SessionID")
+	user_id := cookies[usercookie.Value].UserId
+	cacheDrugId := map[string]int64{}
+
+	for _, experience := range journalData.Experiences {
+		for _, ingestion := range experience.Ingestions {
+			ingestion.ActualTime = time.Unix(ingestion.Time/1000, 0)
+
+			drugID, exists := cacheDrugId[strings.ToLower(ingestion.SubstanceName)]
+
+			if !exists {
+				var drugId int64
+				err = db.QueryRow("select id from drugs where name = ?", strings.ToLower(ingestion.SubstanceName)).Scan(&drugId)
+				if err != nil {
+					if err == sql.ErrNoRows {
+						var result psychonautwikiApiStruct
+						query := fmt.Sprintf(`
+						{
+						substances(query: "%s") {
+								name
+								roas {
+									name
+									dose {
+										units
+									}
+								}
+							}
+						}
+						`, ingestion.SubstanceName)
+						QueryPsychonautWiki(query, &result)
+
+						drugAddedD, err := db.Exec("insert into drugs (name) values(?)", strings.ToLower(ingestion.SubstanceName))
+						if err != nil {
+							fmt.Println(err)
+						}
+						drugIdFromAdded, err := drugAddedD.LastInsertId()
+						if err != nil {
+							fmt.Println(err)
+						}
+						drugId = drugIdFromAdded
+
+						txtemp, err := db.Begin()
+						if err != nil {
+							fmt.Println(err)
+							http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+							return
+						}
+						stmttemp, err := txtemp.Prepare(
+							"INSERT OR IGNORE INTO drug_method_info (drug_id, method_way, unit) VALUES (?, ?, ?)",
+						)
+						if err != nil {
+							fmt.Println(err)
+							http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+							return
+						}
+						defer stmttemp.Close()
+
+						for _, roa := range result.Data.Substances[0].ROAs {
+							_, err := stmttemp.Exec(drugId, roa.Name, roa.Dose.Units)
+							if err != nil {
+								fmt.Println(err)
+								txtemp.Rollback()
+								http.Error(w, "Could not add dose to database", http.StatusBadRequest)
+								return
+							}
+						}
+						err = txtemp.Commit()
+						if err != nil {
+							fmt.Println(err)
+							http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
+							return
+						}
+					} else {
+						fmt.Println(err)
+						http.Error(w, "Something went wrong with database, could not check if drug exists or not", http.StatusInternalServerError)
+						return
+					}
+				}
+				cacheDrugId[strings.ToLower(ingestion.SubstanceName)] = drugId
+				drugID = drugId
+			}
+			_, err := stmt.Exec(user_id, drugID, ingestion.Dose, ingestion.ActualTime)
+			if err != nil {
+				fmt.Println(err)
+				tx.Rollback()
+				http.Error(w, "Could not add dose to database", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	for _, color := range journalData.SubstanceCompanions {
+		drugID, exists := cacheDrugId[strings.ToLower(strings.ToLower(color.SubstanceName))]
+
+		if !exists {
+			var drugId int64
+			err = db.QueryRow("select id from drugs where name = ?", strings.ToLower(color.SubstanceName)).Scan(&drugId)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					var result psychonautwikiApiStruct
+					query := fmt.Sprintf(`
+						{
+						substances(query: "%s") {
+								name
+								roas {
+									name
+									dose {
+										units
+									}
+								}
+							}
+						}
+					`, color.SubstanceName)
+					QueryPsychonautWiki(query, &result)
+
+					drugAddedD, err := db.Exec("insert into drugs (name) values(?)", strings.ToLower(color.SubstanceName))
+					if err != nil {
+						fmt.Println(err)
+					}
+					drugIdFromAdded, err := drugAddedD.LastInsertId()
+					if err != nil {
+						fmt.Println(err)
+					}
+					drugId = drugIdFromAdded
+
+					txtemp, err := db.Begin()
+					if err != nil {
+						fmt.Println(err)
+						http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+						return
+					}
+					stmttemp, err := txtemp.Prepare(
+						"INSERT OR IGNORE INTO drug_method_info (drug_id, method_way, unit) VALUES (?, ?, ?)",
+					)
+					if err != nil {
+						fmt.Println(err)
+						http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+						return
+					}
+					defer stmttemp.Close()
+
+					for _, roa := range result.Data.Substances[0].ROAs {
+						_, err := stmttemp.Exec(drugId, roa.Name, roa.Dose.Units)
+						if err != nil {
+							fmt.Println(err)
+							txtemp.Rollback()
+							http.Error(w, "Could not add dose to database", http.StatusBadRequest)
+							return
+						}
+					}
+					err = txtemp.Commit()
+					if err != nil {
+						fmt.Println(err)
+						http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
+						return
+					}
+				} else {
+					fmt.Println(err)
+					http.Error(w, "Something went wrong with database, could not check if drug exists or not", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+		_, err := stmt.Exec(user_id, drugID, color.Color)
+		if err != nil {
+			fmt.Println(err)
+			tx.Rollback()
+			http.Error(w, "Could not add dose to database", http.StatusBadRequest)
+			return
+		}
+
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
+		return
+	}
+	err = tx2.Commit()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
+		return
+	}
+}
+
+func QueryPsychonautWiki(query string, result any) error {
+	reqBody := struct {
+		Query string
+	}{
+		Query: query,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(
+		"https://api.psychonautwiki.org",
+		"application/json",
+		bytes.NewBuffer(jsonBody),
+	)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(body, result)
 }
 
 func timeToHowLongAgoString(timeArg time.Time) string {
@@ -261,6 +613,52 @@ func timeToHowLongAgoString(timeArg time.Time) string {
 	days := hours / 24
 	months := days / 30
 	years := days / 365
+
+	if seconds < 0 {
+		switch {
+		case seconds > -60:
+			if seconds == -1 {
+				return "In 1 second"
+			}
+			withoutMinus := strings.Trim(strconv.Itoa(seconds), "-")
+			return fmt.Sprintf("In %s second", withoutMinus)
+
+		case minutes > -60:
+			if minutes == -1 {
+				return "In 1 minute"
+			}
+			withoutMinus := strings.Trim(strconv.Itoa(minutes), "-")
+			return fmt.Sprintf("In %s minutes", withoutMinus)
+
+		case hours > -24:
+			if hours == -1 {
+				return "In 1 hour"
+			}
+			withoutMinus := strings.Trim(strconv.Itoa(hours), "-")
+			return fmt.Sprintf("In %s hours", withoutMinus)
+
+		case days > -30:
+			if days == -1 {
+				return "In 1 day"
+			}
+			withoutMinus := strings.Trim(strconv.Itoa(days), "-")
+			return fmt.Sprintf("In %s days", withoutMinus)
+
+		case months > -12:
+			if months == -1 {
+				return "In 1 month"
+			}
+			withoutMinus := strings.Trim(strconv.Itoa(months), "-")
+			return fmt.Sprintf("In %s months", withoutMinus)
+
+		default:
+			if years == -1 {
+				return "In 1 year"
+			}
+			withoutMinus := strings.Trim(strconv.Itoa(years), "-")
+			return fmt.Sprintf("In %s years", withoutMinus)
+		}
+	}
 
 	switch {
 	case seconds < 60:
@@ -317,12 +715,13 @@ func Substance(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveData(w http.ResponseWriter, r *http.Request) {
-	Data := struct{
+	Data := struct {
 		DrugName string `json:"DrugName"`
-		Unit string `json:"Unit"`
-		Doses []struct{
-			Time time.Time `json:"Time"`
-			DoseAmount string `json:"DoseAmount"`
+		Unit     string `json:"Unit"`
+		Doses    []struct {
+			Time       time.Time `json:"Time"`
+			DoseAmount string    `json:"DoseAmount"`
+			Unit       string    `json:"Unit"`
 		} `json:"Doses"`
 	}{}
 
@@ -337,7 +736,22 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow("select id from drugs where name = ?", strings.ToLower(Data.DrugName)).Scan(&drugId)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			drugAddedD,err := db.Exec("insert into drugs (name,unit) values(?, ?)", strings.ToLower(Data.DrugName), strings.ToLower(Data.Unit))
+			var result psychonautwikiApiStruct
+			query := fmt.Sprintf(`
+				{
+				substances(query: "%s") {
+						name
+						roas {
+							name
+							dose {
+								units
+							}
+						}
+					}
+				}
+			`, Data.DrugName)
+			QueryPsychonautWiki(query, &result)
+			drugAddedD, err := db.Exec("insert into drugs (name) values(?)", strings.ToLower(Data.DrugName))
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -346,6 +760,38 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 				fmt.Println(err)
 			}
 			drugId = drugIdFromAdded
+
+			txtemp, err := db.Begin()
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+				return
+			}
+			stmttemp, err := txtemp.Prepare(
+				"INSERT OR IGNORE INTO drug_method_info (drug_id, method_way, unit) VALUES (?, ?, ?)",
+			)
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Something went wrong in server", http.StatusInternalServerError)
+				return
+			}
+			defer stmttemp.Close()
+
+			for _, roa := range result.Data.Substances[0].ROAs {
+				_, err := stmttemp.Exec(drugId, roa.Name, roa.Dose.Units)
+				if err != nil {
+					fmt.Println(err)
+					txtemp.Rollback()
+					http.Error(w, "Could not add dose to database", http.StatusBadRequest)
+					return
+				}
+			}
+			err = txtemp.Commit()
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
+				return
+			}
 		} else {
 			fmt.Println(err)
 			http.Error(w, "Something went wrong with database, could not check if drug exists or not", http.StatusInternalServerError)
@@ -363,7 +809,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stmt, err := tx.Prepare(
-		"INSERT OR IGNORE INTO doses (user_id, drug_id, amount, taken_at) VALUES (?, ?, ?, ?)",
+		"INSERT OR IGNORE INTO doses (user_id, drug_id, amount, taken_at, unit) VALUES (?, ?, ?, ?, ?)",
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -372,8 +818,8 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 	}
 	defer stmt.Close()
 
-	for _,dose := range Data.Doses {
-		_,err = stmt.Exec(userId, drugId, dose.DoseAmount, dose.Time)
+	for _, dose := range Data.Doses {
+		_, err = stmt.Exec(userId, drugId, dose.DoseAmount, dose.Time, dose.Unit)
 		if err != nil {
 			fmt.Println(err)
 			tx.Rollback()
@@ -388,7 +834,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not add all doses to database, something went wrong", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.WriteHeader(200)
 }
 
@@ -427,7 +873,7 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Printf("[%s] NEUTRAL IP=%s PATH=%s REASON=LogginIn\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
 
-	var UserLoginData struct{
+	var UserLoginData struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
@@ -442,7 +888,7 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	var authority string
 	var password string
 	var userId int
-	err = db.QueryRow("select originalUsername,authority,password_hash,id from users where username = ?", strings.ToLower(UserLoginData.Username)).Scan(&originalUsername,&authority, &password, &userId)
+	err = db.QueryRow("select originalUsername,authority,password_hash,id from users where username = ?", strings.ToLower(UserLoginData.Username)).Scan(&originalUsername, &authority, &password, &userId)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "User Dosent Exist", http.StatusBadRequest)
@@ -1051,8 +1497,8 @@ func AdminPanelCreateUserData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if exists {
-			http.Error(w, "User already exists", http.StatusBadRequest)
-			return
+		http.Error(w, "User already exists", http.StatusBadRequest)
+		return
 	}
 
 	HashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

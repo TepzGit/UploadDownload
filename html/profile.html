@@ -1,6 +1,4 @@
-
-<html>
-    <head>
+<html><head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>Profile</title>
@@ -10,9 +8,58 @@
     </head>
     <body>
         <div id="container">
+
+            <div class="popup" id="AP" style="display: flex;">
+                <div class="popcase">
+  <h1>Apperance</h1>
+  <div class="APcontent">
+  <h2>Substance graph colors:</h2>
+  <div id="drugcolor">
+       <p>Pregabalin</p>  <input type="color">   
+  </div>
+  <div id="drugcolor">
+       <p>lisdex</p>  <input type="color">   
+  </div>
+  <div id="drugcolor">
+       <p>lsd</p>  <input type="color">   
+  </div>
+    </div>
+  <a role="button" id="CSA" class="btn">Close</a>
+                </div>
+            </div>
+            
+            <div class="popup" id="DT" style="display: none;">
+                <div class="popcase">
+                    <h1>Data Settings</h1>
+  <div class="content">
+                     <a class="btn">Import Data</a>
+                     <a class="btn">Clear</a>
+    </div>
+  <a role="button" class="btn" id="CSD">Done</a>
+                </div>
+            </div>
+
+            <div class="popup" id="PR">
+                <div class="popcase">
+                    <h1>pr</h1>
+                    <a role="button" id="CSP">Close</a>
+                </div>
+            </div>
+    <div id="options">
+  <a href="#" onclick="history.back(); return false;" class="option" id="back">Back</a>
+     <div id="middle">
+
+        <a role="button" class="option" id="APB">Apearance</a>
+        <a role="button" class="option" id="DTB">Data</a> 
+        <a role="button" class="option" id="PRB">Preferences</a>
+    </div>
+  <a id="home" href="/"><svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 48 48" fill="#ffffff" width="32" height="32">
+<path d="M39.5,43h-9c-1.381,0-2.5-1.119-2.5-2.5v-9c0-1.105-0.895-2-2-2h-4c-1.105,0-2,0.895-2,2v9c0,1.381-1.119,2.5-2.5,2.5h-9	C7.119,43,6,41.881,6,40.5V21.413c0-2.299,1.054-4.471,2.859-5.893L23.071,4.321c0.545-0.428,1.313-0.428,1.857,0L39.142,15.52	C40.947,16.942,42,19.113,42,21.411V40.5C42,41.881,40.881,43,39.5,43z"></path>
+</svg></a>
+    </div>
             <div id="profile">
                 <div id="header">
-                    <h1 id="username">Hookey</h1>
+                    <h1 id="username">test</h1>
                     <div id="profile-pic" class="profile-avatar">
                         <img src="https://i.pinimg.com/736x/86/b5/34/86b53487e37122210591af58182596fb.jpg" alt="Profile Picture">
                         <div class="avatar-overlay">
@@ -27,13 +74,19 @@
                     <h1 id="title">intake:</h1>
                     <div id="intake">
 
-					{{range .RecentIntakes}}
+					
                     <div id="item">
-						<p id="textt">{{.Amount}}{{.Unit}} {{.DrugName}}</p><p id="textt">{{.TimeAgo}}</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
+						<p id="textt">300mg pregabalin</p><p id="textt">In 34 minutes</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
                         <path d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"></path>
                         </svg>
                     </div>
-					{{end}}
+					
+                    <div id="item">
+						<p id="textt">600mg pregabalin</p><p id="textt">2 minutes ago</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
+                        <path d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"></path>
+                        </svg>
+                    </div>
+					
 
                 </div></div>
 
@@ -42,21 +95,80 @@
                     <h1 id="title">Totals:</h1>
                     <div id="intake">
 
+                    
                     <div id="item">
-                        <p id="textt">Prega: x50.</p><p id="textt">total: 20300mg</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
+                        <p id="textt">pregabalin</p><p id="textt">total: 900mg</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
                         <path d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"></path>
                         </svg>
                     </div>
+                    
  
 
                 </div></div>
         
                 </div>
-                    <div class="bottombar">
-                        
-                        <a class="btn" href="/">Back</a>
-                    </div>
+                    
             </div>
+            
         </div>
-    </body>
-</html>
+    
+<style type="text/css"></style>
+
+
+<script>
+    const AP = document.getElementById("AP");
+    const DT = document.getElementById("DT");
+    const PR = document.getElementById("PR");
+
+    const openAP = document.getElementById("APB");
+    const openDT = document.getElementById("DTB");
+    const openPR = document.getElementById("PRB");
+
+    const closeBtnA = document.getElementById("CSA");
+    const closeBtnD = document.getElementById("CSD");
+    const closeBtnP = document.getElementById("CSP");
+
+    const popupTransitionMs = 240;
+
+    function showPopup(popup) {
+        popup.style.display = "flex";
+        requestAnimationFrame(() => {
+            popup.classList.add("active");
+        });
+    }
+
+    function hidePopup(popup) {
+        popup.classList.remove("active");
+        setTimeout(() => {
+            popup.style.display = "none";
+        }, popupTransitionMs);
+    }
+
+    openAP.onclick = (e) => {
+        e.preventDefault();
+        showPopup(AP);
+    };
+
+    openDT.onclick = (e) => {
+        e.preventDefault();
+        showPopup(DT);
+    };
+
+    openPR.onclick = (e) => {
+        e.preventDefault();
+        showPopup(PR);
+    };
+
+    closeBtnA.onclick = () => {
+        hidePopup(AP);
+    };
+
+    closeBtnD.onclick = () => {
+        hidePopup(DT);
+    };
+
+    closeBtnP.onclick = () => {
+        hidePopup(PR);
+    };
+</script>
+<style type="text/css"></style><style type="text/css"></style><style type="text/css"></style></body><style type="text/css"></style></html>
