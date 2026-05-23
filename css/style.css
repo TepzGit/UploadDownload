@@ -35,15 +35,18 @@ body {
 
   position: relative;
   padding: 10px 20px;
-  border-radius: 7px;
-  border: 1px solid #888;
+  border-radius: 5px;
+  
   font-size: 14px;
 
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(10, 10, 10, 0.98);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   color: #ddd;
   overflow: hidden;
-  box-shadow: 0 0 0 0 transparent;
+  
   -webkit-transition: all 0.2s ease-in;
   -moz-transition: all 0.2s ease-in;
   transition: all 0.2s ease-in;
@@ -118,7 +121,7 @@ input {
     padding: 10px 16px;
     width: 200px;
     text-align: center;
-    background: rgb(15, 15, 15);
+
     color: white;
 
     cursor: pointer;
@@ -143,16 +146,18 @@ span {
   font-family: nerd, sans-serif;
   display: flex;
   padding: 10px 20px;
-  border-radius: 7px;
-  border: 1px solid #888;
+  border-radius: 5px;
+  
   font-size: 14px;
   height: 20px;
   width: 40px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(10, 10, 10, 0.98);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   color: #ddd;
   overflow: hidden;
-  box-shadow: 0 0 0 0 transparent;
+
   -webkit-transition: all 0.2s ease-in;
   -moz-transition: all 0.2s ease-in;
   transition: all 0.2s ease-in;
@@ -215,8 +220,9 @@ span {
 	height: 300px;
 	width: 350px;
 
-	border: 2px solid #222222;
-  background-color: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(10, 10, 10, 0.98);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   padding: 10px;
 	
 }
@@ -230,7 +236,7 @@ span {
 }
 
 .FileListings {
-    background-color: #111111;
+    
     order: 5;
     grid-template-columns: repeat(1);
 
@@ -245,8 +251,9 @@ span {
 .filess{
     grid-column: 2;
     grid-row: 1;
-    border: 2px solid #222222;
-    background-color: #111111;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(10, 10, 10, 0.98);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     padding: 10px;
     height: 300px;
     width: 350px;
@@ -290,7 +297,9 @@ span {
     grid-column: 1;
     display: flex;
     flex-direction: column;
-    background-color: #111111;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(10, 10, 10, 0.98);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     align-items: center;
     repeating-conic-gradient(from var(--a, 0deg), var(--l, #0000 0% 70%, #00ff96ff)) border-box;
     gap: 20px;
@@ -298,7 +307,7 @@ span {
     padding: 25px;
     width: 400px;
     min-height: 500px;
-    border: 2px solid #222222;
+    
 
 }
 

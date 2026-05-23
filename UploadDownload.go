@@ -257,14 +257,15 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	type dose struct {
 		DrugName   string
 		Unit       string
-		Amount     int
+		Amount     float64
 		TimeAgo    string
 		Method_way string
 	}
 	type Totals struct {
-		Name        string
-		TotalAmount int
-		Unit        string
+		Name         string
+		TotalAmount  float64
+		Unit         string
+		DisplayTotal string
 	}
 
 	d := struct {
@@ -276,8 +277,18 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userCookie, _ := r.Cookie("SessionID")
-	d.Username = cookies[userCookie.Value].OriginalUsername
-	userId := cookies[userCookie.Value].UserId
+	if err != nil {
+		http.Error(w, "no session", http.StatusUnauthorized)
+		return
+	}
+	session, ok := cookies[userCookie.Value]
+	if !ok {
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	}
+
+	d.Username = session.OriginalUsername
+	userId := session.UserId
 
 	rows, err := db.Query(`
 	SELECT
@@ -292,6 +303,11 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	ORDER BY dose.taken_at DESC
 	LIMIT 10;
 	`, userId)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Database query failed", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 
 	for rows.Next() {
@@ -308,9 +324,14 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		dose.TimeAgo = timeToHowLongAgoString(ti)
 		d.RecentIntakes = append(d.RecentIntakes, dose)
 
+		normalizedAmount, normalizedUnit, err := normalizeAmount(dose.Amount, dose.Unit)
+		if err != nil {
+			continue
+		}
+
 		t := d.Totals[dose.DrugName]
-		t.TotalAmount += dose.Amount
-		t.Unit = dose.Unit
+		t.TotalAmount += normalizedAmount
+		t.Unit = normalizedUnit
 		t.Name = dose.DrugName
 		d.Totals[dose.DrugName] = t
 	}
@@ -320,11 +341,46 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Something went wrong while getting users intakes", http.StatusInternalServerError)
 		return
 	}
+	for name, t := range d.Totals {
+		prettyAmt, prettyUnit := prettyAmount(t.TotalAmount, t.Unit)
+		t.TotalAmount = prettyAmt
+		t.DisplayTotal = strconv.FormatFloat(prettyAmt, 'f', -1, 64)
+		t.Unit = prettyUnit
+		d.Totals[name] = t
+	}
 
 	err = tpl.Execute(w, d)
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func normalizeAmount(amount float64, unit string) (float64, string, error) {
+	switch unit {
+	case "g":
+		return amount * 1_000_000, "ug", nil
+	case "mg":
+		return amount * 1_000, "ug", nil
+	case "ug":
+		return amount, "ug", nil
+	case "ml":
+		return amount, "ml", nil
+	default:
+		return 0, "", fmt.Errorf("unknown unit")
+	}
+}
+
+func prettyAmount(amount float64, unit string) (float64, string) {
+	switch unit {
+	case "ug":
+		if amount >= 1_000_000 {
+			return float64(amount) / 1_000_000, "g"
+		}
+		if amount >= 1_000 {
+			return float64(amount) / 1_000, "mg"
+		}
+	}
+	return float64(amount), unit
 }
 
 func journalImport(w http.ResponseWriter, r *http.Request) {
@@ -722,6 +778,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 			Time       time.Time `json:"Time"`
 			DoseAmount string    `json:"DoseAmount"`
 			Unit       string    `json:"Unit"`
+			Method     string    `json:"Method"`
 		} `json:"Doses"`
 	}{}
 
@@ -755,6 +812,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				fmt.Println(err)
 			}
+			fmt.Println(result.Data.Substances)
 			drugIdFromAdded, err := drugAddedD.LastInsertId()
 			if err != nil {
 				fmt.Println(err)
@@ -809,7 +867,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stmt, err := tx.Prepare(
-		"INSERT OR IGNORE INTO doses (user_id, drug_id, amount, taken_at, unit) VALUES (?, ?, ?, ?, ?)",
+		"INSERT OR IGNORE INTO doses (user_id, drug_id, amount, unit, method_way, taken_at) VALUES (?, ?, ?, ?, ?, ?)",
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -819,7 +877,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 	defer stmt.Close()
 
 	for _, dose := range Data.Doses {
-		_, err = stmt.Exec(userId, drugId, dose.DoseAmount, dose.Time, dose.Unit)
+		_, err = stmt.Exec(userId, drugId, dose.DoseAmount, dose.Unit, dose.Method, dose.Time)
 		if err != nil {
 			fmt.Println(err)
 			tx.Rollback()
@@ -947,7 +1005,6 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 			http.Redirect(w, r, "/Main", http.StatusSeeOther)
 			return
 		}
-
 		fmt.Printf("[%s] ALLOW IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
 
 		// all good → call the real handler

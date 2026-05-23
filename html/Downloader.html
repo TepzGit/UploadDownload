@@ -32,7 +32,7 @@
 			{{range .Files}}
 				<div class="item">
 					{{if .IsDir}}
-					<img class="preview" src="/foldericon.png" alt="no preview available because the file is not an image">
+					<svg id="svgg" fill="#ffffff" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" style="--darkreader-inline-fill: var(--darkreader-background-000000, #000000);" data-darkreader-inline-fill=""><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M11.086 5.5l2.457 2.414 0.629 0.586h15.829v18h-28v-21h9.086zM12 3.5h-10c-1.105 0-2 0.896-2 2v21c0 1.105 0.895 2 2 2h28c1.105 0 2-0.895 2-2v-18c0-1.104-0.895-2-2-2h-15z"></path> </g></svg>
 					<input type="hidden" class="TypeOfFileFolder" value="Dir">
 					{{else if .IsImg}}
 					<img class="preview" src="{{.Path}}" alt="Image">
