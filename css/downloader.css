@@ -123,8 +123,9 @@ body{
     padding: 10px 20px;
     border-radius: 7px;
     border-radius: 5px;
-    border: 1px solid #888;
-    background: rgba(255, 255, 255, 0.08);
+    background-color: rgba(10, 10, 10, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     color: #ddd;
     font-family: nerd, sans-serif ;
 }
@@ -139,14 +140,15 @@ body{
   position: relative;
   padding: 10px 20px;
   border-radius: 7px;
-  border: 1px solid #888;
   font-size: 14px;
 
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
+  
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
   color: #ddd;
   overflow: hidden;
-  box-shadow: 0 0 0 0 transparent;
   -webkit-transition: all 0.2s ease-in;
   -moz-transition: all 0.2s ease-in;
   transition: all 0.2s ease-in;
@@ -237,7 +239,9 @@ body{
     grid-template-columns: repeat(1, minmax(150px, 1fr));
     gap: 20px;
     padding: 20px;
-    background-color: #111111b8;
+    background-color: rgba(10, 10, 10, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     width: calc(100% - 40px);
     max-width: 1280px;
     margin: 20px auto;
@@ -250,7 +254,9 @@ body{
     grid-template-columns: repeat(1, minmax(150px, 1fr));
     gap: 20px;
     padding: 20px;
-    background-color: #111111;
+    background-color: rgba(10, 10, 10, 0.98);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+
     width: calc(100% - 40px);
     max-width: 1280px;
     margin: 20px auto;
@@ -269,7 +275,9 @@ body{
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    background-color: #1e1e1e;
+    background-color: rgba(10, 10, 10, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     border-radius: 5px;
     height: 50px;
     
@@ -328,7 +336,7 @@ body{
   justify-content: center;
   align-items: center;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.397);
-  background: rgba(255, 255, 255, 0.068);
+  background-color: rgba(10, 10, 10, 0.98);
   overflow: hidden;
   font-size: 0.9rem;
   font-weight: 600;
@@ -337,7 +345,6 @@ body{
   margin: 0 5px;
   margin-bottom: 5px;
   transition: 0.2s;
-  border: 1px solid transparent;
   width: 80px;
   height: 20px;
 }
@@ -350,7 +357,7 @@ body{
     rgba(255, 255, 255, 0.247),
     rgba(255, 255, 255, 0.39)
   );
-  box-shadow: 0 4px rgba(255, 255, 255, 0.623);
+  box-shadow: 1px 1px 1px 1px rgba(255, 255, 255, 0.623);
   transform: translateY(-6px);
 }
 
@@ -378,17 +385,24 @@ body{
     margin: 5px;
 }
 
-
+#svgg{
+  margin-left: 15px;
+  border-radius: 5px;
+  height: 50px;
+  width: 50px;
+}
 
 .Upload {
   position: relative;
   padding: 10px 20px;
-  border-radius: 7px;
-  border: 1px solid #888;
+  border-radius: 5px;
+
   font-size: 14px;
 
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   color: #ddd;
   overflow: hidden;
   box-shadow: 0 0 0 0 transparent;

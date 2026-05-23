@@ -197,6 +197,7 @@
                     name
 
                     roas {
+                        name
                         duration {
                             onset { min max units }
                             comeup { min max units }
@@ -356,6 +357,7 @@
         newDoseDiv.id = "dose"
         newDoseDiv.innerHTML = `
         <p id="drugname" class="drugT">${currentSubstance.name}</p>
+        <p id="drugMethod" style="display: none" class="drugT">${currentSubstance.roas[0].name}</p>
         <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value} ${units}</p>
         <p id="consTime" class="drugT">${time}</p>
         <input type="hidden" class="doseNumber" value='${dosesDiv.querySelectorAll(".dose").length+1}'>
@@ -543,6 +545,7 @@
 				Time: DateTaken.toISOString(),
                 DoseAmount: dose.querySelector("#drugdose").textContent.trim().split(" ")[0],
                 Unit: dose.querySelector("#drugdose").textContent.trim().split(" ")[1],
+                Method: dose.querySelector("#drugMethod").textContent.trim()
             })
         }
 
