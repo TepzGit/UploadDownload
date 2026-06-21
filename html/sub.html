@@ -31,25 +31,35 @@
 </div>
   <div id="contt">
 
-        <a href="/journal" id="option">Journal</a>
-        <a href="/Files/" id="option">Files</a>
-        <a href="/" id="option">Home</a>
+                    <a href="/journal" class="option" id="journal">
+                        <img src="icons/journal.png" id="subicon"></img>
+                    </a>
+                    <a href="/Files" class="option" id="files">
+                        <img src="icons/files.png" id="subicon"></img>
+                    </a>
+                    <a href="/" class="option" id="home">
+                        <img src="icons/home.png" id="subicon"></img>
+                    </a>
         </div>
 
     </div>
       <div id="plot">
 
         <div id="plotdiv">
-  <div id="myPlot" class="js-plotly-plot"></div>
-            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <div id="myPlot" class="js-plotly-plot"></div>
+            <script src="/Substance_files/plotly-latest.min.js"></script>
+            <div id="doses">
+            
+            
+            </div>
             </div>
 
     </div>
-    <div id="app">
+   <div id="app">
             <h2 class="title">Substance Timeline</h2>
 
             <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <input id="input" placeholder="Enter substance (e.g. lsd)">
+                <input id="input" placeholder="Enter substance (e.g. lsd)" value="Pregabalin">
                 <button class="searchbtn" onclick="search()">Search</button>
             </div>
             
@@ -61,28 +71,55 @@
 
 
                <div id="dosePanel" style="display: flex;">
-                    <input id="doseInput" placeholder="Dose (e.g. 300)">
-                    <input id="doseStartHour" type="time" placeholder="Start hour">
+                    <input id="doseInput" placeholder="Dose (e.g. 300)" value="300">
+                    <input id="doseStartHour" type="time" placeholder="Start hour" value="00:00">
                     <button class="addbtn" onclick="addDose()">Add Dose</button>
                     <button class="resetbtn" onclick="resetGraph()">Reset</button>
                </div>
 
-            <p id="status">Loaded: Pregabalin (common dose: 225)</p>
+            <p id="status">Choose Substance</p>
+            <div class="infocard"></div>
+            <div class="infocard1">
 
+                <div class="cat-header,cat-caution">
+                    <div class="cat-icon" aria-hidden="true">⚠</div>
+                    <span class="cat-title">Caution</span>
+                </div>
+                <div class="pills">
+                    
+                </div></div><div class="category cat-danger">
+                    
+                <div class="cat-header,cat-danger">
+                <div class="cat-icon" aria-hidden="true">♥</div>
+                <span class="cat-title">Dangerous</span>
+                </div>
+                <div class="pills">
+               
+                </div></div><div class="category cat-severe">
+
+                <div class="cat-header">
+                <div class="cat-icon" aria-hidden="true">✕</div>
+                <span class="cat-title">Severe / Do not combine</span>
+                </div>
+                <div class="pills">
+                </div>
+                
+
+                
+
+                
+
+            </div>
             <div id="multiplierInfo" style="display: none;">
                 <h3 class="titlee">Dose Multipliers</h3>
                 <div id="multiplierList"></div>
             </div>
-            <div id="doses">
-        </div>
+            
             <div class="bottombar">
                     <button class="btn" onclick="saveChart()">Save Data</button>
                     <a class="btn" href="/journal">Back</a>
                 </div>
             </div>
-                
-        
-</div>
 
         <script>
 
@@ -151,6 +188,45 @@
 					}
 				}
 
+                function setPills(container, items) {
+                    try {
+                        const containerEl = typeof container === 'string' ? document.querySelector(container) : container;
+                        if (!containerEl) return;
+                        containerEl.innerHTML = '';
+
+                        if (!items || !items.length) return;
+
+                        items.forEach(it => {
+                            const name = (typeof it === 'string') ? it : (it && it.name) ? it.name : null;
+                            if (!name) return;
+                            const span = document.createElement('span');
+                            span.className = 'pill';
+                            span.textContent = name;
+                            containerEl.appendChild(span);
+                        });
+                    } catch (e) {
+                        console.error('setPills error', e);
+                    }
+                }
+
+                function renderInteractionCategories(substance) {
+                    if (!substance) return;
+
+                    // containers already present in the page (prefer explicit category classes)
+                    const cautionEl = document.querySelector('.cat-caution .pills') || document.querySelector('.infocard1 .pills');
+                    const dangerEl = document.querySelector('.cat-danger .pills');
+                    const severeEl = document.querySelector('.cat-severe .pills');
+
+                    // support both shapes: direct fields (uncertainInteractions...) or nested interactions{uncertain...}
+                    const uncertain = substance.uncertainInteractions || (substance.interactions && substance.interactions.uncertain) || [];
+                    const unsafe = substance.unsafeInteractions || (substance.interactions && substance.interactions.unsafe) || [];
+                    const dangerous = substance.dangerousInteractions || (substance.interactions && substance.interactions.dangerous) || [];
+
+                    setPills(cautionEl, uncertain);
+                    setPills(dangerEl, unsafe);
+                    setPills(severeEl, dangerous);
+                }
+
 				if (event.key == "ArrowDown") {
 					index += 1
 					if (index > children.length - 1) {
@@ -180,6 +256,80 @@
         let currentCommonDose = null;
         let addedDoses = []; 
 
+        function setPills(container, items) {
+            try {
+                const containerEl = typeof container === 'string' ? document.querySelector(container) : container;
+                if (!containerEl) return;
+                containerEl.innerHTML = '';
+
+                if (!items || !items.length) return;
+
+                items.forEach(it => {
+                    const name = (typeof it === 'string') ? it : (it && it.name) ? it.name : null;
+                    if (!name) return;
+                    const span = document.createElement('span');
+                    span.className = 'pill';
+                    span.textContent = name;
+                    containerEl.appendChild(span);
+                });
+            } catch (e) {
+                console.error('setPills error', e);
+            }
+        }
+
+        function renderInteractionCategories(substance) {
+            if (!substance) return;
+
+            const cautionEl = document.querySelector('.cat-caution .pills') || document.querySelector('.infocard1 .pills');
+            const dangerEl = document.querySelector('.cat-danger .pills');
+            const severeEl = document.querySelector('.cat-severe .pills');
+
+            const uncertain = substance.uncertainInteractions || (substance.interactions && substance.interactions.uncertain) || [];
+            const unsafe = substance.unsafeInteractions || (substance.interactions && substance.interactions.unsafe) || [];
+            const dangerous = substance.dangerousInteractions || (substance.interactions && substance.interactions.dangerous) || [];
+
+            setPills(cautionEl, uncertain);
+            setPills(dangerEl, unsafe);
+            setPills(severeEl, dangerous);
+        }
+
+        // Simple helper: append a single <span class="pill"> to each category.
+        function addSpanToCategoryBySelector(categorySelector, text) {
+            const el = document.querySelector(categorySelector + ' .pills') || document.querySelector(categorySelector + '');
+            if (!el) return false;
+            const span = document.createElement('span');
+            span.className = 'pill';
+            span.textContent = text;
+            el.appendChild(span);
+            return true;
+        }
+
+        function addSpanToAll(cautionText, dangerText, severeText) {
+            // Try explicit selectors first, fall back to ordering of .pills containers
+            let ok1 = addSpanToCategoryBySelector('.cat-caution', cautionText);
+            let ok2 = addSpanToCategoryBySelector('.cat-danger', dangerText);
+            let ok3 = addSpanToCategoryBySelector('.cat-severe', severeText);
+
+            if (ok1 && ok2 && ok3) return;
+
+            const pills = Array.from(document.querySelectorAll('.pills'));
+            if (!pills.length) return;
+
+            if (!ok1 && pills[0]) {
+                const s = document.createElement('span'); s.className='pill'; s.textContent = cautionText; pills[0].appendChild(s);
+            }
+            if (!ok2 && pills[1]) {
+                const s = document.createElement('span'); s.className='pill'; s.textContent = dangerText; pills[1].appendChild(s);
+            }
+            if (!ok3 && pills[2]) {
+                const s = document.createElement('span'); s.className='pill'; s.textContent = severeText; pills[2].appendChild(s);
+            }
+        }
+
+        // Demo helper: call from console or wire to a button
+        function addDemoPills() {
+            addSpanToAll('Demo - Caution', 'Demo - Dangerous', 'Demo - Severe');
+        }
 
         function fetchGraphQL(query) {
             const url = "https://api.psychonautwiki.org";
@@ -195,6 +345,12 @@
             {
                 substances(query: "${substanceName}") {
                     name
+                    images{thumb}
+                    summary
+                    addictionPotential
+                    uncertainInteractions{name}
+				    unsafeInteractions{name}
+				    dangerousInteractions{name}
 
                     roas {
                         name
@@ -229,6 +385,24 @@
         
 		}
 
+    function renderInfoCard(substance) {
+        const infocard = document.querySelector('.infocard') || document.getElementById('infoCard');
+        if (!infocard) return;
+
+        const imgUrl = substance?.images?.[0]?.thumb || '';
+        const summary = substance?.summary || 'No summary available.';
+        const addiction = substance?.addictionPotential ?? 'Unknown';
+
+        infocard.innerHTML = `
+            <div class="infocard-inner">
+                ${imgUrl ? `<img src="${imgUrl}" alt="${substance.name} image" style="max-width:100%;border-radius:8px;margin-bottom:8px;">` : ''}
+                <h3 style="margin:0 0 8px 0;color:#dbadff">${substance.name}</h3>
+                <div class="summary" style="font-size:14px;color:#ddd;margin-bottom:8px;">${summary}</div>
+                <div class="addiction" style="font-size:13px;color:#bbb">Addiction potential: <strong>${addiction}</strong></div>
+            </div>
+        `;
+    }
+
 		var units = ""
 
 		let onset = 0
@@ -242,6 +416,7 @@
 
             if (!substanceName) return;
 
+            document.getElementById("sug").style.visibility = "collapse";
             document.getElementById("sug").style.visibility = "collapse";
 
             status.textContent = "Loading...";
@@ -281,7 +456,9 @@
             status.textContent = `Loaded: ${substance.name} (common dose: ${commonDose})`;
             document.getElementById("dosePanel").style.display = "flex";
             document.getElementById("multiplierInfo").style.display = "none";
-            
+            renderInfoCard(substance);
+            renderInteractionCategories(substance);
+
             if (chart) chart.destroy();
         }
 
@@ -355,11 +532,11 @@
 
         newDoseDiv = document.createElement("div")
         newDoseDiv.id = "dose"
-        newDoseDiv.innerHTML = `
-        <p id="drugname" class="drugT">${currentSubstance.name}</p>
-        <p id="drugMethod" style="display: none" class="drugT">${currentSubstance.roas[0].name}</p>
-        <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value} ${units}</p>
+        newDoseDiv.innerHTML = ` 
         <p id="consTime" class="drugT">${time}</p>
+        <p id="drugname" class="drugT">${currentSubstance.name}</p>
+        <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value} ${units}</p>
+       
         <input type="hidden" class="doseNumber" value='${dosesDiv.querySelectorAll(".dose").length+1}'>
         <div id="delete" onclick="DeleteDose(this)"> 
         <p class="closebtn">Delete</p> 
@@ -490,18 +667,18 @@
             
         };
 		
-
+        
         
 		var layout = {
 			template: "simple_white",
 			margin: { t: 30, r: 20, b: 40, l: 40 },
             
             yaxis: {
-				title: 'Intensity',
+				automargin: true,
 			},
 
             xaxis: {
-                title: 'Time',
+                automargin: true,
                 tickmode: 'array',
                 tickvals: tickVals,
                 ticktext: tickText,
@@ -509,7 +686,7 @@
             
             font: {
                 family: 'nerd',
-                size: 12,
+                size: 24,
                 color: '#fff'
             },
 
@@ -567,4 +744,4 @@
         </script>
 
     
-<svg id="js-plotly-tester" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="position: absolute; left: -10000px; top: -10000px; width: 9000px; height: 9000px; z-index: 1;"><path class="js-reference-point" d="M0,0H1V1H0Z" style="stroke-width: 0px; fill: black;"></path></svg></body><style type="text/css"></style></html>
+<svg id="js-plotly-tester" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="position: absolute; left: -10000px; top: -10000px; width: 9000px; height: 9000px; z-index: 1;"><path class="js-reference-point" d="M0,0H1V1H0Z" style="stroke-width: 0px; fill: black;"></path></svg><style type="text/css"></style></body></html>

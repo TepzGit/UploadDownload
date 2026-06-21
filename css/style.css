@@ -533,7 +533,10 @@ span {
     left: 50%;
     top: 0;
     transition: transform .2s linear; 
-     
+
+    width: inherit;
+    white-space: nowrap;
+
     &:before { 
       content: "";
       position: absolute; 
