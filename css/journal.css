@@ -49,30 +49,63 @@ body {
   border-color: rgba(255, 255, 255, 0.623);
 }
 
-#search {
+#input {
   background-color: rgba(10, 10, 10, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   border-radius: 5px;
   color: white;
   margin: 5px 0px 15px;
-  height: 2rem;
-  padding: 0.3rem;
+  height: 3rem;
+  padding: 0.7rem;
+  font-size: larger;
+  text-align: center;
+  width: 25%;
+  align-self: end;
+}
+
+#sug {
+  visibility: collapse;
+
+  margin: 5px;
+  min-height: 5rem;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+  border-radius: 8px;
+  display: grid;
+  padding: 5px;
+  display: flex;
+  position: absolute;
+  width: 30rem;
+  justify-self: center;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  top: 140;
 }
 
 .Drugs {
-  display: grid;
-  height: 50%;
+  display: flex;
+  height: 80%;
   min-height: 0;
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   border-radius: 5px;
-  overflow: auto;
+  overflow-y: scroll;
   box-sizing: border-box;
-	padding: 5px;
-	gap: 7px;
+  padding: 10px;
+  flex-direction: column;
+  gap: 3%;
 }
+
+.drugimg{
+
+  
+}
+
+
 
 .drugname {
   margin-left: 15px;
@@ -163,7 +196,6 @@ body {
 
 }
 #sidebar {
-  width: 87%;
   background-color: rgba(10, 10, 10, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -171,16 +203,58 @@ body {
   display: flex;
   flex-direction: column;
   border-radius: 5px;
+  width: 40%;
+  height: 100% !important;
 }
+
+#icon{
+
+  width: 50%;
+}
+
+
+
+.pagebtn:hover {
+  background-color: rgba(17, 17, 17, 0.98);
+  box-shadow: 0px 0px 22px 0px #8b47c0;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+}
+.pagebtn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid #8b47c0;
+  box-shadow: 0px 0px 19px -6px #8b47c0;
+  color: white;
+  cursor: pointer;
+}
+
+#subicon {
+  height: 2rem;
+  align-self: center;
+}
+
+
+
+
+
+
+
+
+
 #sideheader {
   display: flex;
   justify-content: space-between;
   color: white;
   align-items: center;
-  margin-right: 1rem;
+  margin-right: 0.5rem;
+  margin-top: 0.5rem;
 }
 #xentara {
-  color: antiquewhite;
+  color: white;
   font-size: inherit;
   margin-left: 0.7rem;
 }
@@ -209,14 +283,14 @@ svg:hover {
   transition: all 0.2s ease-out;
 }
 
-.main{
+#cont, .main {
   display:grid;
   height: 100vh;  
   width: 100%;
   grid-template-columns: 0.15fr 1fr;
   overflow: hidden;
 }
-#option:hover {
+.option:hover {
   background: rgba(255, 255, 255, 0.15);
   box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
   -webkit-transition: all 0.2s ease-out;
@@ -224,16 +298,12 @@ svg:hover {
   transition: all 0.2s ease-out;
   border-color: rgba(255, 255, 255, 0.623);
 }
-#option {
+.option {
   background-color: rgba(10, 10, 10, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
-    border-top-color: rgba(255, 255, 255, 0.12);
-    border-right-color: rgba(255, 255, 255, 0.12);
-    border-bottom-color: rgba(255, 255, 255, 0.12);
-    border-left-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  width: 11rem;
-  height: 2.2rem;
+  width: 80%;
+  height: 4.2rem;
   border-radius: 0.5rem;
   color: white;
   text-align: center;
@@ -249,4 +319,5 @@ svg:hover {
   margin: auto;
   gap: 0.7rem;
   align-items: center;
+  margin-top: 1rem;
 }

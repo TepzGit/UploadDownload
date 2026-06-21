@@ -8,148 +8,350 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="/journal.css">
     </head>
-    <body>
+ <body>
         <div class="main">
             <div id="sidebar">
-  
                 <div id="sideheader">
-                
                     <h1 id="xentara">Xentara</h1>
                     <div id="butcont">
                         <a href="/Profile" id="but">
-
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path fill-rule="evenodd" clip-rule="evenodd" d="M16 9C16 11.2091 14.2091 13 12 13C9.79086 13 8 11.2091 8 9C8 6.79086 9.79086 5 12 5C14.2091 5 16 6.79086 16 9ZM14 9C14 10.1046 13.1046 11 12 11C10.8954 11 10 10.1046 10 9C10 7.89543 10.8954 7 12 7C13.1046 7 14 7.89543 14 9Z" fill="currentColor"></path>
                             <path fill-rule="evenodd" clip-rule="evenodd" d="M12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12C23 5.92487 18.0751 1 12 1ZM3 12C3 14.0902 3.71255 16.014 4.90798 17.5417C6.55245 15.3889 9.14627 14 12.0645 14C14.9448 14 17.5092 15.3531 19.1565 17.4583C20.313 15.9443 21 14.0524 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12ZM12 21C9.84977 21 7.87565 20.2459 6.32767 18.9878C7.59352 17.1812 9.69106 16 12.0645 16C14.4084 16 16.4833 17.1521 17.7538 18.9209C16.1939 20.2191 14.1881 21 12 21Z" fill="currentColor"></path>
                             </svg>
                         </a>
-
                     </div>
                 </div>
                 <div id="contt">
-
-                        <a href="/journal" id="option">Journal</a>
-                        <a href="/Files/" id="option">Files</a>
-                        <a href="/" id="option">Home</a>
+                    <a href="/sub" class="option" id="journal">
+                        <img src="icons/sub.png" id="subicon"></img>
+                    </a>
+                    <a href="/Files" class="option" id="files">
+                        <img src="icons/files.png" id="subicon"></img>
+                    </a>
+                    <a href="/" class="option" id="home">
+                        <img src="icons/home.png" id="subicon"></img>
+                    </a>
                 </div>
-
             </div>
             <div class="cont">
                 <div class="Header">
                     <h1 id="title">Journal</h1>
-                    <label class="Sub" onclick="window.location.pathname='/sub'">Substance</label>
+                    <input placeholder="Search..." type="text" id="input">
                 </div>
 
-                <input placeholder="Search..." id="search" type="text">
+                
+
+
+
+
 
                 <div class="Drugs">
-                
-                    <div class="Drug" data-drugname="LSD">
-                        <p class="drugname">LSD</p>  
-                        <p class="nick" id="lucy" >Lucy</p>
-                    </div>
-                    
-                    <div class="Drug" data-drugname="Pregabalin">
-                        <p class="drugname">Pregabalin</p>  
-                        <p class="nick" id="prrprr">PrrPrr</p>
-                    </div>
-
-                    <div class="Drug" data-drugname="Tramadol">
-                        <p class="drugname">Tramadol</p>  
-                        <p class="nick" id="dol">Dol</p>
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-                    
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-                    
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-l
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
-                    <div class="Drug" data-drugname="Lisdexamphetamine">
-                        <p class="drugname">Lisdexamphetamine</p> 
-                        <p class="nick" id="lisa">Lisa</p> 
-                    </div>
-
                 </div>
 
-            <div class="bottombar" >
+            <div class="bottombar">
+                <button class="pagebtn" id="backBtn" onclick="previousPage()">← Back</button>
                 
-                    <a class="btn" href="/">Back</a>
+                <button class="pagebtn" id="nextBtn" onclick="nextPage()">Forward →</button>
             </div>
 
             </div>
             
-                <script src="" async="" defer=""></script>
+                
             
 
             <script>
-            Drugs = document.querySelectorAll(".Drug")
+            let currentOffset = 0;
+            let currentSearchQuery = "";
 
-            Drugs.forEach(item => {
-                item.addEventListener("click", () => {
-                    window.location.href = "/journal/Drug?drug=" + item.dataset.drugname
+            async function getSubstances(offset, query = "") {
+                let gql;
+                if (query) {
+                    gql = `{
+                      substances(query: "${query}") {
+                        name
+                        class{
+                            chemical
+                        }
+                        images{thumb}
+                      }
+                    }`;
+                } else {
+                    gql = `{
+                      substances(limit: 10 offset: ${offset}) {
+                        name
+                        class{
+                            chemical
+                        }
+                        images{
+                            thumb
+                        }
+                      }
+                    }`;
+                }
+                return fetchGraphQL(gql);
+            }
+
+            async function displaySubstances(offset, query = "") {
+                try {
+                    const result = await getSubstances(offset, query);
+                    const substances = result?.data?.substances || [];
+                    
+                    const drugsDiv = document.querySelector(".Drugs");
+                    drugsDiv.innerHTML = "";
+                    
+                    substances.forEach(substance => {
+                        const drugDiv = document.createElement("div");
+                        const imgUrl = substance?.images?.[0]?.thumb || '';
+
+                        const DrugName = substance?.name ?? "";
+                        const DrugClass = substance?.class?.chemical ?? "";
+                        const DrugImage = substance?.images?.[0]?.thumb ?? "";
+
+                        drugDiv.className = "Drug";
+                        drugDiv.dataset.drugname = DrugName;
+                        drugDiv.dataset.drugclass = DrugClass;
+                        drugDiv.dataset.drugimage = DrugImage;
+                        drugDiv.innerHTML = `
+
+                            <p class="drugname">${DrugName}</p>
+                            <p class="drugname">${DrugClass}</p>
+                            ${imgUrl ? `<img src="${imgUrl}" style="max-width:100%;border-radius:8px;margin-bottom:8px;">` : ''}
+                            
+                        `;
+                        drugsDiv.appendChild(drugDiv);
+
+                        drugDiv.addEventListener("click", () => {
+                            window.location.href = "/journal/Drug?drug=" + drugDiv.dataset.drugname;
+                        });
+                    });
+                    currentOffset = offset;
+                    currentSearchQuery = query;
+                    document.getElementById("backBtn").disabled = offset === 0;
+                    document.getElementById("nextBtn").disabled = substances.length < 10;
+                } catch (error) {
+                    console.error("Error fetching substances:", error);
+                }
+            }
+
+            function nextPage() {
+                displaySubstances(currentOffset + 10, currentSearchQuery);
+            }
+
+            function previousPage() {
+                if (currentOffset >= 10) {
+                    displaySubstances(currentOffset - 10, currentSearchQuery);
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                displaySubstances(0);
+                
+                const inputField = document.getElementById("input");
+                let searchTimeout;
+                
+                inputField.addEventListener("input", (e) => {
+                    clearTimeout(searchTimeout);
+                    const value = e.target.value.trim();
+                    
+                    if (value.length === 0) {
+                        searchTimeout = setTimeout(() => {
+                            displaySubstances(0);
+                        }, 300);
+                    } else if (value.length >= 2) {
+                        searchTimeout = setTimeout(() => {
+                            displaySubstances(0, value);
+                        }, 300);
+                    }
                 });
             });
             </script>
             </div>
-        </div>
+        
+            <script>
+
+        let timeout;
+        document.querySelector("#input").addEventListener("input", (e) => {
+            const value = e.target.value.trim();
+
+            if (value.length < 2) {
+                document.getElementById("sug").style.visibility = "collapse";
+                return;
+            }
+
+            clearTimeout(timeout);
+
+            timeout = setTimeout(() => {
+                searchSuggestions();
+            }, 500);
+        });
+
+        function searchSuggestions() {
+			value = document.querySelector("#input").value
+            if (value.length < 2) {
+                document.getElementById("sug").style.visibility = "collapse";
+                return;
+            }
+
+            const gql = `
+            {
+                substances(query: "${value}") {
+                    name
+                    class
+                }
+            }`;
+
+            fetchGraphQL(gql).then(res => {
+                document.getElementById("sug").style.visibility = "visible";
+
+                showSuggestions(res.data.substances);
+            });
+        }
+
+        function showSuggestions(substances) {
+            const datalist = document.getElementById("sugC");
+            datalist.innerHTML = ""; 
+
+            substances.forEach(sub => {
+                const option = document.createElement("p");
+                option.textContent = sub.name;
+                option.id = "sug1";
+                datalist.appendChild(option);
+                
+                option.addEventListener("click", (e) => {
+                    const value = option.textContent;
+                    document.getElementById("input").value = value;
+                    search();
+                });
+            });
+
+			let index = -1
+			children = datalist.children
+			document.getElementById("input").addEventListener("keydown", (e) => {
+				for (let i=0;i<children.length;i++) {
+					if (children[i].classList.contains("Selected")) {
+						children[i].classList.remove("Selected")
+					}
+				}
+
+                if (event.key == "ArrowDown") {
+					index += 1
+					if (index > children.length - 1) {
+						index = 0
+					}
+					children[index].classList.add("Selected")
+				}
+
+				if (event.key == "ArrowUp") {
+					index -= 1
+					if (index < 0) {
+						index = children.length - 1
+					}
+					children[index].classList.add("Selected")
+				}
+
+				if (event.key == "Enter") {
+                    document.getElementById("input").value = children[index].textContent;
+                    search();
+				}
+			})
+        }
+
+
+
+         function fetchGraphQL(query) {
+            const url = "https://api.psychonautwiki.org";
+            return fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query })
+            }).then(r => r.json());
+        }
+
+        async function getData(substanceName) {
+            const query = `
+            {
+                substances(query: "${substanceName}") {
+                    name
+                    images{thumb}
+                    summary
+                    addictionPotential
+                    uncertainInteractions{name}
+				    unsafeInteractions{name}
+				    dangerousInteractions{name}
+
+                    roas {
+                        name
+                        duration {
+                            onset { min max units }
+                            comeup { min max units }
+                            peak { min max units }
+                            offset { min max units }
+                        }
+                        dose {
+                                units
+                                common {
+                                    min
+                                }
+                        }
+                    }
+                }
+            }`;
+            return fetchGraphQL(query);
+        }
+
+        var units = ""
+
+		let onset = 0
+		let comeup = 0
+		let peak = 0
+		let offset = 0
+
+        async function search() {
+            const substanceName = document.getElementById("input").value.trim();
+            
+
+            if (!substanceName) return;
+
+            document.getElementById("sug").style.visibility = "collapse";
+
+        
+            status.textContent = "Loading...";
+            const result = await getData(substanceName);
+            console.log("RAW RESPONSE:", result);
+
+            const substance = result?.data?.substances?.[0];
+            if (!substance) {
+                status.textContent = "No data found.";
+                return;
+            }
+
+            const duration = substance.roas?.[0]?.duration;
+            const dosage = substance.roas?.[0]?.dose;
+            units = dosage.units
+            
+            if (!duration) {
+                status.textContent = "No duration data.";
+                return;
+            }
+
+            const commonDose = dosage?.common?.min;
+            if (!commonDose) {
+                status.textContent = "No common dose data found for this substance.";
+                return;
+            }
+
+            currentSubstance = substance;
+            currentCommonDose = commonDose;
+            addedDoses = [];
+
+            onset = DurationsIntoHour(duration.onset)
+            comeup = DurationsIntoHour(duration.comeup)
+            peak = DurationsIntoHour(duration.peak)
+            offset = DurationsIntoHour(duration.offset)
+
+
+        }
+        </script>
+</body>
 </html>

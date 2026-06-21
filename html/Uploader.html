@@ -274,6 +274,68 @@
                 console.log("Element not found");
             }
         }
+
+        const form = document.getElementById("box");
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault(); // 🔥 stop page reload
+            uploadFiles();
+        });
+        
+        function uploadFiles() {
+            const fileInput = document.getElementById("file-input");
+            const files = fileInput.files;
+
+            const formData = new FormData();
+
+            for (let i = 0; i < files.length; i++) {
+                formData.append("files", files[i]);
+            }
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload", true);
+            document.getElementById("progressBar").style.visibility = "visible"
+
+            let lastLoaded = 0;
+            let lastTime = Date.now();
+
+            // 🔥 progress bar
+            xhr.upload.onprogress = function (event) {
+                if (event.lengthComputable) {
+                    const now = Date.now();
+                    const percent = (event.loaded / event.total) * 100;
+                    const timeDiff = (now - lastTime) / 1000;
+                    const bytesDiff = event.loaded - lastLoaded;
+                    const speedBps = bytesDiff / timeDiff;
+
+                    const speedKBs = speedBps / 1024;
+                    const speedMBs = speedKBs / 1024;
+
+                    document.querySelector(".progress-bar").style.width = `${percent.toFixed(0)}%`;
+
+                    if (speedKBs > 1024) {
+                        document.querySelector(".progress-number").setAttribute("aria-valuenow", `${percent.toFixed(0)}% - ${speedMBs.toFixed(1)} MB/s}`);
+                    } else {
+                        document.querySelector(".progress-number").setAttribute("aria-valuenow", `${percent.toFixed(0)}% - ${speedKBs.toFixed(1)} KB/s}`);
+                    }
+                    lastLoaded = event.loaded;
+                    lastTime = now;
+                }
+            };
+
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    console.log("Upload done");
+
+                    document.getElementById("progressBar").style.visibility = "hidden"
+                    document.getElementById("success").style.visibility = "visible";
+                } else {
+                    console.error("Upload failed");
+                }
+            };
+
+            xhr.send(formData);
+        }
     </script>
     </body>
 </html>

@@ -181,12 +181,30 @@ func main() {
 	}
 	for _, asset := range assets {
 		assetName := asset.Name()
-		name := assetName
 
+		if asset.IsDir() {
+			subAssets, _ := os.ReadDir("assets/" + assetName)
+
+			for _, assetInDir := range subAssets {
+				subAssetName := assetInDir.Name()
+
+				p := filepath.ToSlash(filepath.Join(assetName, subAssetName))
+				filePath := "assets/" + p // COPY VALUE
+
+				route := "/" + p // COPY VALUE
+
+				http.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
+					http.ServeFile(w, r, filePath)
+				})
+			}
+			continue
+		}
+
+		name := assetName
 		http.HandleFunc("/"+name, func(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, "assets/"+name)
 		})
-	}
+	} // TODO Make it recursive for the subfiles
 
 	cookies["test"] = cookiesStruct{
 		Time:             time.Now(),
