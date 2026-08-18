@@ -92,6 +92,7 @@ function byteConverter(size) {
 async function searchFiles(searchInput) {
 	const value = searchInput.value
 	const res = await fetch(`/search?q=${encodeURIComponent(value)}&path=${window.location.pathname}`)
+	console.log(`/search?q=${encodeURIComponent(value)}&path=${window.location.pathname}`)
 	try {
 		results = await res.json()
 		const itemsresult = document.querySelector("#itemsresults")
