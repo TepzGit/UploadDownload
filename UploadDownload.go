@@ -150,6 +150,7 @@ func main() {
 	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
 	http.HandleFunc("/getFolders", requireLogin(getFolders))
 	http.HandleFunc("/search", requireLogin(search))
+	http.HandleFunc("/getItems", requireLogin(getItems))
 	http.HandleFunc("/delete", requireLogin(Delete))
 	http.HandleFunc("/rename", requireLogin(Rename))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
@@ -1315,6 +1316,11 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func getItems(w http.ResponseWriter, r *http.Request) {
+
+}
+
 
 func getItemsInPath(w http.ResponseWriter, r *http.Request, PathString string) ([]FileFolderInfo, error) {
 	var Items []FileFolderInfo
