@@ -1318,7 +1318,16 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func getItems(w http.ResponseWriter, r *http.Request) {
-
+	result,err := getItemsInPath(w, r, r.Header.Get("Path"))
+	if err != nil {
+		http.Error(w, "Failed to get items", http.StatusInternalServerError)
+		return
+	}
+	err = json.NewEncoder(w).Encode(result)
+	if err != nil {
+		http.Error(w, "Failed to encode results", http.StatusInternalServerError)
+		return
+	}
 }
 
 
