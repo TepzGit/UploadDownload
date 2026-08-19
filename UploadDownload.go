@@ -1318,11 +1318,24 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func getItems(w http.ResponseWriter, r *http.Request) {
-	result,err := getItemsInPath(w, r, r.Header.Get("Path"))
+	finalPath := urlPathToFile(r.Header.Get("Path"))
+	info, err := os.Stat(finalPath)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	if !info.IsDir() {
+		http.ServeFile(w, r, finalPath)
+		return
+	}
+
+	result,err := getItemsInPath(w, r, finalPath)
 	if err != nil {
 		http.Error(w, "Failed to get items", http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(result)
 	if err != nil {
 		http.Error(w, "Failed to encode results", http.StatusInternalServerError)
