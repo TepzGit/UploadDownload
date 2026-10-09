@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en" data-theme="lab">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Effect Curve — Caffeine</title>
+
+<!-- ============================================================
+  GO TEMPLATE NOTE: this file corresponds to templates/substance_view.html
+  Sections are marked with HTML comments showing where Go template
+  actions ({{ }}) would sit once wired to the backend. See the
+  chat response for the full template/partial breakdown.
+============================================================= -->
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:        #12141a;
+    --surface:   #181b23;
+    --surface-2: #1f232d;
+    --line:      #2a2f3b;
+    --text:      #e8e6e1;
+    --muted:     #8b8f9c;
+    --amber:     #ff8a4c;
+    --amber-dim: #ff8a4c33;
+    --blue:      #6ea8fe;
+    --blue-dim:  #6ea8fe33;
+    --gold:      #ffb703;
+    --green:     #7cd992;
+  }
+  [data-theme="lab"]{
+    color-scheme: dark;
+    --b1: 18 20 26; --b2: 24 27 35; --b3: 31 35 45;
+  }
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, #ff8a4c0d, transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, #6ea8fe0d, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+  }
+  .font-display{ font-family:'Space Grotesk', sans-serif; }
+  .font-mono{ font-family:'JetBrains Mono', monospace; }
+
+  .glass{
+    background: linear-gradient(180deg, #ffffff08, #ffffff02);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+  }
+  .grid-overlay{
+    background-image:
+      linear-gradient(#ffffff08 1px, transparent 1px),
+      linear-gradient(90deg, #ffffff08 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .glow-dot{
+    box-shadow: 0 0 0 3px #7cd99222, 0 0 12px #7cd99299;
+  }
+  @keyframes pulse-soft{
+    0%,100%{ opacity:1; } 50%{ opacity:.4; }
+  }
+  .pulse{ animation: pulse-soft 2s ease-in-out infinite; }
+
+  .phase-chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background: var(--line); border-radius: 4px; }
+  ::-webkit-scrollbar-track{ background: transparent; }
+
+  input[type=range]{ accent-color: var(--amber); }
+
+  .tick-label{ color: var(--muted); font-family:'JetBrains Mono', monospace; }
+</style>
+</head>
+
+<body class="min-h-screen">
+
+<!-- ============ NAV ============ -->
+<!-- {{ template "partials/nav.html" . }} -->
+<header class="sticky top-0 z-40 glass">
+  <div class="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5 shrink-0">
+      <span class="w-7 h-7 rounded-md bg-gradient-to-br from-[var(--amber)] to-[var(--gold)] flex items-center justify-center">
+        <svg viewBox="0 0 24 24" class="w-4 h-4 text-[#1a1200]" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+          <path d="M3 17 Q8 17 10 9 Q12 3 14 9 Q16 17 21 17"/>
+        </svg>
+      </span>
+      <span class="font-display font-semibold text-[15px] tracking-tight hidden sm:block">Curve<span class="text-[var(--amber)]">lab</span></span>
+    </a>
+
+    <div class="hidden md:flex items-center gap-1 font-mono text-[13px] text-[var(--muted)]">
+      <a href="#" class="px-3 py-1.5 rounded-md hover:bg-white/5 hover:text-[var(--text)] transition">Dashboard</a>
+      <a href="#" class="px-3 py-1.5 rounded-md bg-white/5 text-[var(--text)]">Substance</a>
+      <a href="#" class="px-3 py-1.5 rounded-md hover:bg-white/5 hover:text-[var(--text)] transition">Timeline</a>
+      <a href="#" class="px-3 py-1.5 rounded-md hover:bg-white/5 hover:text-[var(--text)] transition">Settings</a>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <label class="input input-sm bg-[var(--surface-2)] border-[var(--line)] rounded-md flex items-center gap-2 w-40 sm:w-56">
+        <svg class="w-3.5 h-3.5 text-[var(--muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" placeholder="Search substance..." class="grow font-mono text-[12px] bg-transparent" />
+        <kbd class="kbd kbd-xs bg-transparent border-[var(--line)] text-[var(--muted)] hidden sm:flex">/</kbd>
+      </label>
+      <button class="btn btn-sm btn-ghost btn-circle" aria-label="Toggle theme">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ PAGE HEADER ============ -->
+<!-- {{ with .Substance }} -->
+<div class="max-w-[1400px] mx-auto px-4 sm:px-6 pt-8 pb-4">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1.5">
+        <span class="phase-chip px-2 py-0.5 rounded border border-[var(--line)] text-[var(--muted)]">Stimulant</span>
+        <span class="phase-chip px-2 py-0.5 rounded border border-[var(--green)]/30 text-[var(--green)] bg-[var(--green)]/5">Common · Well studied</span>
+      </div>
+      <h1 class="font-display text-3xl sm:text-[34px] font-semibold tracking-tight">Caffeine</h1>
+      <p class="text-[var(--muted)] text-sm mt-1 max-w-lg">Oral · effect curve modeled from onset, come-up, peak, and offset duration ranges. For orientation only — not medical advice.</p>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-sm bg-[var(--surface-2)] border-[var(--line)] hover:bg-[var(--surface-2)]/70 font-mono text-xs gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+        Export PNG
+      </button>
+      <button class="btn btn-sm bg-[var(--surface-2)] border-[var(--line)] hover:bg-[var(--surface-2)]/70 font-mono text-xs gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+        Share
+      </button>
+    </div>
+  </div>
+</div>
+<!-- {{ end }} -->
+
+<!-- ============ MAIN GRID ============ -->
+<main class="max-w-[1400px] mx-auto px-4 sm:px-6 pb-16 grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
+
+  <!-- ---------- LEFT: GRAPH + DATA PANEL ---------- -->
+  <div class="flex flex-col gap-5 min-w-0">
+
+    <!-- Graph console -->
+    <section class="glass rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[var(--line)]">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2 h-2 rounded-full bg-[var(--green)] glow-dot pulse"></span>
+          <span class="font-mono text-xs text-[var(--muted)]">LIVE READOUT</span>
+          <span class="font-mono text-xs text-[var(--text)]/70">·</span>
+          <span class="font-mono text-xs text-[var(--muted)]">t+02:14</span>
+        </div>
+        <div class="flex items-center gap-1 bg-[var(--surface-2)] rounded-lg p-0.5 border border-[var(--line)]">
+          <button class="px-2.5 py-1 rounded-md text-xs font-mono bg-[var(--amber)] text-[#1a1200] font-medium">Linear</button>
+          <button class="px-2.5 py-1 rounded-md text-xs font-mono text-[var(--muted)] hover:text-[var(--text)]">Log</button>
+        </div>
+      </div>
+
+      <div class="p-2 sm:p-4">
+        <div id="effectGraph" class="w-full grid-overlay rounded-lg" style="height:440px;"></div>
+      </div>
+
+      <!-- phase legend -->
+      <div class="flex flex-wrap gap-4 px-4 sm:px-5 pb-4 pt-1">
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#6ea8fe55"></span><span class="phase-chip text-[var(--muted)]">Onset</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#7cd99255"></span><span class="phase-chip text-[var(--muted)]">Come-up</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#ffb70355"></span><span class="phase-chip text-[var(--muted)]">Peak</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm" style="background:#ff8a4c33"></span><span class="phase-chip text-[var(--muted)]">Offset</span></div>
+        <div class="flex items-center gap-1.5 ml-auto"><span class="w-4 h-0.5 rounded" style="background:#ff8a4c"></span><span class="phase-chip text-[var(--muted)]">Dose A</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-4 h-0.5 rounded" style="background:#6ea8fe"></span><span class="phase-chip text-[var(--muted)]">Dose B</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-4 h-0.5 rounded border-t border-dashed" style="border-color:#e8e6e199"></span><span class="phase-chip text-[var(--muted)]">Combined</span></div>
+      </div>
+    </section>
+
+    <!-- Data panel: PW-style timing cards -->
+    <!-- {{ range .Substance.Durations }} -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="glass rounded-lg p-4">
+        <p class="phase-chip text-[var(--blue)] mb-2">Onset</p>
+        <p class="font-display text-xl font-semibold">10<span class="text-sm text-[var(--muted)] font-mono">–20m</span></p>
+        <p class="font-mono text-[11px] text-[var(--muted)] mt-1">before felt</p>
+      </div>
+      <div class="glass rounded-lg p-4">
+        <p class="phase-chip text-[var(--green)] mb-2">Come-up</p>
+        <p class="font-display text-xl font-semibold">20<span class="text-sm text-[var(--muted)] font-mono">–40m</span></p>
+        <p class="font-mono text-[11px] text-[var(--muted)] mt-1">rising intensity</p>
+      </div>
+      <div class="glass rounded-lg p-4">
+        <p class="phase-chip text-[var(--gold)] mb-2">Peak</p>
+        <p class="font-display text-xl font-semibold">1<span class="text-sm text-[var(--muted)] font-mono">–1.5h</span></p>
+        <p class="font-mono text-[11px] text-[var(--muted)] mt-1">full effects</p>
+      </div>
+      <div class="glass rounded-lg p-4">
+        <p class="phase-chip text-[var(--amber)] mb-2">Offset</p>
+        <p class="font-display text-xl font-semibold">3<span class="text-sm text-[var(--muted)] font-mono">–5h</span></p>
+        <p class="font-mono text-[11px] text-[var(--muted)] mt-1">gradual decline</p>
+      </div>
+    </section>
+    <!-- {{ end }} -->
+
+    <!-- Timeline builder -->
+    <!-- {{ template "partials/timeline_builder.html" .Doses }} -->
+    <section class="glass rounded-xl p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-display text-sm font-semibold tracking-tight">Timeline</h2>
+        <span class="font-mono text-[11px] text-[var(--muted)]">00:00 → 12:00</span>
+      </div>
+
+      <div class="relative h-14">
+        <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-[var(--line)]"></div>
+        <!-- hour ticks -->
+        <div class="absolute inset-0 flex justify-between px-1">
+          <template x-for-placeholder></template>
+        </div>
+        <!-- dose block A -->
+        <div class="absolute left-[6%] top-1/2 -translate-y-1/2 group cursor-pointer">
+          <div class="w-3 h-3 rounded-full bg-[var(--amber)] ring-4 ring-[var(--amber)]/15"></div>
+          <div class="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">
+            08:00 · 200mg
+          </div>
+        </div>
+        <!-- dose block B -->
+        <div class="absolute left-[38%] top-1/2 -translate-y-1/2 group cursor-pointer">
+          <div class="w-3 h-3 rounded-full bg-[var(--blue)] ring-4 ring-[var(--blue)]/15"></div>
+          <div class="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[10px] bg-[var(--surface-2)] border border-[var(--line)] rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">
+            12:00 · 100mg
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between mt-1 px-0.5">
+        <span class="tick-label text-[10px]">00:00</span>
+        <span class="tick-label text-[10px]">03:00</span>
+        <span class="tick-label text-[10px]">06:00</span>
+        <span class="tick-label text-[10px]">09:00</span>
+        <span class="tick-label text-[10px]">12:00</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- ---------- RIGHT: DOSE CONSOLE ---------- -->
+  <aside class="flex flex-col gap-5">
+    <!-- {{ template "partials/dose_console.html" . }} -->
+    <section class="glass rounded-xl p-4 sm:p-5">
+      <h2 class="font-display text-sm font-semibold tracking-tight mb-4">Add dose</h2>
+
+      <div class="space-y-3">
+        <div>
+          <label class="phase-chip text-[var(--muted)] block mb-1.5">Amount</label>
+          <div class="join w-full">
+            <input type="number" value="200" class="input input-sm join-item bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+            <select class="select select-sm join-item bg-[var(--surface-2)] border-[var(--line)] font-mono w-24">
+              <option>mg</option>
+              <option>tabs</option>
+              <option>mL</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="phase-chip text-[var(--muted)] block mb-1.5">Time</label>
+          <input type="time" value="08:00" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+        </div>
+
+        <div>
+          <label class="phase-chip text-[var(--muted)] block mb-1.5">Route</label>
+          <select class="select select-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full">
+            <option>Oral</option>
+            <option>Sublingual</option>
+            <option>Insufflated</option>
+          </select>
+        </div>
+
+        <button class="btn btn-sm w-full bg-[var(--amber)] hover:bg-[var(--amber)]/90 border-none text-[#1a1200] font-mono font-medium mt-1">
+          + Add to graph
+        </button>
+      </div>
+
+      <div class="divider my-4 text-[var(--muted)] text-[11px] font-mono before:bg-[var(--line)] after:bg-[var(--line)]">active doses</div>
+
+      <ul class="space-y-2">
+        <li class="flex items-center justify-between bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2">
+          <div class="flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--amber)]"></span>
+            <span class="font-mono text-xs">08:00 · 200mg</span>
+          </div>
+          <button class="text-[var(--muted)] hover:text-red-400 transition" aria-label="Remove dose">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </li>
+        <li class="flex items-center justify-between bg-[var(--surface-2)] border border-[var(--line)] rounded-lg px-3 py-2">
+          <div class="flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--blue)]"></span>
+            <span class="font-mono text-xs">12:00 · 100mg</span>
+          </div>
+          <button class="text-[var(--muted)] hover:text-red-400 transition" aria-label="Remove dose">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Reference scale card -->
+    <section class="glass rounded-xl p-4 sm:p-5">
+      <h2 class="font-display text-sm font-semibold tracking-tight mb-3">Intensity scale</h2>
+      <p class="text-[var(--muted)] text-xs leading-relaxed mb-3">Y-axis is relative, not absolute. 100 marks one common dose; 200 reflects roughly double.</p>
+      <div class="space-y-2 font-mono text-[11px]">
+        <div class="flex items-center justify-between"><span class="text-[var(--muted)]">100</span><span>common dose</span></div>
+        <div class="flex items-center justify-between"><span class="text-[var(--muted)]">150</span><span>strong dose</span></div>
+        <div class="flex items-center justify-between"><span class="text-[var(--muted)]">200</span><span>double dose</span></div>
+      </div>
+    </section>
+
+    <!-- Notice -->
+    <section class="rounded-xl p-4 border border-[var(--line)] bg-[var(--surface)]">
+      <p class="text-[var(--muted)] text-[11px] leading-relaxed font-mono">
+        Modeled curve for orientation only. Individual response varies with body weight, tolerance, and combination. Not a substitute for professional guidance.
+      </p>
+    </section>
+  </aside>
+</main>
+
+<script>
+// ------------------------------------------------------------------
+// Effect-curve model: onset → come-up → peak → offset, per dose,
+// summed into a combined curve. Values below are illustrative only.
+// ------------------------------------------------------------------
+function buildCurve(startMinutes, amountFactor, phases){
+  // phases = { onset, comeup, peak, offset } in minutes
+  const points = [];
+  const t0 = startMinutes;
+  const onsetEnd  = t0 + phases.onset;
+  const peakStart = onsetEnd + phases.comeup;
+  const peakEnd   = peakStart + phases.peak;
+  const offsetEnd = peakEnd + phases.offset;
+
+  const totalMax = 1440; // 24h window in minutes
+  const step = 5;
+  for(let t = 0; t <= totalMax; t += step){
+    let v = 0;
+    if(t < t0){
+      v = 0;
+    } else if(t < onsetEnd){
+      v = 0;
+    } else if(t < peakStart){
+      const p = (t - onsetEnd) / phases.comeup;
+      v = 100 * easeInOutCubic(p);
+    } else if(t < peakEnd){
+      v = 100;
+    } else if(t < offsetEnd){
+      const p = (t - peakEnd) / phases.offset;
+      v = 100 * (1 - easeInOutCubic(p));
+    } else {
+      v = 0;
+    }
+    points.push(v * amountFactor);
+  }
+  return points;
+}
+function easeInOutCubic(x){
+  return x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2,3)/2;
+}
+
+const phases = { onset: 15, comeup: 30, peak: 75, offset: 240 };
+const totalMax = 1440, step = 5;
+const timeLabels = [];
+for(let t=0; t<=totalMax; t+=step){
+  const h = String(Math.floor(t/60)).padStart(2,'0');
+  const m = String(t%60).padStart(2,'0');
+  timeLabels.push(`${h}:${m}`);
+}
+
+const doseA = buildCurve(8*60, 1.0, phases);        // 08:00, 200mg -> factor 1.0
+const doseB = buildCurve(12*60, 0.5, phases);       // 12:00, 100mg -> factor 0.5
+const combined = doseA.map((v,i) => v + doseB[i]);
+
+const traceA = {
+  x: timeLabels, y: doseA, name: 'Dose A · 200mg',
+  mode: 'lines', line: { color: '#ff8a4c', width: 2.5, shape: 'spline', smoothing: 1.1 },
+  hovertemplate: '<b>%{x}</b><br>Dose A: %{y:.0f}<extra></extra>'
+};
+const traceB = {
+  x: timeLabels, y: doseB, name: 'Dose B · 100mg',
+  mode: 'lines', line: { color: '#6ea8fe', width: 2, shape: 'spline', smoothing: 1.1, dash: 'solid' },
+  hovertemplate: '<b>%{x}</b><br>Dose B: %{y:.0f}<extra></extra>'
+};
+const traceCombined = {
+  x: timeLabels, y: combined, name: 'Combined effect',
+  mode: 'lines', line: { color: '#e8e6e1', width: 1.5, dash: 'dot', shape: 'spline', smoothing: 1.1 },
+  hovertemplate: '<b>%{x}</b><br>Combined: %{y:.0f}<extra></extra>'
+};
+
+// phase bands for dose A, drawn as translucent vrects
+function phaseShapes(t0, ph){
+  const onsetEnd  = t0 + ph.onset;
+  const peakStart = onsetEnd + ph.comeup;
+  const peakEnd   = peakStart + ph.peak;
+  const offsetEnd = peakEnd + ph.offset;
+  const toLabel = (m) => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  return [
+    { type:'rect', xref:'x', yref:'paper', x0:toLabel(t0), x1:toLabel(onsetEnd), y0:0, y1:1, fillcolor:'#6ea8fe', opacity:0.06, line:{width:0} },
+    { type:'rect', xref:'x', yref:'paper', x0:toLabel(onsetEnd), x1:toLabel(peakStart), y0:0, y1:1, fillcolor:'#7cd992', opacity:0.06, line:{width:0} },
+    { type:'rect', xref:'x', yref:'paper', x0:toLabel(peakStart), x1:toLabel(peakEnd), y0:0, y1:1, fillcolor:'#ffb703', opacity:0.08, line:{width:0} },
+    { type:'rect', xref:'x', yref:'paper', x0:toLabel(peakEnd), x1:toLabel(offsetEnd), y0:0, y1:1, fillcolor:'#ff8a4c', opacity:0.05, line:{width:0} },
+  ];
+}
+
+const layout = {
+  paper_bgcolor: 'rgba(0,0,0,0)',
+  plot_bgcolor: 'rgba(0,0,0,0)',
+  font: { family: 'JetBrains Mono, monospace', color: '#8b8f9c', size: 11 },
+  margin: { l: 44, r: 16, t: 10, b: 36 },
+  xaxis: {
+    gridcolor: 'rgba(255,255,255,0.04)',
+    zerolinecolor: 'rgba(255,255,255,0.08)',
+    tickfont: { size: 10 },
+    dtick: 24, // roughly every 2h at 5-min steps *2h... adjust via nticks instead
+    nticks: 12,
+  },
+  yaxis: {
+    title: { text: 'Intensity', font: { size: 10 } },
+    gridcolor: 'rgba(255,255,255,0.04)',
+    zerolinecolor: 'rgba(255,255,255,0.08)',
+    range: [0, 220],
+  },
+  shapes: phaseShapes(8*60, phases),
+  legend: {
+    orientation: 'h', y: 1.12, x: 0,
+    font: { size: 10, color: '#8b8f9c' },
+    bgcolor: 'rgba(0,0,0,0)'
+  },
+  hovermode: 'x unified',
+  hoverlabel: {
+    bgcolor: '#1f232d',
+    bordercolor: '#2a2f3b',
+    font: { family: 'JetBrains Mono, monospace', size: 11, color: '#e8e6e1' }
+  },
+};
+
+const config = {
+  responsive: true,
+  displayModeBar: false,
+  scrollZoom: false,
+};
+
+Plotly.newPlot('effectGraph', [traceCombined, traceA, traceB], layout, config)
+  .then(gd => {
+    // simple entrance animation: fade traces in via opacity ramp
+    Plotly.animate(gd, {
+      data: [{opacity: 1}, {opacity: 1}, {opacity: 1}]
+    }, { transition: { duration: 600, easing: 'cubic-in-out' }, frame: { duration: 600 } });
+  });
+
+// Re-flow on resize (mobile-first)
+window.addEventListener('resize', () => Plotly.Plots.resize('effectGraph'));
+</script>
+
+</body>
+</html>

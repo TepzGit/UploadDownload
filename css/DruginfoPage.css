@@ -1,10 +1,86 @@
-body {
-	background: #000000;
-	font-family: nerd, sans-serif !important;
-	margin: 0;
-	padding: 0;
+/* Drug info page (html/DruginfoPage.html).
+   Cards and the background come from oled.css, which loads after this file,
+   so overrides of those classes use two class names. */
+
+.di { display: flex; flex-direction: column; gap: 20px; }
+
+.di-back {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--oled-muted);
+  text-decoration: none;
 }
-@font-face {
-    font-family: 'nerd';
-    src: url('/JetBrainsMono-Regular.ttf') format('truetype');
+@media (hover: hover) { .di-back:hover { color: var(--oled-text); } }
+.di-back:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+
+.di-top { display: flex; align-items: center; gap: 16px; }
+.di-titles { min-width: 0; }
+.di-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--oled-line);
+  border-radius: 2px;
+  background: #000;
+}
+/* Wiki structure drawings are black on white/clear; inverting them suits the black theme. */
+.di-thumb img { width: 100%; height: 100%; padding: 6px; object-fit: contain; filter: invert(1) hue-rotate(180deg); }
+.di-summary { max-width: 72ch; margin: 16px 0 0; font-size: 13px; line-height: 1.7; color: #d4d0de; }
+.di-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.di-links[hidden] { display: none; }
+
+/* One card per way of taking it */
+.DrugInfoIntakeMethods {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.DrugInfoIntakeMethod { display: flex; flex-direction: column; }
+.di-roa-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--oled-line);
+}
+.di-roa-name { text-transform: capitalize; }
+.di-bio { font-size: 11px; color: var(--oled-muted); }
+.xn-label.di-sub { margin: 18px 0 8px; text-transform: uppercase; letter-spacing: 0.18em; font-size: 10px; }
+
+.di-list { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.di-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid var(--oled-line);
+  border-radius: 2px;
+  background: var(--oled-surface-2);
+  font-size: 13px;
+}
+.di-row dt { color: var(--oled-muted); }
+.di-row dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+/* Dose levels get a violet marker that deepens from threshold to heavy. */
+.di-doses .di-row { border-left: 3px solid rgba(166, 124, 255, 0.25); }
+.di-doses .di-row:nth-child(2) { border-left-color: rgba(166, 124, 255, 0.45); }
+.di-doses .di-row:nth-child(3) { border-left-color: rgba(166, 124, 255, 0.65); }
+.di-doses .di-row:nth-child(4) { border-left-color: rgba(166, 124, 255, 0.85); }
+.di-doses .di-row:nth-child(5) { border-left-color: #a67cff; }
+
+.xn-card.di-empty { margin: 0; grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--oled-muted); }
+.di-note { margin: 0; font-size: 11px; color: var(--oled-muted); text-align: center; }
+
+@media (max-width: 640px) {
+  .di-thumb { width: 56px; height: 56px; }
+  .di-links .xn-btn { flex: 1; }
 }

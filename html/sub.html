@@ -1,747 +1,213 @@
-<html><head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>Substance</title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="/sub.css">
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!doctype html>
+<html lang="en" data-theme="dark" class="xn-js"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Substance timeline · Geek⁴u</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:#a67cff; }
+  body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
+  .font-display{ font-family:'Space Grotesk',sans-serif; }
+  .font-mono{ font-family:'JetBrains Mono',monospace; }
+  .glass{ background:var(--surface); border:1px solid var(--line); }
+  .check-card{ cursor:pointer; }
+  .check-card.selected{ border-color:var(--violet); background:rgba(166,124,255,.12); }
+  .suggestion{ display:block; width:100%; text-align:left; padding:.5rem .75rem; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
+  .suggestion:hover{ background:rgba(255,255,255,.08); }
+  .dose-card{ display:flex; align-items:center; gap:.75rem; background:var(--surface-2); border:1px solid var(--line); border-radius:.125rem; padding:.6rem .5rem .6rem .8rem; }
+  .dose-card time{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--violet); flex:none; }
+  .dose-card div{ display:flex; flex-direction:column; min-width:0; flex:1; }
+  .dose-card strong{ font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dose-card span{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+  .remove-dose{ flex:none; width:40px; height:40px; border-radius:.125rem; color:var(--muted); font-size:20px; line-height:1; }
+  .remove-dose:hover, .remove-dose:focus-visible{ color:var(--text); background:rgba(255,255,255,.06); outline:none; }
+  .pill{ display:inline-block; margin:0 .3rem .3rem 0; padding:.2rem .55rem; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text); }
+  .pill.empty{ color:var(--muted); background:transparent; }
+  .dose-list-empty{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding:.5rem 0; }
+  .toast{ position:fixed; left:50%; bottom:calc(1.25rem + env(safe-area-inset-bottom)); max-width:calc(100vw - 2rem); text-align:center; transform:translate(-50%,20px); background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:.6rem 1rem; border-radius:.125rem; opacity:0; pointer-events:none; transition:.25s ease; z-index:60; }
+  .toast.visible{ opacity:1; transform:translate(-50%,0); }
+  .toast.error{ border-color:#f8717155; color:#fca5a5; }
+  .chart-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; height:var(--chart-h); padding:0 1rem; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center; }
+  :root{ --chart-h:360px; }
+  @media (min-width:1280px){ :root{ --chart-h:min(62vh, 640px); } }
+  .crosshatch{
+    background-image:
+      linear-gradient(45deg, transparent 49%, #23202b 49%, #23202b 51%, transparent 51%),
+      linear-gradient(-45deg, transparent 49%, #23202b 49%, #23202b 51%, transparent 51%);
+    background-size: 20px 20px;
+  }
+  .chart-empty + #myPlot{ height:var(--chart-h); width:100%; }
+  .chart-empty:not([hidden]) + #myPlot{ display:none; }
+  .suggestion{ min-height:44px; }
+  input[type=time]{ -webkit-appearance:none; appearance:none; }
+  input[type=time]::-webkit-date-and-time-value{ text-align:left; }
+  @media (max-width: 640px){
+    :root{ --chart-h:260px; }
+  }
+  @media (hover:none) and (pointer:coarse){
+    .input-sm{ height:2.75rem; }
+    .btn-sm{ height:2.75rem; min-height:2.75rem; }
+    .btn-xs{ height:2.25rem; min-height:2.25rem; padding:0 .75rem; }
+    .check-card{ padding:.7rem; }
+  }
+  .input, .btn, .join-item, .checkbox{ border-radius:.125rem !important; }
+  .release-details > summary{ list-style:none; }
+  .release-details > summary::-webkit-details-marker{ display:none; }
+  .release-details[open] .release-chevron{ transform:rotate(180deg); }
+  .release-chevron{ transition:transform .15s ease; }
+</style>
+  <meta name="theme-color" content="#000000">
+  <link rel="stylesheet" href="/oled.css">
+  <script src="/nav.js"></script>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0, 0, 0, 0);white-space:nowrap;border-width:0}.pointer-events-none{pointer-events:none}.visible{visibility:visible}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.inset-x-0{left:0px;right:0px}.left-0{left:0px}.right-0{right:0px}.top-full{top:100%}.bottom-0{bottom:0px}.z-0{z-index:0}.z-20{z-index:20}.z-\[1\]{z-index:1}.order-2{order:2}.order-3{order:3}.order-4{order:4}.order-5{order:5}.order-6{order:6}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:0.25rem}.mb-2{margin-bottom:0.5rem}.mb-3{margin-bottom:0.75rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.mt-0\.5{margin-top:0.125rem}.mt-1{margin-top:0.25rem}.mt-2{margin-top:0.5rem}.mt-auto{margin-top:auto}.block{display:block}.flex{display:flex}.grid{display:grid}.contents{display:contents}.h-12{height:3rem}.h-20{height:5rem}.h-3\.5{height:0.875rem}.h-9{height:2.25rem}.min-h-screen{min-height:100vh}.w-20{width:5rem}.w-3\.5{width:0.875rem}.w-full{width:100%}.min-w-0{min-width:0px}.max-w-\[1880px\]{max-width:1880px}.flex-none{flex:none}.cursor-pointer{cursor:pointer}.cursor-crosshair{cursor:crosshair}.select-none{-webkit-user-select:none;user-select:none}.scroll-mt-20{scroll-margin-top:5rem}.grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.flex-col{flex-direction:column}.items-start{align-items:flex-start}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-4{gap:1rem}.gap-5{gap:1.25rem}.space-y-7 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.75rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.rounded-sm{border-radius:0.125rem}.border{border-width:1px}.border-b-2{border-bottom-width:2px}.border-t{border-top-width:1px}.border-none{border-style:none}.border-\[var\(--line\)\]{border-color:var(--line)}.bg-\[var\(--bg\)\]{background-color:var(--bg)}.bg-\[var\(--surface\)\]{background-color:var(--surface)}.bg-\[var\(--surface-2\)\]{background-color:var(--surface-2)}.bg-\[var\(--violet\)\]{background-color:var(--violet)}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity, 1))}.object-contain{object-fit:contain}.p-2{padding:0.5rem}.p-3{padding:0.75rem}.p-4{padding:1rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.pb-4{padding-bottom:1rem}.pb-\[calc\(2rem\+env\(safe-area-inset-bottom\)\)\]{padding-bottom:calc(2rem + env(safe-area-inset-bottom))}.pt-2{padding-top:0.5rem}.font-mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}.text-\[10px\]{font-size:10px}.text-\[11px\]{font-size:11px}.text-base{font-size:1rem;line-height:1.5rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.leading-relaxed{line-height:1.625}.tracking-\[0\.2em\]{letter-spacing:0.2em}.text-\[\#160f24\]{--tw-text-opacity:1;color:rgb(22 15 36 / var(--tw-text-opacity, 1))}.text-\[\#f8f4ff\]{--tw-text-opacity:1;color:rgb(248 244 255 / var(--tw-text-opacity, 1))}.text-\[var\(--muted\)\]{color:var(--muted)}.text-\[var\(--text\)\]{color:var(--text)}.text-amber-300{--tw-text-opacity:1;color:rgb(252 211 77 / var(--tw-text-opacity, 1))}.text-orange-400{--tw-text-opacity:1;color:rgb(251 146 60 / var(--tw-text-opacity, 1))}.text-red-400{--tw-text-opacity:1;color:rgb(248 113 113 / var(--tw-text-opacity, 1))}.hover\:bg-\[var\(--violet\)\]:hover{background-color:var(--violet)}.hover\:brightness-110:hover{--tw-brightness:brightness(1.1);filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.disabled\:opacity-40:disabled{opacity:0.4}@media (min-width: 640px){.sm\:p-5{padding:1.25rem}.sm\:p-6{padding:1.5rem}.sm\:px-0{padding-left:0px;padding-right:0px}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}.sm\:py-8{padding-top:2rem;padding-bottom:2rem}}@media (min-width: 1280px){.xl\:sticky{position:sticky}.xl\:top-20{top:5rem}.xl\:order-none{order:0}.xl\:col-start-1{grid-column-start:1}.xl\:col-start-2{grid-column-start:2}.xl\:col-start-3{grid-column-start:3}.xl\:row-start-1{grid-row-start:1}.xl\:m-\[2px\]{margin:2px}.xl\:m-\[5px\]{margin:5px}.xl\:m-\[15px\]{margin:15px}.xl\:flex{display:flex}.xl\:grid{display:grid}.xl\:min-h-\[34rem\]{min-height:34rem}.xl\:min-h-\[calc\(100vh-7rem\)\]{min-height:calc(100vh - 7rem)}.xl\:min-h-\[100\%\]{min-height:100%}.xl\:min-h-\[100vh\]{min-height:100vh}.xl\:min-h-\[900vh\]{min-height:900vh}.xl\:min-h-\[90vh\]{min-height:90vh}.xl\:min-h-\[70rem\]{min-height:70rem}.xl\:min-h-\[20rem\]{min-height:20rem}.xl\:min-h-\[35rem\]{min-height:35rem}.xl\:min-h-\[33rem\]{min-height:33rem}.xl\:min-h-\[30rem\]{min-height:30rem}.xl\:min-h-\[95vh\]{min-height:95vh}.xl\:min-h-\[90\%\]{min-height:90%}.xl\:min-h-\[56rem\]{min-height:56rem}.xl\:min-w-0{min-width:0px}.xl\:grid-cols-\[340px_minmax\(0\2c 1fr\)_340px\]{grid-template-columns:340px minmax(0,1fr) 340px}.xl\:flex-col{flex-direction:column}.xl\:items-start{align-items:flex-start}.xl\:gap-5{gap:1.25rem}.xl\:gap-x-12{column-gap:3rem}.xl\:p-\[2px\]{padding:2px}}</style><script src="https://cdn.plot.ly/plotly-2.32.0.min.js" async=""></script><style id="plotly.js-style-global"></style></head>
+<body class="min-h-screen bg-black text-[#f8f4ff]">
+<div class="crosshatch fixed inset-0 z-0 pointer-events-none" aria-hidden="true"></div>
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/" aria-current="page">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
 
-    <style id="plotly.js-style-global"></style></head>
-    <body>
+<div class="relative z-[1] mx-auto max-w-[1880px] px-4 sm:px-6 py-6 sm:py-8 pb-[calc(2rem+env(safe-area-inset-bottom))] flex flex-col xl:grid xl:grid-cols-[340px_minmax(0,1fr)_340px] xl:items-start gap-5 xl:gap-x-12">
+  <div class="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0 xl:col-start-2 xl:row-start-1">
 
 
-           
-<div id="cont">
-    <div id="sidebar">
-  
-<div id="sideheader">
-  
-<h1 id="xentara">Xentara</h1>
-    <div id="butcont">
-        <a href="/Profile" id="but">
+    <section id="chartCard" class="glass rounded-sm p-3 sm:p-5 xl:min-h-[56rem] order-3 xl:order-none min-w-0 scroll-mt-20">
 
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M16 9C16 11.2091 14.2091 13 12 13C9.79086 13 8 11.2091 8 9C8 6.79086 9.79086 5 12 5C14.2091 5 16 6.79086 16 9ZM14 9C14 10.1046 13.1046 11 12 11C10.8954 11 10 10.1046 10 9C10 7.89543 10.8954 7 12 7C13.1046 7 14 7.89543 14 9Z" fill="currentColor"></path>
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12C23 5.92487 18.0751 1 12 1ZM3 12C3 14.0902 3.71255 16.014 4.90798 17.5417C6.55245 15.3889 9.14627 14 12.0645 14C14.9448 14 17.5092 15.3531 19.1565 17.4583C20.313 15.9443 21 14.0524 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12ZM12 21C9.84977 21 7.87565 20.2459 6.32767 18.9878C7.59352 17.1812 9.69106 16 12.0645 16C14.4084 16 16.4833 17.1521 17.7538 18.9209C16.1939 20.2191 14.1881 21 12 21Z" fill="currentColor"></path>
-            </svg>
-        </a>
+      <div id="chartEmpty" class="chart-empty" hidden="">
+        <span class="text-xl">↗</span>
+        <strong class="text-[var(--text)]">Your timeline will appear here</strong>
+        <span>Find a substance, choose its formulation, and add a dose.</span>
+      </div>
+      <div id="myPlot" class="js-plotly-plot"><div class="plot-container plotly"><div class="user-select-none svg-container" style="position: relative; width: 100%; height: 100%;"><svg class="main-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1014" height="621.85" style="background: none;"><defs id="defs-ac5ffe"><g class="clips"><clipPath id="clipac5ffexyplot" class="plotclip"><rect width="944" height="519"></rect></clipPath><clipPath class="axesclip" id="clipac5ffex"><rect x="52" y="0" width="944" height="621.85"></rect></clipPath><clipPath class="axesclip" id="clipac5ffey"><rect x="0" y="51" width="1014" height="519"></rect></clipPath><clipPath class="axesclip" id="clipac5ffexy"><rect x="52" y="51" width="944" height="519"></rect></clipPath></g><g class="gradients"></g><g class="patterns"></g></defs><g class="bglayer"><rect class="bg" x="52" y="51" width="944" height="519" style="fill: rgb(0, 0, 0); fill-opacity: 0; stroke-width: 0px;"></rect></g><g class="draglayer cursor-crosshair"><g class="xy"><rect class="nsewdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: all;" data-subplot="xy" x="52" y="51" width="944" height="519"></rect><rect class="nwdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="32" y="31" width="20" height="20"></rect><rect class="nedrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="996" y="31" width="20" height="20"></rect><rect class="swdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="32" y="570" width="20" height="20"></rect><rect class="sedrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="996" y="570" width="20" height="20"></rect><rect class="ewdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="146.4" y="570.5" width="755.2" height="20"></rect><rect class="wdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="52" y="570.5" width="94.4" height="20"></rect><rect class="edrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="901.6" y="570.5" width="94.4" height="20"></rect><rect class="nsdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="31.5" y="102.9" width="20" height="415.20000000000005"></rect><rect class="sdrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="31.5" y="518.1" width="20" height="51.900000000000006"></rect><rect class="ndrag drag cursor-pointer" style="fill: transparent; stroke-width: 0px; pointer-events: none;" data-subplot="xy" x="31.5" y="51" width="20" height="51.900000000000006"></rect></g></g><g class="layer-below"><g class="imagelayer"></g><g class="shapelayer"></g></g><g class="cartesianlayer"><g class="subplot xy"><g class="layer-subplot"><g class="shapelayer"></g><g class="imagelayer"></g></g><g class="minor-gridlayer"><g class="x"></g><g class="y"></g></g><g class="gridlayer"><g class="x"><path class="xgrid crisp" transform="translate(60.39,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(132.32,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(204.24,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(276.15999999999997,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(348.09,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(420.01,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(491.94,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(563.86,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(635.78,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(707.71,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(779.63,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(851.56,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="xgrid crisp" transform="translate(923.48,0)" d="M0,51v519" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path></g><g class="y"><path class="ygrid crisp" transform="translate(0,510.83)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,451.67)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,392.5)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,333.34)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,274.16999999999996)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,215)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,155.84)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path><path class="ygrid crisp" transform="translate(0,96.67)" d="M52,0h944" style="stroke: rgb(255, 255, 255); stroke-opacity: 0.07; stroke-width: 1px;"></path></g></g><g class="zerolinelayer"></g><g class="layer-between"><g class="shapelayer"></g><g class="imagelayer"></g></g><path class="xlines-below"></path><path class="ylines-below"></path><g class="overlines-below"></g><g class="xaxislayer-below"></g><g class="yaxislayer-below"></g><g class="overaxes-below"></g><g class="plot" transform="translate(52,51)" clip-path="url(#clipac5ffexyplot)"><g class="scatterlayer mlayer"><g class="trace scatter trace65ed14" style="stroke-miterlimit: 2;"><g class="fills"><g><path class="js-fill" d="M944,519L0,519L0,519Q3.21,519 3.46,519C3.51,519 3.55,519 3.6,519C3.85,519 6.6,519 6.92,519C7.01,519 7.1,519 7.19,519C7.5,519 10.02,519 10.38,519C10.51,519 10.66,519 10.79,519C11.14,519 13.44,519 13.83,519C14,519 14.21,519 14.38,519C14.76,519 16.88,519 17.29,519C17.49,519 17.78,519 17.98,519C18.38,519 20.33,519 20.75,519C20.98,519 21.35,519 21.58,519C21.99,519 23.78,519 24.21,519C24.47,519 24.91,519 25.17,519C25.58,519 27.23,519 27.66,519C27.95,519 28.48,519 28.77,519C29.18,519 30.69,519 31.12,519C31.43,519 32.06,519 32.37,519C32.78,519 34.16,519 34.58,519C34.91,519 35.63,519 35.96,519C36.36,519 37.62,519 38.04,519C38.4,519 39.21,519 39.56,519C39.95,519 41.1,519 41.5,519C41.87,519 42.78,519 43.15,519C43.53,519 44.62,519.25 44.95,519C45.58,518.52 46.36,513.85 46.75,512.43C47.14,511.01 48.16,507.28 48.55,505.86C48.94,504.44 49.96,500.71 50.35,499.29C50.74,497.87 51.75,494.13 52.14,492.71C52.53,491.29 53.55,487.56 53.94,486.14C54.33,484.71 55.35,480.99 55.74,479.56C56.13,478.14 57.15,474.41 57.54,472.99C57.93,471.57 58.95,467.84 59.34,466.42C59.73,464.99 60.75,461.27 61.14,459.84C61.53,458.42 62.54,454.69 62.93,453.27C63.32,451.84 64.34,448.12 64.73,446.69C65.12,445.27 66.14,441.54 66.53,440.12C66.92,438.7 67.94,434.97 68.33,433.55C68.72,432.12 69.74,428.4 70.13,426.97C70.52,425.55 71.53,421.82 71.92,420.4C72.31,418.97 73.33,415.25 73.72,413.82C74.11,412.4 75.13,408.67 75.52,407.25C75.91,405.83 76.93,402.1 77.32,400.68C77.71,399.25 78.73,395.53 79.12,394.1C79.51,392.68 80.52,388.95 80.91,387.53C81.3,386.1 82.32,382.38 82.71,380.95C83.1,379.53 84.12,375.8 84.51,374.38C84.9,372.96 85.92,369.23 86.31,367.81C86.7,366.38 87.72,362.66 88.11,361.23C88.5,359.81 89.51,356.08 89.9,354.66C90.29,353.23 91.31,349.51 91.7,348.08C92.09,346.66 93.11,342.93 93.5,341.51C93.89,340.09 94.91,336.36 95.3,334.94C95.69,333.51 96.71,329.79 97.1,328.36C97.49,326.94 98.51,323.21 98.9,321.79C99.29,320.37 100.3,316.63 100.69,315.21C101.08,313.79 102.1,310.06 102.49,308.64C102.88,307.22 103.9,303.49 104.29,302.07C104.68,300.64 105.7,296.92 106.09,295.49C106.48,294.07 107.5,290.34 107.89,288.92C108.28,287.5 109.29,283.76 109.68,282.34C110.07,280.92 111.09,277.19 111.48,275.77C111.87,274.35 112.89,270.62 113.28,269.2C113.67,267.77 114.69,264.05 115.08,262.62C115.47,261.2 116.49,257.47 116.88,256.05C117.27,254.63 118.28,250.89 118.67,249.47C119.06,248.05 120.08,244.32 120.47,242.9C120.86,241.48 121.88,237.75 122.27,236.33C122.66,234.9 123.68,231.18 124.07,229.75C124.46,228.33 125.48,224.6 125.87,223.18C126.26,221.76 127.27,218.02 127.66,216.6C128.05,215.18 129.07,211.45 129.46,210.03C129.85,208.61 130.87,204.88 131.26,203.46C131.65,202.03 132.67,198.31 133.06,196.88C133.45,195.46 134.47,191.73 134.86,190.31C135.25,188.88 136.27,185.16 136.66,183.73C137.05,182.31 138.06,178.58 138.45,177.16C138.84,175.74 139.86,172.01 140.25,170.59C140.64,169.16 141.66,165.44 142.05,164.01C142.44,162.59 143.46,158.86 143.85,157.44C144.24,156.01 145.26,152.29 145.65,150.86C146.04,149.44 147.05,145.71 147.44,144.29C147.83,142.87 148.85,139.14 149.24,137.72C149.63,136.29 150.65,132.57 151.04,131.14C151.43,129.72 152.21,125.06 152.84,124.57C153.17,124.32 154.25,124.56 154.64,124.56C155.03,124.56 156.04,124.56 156.43,124.56C156.82,124.56 157.84,124.56 158.23,124.56C158.62,124.56 159.64,124.56 160.03,124.56C160.42,124.56 161.44,124.56 161.83,124.56C162.22,124.56 163.24,124.56 163.63,124.56C164.02,124.56 165.03,124.56 165.42,124.56C165.81,124.56 166.83,124.56 167.22,124.56C167.61,124.56 168.63,124.56 169.02,124.56C169.41,124.56 170.43,124.56 170.82,124.56C171.21,124.56 172.23,124.56 172.62,124.56C173.01,124.56 174.03,124.56 174.42,124.56C174.81,124.56 175.82,124.56 176.21,124.56C176.6,124.56 177.62,124.56 178.01,124.56C178.4,124.56 179.42,124.56 179.81,124.56C180.2,124.56 181.22,124.56 181.61,124.56C182,124.56 183.02,124.56 183.41,124.56C183.8,124.56 184.81,124.56 185.2,124.56C185.59,124.56 186.61,124.56 187,124.56C187.39,124.56 188.41,124.56 188.8,124.56C189.19,124.56 190.21,124.56 190.6,124.56C190.99,124.56 192.01,124.56 192.4,124.56C192.79,124.56 193.8,124.56 194.19,124.56C194.58,124.56 195.6,124.56 195.99,124.56C196.38,124.56 197.4,124.56 197.79,124.56C198.18,124.56 199.2,124.56 199.59,124.56C199.98,124.56 201,124.56 201.39,124.56C201.78,124.56 202.79,124.56 203.18,124.56C203.57,124.56 204.59,124.56 204.98,124.56C205.37,124.56 206.39,124.56 206.78,124.56C207.17,124.56 208.19,124.56 208.58,124.56C208.97,124.56 209.99,124.56 210.38,124.56C210.77,124.56 211.79,124.56 212.18,124.56C212.57,124.56 213.58,124.56 213.97,124.56C214.36,124.56 215.38,124.56 215.77,124.56C216.16,124.56 217.18,124.56 217.57,124.56C217.96,124.56 218.98,124.56 219.37,124.56C219.76,124.56 220.78,124.56 221.17,124.56C221.56,124.56 222.57,124.56 222.96,124.56C223.35,124.56 224.37,124.56 224.76,124.56C225.15,124.56 226.17,124.56 226.56,124.56C226.95,124.56 227.97,124.56 228.36,124.56C228.75,124.56 229.77,124.56 230.16,124.56C230.55,124.56 231.56,124.56 231.95,124.56C232.34,124.56 233.36,124.56 233.75,124.56C234.14,124.56 235.16,124.56 235.55,124.56C235.94,124.56 236.96,124.56 237.35,124.56C237.74,124.56 238.76,124.56 239.15,124.56C239.54,124.56 240.55,124.56 240.94,124.56C241.33,124.56 242.35,124.56 242.74,124.56C243.13,124.56 244.15,124.56 244.54,124.56C244.93,124.56 245.95,124.56 246.34,124.56C246.73,124.56 247.75,124.56 248.14,124.56C248.53,124.56 249.55,124.56 249.94,124.56C250.33,124.56 251.34,124.56 251.73,124.56C252.12,124.56 253.14,124.56 253.53,124.56C253.92,124.56 254.94,124.56 255.33,124.56C255.72,124.56 256.74,124.56 257.13,124.56C257.52,124.56 258.54,124.56 258.93,124.56C259.32,124.56 260.33,124.56 260.72,124.56C261.11,124.56 262.13,124.56 262.52,124.56C262.91,124.56 263.93,124.56 264.32,124.56C264.71,124.56 265.73,124.56 266.12,124.56C266.51,124.56 267.53,124.56 267.92,124.56C268.31,124.56 269.32,124.56 269.71,124.56C270.1,124.56 271.12,124.56 271.51,124.56C271.9,124.56 272.92,124.56 273.31,124.56C273.7,124.56 274.72,124.56 275.11,124.56C275.5,124.56 276.52,124.56 276.91,124.56C277.3,124.56 278.31,124.56 278.7,124.56C279.09,124.56 280.11,124.56 280.5,124.56C280.89,124.56 281.91,124.56 282.3,124.56C282.69,124.56 283.71,124.56 284.1,124.56C284.49,124.56 285.51,124.56 285.9,124.56C286.29,124.56 287.31,124.56 287.7,124.56C288.09,124.56 289.1,124.56 289.49,124.56C289.88,124.56 290.9,124.56 291.29,124.56C291.68,124.56 292.7,124.56 293.09,124.56C293.48,124.56 294.5,124.56 294.89,124.56C295.28,124.56 296.3,124.56 296.69,124.56C297.08,124.56 298.09,124.56 298.48,124.56C298.87,124.56 299.89,124.56 300.28,124.56C300.67,124.56 301.69,124.56 302.08,124.56C302.47,124.56 303.49,124.56 303.88,124.56C304.27,124.56 305.29,124.56 305.68,124.56C306.07,124.56 307.08,124.56 307.47,124.56C307.86,124.56 308.88,124.56 309.27,124.56C309.66,124.56 310.68,124.56 311.07,124.56C311.46,124.56 312.48,124.56 312.87,124.56C313.26,124.56 314.28,124.56 314.67,124.56C315.06,124.56 316.07,124.56 316.46,124.56C316.85,124.56 317.87,124.56 318.26,124.56C318.65,124.56 319.67,124.56 320.06,124.56C320.45,124.56 321.47,124.56 321.86,124.56C322.25,124.56 323.27,124.56 323.66,124.56C324.05,124.56 325.07,124.56 325.46,124.56C325.85,124.56 326.86,124.56 327.25,124.56C327.64,124.56 328.66,124.56 329.05,124.56C329.44,124.56 330.46,124.56 330.85,124.56C331.24,124.56 332.26,124.56 332.65,124.56C333.04,124.56 334.06,124.56 334.45,124.56C334.84,124.56 335.85,124.56 336.24,124.56C336.63,124.56 337.65,124.56 338.04,124.56C338.43,124.56 339.45,124.56 339.84,124.56C340.23,124.56 341.25,124.56 341.64,124.56C342.03,124.56 343.05,124.56 343.44,124.56C343.83,124.56 344.84,124.56 345.23,124.56C345.62,124.56 346.64,124.56 347.03,124.56C347.42,124.56 348.44,124.56 348.83,124.56C349.22,124.56 350.24,124.56 350.63,124.56C351.02,124.56 352.04,124.56 352.43,124.56C352.82,124.56 353.83,124.56 354.22,124.56C354.61,124.56 355.63,124.56 356.02,124.56C356.41,124.56 357.43,124.56 357.82,124.56C358.21,124.56 359.23,124.56 359.62,124.56C360.01,124.56 361.03,124.56 361.42,124.56C361.81,124.56 362.83,124.56 363.22,124.56C363.61,124.56 364.62,124.56 365.01,124.56C365.4,124.56 366.42,124.56 366.81,124.56C367.2,124.56 368.22,124.56 368.61,124.56C369,124.56 370.02,124.56 370.41,124.56C370.8,124.56 371.82,124.56 372.21,124.56C372.6,124.56 373.61,124.56 374,124.56C374.39,124.56 375.41,124.56 375.8,124.56C376.19,124.56 377.21,124.56 377.6,124.56C377.99,124.56 379.01,124.56 379.4,124.56C379.79,124.56 380.81,124.56 381.2,124.56C381.59,124.56 382.6,124.56 382.99,124.56C383.38,124.56 384.4,124.56 384.79,124.56C385.18,124.56 386.2,124.56 386.59,124.56C386.98,124.56 388,124.56 388.39,124.56C388.78,124.56 389.8,124.56 390.19,124.56C390.58,124.56 391.59,124.56 391.98,124.56C392.37,124.56 393.39,124.56 393.78,124.56C394.17,124.56 395.19,124.56 395.58,124.56C395.97,124.56 396.99,124.56 397.38,124.56C397.77,124.56 398.79,124.56 399.18,124.56C399.57,124.56 400.59,124.56 400.98,124.56C401.37,124.56 402.38,124.56 402.77,124.56C403.16,124.56 404.18,124.56 404.57,124.56C404.96,124.56 405.98,124.56 406.37,124.56C406.76,124.56 407.78,124.56 408.17,124.56C408.56,124.56 409.58,124.56 409.97,124.56C410.36,124.56 411.37,124.56 411.76,124.56C412.15,124.56 413.17,124.56 413.56,124.56C413.95,124.56 414.97,124.56 415.36,124.56C415.75,124.56 416.77,124.56 417.16,124.56C417.55,124.56 418.57,124.56 418.96,124.56C419.35,124.56 420.36,124.56 420.75,124.56C421.14,124.56 422.16,124.56 422.55,124.56C422.94,124.56 423.96,124.56 424.35,124.56C424.74,124.56 425.76,124.56 426.15,124.56C426.54,124.56 427.56,124.56 427.95,124.56C428.34,124.56 429.35,124.56 429.74,124.56C430.13,124.56 431.15,124.56 431.54,124.56C431.93,124.56 432.95,124.56 433.34,124.56C433.73,124.56 434.75,124.56 435.14,124.56C435.53,124.56 436.55,124.56 436.94,124.56C437.33,124.56 438.35,124.56 438.74,124.56C439.13,124.56 440.14,124.56 440.53,124.56C440.92,124.56 441.94,124.56 442.33,124.56C442.72,124.56 443.74,124.56 444.13,124.56C444.52,124.56 445.54,124.56 445.93,124.56C446.32,124.56 447.34,124.56 447.73,124.56C448.12,124.56 449.13,124.56 449.52,124.56C449.91,124.56 450.93,124.56 451.32,124.56C451.71,124.56 452.73,124.56 453.12,124.56C453.51,124.56 454.53,124.56 454.92,124.56C455.31,124.56 456.33,124.56 456.72,124.56C457.11,124.56 458.12,124.56 458.51,124.56C458.9,124.56 459.92,124.56 460.31,124.56C460.7,124.56 461.72,124.56 462.11,124.56C462.5,124.56 463.52,124.56 463.91,124.56C464.3,124.56 465.32,124.56 465.71,124.56C466.1,124.56 467.11,124.56 467.5,124.56C467.89,124.56 468.91,124.56 469.3,124.56C469.69,124.56 470.71,124.56 471.1,124.56C471.49,124.56 472.51,124.56 472.9,124.56C473.29,124.56 474.31,124.56 474.7,124.56C475.09,124.56 476.11,124.56 476.5,124.56C476.89,124.56 477.9,124.56 478.29,124.56C478.68,124.56 479.7,124.56 480.09,124.56C480.48,124.56 481.5,124.56 481.89,124.56C482.28,124.56 483.3,124.56 483.69,124.56C484.08,124.56 485.1,124.56 485.49,124.56C485.88,124.56 486.89,124.56 487.28,124.56C487.67,124.56 488.69,124.56 489.08,124.56C489.47,124.56 490.49,124.56 490.88,124.56C491.27,124.56 492.29,124.56 492.68,124.56C493.07,124.56 494.09,124.56 494.48,124.56C494.87,124.56 495.88,124.56 496.27,124.56C496.66,124.56 497.68,124.56 498.07,124.56C498.46,124.56 499.48,124.56 499.87,124.56C500.26,124.56 501.28,124.56 501.67,124.56C502.06,124.56 503.08,124.56 503.47,124.56C503.86,124.56 504.87,124.56 505.26,124.56C505.65,124.56 506.67,124.56 507.06,124.56C507.45,124.56 508.47,124.56 508.86,124.56C509.25,124.56 510.27,124.56 510.66,124.56C511.05,124.56 512.1,124.42 512.46,124.56C512.88,124.72 513.87,125.84 514.26,126.2C514.65,126.56 515.66,127.48 516.05,127.84C516.44,128.2 517.46,129.13 517.85,129.49C518.24,129.85 519.26,130.77 519.65,131.13C520.04,131.49 521.06,132.42 521.45,132.78C521.84,133.14 522.86,134.06 523.25,134.42C523.64,134.78 524.65,135.7 525.04,136.06C525.43,136.42 526.45,137.35 526.84,137.71C527.23,138.07 528.25,138.99 528.64,139.35C529.03,139.71 530.05,140.63 530.44,140.99C530.83,141.35 531.85,142.28 532.24,142.64C532.63,143 533.64,143.92 534.03,144.28C534.42,144.64 535.44,145.56 535.83,145.92C536.22,146.28 537.24,147.21 537.63,147.57C538.02,147.93 539.04,148.85 539.43,149.21C539.82,149.57 540.84,150.49 541.23,150.85C541.62,151.21 542.63,152.14 543.02,152.5C543.41,152.86 544.43,153.78 544.82,154.14C545.21,154.5 546.23,155.42 546.62,155.78C547.01,156.14 548.03,157.07 548.42,157.43C548.81,157.79 549.83,158.71 550.22,159.07C550.61,159.43 551.63,160.35 552.02,160.71C552.41,161.07 553.42,162 553.81,162.36C554.2,162.72 555.22,163.64 555.61,164C556,164.36 557.02,165.29 557.41,165.65C557.8,166.01 558.82,166.93 559.21,167.29C559.6,167.65 560.62,168.57 561.01,168.93C561.4,169.29 562.41,170.22 562.8,170.58C563.19,170.94 564.21,171.86 564.6,172.22C564.99,172.58 566.01,173.5 566.4,173.86C566.79,174.22 567.81,175.15 568.2,175.51C568.59,175.87 569.61,176.79 570,177.15C570.39,177.51 571.4,178.43 571.79,178.79C572.18,179.15 573.2,180.08 573.59,180.44C573.98,180.8 575,181.72 575.39,182.08C575.78,182.44 576.8,183.36 577.19,183.72C577.58,184.08 578.6,185.01 578.99,185.37C579.38,185.73 580.39,186.65 580.78,187.01C581.17,187.37 582.19,188.29 582.58,188.65C582.97,189.01 583.99,189.94 584.38,190.3C584.77,190.66 585.79,191.58 586.18,191.94C586.57,192.3 587.59,193.22 587.98,193.58C588.37,193.94 589.39,194.87 589.78,195.23C590.17,195.59 591.18,196.51 591.57,196.87C591.96,197.23 592.98,198.16 593.37,198.52C593.76,198.88 594.78,199.8 595.17,200.16C595.56,200.52 596.58,201.44 596.97,201.8C597.36,202.16 598.38,203.09 598.77,203.45C599.16,203.81 600.17,204.73 600.56,205.09C600.95,205.45 601.97,206.37 602.36,206.73C602.75,207.09 603.77,208.02 604.16,208.38C604.55,208.74 605.57,209.66 605.96,210.02C606.35,210.38 607.37,211.3 607.76,211.66C608.15,212.02 609.16,212.95 609.55,213.31C609.94,213.67 610.96,214.59 611.35,214.95C611.74,215.31 612.76,216.23 613.15,216.59C613.54,216.95 614.56,217.88 614.95,218.24C615.34,218.6 616.36,219.52 616.75,219.88C617.14,220.24 618.15,221.16 618.54,221.52C618.93,221.88 619.95,222.81 620.34,223.17C620.73,223.53 621.75,224.45 622.14,224.81C622.53,225.17 623.55,226.09 623.94,226.45C624.33,226.81 625.35,227.74 625.74,228.1C626.13,228.46 627.15,229.38 627.54,229.74C627.93,230.1 628.94,231.03 629.33,231.39C629.72,231.75 630.74,232.67 631.13,233.03C631.52,233.39 632.54,234.31 632.93,234.67C633.32,235.03 634.34,235.96 634.73,236.32C635.12,236.68 636.14,237.6 636.53,237.96C636.92,238.32 637.93,239.24 638.32,239.6C638.71,239.96 639.73,240.89 640.12,241.25C640.51,241.61 641.53,242.53 641.92,242.89C642.31,243.25 643.33,244.17 643.72,244.53C644.11,244.89 645.13,245.82 645.52,246.18C645.91,246.54 646.92,247.46 647.31,247.82C647.7,248.18 648.72,249.1 649.11,249.46C649.5,249.82 650.52,250.75 650.91,251.11C651.3,251.47 652.32,252.39 652.71,252.75C653.1,253.11 654.12,254.03 654.51,254.39C654.9,254.75 655.91,255.68 656.3,256.04C656.69,256.4 657.71,257.32 658.1,257.68C658.49,258.04 659.51,258.96 659.9,259.32C660.29,259.68 661.31,260.61 661.7,260.97C662.09,261.33 663.11,262.25 663.5,262.61C663.89,262.97 664.91,263.9 665.3,264.26C665.69,264.62 666.7,265.54 667.09,265.9C667.48,266.26 668.5,267.18 668.89,267.54C669.28,267.9 670.3,268.83 670.69,269.19C671.08,269.55 672.1,270.47 672.49,270.83C672.88,271.19 673.9,272.11 674.29,272.47C674.68,272.83 675.69,273.76 676.08,274.12C676.47,274.48 677.49,275.4 677.88,275.76C678.27,276.12 679.29,277.04 679.68,277.4C680.07,277.76 681.09,278.69 681.48,279.05C681.87,279.41 682.89,280.33 683.28,280.69C683.67,281.05 684.68,281.97 685.07,282.33C685.46,282.69 686.48,283.62 686.87,283.98C687.26,284.34 688.28,285.26 688.67,285.62C689.06,285.98 690.08,286.9 690.47,287.26C690.86,287.62 691.88,288.55 692.27,288.91C692.66,289.27 693.67,290.19 694.06,290.55C694.45,290.91 695.47,291.83 695.86,292.19C696.25,292.55 697.27,293.48 697.66,293.84C698.05,294.2 699.07,295.12 699.46,295.48C699.85,295.84 700.87,296.77 701.26,297.13C701.65,297.49 702.67,298.41 703.06,298.77C703.45,299.13 704.46,300.05 704.85,300.41C705.24,300.77 706.26,301.7 706.65,302.06C707.04,302.42 708.06,303.34 708.45,303.7C708.84,304.06 709.86,304.98 710.25,305.34C710.64,305.7 711.66,306.63 712.05,306.99C712.44,307.35 713.45,308.27 713.84,308.63C714.23,308.99 715.25,309.91 715.64,310.27C716.03,310.63 717.05,311.56 717.44,311.92C717.83,312.28 718.85,313.2 719.24,313.56C719.63,313.92 720.65,314.84 721.04,315.2C721.43,315.56 722.44,316.49 722.83,316.85C723.22,317.21 724.24,318.13 724.63,318.49C725.02,318.85 726.04,319.77 726.43,320.13C726.82,320.49 727.84,321.42 728.23,321.78C728.62,322.14 729.64,323.06 730.03,323.42C730.42,323.78 731.43,324.7 731.82,325.06C732.21,325.42 733.23,326.35 733.62,326.71C734.01,327.07 735.03,327.99 735.42,328.35C735.81,328.71 736.83,329.64 737.22,330C737.61,330.36 738.63,331.28 739.02,331.64C739.41,332 740.43,332.92 740.82,333.28C741.21,333.64 742.22,334.57 742.61,334.93C743,335.29 744.02,336.21 744.41,336.57C744.8,336.93 745.82,337.85 746.21,338.21C746.6,338.57 747.62,339.5 748.01,339.86C748.4,340.22 749.42,341.14 749.81,341.5C750.2,341.86 751.21,342.78 751.6,343.14C751.99,343.5 753.01,344.43 753.4,344.79C753.79,345.15 754.81,346.07 755.2,346.43C755.59,346.79 756.61,347.71 757,348.07C757.39,348.43 758.41,349.36 758.8,349.72C759.19,350.08 760.2,351 760.59,351.36C760.98,351.72 762,352.64 762.39,353C762.78,353.36 763.8,354.29 764.19,354.65C764.58,355.01 765.6,355.93 765.99,356.29C766.38,356.65 767.4,357.57 767.79,357.93C768.18,358.29 769.19,359.22 769.58,359.58C769.97,359.94 770.99,360.86 771.38,361.22C771.77,361.58 772.79,362.51 773.18,362.87C773.57,363.23 774.59,364.15 774.98,364.51C775.37,364.87 776.39,365.79 776.78,366.15C777.17,366.51 778.19,367.44 778.58,367.8C778.97,368.16 779.98,369.08 780.37,369.44C780.76,369.8 781.78,370.72 782.17,371.08C782.56,371.44 783.58,372.37 783.97,372.73C784.36,373.09 785.38,374.01 785.77,374.37C786.16,374.73 787.18,375.65 787.57,376.01C787.96,376.37 788.97,377.3 789.36,377.66C789.75,378.02 790.77,378.94 791.16,379.3C791.55,379.66 792.5,380.52 792.96,380.94C793.61,381.53 795.78,383.52 796.56,384.23C797.34,384.94 799.37,386.81 800.15,387.52C800.93,388.23 802.97,390.09 803.75,390.8C804.53,391.51 806.56,393.38 807.34,394.09C808.12,394.8 810.16,396.67 810.94,397.38C811.72,398.09 813.76,399.96 814.54,400.67C815.32,401.38 817.35,403.24 818.13,403.95C818.91,404.66 820.95,406.53 821.73,407.24C822.51,407.95 824.55,409.82 825.33,410.53C826.11,411.24 828.14,413.1 828.92,413.81C829.7,414.52 831.74,416.39 832.52,417.1C833.3,417.81 835.33,419.68 836.11,420.39C836.89,421.1 838.93,422.96 839.71,423.67C840.49,424.38 842.53,426.25 843.31,426.96C844.09,427.67 846.12,429.54 846.9,430.25C847.68,430.96 849.72,432.83 850.5,433.54C851.28,434.25 853.32,436.11 854.1,436.82C854.88,437.53 856.91,439.4 857.69,440.11C858.47,440.82 860.51,442.69 861.29,443.4C862.07,444.11 864.1,445.97 864.88,446.68C865.66,447.39 867.7,449.26 868.48,449.97C869.26,450.68 871.3,452.55 872.08,453.26C872.86,453.97 874.89,455.83 875.67,456.54C876.45,457.25 878.49,459.12 879.27,459.83C880.05,460.54 882.08,462.41 882.86,463.12C883.64,463.83 885.68,465.7 886.46,466.41C887.24,467.12 889.28,468.98 890.06,469.69C890.84,470.4 892.87,472.27 893.65,472.98C894.43,473.69 896.47,475.56 897.25,476.27C898.03,476.98 900.07,478.84 900.85,479.55C901.63,480.26 903.66,482.13 904.44,482.84C905.22,483.55 907.26,485.42 908.04,486.13C908.82,486.84 910.85,488.7 911.63,489.41C912.41,490.12 914.45,491.99 915.23,492.7C916.01,493.41 918.05,495.28 918.83,495.99C919.61,496.7 921.64,498.57 922.42,499.28C923.2,499.99 925.24,501.85 926.02,502.56C926.8,503.27 928.84,505.14 929.62,505.85C930.4,506.56 932.43,508.43 933.21,509.14C933.99,509.85 936.03,511.71 936.81,512.42C937.59,513.13 939.62,515 940.4,515.71Q941.18,516.42 944,519" style="fill: rgb(166, 124, 255); fill-opacity: 0.12; stroke-width: 0px;"></path></g></g><g class="errorbars"></g><g class="lines"><path class="js-line" style="vector-effect: non-scaling-stroke; fill: none; stroke: rgb(166, 124, 255); stroke-opacity: 1; stroke-width: 3px; opacity: 1;" d="M0,519Q3.21,519 3.46,519C3.51,519 3.55,519 3.6,519C3.85,519 6.6,519 6.92,519C7.01,519 7.1,519 7.19,519C7.5,519 10.02,519 10.38,519C10.51,519 10.66,519 10.79,519C11.14,519 13.44,519 13.83,519C14,519 14.21,519 14.38,519C14.76,519 16.88,519 17.29,519C17.49,519 17.78,519 17.98,519C18.38,519 20.33,519 20.75,519C20.98,519 21.35,519 21.58,519C21.99,519 23.78,519 24.21,519C24.47,519 24.91,519 25.17,519C25.58,519 27.23,519 27.66,519C27.95,519 28.48,519 28.77,519C29.18,519 30.69,519 31.12,519C31.43,519 32.06,519 32.37,519C32.78,519 34.16,519 34.58,519C34.91,519 35.63,519 35.96,519C36.36,519 37.62,519 38.04,519C38.4,519 39.21,519 39.56,519C39.95,519 41.1,519 41.5,519C41.87,519 42.78,519 43.15,519C43.53,519 44.62,519.25 44.95,519C45.58,518.52 46.36,513.85 46.75,512.43C47.14,511.01 48.16,507.28 48.55,505.86C48.94,504.44 49.96,500.71 50.35,499.29C50.74,497.87 51.75,494.13 52.14,492.71C52.53,491.29 53.55,487.56 53.94,486.14C54.33,484.71 55.35,480.99 55.74,479.56C56.13,478.14 57.15,474.41 57.54,472.99C57.93,471.57 58.95,467.84 59.34,466.42C59.73,464.99 60.75,461.27 61.14,459.84C61.53,458.42 62.54,454.69 62.93,453.27C63.32,451.84 64.34,448.12 64.73,446.69C65.12,445.27 66.14,441.54 66.53,440.12C66.92,438.7 67.94,434.97 68.33,433.55C68.72,432.12 69.74,428.4 70.13,426.97C70.52,425.55 71.53,421.82 71.92,420.4C72.31,418.97 73.33,415.25 73.72,413.82C74.11,412.4 75.13,408.67 75.52,407.25C75.91,405.83 76.93,402.1 77.32,400.68C77.71,399.25 78.73,395.53 79.12,394.1C79.51,392.68 80.52,388.95 80.91,387.53C81.3,386.1 82.32,382.38 82.71,380.95C83.1,379.53 84.12,375.8 84.51,374.38C84.9,372.96 85.92,369.23 86.31,367.81C86.7,366.38 87.72,362.66 88.11,361.23C88.5,359.81 89.51,356.08 89.9,354.66C90.29,353.23 91.31,349.51 91.7,348.08C92.09,346.66 93.11,342.93 93.5,341.51C93.89,340.09 94.91,336.36 95.3,334.94C95.69,333.51 96.71,329.79 97.1,328.36C97.49,326.94 98.51,323.21 98.9,321.79C99.29,320.37 100.3,316.63 100.69,315.21C101.08,313.79 102.1,310.06 102.49,308.64C102.88,307.22 103.9,303.49 104.29,302.07C104.68,300.64 105.7,296.92 106.09,295.49C106.48,294.07 107.5,290.34 107.89,288.92C108.28,287.5 109.29,283.76 109.68,282.34C110.07,280.92 111.09,277.19 111.48,275.77C111.87,274.35 112.89,270.62 113.28,269.2C113.67,267.77 114.69,264.05 115.08,262.62C115.47,261.2 116.49,257.47 116.88,256.05C117.27,254.63 118.28,250.89 118.67,249.47C119.06,248.05 120.08,244.32 120.47,242.9C120.86,241.48 121.88,237.75 122.27,236.33C122.66,234.9 123.68,231.18 124.07,229.75C124.46,228.33 125.48,224.6 125.87,223.18C126.26,221.76 127.27,218.02 127.66,216.6C128.05,215.18 129.07,211.45 129.46,210.03C129.85,208.61 130.87,204.88 131.26,203.46C131.65,202.03 132.67,198.31 133.06,196.88C133.45,195.46 134.47,191.73 134.86,190.31C135.25,188.88 136.27,185.16 136.66,183.73C137.05,182.31 138.06,178.58 138.45,177.16C138.84,175.74 139.86,172.01 140.25,170.59C140.64,169.16 141.66,165.44 142.05,164.01C142.44,162.59 143.46,158.86 143.85,157.44C144.24,156.01 145.26,152.29 145.65,150.86C146.04,149.44 147.05,145.71 147.44,144.29C147.83,142.87 148.85,139.14 149.24,137.72C149.63,136.29 150.65,132.57 151.04,131.14C151.43,129.72 152.21,125.06 152.84,124.57C153.17,124.32 154.25,124.56 154.64,124.56C155.03,124.56 156.04,124.56 156.43,124.56C156.82,124.56 157.84,124.56 158.23,124.56C158.62,124.56 159.64,124.56 160.03,124.56C160.42,124.56 161.44,124.56 161.83,124.56C162.22,124.56 163.24,124.56 163.63,124.56C164.02,124.56 165.03,124.56 165.42,124.56C165.81,124.56 166.83,124.56 167.22,124.56C167.61,124.56 168.63,124.56 169.02,124.56C169.41,124.56 170.43,124.56 170.82,124.56C171.21,124.56 172.23,124.56 172.62,124.56C173.01,124.56 174.03,124.56 174.42,124.56C174.81,124.56 175.82,124.56 176.21,124.56C176.6,124.56 177.62,124.56 178.01,124.56C178.4,124.56 179.42,124.56 179.81,124.56C180.2,124.56 181.22,124.56 181.61,124.56C182,124.56 183.02,124.56 183.41,124.56C183.8,124.56 184.81,124.56 185.2,124.56C185.59,124.56 186.61,124.56 187,124.56C187.39,124.56 188.41,124.56 188.8,124.56C189.19,124.56 190.21,124.56 190.6,124.56C190.99,124.56 192.01,124.56 192.4,124.56C192.79,124.56 193.8,124.56 194.19,124.56C194.58,124.56 195.6,124.56 195.99,124.56C196.38,124.56 197.4,124.56 197.79,124.56C198.18,124.56 199.2,124.56 199.59,124.56C199.98,124.56 201,124.56 201.39,124.56C201.78,124.56 202.79,124.56 203.18,124.56C203.57,124.56 204.59,124.56 204.98,124.56C205.37,124.56 206.39,124.56 206.78,124.56C207.17,124.56 208.19,124.56 208.58,124.56C208.97,124.56 209.99,124.56 210.38,124.56C210.77,124.56 211.79,124.56 212.18,124.56C212.57,124.56 213.58,124.56 213.97,124.56C214.36,124.56 215.38,124.56 215.77,124.56C216.16,124.56 217.18,124.56 217.57,124.56C217.96,124.56 218.98,124.56 219.37,124.56C219.76,124.56 220.78,124.56 221.17,124.56C221.56,124.56 222.57,124.56 222.96,124.56C223.35,124.56 224.37,124.56 224.76,124.56C225.15,124.56 226.17,124.56 226.56,124.56C226.95,124.56 227.97,124.56 228.36,124.56C228.75,124.56 229.77,124.56 230.16,124.56C230.55,124.56 231.56,124.56 231.95,124.56C232.34,124.56 233.36,124.56 233.75,124.56C234.14,124.56 235.16,124.56 235.55,124.56C235.94,124.56 236.96,124.56 237.35,124.56C237.74,124.56 238.76,124.56 239.15,124.56C239.54,124.56 240.55,124.56 240.94,124.56C241.33,124.56 242.35,124.56 242.74,124.56C243.13,124.56 244.15,124.56 244.54,124.56C244.93,124.56 245.95,124.56 246.34,124.56C246.73,124.56 247.75,124.56 248.14,124.56C248.53,124.56 249.55,124.56 249.94,124.56C250.33,124.56 251.34,124.56 251.73,124.56C252.12,124.56 253.14,124.56 253.53,124.56C253.92,124.56 254.94,124.56 255.33,124.56C255.72,124.56 256.74,124.56 257.13,124.56C257.52,124.56 258.54,124.56 258.93,124.56C259.32,124.56 260.33,124.56 260.72,124.56C261.11,124.56 262.13,124.56 262.52,124.56C262.91,124.56 263.93,124.56 264.32,124.56C264.71,124.56 265.73,124.56 266.12,124.56C266.51,124.56 267.53,124.56 267.92,124.56C268.31,124.56 269.32,124.56 269.71,124.56C270.1,124.56 271.12,124.56 271.51,124.56C271.9,124.56 272.92,124.56 273.31,124.56C273.7,124.56 274.72,124.56 275.11,124.56C275.5,124.56 276.52,124.56 276.91,124.56C277.3,124.56 278.31,124.56 278.7,124.56C279.09,124.56 280.11,124.56 280.5,124.56C280.89,124.56 281.91,124.56 282.3,124.56C282.69,124.56 283.71,124.56 284.1,124.56C284.49,124.56 285.51,124.56 285.9,124.56C286.29,124.56 287.31,124.56 287.7,124.56C288.09,124.56 289.1,124.56 289.49,124.56C289.88,124.56 290.9,124.56 291.29,124.56C291.68,124.56 292.7,124.56 293.09,124.56C293.48,124.56 294.5,124.56 294.89,124.56C295.28,124.56 296.3,124.56 296.69,124.56C297.08,124.56 298.09,124.56 298.48,124.56C298.87,124.56 299.89,124.56 300.28,124.56C300.67,124.56 301.69,124.56 302.08,124.56C302.47,124.56 303.49,124.56 303.88,124.56C304.27,124.56 305.29,124.56 305.68,124.56C306.07,124.56 307.08,124.56 307.47,124.56C307.86,124.56 308.88,124.56 309.27,124.56C309.66,124.56 310.68,124.56 311.07,124.56C311.46,124.56 312.48,124.56 312.87,124.56C313.26,124.56 314.28,124.56 314.67,124.56C315.06,124.56 316.07,124.56 316.46,124.56C316.85,124.56 317.87,124.56 318.26,124.56C318.65,124.56 319.67,124.56 320.06,124.56C320.45,124.56 321.47,124.56 321.86,124.56C322.25,124.56 323.27,124.56 323.66,124.56C324.05,124.56 325.07,124.56 325.46,124.56C325.85,124.56 326.86,124.56 327.25,124.56C327.64,124.56 328.66,124.56 329.05,124.56C329.44,124.56 330.46,124.56 330.85,124.56C331.24,124.56 332.26,124.56 332.65,124.56C333.04,124.56 334.06,124.56 334.45,124.56C334.84,124.56 335.85,124.56 336.24,124.56C336.63,124.56 337.65,124.56 338.04,124.56C338.43,124.56 339.45,124.56 339.84,124.56C340.23,124.56 341.25,124.56 341.64,124.56C342.03,124.56 343.05,124.56 343.44,124.56C343.83,124.56 344.84,124.56 345.23,124.56C345.62,124.56 346.64,124.56 347.03,124.56C347.42,124.56 348.44,124.56 348.83,124.56C349.22,124.56 350.24,124.56 350.63,124.56C351.02,124.56 352.04,124.56 352.43,124.56C352.82,124.56 353.83,124.56 354.22,124.56C354.61,124.56 355.63,124.56 356.02,124.56C356.41,124.56 357.43,124.56 357.82,124.56C358.21,124.56 359.23,124.56 359.62,124.56C360.01,124.56 361.03,124.56 361.42,124.56C361.81,124.56 362.83,124.56 363.22,124.56C363.61,124.56 364.62,124.56 365.01,124.56C365.4,124.56 366.42,124.56 366.81,124.56C367.2,124.56 368.22,124.56 368.61,124.56C369,124.56 370.02,124.56 370.41,124.56C370.8,124.56 371.82,124.56 372.21,124.56C372.6,124.56 373.61,124.56 374,124.56C374.39,124.56 375.41,124.56 375.8,124.56C376.19,124.56 377.21,124.56 377.6,124.56C377.99,124.56 379.01,124.56 379.4,124.56C379.79,124.56 380.81,124.56 381.2,124.56C381.59,124.56 382.6,124.56 382.99,124.56C383.38,124.56 384.4,124.56 384.79,124.56C385.18,124.56 386.2,124.56 386.59,124.56C386.98,124.56 388,124.56 388.39,124.56C388.78,124.56 389.8,124.56 390.19,124.56C390.58,124.56 391.59,124.56 391.98,124.56C392.37,124.56 393.39,124.56 393.78,124.56C394.17,124.56 395.19,124.56 395.58,124.56C395.97,124.56 396.99,124.56 397.38,124.56C397.77,124.56 398.79,124.56 399.18,124.56C399.57,124.56 400.59,124.56 400.98,124.56C401.37,124.56 402.38,124.56 402.77,124.56C403.16,124.56 404.18,124.56 404.57,124.56C404.96,124.56 405.98,124.56 406.37,124.56C406.76,124.56 407.78,124.56 408.17,124.56C408.56,124.56 409.58,124.56 409.97,124.56C410.36,124.56 411.37,124.56 411.76,124.56C412.15,124.56 413.17,124.56 413.56,124.56C413.95,124.56 414.97,124.56 415.36,124.56C415.75,124.56 416.77,124.56 417.16,124.56C417.55,124.56 418.57,124.56 418.96,124.56C419.35,124.56 420.36,124.56 420.75,124.56C421.14,124.56 422.16,124.56 422.55,124.56C422.94,124.56 423.96,124.56 424.35,124.56C424.74,124.56 425.76,124.56 426.15,124.56C426.54,124.56 427.56,124.56 427.95,124.56C428.34,124.56 429.35,124.56 429.74,124.56C430.13,124.56 431.15,124.56 431.54,124.56C431.93,124.56 432.95,124.56 433.34,124.56C433.73,124.56 434.75,124.56 435.14,124.56C435.53,124.56 436.55,124.56 436.94,124.56C437.33,124.56 438.35,124.56 438.74,124.56C439.13,124.56 440.14,124.56 440.53,124.56C440.92,124.56 441.94,124.56 442.33,124.56C442.72,124.56 443.74,124.56 444.13,124.56C444.52,124.56 445.54,124.56 445.93,124.56C446.32,124.56 447.34,124.56 447.73,124.56C448.12,124.56 449.13,124.56 449.52,124.56C449.91,124.56 450.93,124.56 451.32,124.56C451.71,124.56 452.73,124.56 453.12,124.56C453.51,124.56 454.53,124.56 454.92,124.56C455.31,124.56 456.33,124.56 456.72,124.56C457.11,124.56 458.12,124.56 458.51,124.56C458.9,124.56 459.92,124.56 460.31,124.56C460.7,124.56 461.72,124.56 462.11,124.56C462.5,124.56 463.52,124.56 463.91,124.56C464.3,124.56 465.32,124.56 465.71,124.56C466.1,124.56 467.11,124.56 467.5,124.56C467.89,124.56 468.91,124.56 469.3,124.56C469.69,124.56 470.71,124.56 471.1,124.56C471.49,124.56 472.51,124.56 472.9,124.56C473.29,124.56 474.31,124.56 474.7,124.56C475.09,124.56 476.11,124.56 476.5,124.56C476.89,124.56 477.9,124.56 478.29,124.56C478.68,124.56 479.7,124.56 480.09,124.56C480.48,124.56 481.5,124.56 481.89,124.56C482.28,124.56 483.3,124.56 483.69,124.56C484.08,124.56 485.1,124.56 485.49,124.56C485.88,124.56 486.89,124.56 487.28,124.56C487.67,124.56 488.69,124.56 489.08,124.56C489.47,124.56 490.49,124.56 490.88,124.56C491.27,124.56 492.29,124.56 492.68,124.56C493.07,124.56 494.09,124.56 494.48,124.56C494.87,124.56 495.88,124.56 496.27,124.56C496.66,124.56 497.68,124.56 498.07,124.56C498.46,124.56 499.48,124.56 499.87,124.56C500.26,124.56 501.28,124.56 501.67,124.56C502.06,124.56 503.08,124.56 503.47,124.56C503.86,124.56 504.87,124.56 505.26,124.56C505.65,124.56 506.67,124.56 507.06,124.56C507.45,124.56 508.47,124.56 508.86,124.56C509.25,124.56 510.27,124.56 510.66,124.56C511.05,124.56 512.1,124.42 512.46,124.56C512.88,124.72 513.87,125.84 514.26,126.2C514.65,126.56 515.66,127.48 516.05,127.84C516.44,128.2 517.46,129.13 517.85,129.49C518.24,129.85 519.26,130.77 519.65,131.13C520.04,131.49 521.06,132.42 521.45,132.78C521.84,133.14 522.86,134.06 523.25,134.42C523.64,134.78 524.65,135.7 525.04,136.06C525.43,136.42 526.45,137.35 526.84,137.71C527.23,138.07 528.25,138.99 528.64,139.35C529.03,139.71 530.05,140.63 530.44,140.99C530.83,141.35 531.85,142.28 532.24,142.64C532.63,143 533.64,143.92 534.03,144.28C534.42,144.64 535.44,145.56 535.83,145.92C536.22,146.28 537.24,147.21 537.63,147.57C538.02,147.93 539.04,148.85 539.43,149.21C539.82,149.57 540.84,150.49 541.23,150.85C541.62,151.21 542.63,152.14 543.02,152.5C543.41,152.86 544.43,153.78 544.82,154.14C545.21,154.5 546.23,155.42 546.62,155.78C547.01,156.14 548.03,157.07 548.42,157.43C548.81,157.79 549.83,158.71 550.22,159.07C550.61,159.43 551.63,160.35 552.02,160.71C552.41,161.07 553.42,162 553.81,162.36C554.2,162.72 555.22,163.64 555.61,164C556,164.36 557.02,165.29 557.41,165.65C557.8,166.01 558.82,166.93 559.21,167.29C559.6,167.65 560.62,168.57 561.01,168.93C561.4,169.29 562.41,170.22 562.8,170.58C563.19,170.94 564.21,171.86 564.6,172.22C564.99,172.58 566.01,173.5 566.4,173.86C566.79,174.22 567.81,175.15 568.2,175.51C568.59,175.87 569.61,176.79 570,177.15C570.39,177.51 571.4,178.43 571.79,178.79C572.18,179.15 573.2,180.08 573.59,180.44C573.98,180.8 575,181.72 575.39,182.08C575.78,182.44 576.8,183.36 577.19,183.72C577.58,184.08 578.6,185.01 578.99,185.37C579.38,185.73 580.39,186.65 580.78,187.01C581.17,187.37 582.19,188.29 582.58,188.65C582.97,189.01 583.99,189.94 584.38,190.3C584.77,190.66 585.79,191.58 586.18,191.94C586.57,192.3 587.59,193.22 587.98,193.58C588.37,193.94 589.39,194.87 589.78,195.23C590.17,195.59 591.18,196.51 591.57,196.87C591.96,197.23 592.98,198.16 593.37,198.52C593.76,198.88 594.78,199.8 595.17,200.16C595.56,200.52 596.58,201.44 596.97,201.8C597.36,202.16 598.38,203.09 598.77,203.45C599.16,203.81 600.17,204.73 600.56,205.09C600.95,205.45 601.97,206.37 602.36,206.73C602.75,207.09 603.77,208.02 604.16,208.38C604.55,208.74 605.57,209.66 605.96,210.02C606.35,210.38 607.37,211.3 607.76,211.66C608.15,212.02 609.16,212.95 609.55,213.31C609.94,213.67 610.96,214.59 611.35,214.95C611.74,215.31 612.76,216.23 613.15,216.59C613.54,216.95 614.56,217.88 614.95,218.24C615.34,218.6 616.36,219.52 616.75,219.88C617.14,220.24 618.15,221.16 618.54,221.52C618.93,221.88 619.95,222.81 620.34,223.17C620.73,223.53 621.75,224.45 622.14,224.81C622.53,225.17 623.55,226.09 623.94,226.45C624.33,226.81 625.35,227.74 625.74,228.1C626.13,228.46 627.15,229.38 627.54,229.74C627.93,230.1 628.94,231.03 629.33,231.39C629.72,231.75 630.74,232.67 631.13,233.03C631.52,233.39 632.54,234.31 632.93,234.67C633.32,235.03 634.34,235.96 634.73,236.32C635.12,236.68 636.14,237.6 636.53,237.96C636.92,238.32 637.93,239.24 638.32,239.6C638.71,239.96 639.73,240.89 640.12,241.25C640.51,241.61 641.53,242.53 641.92,242.89C642.31,243.25 643.33,244.17 643.72,244.53C644.11,244.89 645.13,245.82 645.52,246.18C645.91,246.54 646.92,247.46 647.31,247.82C647.7,248.18 648.72,249.1 649.11,249.46C649.5,249.82 650.52,250.75 650.91,251.11C651.3,251.47 652.32,252.39 652.71,252.75C653.1,253.11 654.12,254.03 654.51,254.39C654.9,254.75 655.91,255.68 656.3,256.04C656.69,256.4 657.71,257.32 658.1,257.68C658.49,258.04 659.51,258.96 659.9,259.32C660.29,259.68 661.31,260.61 661.7,260.97C662.09,261.33 663.11,262.25 663.5,262.61C663.89,262.97 664.91,263.9 665.3,264.26C665.69,264.62 666.7,265.54 667.09,265.9C667.48,266.26 668.5,267.18 668.89,267.54C669.28,267.9 670.3,268.83 670.69,269.19C671.08,269.55 672.1,270.47 672.49,270.83C672.88,271.19 673.9,272.11 674.29,272.47C674.68,272.83 675.69,273.76 676.08,274.12C676.47,274.48 677.49,275.4 677.88,275.76C678.27,276.12 679.29,277.04 679.68,277.4C680.07,277.76 681.09,278.69 681.48,279.05C681.87,279.41 682.89,280.33 683.28,280.69C683.67,281.05 684.68,281.97 685.07,282.33C685.46,282.69 686.48,283.62 686.87,283.98C687.26,284.34 688.28,285.26 688.67,285.62C689.06,285.98 690.08,286.9 690.47,287.26C690.86,287.62 691.88,288.55 692.27,288.91C692.66,289.27 693.67,290.19 694.06,290.55C694.45,290.91 695.47,291.83 695.86,292.19C696.25,292.55 697.27,293.48 697.66,293.84C698.05,294.2 699.07,295.12 699.46,295.48C699.85,295.84 700.87,296.77 701.26,297.13C701.65,297.49 702.67,298.41 703.06,298.77C703.45,299.13 704.46,300.05 704.85,300.41C705.24,300.77 706.26,301.7 706.65,302.06C707.04,302.42 708.06,303.34 708.45,303.7C708.84,304.06 709.86,304.98 710.25,305.34C710.64,305.7 711.66,306.63 712.05,306.99C712.44,307.35 713.45,308.27 713.84,308.63C714.23,308.99 715.25,309.91 715.64,310.27C716.03,310.63 717.05,311.56 717.44,311.92C717.83,312.28 718.85,313.2 719.24,313.56C719.63,313.92 720.65,314.84 721.04,315.2C721.43,315.56 722.44,316.49 722.83,316.85C723.22,317.21 724.24,318.13 724.63,318.49C725.02,318.85 726.04,319.77 726.43,320.13C726.82,320.49 727.84,321.42 728.23,321.78C728.62,322.14 729.64,323.06 730.03,323.42C730.42,323.78 731.43,324.7 731.82,325.06C732.21,325.42 733.23,326.35 733.62,326.71C734.01,327.07 735.03,327.99 735.42,328.35C735.81,328.71 736.83,329.64 737.22,330C737.61,330.36 738.63,331.28 739.02,331.64C739.41,332 740.43,332.92 740.82,333.28C741.21,333.64 742.22,334.57 742.61,334.93C743,335.29 744.02,336.21 744.41,336.57C744.8,336.93 745.82,337.85 746.21,338.21C746.6,338.57 747.62,339.5 748.01,339.86C748.4,340.22 749.42,341.14 749.81,341.5C750.2,341.86 751.21,342.78 751.6,343.14C751.99,343.5 753.01,344.43 753.4,344.79C753.79,345.15 754.81,346.07 755.2,346.43C755.59,346.79 756.61,347.71 757,348.07C757.39,348.43 758.41,349.36 758.8,349.72C759.19,350.08 760.2,351 760.59,351.36C760.98,351.72 762,352.64 762.39,353C762.78,353.36 763.8,354.29 764.19,354.65C764.58,355.01 765.6,355.93 765.99,356.29C766.38,356.65 767.4,357.57 767.79,357.93C768.18,358.29 769.19,359.22 769.58,359.58C769.97,359.94 770.99,360.86 771.38,361.22C771.77,361.58 772.79,362.51 773.18,362.87C773.57,363.23 774.59,364.15 774.98,364.51C775.37,364.87 776.39,365.79 776.78,366.15C777.17,366.51 778.19,367.44 778.58,367.8C778.97,368.16 779.98,369.08 780.37,369.44C780.76,369.8 781.78,370.72 782.17,371.08C782.56,371.44 783.58,372.37 783.97,372.73C784.36,373.09 785.38,374.01 785.77,374.37C786.16,374.73 787.18,375.65 787.57,376.01C787.96,376.37 788.97,377.3 789.36,377.66C789.75,378.02 790.77,378.94 791.16,379.3C791.55,379.66 792.5,380.52 792.96,380.94C793.61,381.53 795.78,383.52 796.56,384.23C797.34,384.94 799.37,386.81 800.15,387.52C800.93,388.23 802.97,390.09 803.75,390.8C804.53,391.51 806.56,393.38 807.34,394.09C808.12,394.8 810.16,396.67 810.94,397.38C811.72,398.09 813.76,399.96 814.54,400.67C815.32,401.38 817.35,403.24 818.13,403.95C818.91,404.66 820.95,406.53 821.73,407.24C822.51,407.95 824.55,409.82 825.33,410.53C826.11,411.24 828.14,413.1 828.92,413.81C829.7,414.52 831.74,416.39 832.52,417.1C833.3,417.81 835.33,419.68 836.11,420.39C836.89,421.1 838.93,422.96 839.71,423.67C840.49,424.38 842.53,426.25 843.31,426.96C844.09,427.67 846.12,429.54 846.9,430.25C847.68,430.96 849.72,432.83 850.5,433.54C851.28,434.25 853.32,436.11 854.1,436.82C854.88,437.53 856.91,439.4 857.69,440.11C858.47,440.82 860.51,442.69 861.29,443.4C862.07,444.11 864.1,445.97 864.88,446.68C865.66,447.39 867.7,449.26 868.48,449.97C869.26,450.68 871.3,452.55 872.08,453.26C872.86,453.97 874.89,455.83 875.67,456.54C876.45,457.25 878.49,459.12 879.27,459.83C880.05,460.54 882.08,462.41 882.86,463.12C883.64,463.83 885.68,465.7 886.46,466.41C887.24,467.12 889.28,468.98 890.06,469.69C890.84,470.4 892.87,472.27 893.65,472.98C894.43,473.69 896.47,475.56 897.25,476.27C898.03,476.98 900.07,478.84 900.85,479.55C901.63,480.26 903.66,482.13 904.44,482.84C905.22,483.55 907.26,485.42 908.04,486.13C908.82,486.84 910.85,488.7 911.63,489.41C912.41,490.12 914.45,491.99 915.23,492.7C916.01,493.41 918.05,495.28 918.83,495.99C919.61,496.7 921.64,498.57 922.42,499.28C923.2,499.99 925.24,501.85 926.02,502.56C926.8,503.27 928.84,505.14 929.62,505.85C930.4,506.56 932.43,508.43 933.21,509.14C933.99,509.85 936.03,511.71 936.81,512.42C937.59,513.13 939.62,515 940.4,515.71Q941.18,516.42 944,519"></path></g><g class="points"></g><g class="text"></g></g><g class="trace scatter trace21b558" style="stroke-miterlimit: 2;"><g class="fills"><g><path class="js-fill" d="M944,519L0,519L0,519Q3.21,519 3.46,519C3.51,519 3.55,519 3.6,519C3.85,519 6.6,519 6.92,519C7.01,519 7.1,519 7.19,519C7.5,519 10.02,519 10.38,519C10.51,519 10.66,519 10.79,519C11.14,519 13.44,519 13.83,519C14,519 14.21,519 14.38,519C14.76,519 16.88,519 17.29,519C17.49,519 17.78,519 17.98,519C18.38,519 20.33,519 20.75,519C20.98,519 21.35,519 21.58,519C21.99,519 23.78,519 24.21,519C24.47,519 24.91,519 25.17,519C25.58,519 27.23,519 27.66,519C27.95,519 28.48,519 28.77,519C29.18,519 30.69,519 31.12,519C31.43,519 32.06,519 32.37,519C32.78,519 34.16,519 34.58,519C34.91,519 35.63,519 35.96,519C36.36,519 37.62,519 38.04,519C38.4,519 39.21,519 39.56,519C39.95,519 41.1,519 41.5,519C41.87,519 42.78,519 43.15,519C43.53,519 44.56,519 44.95,519C45.34,519 46.36,519 46.75,519C47.14,519 48.16,519 48.55,519C48.94,519 49.96,519 50.35,519C50.74,519 51.75,519 52.14,519C52.53,519 53.55,519 53.94,519C54.33,519 55.35,519 55.74,519C56.13,519 57.15,519 57.54,519C57.93,519 58.95,519 59.34,519C59.73,519 60.75,519 61.14,519C61.53,519 62.54,519 62.93,519C63.32,519 64.34,519 64.73,519C65.12,519 66.14,519 66.53,519C66.92,519 67.94,519 68.33,519C68.72,519 69.74,519 70.13,519C70.52,519 71.53,519 71.92,519C72.31,519 73.33,519 73.72,519C74.11,519 75.13,519 75.52,519C75.91,519 76.93,519 77.32,519C77.71,519 78.73,519 79.12,519C79.51,519 80.52,519 80.91,519C81.3,519 82.32,519 82.71,519C83.1,519 84.12,519 84.51,519C84.9,519 85.92,519 86.31,519C86.7,519 87.72,519 88.11,519C88.5,519 89.58,519.29 89.9,519C90.88,518.12 91.31,506.15 91.7,502.59C92.09,499.03 93.11,489.71 93.5,486.15C93.89,482.59 94.91,473.28 95.3,469.72C95.69,466.16 96.71,456.84 97.1,453.28C97.49,449.72 98.51,440.41 98.9,436.85C99.29,433.29 100.3,423.97 100.69,420.41C101.08,416.85 102.1,407.54 102.49,403.98C102.88,400.42 103.9,391.1 104.29,387.54C104.68,383.98 105.7,374.67 106.09,371.11C106.48,367.55 107.5,358.23 107.89,354.67C108.28,351.11 109.29,341.8 109.68,338.24C110.07,334.68 111.09,325.36 111.48,321.8C111.87,318.24 112.89,308.93 113.28,305.37C113.67,301.81 114.69,292.49 115.08,288.93C115.47,285.37 116.49,276.06 116.88,272.5C117.27,268.94 118.28,259.62 118.67,256.06C119.06,252.5 120.08,243.19 120.47,239.63C120.86,236.07 121.88,226.75 122.27,223.19C122.66,219.63 123.68,210.32 124.07,206.76C124.46,203.2 125.48,193.88 125.87,190.32C126.26,186.76 127.27,177.45 127.66,173.89C128.05,170.33 129.07,161.01 129.46,157.45C129.85,153.89 130.87,144.58 131.26,141.02C131.65,137.46 132.67,128.14 133.06,124.58C133.45,121.02 134.47,111.71 134.86,108.15C135.25,104.59 136.27,95.27 136.66,91.71C137.05,88.15 138.06,78.84 138.45,75.28C138.84,71.72 139.86,62.4 140.25,58.84C140.64,55.28 141.66,45.97 142.05,42.41C142.44,38.85 142.86,26.86 143.85,25.97C144.18,25.68 145.26,25.95 145.65,25.95C146.04,25.95 147.05,25.95 147.44,25.95C147.83,25.95 148.85,25.95 149.24,25.95C149.63,25.95 150.65,25.95 151.04,25.95C151.43,25.95 152.45,25.95 152.84,25.95C153.23,25.95 154.25,25.95 154.64,25.95C155.03,25.95 156.04,25.95 156.43,25.95C156.82,25.95 157.84,25.95 158.23,25.95C158.62,25.95 159.64,25.95 160.03,25.95C160.42,25.95 161.44,25.95 161.83,25.95C162.22,25.95 163.24,25.95 163.63,25.95C164.02,25.95 165.03,25.95 165.42,25.95C165.81,25.95 166.83,25.95 167.22,25.95C167.61,25.95 168.63,25.95 169.02,25.95C169.41,25.95 170.43,25.95 170.82,25.95C171.21,25.95 172.23,25.95 172.62,25.95C173.01,25.95 174.03,25.95 174.42,25.95C174.81,25.95 175.82,25.95 176.21,25.95C176.6,25.95 177.62,25.95 178.01,25.95C178.4,25.95 179.42,25.95 179.81,25.95C180.2,25.95 181.22,25.95 181.61,25.95C182,25.95 183.02,25.95 183.41,25.95C183.8,25.95 184.81,25.95 185.2,25.95C185.59,25.95 186.61,25.95 187,25.95C187.39,25.95 188.41,25.95 188.8,25.95C189.19,25.95 190.21,25.95 190.6,25.95C190.99,25.95 192.01,25.95 192.4,25.95C192.79,25.95 193.8,25.95 194.19,25.95C194.58,25.95 195.6,25.95 195.99,25.95C196.38,25.95 197.4,25.95 197.79,25.95C198.18,25.95 199.2,25.95 199.59,25.95C199.98,25.95 201,25.95 201.39,25.95C201.78,25.95 202.79,25.95 203.18,25.95C203.57,25.95 204.59,25.95 204.98,25.95C205.37,25.95 206.39,25.95 206.78,25.95C207.17,25.95 208.19,25.95 208.58,25.95C208.97,25.95 209.99,25.95 210.38,25.95C210.77,25.95 211.79,25.95 212.18,25.95C212.57,25.95 213.58,25.95 213.97,25.95C214.36,25.95 215.38,25.95 215.77,25.95C216.16,25.95 217.18,25.95 217.57,25.95C217.96,25.95 218.98,25.95 219.37,25.95C219.76,25.95 220.78,25.95 221.17,25.95C221.56,25.95 222.57,25.95 222.96,25.95C223.35,25.95 224.37,25.95 224.76,25.95C225.15,25.95 226.17,25.95 226.56,25.95C226.95,25.95 227.97,25.95 228.36,25.95C228.75,25.95 229.77,25.95 230.16,25.95C230.55,25.95 231.56,25.95 231.95,25.95C232.34,25.95 233.36,25.95 233.75,25.95C234.14,25.95 235.16,25.95 235.55,25.95C235.94,25.95 236.96,25.95 237.35,25.95C237.74,25.95 238.76,25.95 239.15,25.95C239.54,25.95 240.55,25.95 240.94,25.95C241.33,25.95 242.35,25.95 242.74,25.95C243.13,25.95 244.15,25.95 244.54,25.95C244.93,25.95 245.95,25.95 246.34,25.95C246.73,25.95 247.75,25.95 248.14,25.95C248.53,25.95 249.55,25.95 249.94,25.95C250.33,25.95 251.34,25.95 251.73,25.95C252.12,25.95 253.14,25.95 253.53,25.95C253.92,25.95 254.94,25.95 255.33,25.95C255.72,25.95 256.74,25.95 257.13,25.95C257.52,25.95 258.54,25.95 258.93,25.95C259.32,25.95 260.33,25.95 260.72,25.95C261.11,25.95 262.13,25.95 262.52,25.95C262.91,25.95 263.93,25.95 264.32,25.95C264.71,25.95 265.73,25.95 266.12,25.95C266.51,25.95 267.53,25.95 267.92,25.95C268.31,25.95 269.32,25.95 269.71,25.95C270.1,25.95 271.12,25.95 271.51,25.95C271.9,25.95 272.92,25.95 273.31,25.95C273.7,25.95 274.72,25.95 275.11,25.95C275.5,25.95 276.52,25.95 276.91,25.95C277.3,25.95 278.31,25.95 278.7,25.95C279.09,25.95 280.11,25.95 280.5,25.95C280.89,25.95 281.91,25.95 282.3,25.95C282.69,25.95 283.71,25.95 284.1,25.95C284.49,25.95 285.51,25.95 285.9,25.95C286.29,25.95 287.31,25.95 287.7,25.95C288.09,25.95 289.1,25.95 289.49,25.95C289.88,25.95 290.9,25.95 291.29,25.95C291.68,25.95 292.7,25.95 293.09,25.95C293.48,25.95 294.5,25.95 294.89,25.95C295.28,25.95 296.3,25.95 296.69,25.95C297.08,25.95 298.09,25.95 298.48,25.95C298.87,25.95 299.89,25.95 300.28,25.95C300.67,25.95 301.69,25.95 302.08,25.95C302.47,25.95 303.49,25.95 303.88,25.95C304.27,25.95 305.29,25.95 305.68,25.95C306.07,25.95 307.08,25.95 307.47,25.95C307.86,25.95 308.88,25.95 309.27,25.95C309.66,25.95 310.68,25.95 311.07,25.95C311.46,25.95 312.48,25.95 312.87,25.95C313.26,25.95 314.28,25.95 314.67,25.95C315.06,25.95 316.07,25.95 316.46,25.95C316.85,25.95 317.87,25.95 318.26,25.95C318.65,25.95 319.67,25.95 320.06,25.95C320.45,25.95 321.47,25.95 321.86,25.95C322.25,25.95 323.27,25.95 323.66,25.95C324.05,25.95 325.07,25.95 325.46,25.95C325.85,25.95 326.86,25.95 327.25,25.95C327.64,25.95 328.66,25.95 329.05,25.95C329.44,25.95 330.46,25.95 330.85,25.95C331.24,25.95 332.26,25.95 332.65,25.95C333.04,25.95 334.06,25.95 334.45,25.95C334.84,25.95 335.85,25.95 336.24,25.95C336.63,25.95 337.65,25.95 338.04,25.95C338.43,25.95 339.45,25.95 339.84,25.95C340.23,25.95 341.25,25.95 341.64,25.95C342.03,25.95 343.05,25.95 343.44,25.95C343.83,25.95 344.84,25.95 345.23,25.95C345.62,25.95 346.64,25.95 347.03,25.95C347.42,25.95 348.44,25.95 348.83,25.95C349.22,25.95 350.24,25.95 350.63,25.95C351.02,25.95 352.04,25.95 352.43,25.95C352.82,25.95 353.83,25.95 354.22,25.95C354.61,25.95 355.63,25.95 356.02,25.95C356.41,25.95 357.43,25.95 357.82,25.95C358.21,25.95 359.23,25.95 359.62,25.95C360.01,25.95 361.03,25.95 361.42,25.95C361.81,25.95 362.83,25.95 363.22,25.95C363.61,25.95 364.62,25.95 365.01,25.95C365.4,25.95 366.42,25.95 366.81,25.95C367.2,25.95 368.22,25.95 368.61,25.95C369,25.95 370.02,25.95 370.41,25.95C370.8,25.95 371.82,25.95 372.21,25.95C372.6,25.95 373.61,25.95 374,25.95C374.39,25.95 375.41,25.95 375.8,25.95C376.19,25.95 377.21,25.95 377.6,25.95C377.99,25.95 379.01,25.95 379.4,25.95C379.79,25.95 380.81,25.95 381.2,25.95C381.59,25.95 382.6,25.95 382.99,25.95C383.38,25.95 384.4,25.95 384.79,25.95C385.18,25.95 386.2,25.95 386.59,25.95C386.98,25.95 388,25.95 388.39,25.95C388.78,25.95 389.8,25.95 390.19,25.95C390.58,25.95 391.59,25.95 391.98,25.95C392.37,25.95 393.39,25.95 393.78,25.95C394.17,25.95 395.19,25.95 395.58,25.95C395.97,25.95 396.99,25.95 397.38,25.95C397.77,25.95 398.79,25.95 399.18,25.95C399.57,25.95 400.59,25.95 400.98,25.95C401.37,25.95 402.38,25.95 402.77,25.95C403.16,25.95 404.18,25.95 404.57,25.95C404.96,25.95 405.98,25.95 406.37,25.95C406.76,25.95 407.78,25.95 408.17,25.95C408.56,25.95 409.58,25.95 409.97,25.95C410.36,25.95 411.37,25.95 411.76,25.95C412.15,25.95 413.17,25.95 413.56,25.95C413.95,25.95 414.97,25.95 415.36,25.95C415.75,25.95 416.77,25.95 417.16,25.95C417.55,25.95 418.57,25.95 418.96,25.95C419.35,25.95 420.36,25.95 420.75,25.95C421.14,25.95 422.16,25.95 422.55,25.95C422.94,25.95 423.96,25.95 424.35,25.95C424.74,25.95 425.76,25.95 426.15,25.95C426.54,25.95 427.56,25.95 427.95,25.95C428.34,25.95 429.35,25.95 429.74,25.95C430.13,25.95 431.19,25.77 431.54,25.95C432,26.18 432.95,27.88 433.34,28.41C433.73,28.94 434.75,30.35 435.14,30.88C435.53,31.41 436.55,32.81 436.94,33.34C437.33,33.87 438.35,35.28 438.74,35.81C439.13,36.34 440.14,37.74 440.53,38.27C440.92,38.8 441.94,40.21 442.33,40.74C442.72,41.27 443.74,42.67 444.13,43.2C444.52,43.73 445.54,45.14 445.93,45.67C446.32,46.2 447.34,47.6 447.73,48.13C448.12,48.66 449.13,50.07 449.52,50.6C449.91,51.13 450.93,52.53 451.32,53.06C451.71,53.59 452.73,55 453.12,55.53C453.51,56.06 454.53,57.46 454.92,57.99C455.31,58.52 456.33,59.92 456.72,60.46C457.11,60.99 458.12,62.4 458.51,62.93C458.9,63.46 459.92,64.86 460.31,65.39C460.7,65.92 461.72,67.33 462.11,67.86C462.5,68.39 463.52,69.79 463.91,70.32C464.3,70.85 465.32,72.26 465.71,72.79C466.1,73.32 467.11,74.72 467.5,75.25C467.89,75.78 468.91,77.19 469.3,77.72C469.69,78.25 470.71,79.65 471.1,80.18C471.49,80.71 472.51,82.12 472.9,82.65C473.29,83.18 474.31,84.58 474.7,85.11C475.09,85.64 476.11,87.05 476.5,87.58C476.89,88.11 477.9,89.51 478.29,90.04C478.68,90.57 479.7,91.98 480.09,92.51C480.48,93.04 481.5,94.44 481.89,94.97C482.28,95.5 483.3,96.91 483.69,97.44C484.08,97.97 485.1,99.37 485.49,99.9C485.88,100.43 486.89,101.84 487.28,102.37C487.67,102.9 488.69,104.3 489.08,104.83C489.47,105.36 490.49,106.76 490.88,107.3C491.27,107.84 492.29,109.24 492.68,109.77C493.07,110.3 494.09,111.7 494.48,112.23C494.87,112.76 495.88,114.17 496.27,114.7C496.66,115.23 497.68,116.63 498.07,117.16C498.46,117.69 499.48,119.1 499.87,119.63C500.26,120.16 501.28,121.56 501.67,122.09C502.06,122.62 503.08,124.03 503.47,124.56C503.86,125.09 504.87,126.49 505.26,127.02C505.65,127.55 506.67,128.96 507.06,129.49C507.45,130.02 508.47,131.42 508.86,131.95C509.25,132.48 510.27,133.89 510.66,134.42C511.05,134.95 512.07,136.35 512.46,136.88C512.85,137.41 513.87,138.82 514.26,139.35C514.65,139.88 515.66,141.28 516.05,141.81C516.44,142.34 517.46,143.75 517.85,144.28C518.24,144.81 519.26,146.21 519.65,146.74C520.04,147.27 521.06,148.68 521.45,149.21C521.84,149.74 522.86,151.14 523.25,151.67C523.64,152.2 524.65,153.61 525.04,154.14C525.43,154.67 526.45,156.07 526.84,156.6C527.23,157.13 528.25,158.53 528.64,159.07C529.03,159.61 530.05,161.01 530.44,161.54C530.83,162.07 531.85,163.47 532.24,164C532.63,164.53 533.64,165.94 534.03,166.47C534.42,167 535.44,168.4 535.83,168.93C536.22,169.46 537.24,170.87 537.63,171.4C538.02,171.93 539.04,173.33 539.43,173.86C539.82,174.39 540.84,175.8 541.23,176.33C541.62,176.86 542.63,178.26 543.02,178.79C543.41,179.32 544.43,180.73 544.82,181.26C545.21,181.79 546.23,183.19 546.62,183.72C547.01,184.25 548.03,185.66 548.42,186.19C548.81,186.72 549.83,188.12 550.22,188.65C550.61,189.18 551.63,190.59 552.02,191.12C552.41,191.65 553.42,193.05 553.81,193.58C554.2,194.11 555.22,195.52 555.61,196.05C556,196.58 557.02,197.98 557.41,198.51C557.8,199.04 558.82,200.45 559.21,200.98C559.6,201.51 560.62,202.91 561.01,203.44C561.4,203.97 562.41,205.38 562.8,205.91C563.19,206.45 564.21,207.85 564.6,208.38C564.99,208.91 566.01,210.31 566.4,210.84C566.79,211.37 567.81,212.78 568.2,213.31C568.59,213.84 569.61,215.24 570,215.77C570.39,216.3 571.4,217.71 571.79,218.24C572.18,218.77 573.2,220.17 573.59,220.7C573.98,221.23 575,222.64 575.39,223.17C575.78,223.7 576.8,225.1 577.19,225.63C577.58,226.16 578.6,227.57 578.99,228.1C579.38,228.63 580.39,230.03 580.78,230.56C581.17,231.09 582.19,232.5 582.58,233.03C582.97,233.56 583.99,234.96 584.38,235.49C584.77,236.02 585.79,237.43 586.18,237.96C586.57,238.49 587.59,239.89 587.98,240.42C588.37,240.95 589.39,242.36 589.78,242.89C590.17,243.42 591.18,244.82 591.57,245.35C591.96,245.88 592.98,247.29 593.37,247.82C593.76,248.35 594.78,249.75 595.17,250.28C595.56,250.81 596.58,252.22 596.97,252.75C597.36,253.28 598.38,254.68 598.77,255.21C599.16,255.74 600.17,257.15 600.56,257.68C600.95,258.22 601.97,259.62 602.36,260.15C602.75,260.68 603.77,262.08 604.16,262.61C604.55,263.14 605.57,264.55 605.96,265.08C606.35,265.61 607.37,267.01 607.76,267.54C608.15,268.07 609.16,269.48 609.55,270.01C609.94,270.54 610.96,271.94 611.35,272.47C611.74,273 612.76,274.41 613.15,274.94C613.54,275.47 614.56,276.87 614.95,277.4C615.34,277.93 616.36,279.34 616.75,279.87C617.14,280.4 618.15,281.8 618.54,282.33C618.93,282.86 619.95,284.27 620.34,284.8C620.73,285.33 621.75,286.73 622.14,287.26C622.53,287.79 623.55,289.2 623.94,289.73C624.33,290.26 625.35,291.66 625.74,292.19C626.13,292.72 627.15,294.13 627.54,294.66C627.93,295.19 628.94,296.59 629.33,297.12C629.72,297.65 630.74,299.06 631.13,299.59C631.52,300.12 632.54,301.52 632.93,302.05C633.32,302.58 634.34,303.98 634.73,304.52C635.12,305.06 636.14,306.46 636.53,306.99C636.92,307.52 637.93,308.92 638.32,309.45C638.71,309.98 639.73,311.39 640.12,311.92C640.51,312.45 641.53,313.85 641.92,314.38C642.31,314.91 643.33,316.32 643.72,316.85C644.11,317.38 645.13,318.78 645.52,319.31C645.91,319.84 646.92,321.25 647.31,321.78C647.7,322.31 648.72,323.71 649.11,324.24C649.5,324.77 650.52,326.18 650.91,326.71C651.3,327.24 652.32,328.64 652.71,329.17C653.1,329.7 654.12,331.11 654.51,331.64C654.9,332.17 655.91,333.57 656.3,334.1C656.69,334.63 657.71,336.04 658.1,336.57C658.49,337.1 659.51,338.5 659.9,339.03C660.29,339.56 661.31,340.97 661.7,341.5C662.09,342.03 663.11,343.43 663.5,343.96C663.89,344.49 664.91,345.9 665.3,346.43C665.69,346.96 666.7,348.36 667.09,348.89C667.48,349.42 668.5,350.83 668.89,351.36C669.28,351.89 670.3,353.29 670.69,353.82C671.08,354.35 672.1,355.75 672.49,356.29C672.88,356.83 673.9,358.23 674.29,358.76C674.68,359.29 675.69,360.69 676.08,361.22C676.47,361.75 677.49,363.16 677.88,363.69C678.27,364.22 679.29,365.62 679.68,366.15C680.07,366.68 681.09,368.09 681.48,368.62C681.87,369.15 682.89,370.55 683.28,371.08C683.67,371.61 684.68,373.02 685.07,373.55C685.46,374.08 686.48,375.48 686.87,376.01C687.26,376.54 688.28,377.95 688.67,378.48C689.06,379.01 690.08,380.41 690.47,380.94C690.86,381.47 691.88,382.88 692.27,383.41C692.66,383.94 693.67,385.34 694.06,385.87C694.45,386.4 695.47,387.81 695.86,388.34C696.25,388.87 697.27,390.27 697.66,390.8C698.05,391.33 699.07,392.74 699.46,393.27C699.85,393.8 700.87,395.2 701.26,395.73C701.65,396.26 702.67,397.67 703.06,398.2C703.45,398.73 704.46,400.13 704.85,400.66C705.24,401.19 706.26,402.59 706.65,403.13C707.04,403.67 708.06,405.07 708.45,405.6C708.84,406.13 709.86,407.53 710.25,408.06C710.64,408.59 711.66,410 712.05,410.53C712.44,411.06 713.45,412.46 713.84,412.99C714.23,413.52 715.25,414.93 715.64,415.46C716.03,415.99 717.05,417.39 717.44,417.92C717.83,418.45 718.85,419.86 719.24,420.39C719.63,420.92 720.65,422.32 721.04,422.85C721.43,423.38 722.44,424.79 722.83,425.32C723.22,425.85 724.24,427.25 724.63,427.78C725.02,428.31 726.04,429.72 726.43,430.25C726.82,430.78 727.84,432.18 728.23,432.71C728.62,433.24 729.64,434.65 730.03,435.18C730.42,435.71 731.43,437.11 731.82,437.64C732.21,438.17 733.23,439.58 733.62,440.11C734.01,440.64 735.03,442.04 735.42,442.57C735.81,443.1 736.83,444.51 737.22,445.04C737.61,445.57 738.63,446.97 739.02,447.5C739.41,448.03 740.43,449.44 740.82,449.97C741.21,450.5 742.22,451.9 742.61,452.43C743,452.96 744.02,454.36 744.41,454.9C744.8,455.44 745.82,456.84 746.21,457.37C746.6,457.9 747.62,459.3 748.01,459.83C748.4,460.36 749.42,461.77 749.81,462.3C750.2,462.83 751.21,464.23 751.6,464.76C751.99,465.29 753.01,466.7 753.4,467.23C753.79,467.76 754.81,469.16 755.2,469.69C755.59,470.22 756.61,471.63 757,472.16C757.39,472.69 758.41,474.09 758.8,474.62C759.19,475.15 760.2,476.56 760.59,477.09C760.98,477.62 762,479.02 762.39,479.55C762.78,480.08 763.8,481.49 764.19,482.02C764.58,482.55 765.6,483.95 765.99,484.48C766.38,485.01 767.4,486.42 767.79,486.95C768.18,487.48 769.19,488.88 769.58,489.41C769.97,489.94 770.99,491.35 771.38,491.88C771.77,492.41 772.79,493.81 773.18,494.34C773.57,494.87 774.59,496.28 774.98,496.81C775.37,497.34 776.39,498.74 776.78,499.27C777.17,499.8 778.19,501.2 778.58,501.74C778.97,502.27 779.98,503.68 780.37,504.21C780.76,504.74 781.78,506.14 782.17,506.67C782.56,507.2 783.58,508.61 783.97,509.14C784.36,509.67 785.38,511.07 785.77,511.6C786.16,512.13 787.18,513.54 787.57,514.07C787.96,514.6 788.97,516 789.36,516.53C789.75,517.06 790.7,518.77 791.16,519C791.51,519.18 792.5,519 792.96,519C793.61,519 795.78,519 796.56,519C797.34,519 799.37,519 800.15,519C800.93,519 802.97,519 803.75,519C804.53,519 806.56,519 807.34,519C808.12,519 810.16,519 810.94,519C811.72,519 813.76,519 814.54,519C815.32,519 817.35,519 818.13,519C818.91,519 820.95,519 821.73,519C822.51,519 824.55,519 825.33,519C826.11,519 828.14,519 828.92,519C829.7,519 831.74,519 832.52,519C833.3,519 835.33,519 836.11,519C836.89,519 838.93,519 839.71,519C840.49,519 842.53,519 843.31,519C844.09,519 846.12,519 846.9,519C847.68,519 849.72,519 850.5,519C851.28,519 853.32,519 854.1,519C854.88,519 856.91,519 857.69,519C858.47,519 860.51,519 861.29,519C862.07,519 864.1,519 864.88,519C865.66,519 867.7,519 868.48,519C869.26,519 871.3,519 872.08,519C872.86,519 874.89,519 875.67,519C876.45,519 878.49,519 879.27,519C880.05,519 882.08,519 882.86,519C883.64,519 885.68,519 886.46,519C887.24,519 889.28,519 890.06,519C890.84,519 892.87,519 893.65,519C894.43,519 896.47,519 897.25,519C898.03,519 900.07,519 900.85,519C901.63,519 903.66,519 904.44,519C905.22,519 907.26,519 908.04,519C908.82,519 910.85,519 911.63,519C912.41,519 914.45,519 915.23,519C916.01,519 918.05,519 918.83,519C919.61,519 921.64,519 922.42,519C923.2,519 925.24,519 926.02,519C926.8,519 928.84,519 929.62,519C930.4,519 932.43,519 933.21,519C933.99,519 936.03,519 936.81,519C937.59,519 939.62,519 940.4,519Q941.18,519 944,519" style="fill: rgb(45, 212, 191); fill-opacity: 0.12; stroke-width: 0px;"></path></g></g><g class="errorbars"></g><g class="lines"><path class="js-line" style="vector-effect: non-scaling-stroke; fill: none; stroke: rgb(45, 212, 191); stroke-opacity: 1; stroke-width: 3px; opacity: 1;" d="M0,519Q3.21,519 3.46,519C3.51,519 3.55,519 3.6,519C3.85,519 6.6,519 6.92,519C7.01,519 7.1,519 7.19,519C7.5,519 10.02,519 10.38,519C10.51,519 10.66,519 10.79,519C11.14,519 13.44,519 13.83,519C14,519 14.21,519 14.38,519C14.76,519 16.88,519 17.29,519C17.49,519 17.78,519 17.98,519C18.38,519 20.33,519 20.75,519C20.98,519 21.35,519 21.58,519C21.99,519 23.78,519 24.21,519C24.47,519 24.91,519 25.17,519C25.58,519 27.23,519 27.66,519C27.95,519 28.48,519 28.77,519C29.18,519 30.69,519 31.12,519C31.43,519 32.06,519 32.37,519C32.78,519 34.16,519 34.58,519C34.91,519 35.63,519 35.96,519C36.36,519 37.62,519 38.04,519C38.4,519 39.21,519 39.56,519C39.95,519 41.1,519 41.5,519C41.87,519 42.78,519 43.15,519C43.53,519 44.56,519 44.95,519C45.34,519 46.36,519 46.75,519C47.14,519 48.16,519 48.55,519C48.94,519 49.96,519 50.35,519C50.74,519 51.75,519 52.14,519C52.53,519 53.55,519 53.94,519C54.33,519 55.35,519 55.74,519C56.13,519 57.15,519 57.54,519C57.93,519 58.95,519 59.34,519C59.73,519 60.75,519 61.14,519C61.53,519 62.54,519 62.93,519C63.32,519 64.34,519 64.73,519C65.12,519 66.14,519 66.53,519C66.92,519 67.94,519 68.33,519C68.72,519 69.74,519 70.13,519C70.52,519 71.53,519 71.92,519C72.31,519 73.33,519 73.72,519C74.11,519 75.13,519 75.52,519C75.91,519 76.93,519 77.32,519C77.71,519 78.73,519 79.12,519C79.51,519 80.52,519 80.91,519C81.3,519 82.32,519 82.71,519C83.1,519 84.12,519 84.51,519C84.9,519 85.92,519 86.31,519C86.7,519 87.72,519 88.11,519C88.5,519 89.58,519.29 89.9,519C90.88,518.12 91.31,506.15 91.7,502.59C92.09,499.03 93.11,489.71 93.5,486.15C93.89,482.59 94.91,473.28 95.3,469.72C95.69,466.16 96.71,456.84 97.1,453.28C97.49,449.72 98.51,440.41 98.9,436.85C99.29,433.29 100.3,423.97 100.69,420.41C101.08,416.85 102.1,407.54 102.49,403.98C102.88,400.42 103.9,391.1 104.29,387.54C104.68,383.98 105.7,374.67 106.09,371.11C106.48,367.55 107.5,358.23 107.89,354.67C108.28,351.11 109.29,341.8 109.68,338.24C110.07,334.68 111.09,325.36 111.48,321.8C111.87,318.24 112.89,308.93 113.28,305.37C113.67,301.81 114.69,292.49 115.08,288.93C115.47,285.37 116.49,276.06 116.88,272.5C117.27,268.94 118.28,259.62 118.67,256.06C119.06,252.5 120.08,243.19 120.47,239.63C120.86,236.07 121.88,226.75 122.27,223.19C122.66,219.63 123.68,210.32 124.07,206.76C124.46,203.2 125.48,193.88 125.87,190.32C126.26,186.76 127.27,177.45 127.66,173.89C128.05,170.33 129.07,161.01 129.46,157.45C129.85,153.89 130.87,144.58 131.26,141.02C131.65,137.46 132.67,128.14 133.06,124.58C133.45,121.02 134.47,111.71 134.86,108.15C135.25,104.59 136.27,95.27 136.66,91.71C137.05,88.15 138.06,78.84 138.45,75.28C138.84,71.72 139.86,62.4 140.25,58.84C140.64,55.28 141.66,45.97 142.05,42.41C142.44,38.85 142.86,26.86 143.85,25.97C144.18,25.68 145.26,25.95 145.65,25.95C146.04,25.95 147.05,25.95 147.44,25.95C147.83,25.95 148.85,25.95 149.24,25.95C149.63,25.95 150.65,25.95 151.04,25.95C151.43,25.95 152.45,25.95 152.84,25.95C153.23,25.95 154.25,25.95 154.64,25.95C155.03,25.95 156.04,25.95 156.43,25.95C156.82,25.95 157.84,25.95 158.23,25.95C158.62,25.95 159.64,25.95 160.03,25.95C160.42,25.95 161.44,25.95 161.83,25.95C162.22,25.95 163.24,25.95 163.63,25.95C164.02,25.95 165.03,25.95 165.42,25.95C165.81,25.95 166.83,25.95 167.22,25.95C167.61,25.95 168.63,25.95 169.02,25.95C169.41,25.95 170.43,25.95 170.82,25.95C171.21,25.95 172.23,25.95 172.62,25.95C173.01,25.95 174.03,25.95 174.42,25.95C174.81,25.95 175.82,25.95 176.21,25.95C176.6,25.95 177.62,25.95 178.01,25.95C178.4,25.95 179.42,25.95 179.81,25.95C180.2,25.95 181.22,25.95 181.61,25.95C182,25.95 183.02,25.95 183.41,25.95C183.8,25.95 184.81,25.95 185.2,25.95C185.59,25.95 186.61,25.95 187,25.95C187.39,25.95 188.41,25.95 188.8,25.95C189.19,25.95 190.21,25.95 190.6,25.95C190.99,25.95 192.01,25.95 192.4,25.95C192.79,25.95 193.8,25.95 194.19,25.95C194.58,25.95 195.6,25.95 195.99,25.95C196.38,25.95 197.4,25.95 197.79,25.95C198.18,25.95 199.2,25.95 199.59,25.95C199.98,25.95 201,25.95 201.39,25.95C201.78,25.95 202.79,25.95 203.18,25.95C203.57,25.95 204.59,25.95 204.98,25.95C205.37,25.95 206.39,25.95 206.78,25.95C207.17,25.95 208.19,25.95 208.58,25.95C208.97,25.95 209.99,25.95 210.38,25.95C210.77,25.95 211.79,25.95 212.18,25.95C212.57,25.95 213.58,25.95 213.97,25.95C214.36,25.95 215.38,25.95 215.77,25.95C216.16,25.95 217.18,25.95 217.57,25.95C217.96,25.95 218.98,25.95 219.37,25.95C219.76,25.95 220.78,25.95 221.17,25.95C221.56,25.95 222.57,25.95 222.96,25.95C223.35,25.95 224.37,25.95 224.76,25.95C225.15,25.95 226.17,25.95 226.56,25.95C226.95,25.95 227.97,25.95 228.36,25.95C228.75,25.95 229.77,25.95 230.16,25.95C230.55,25.95 231.56,25.95 231.95,25.95C232.34,25.95 233.36,25.95 233.75,25.95C234.14,25.95 235.16,25.95 235.55,25.95C235.94,25.95 236.96,25.95 237.35,25.95C237.74,25.95 238.76,25.95 239.15,25.95C239.54,25.95 240.55,25.95 240.94,25.95C241.33,25.95 242.35,25.95 242.74,25.95C243.13,25.95 244.15,25.95 244.54,25.95C244.93,25.95 245.95,25.95 246.34,25.95C246.73,25.95 247.75,25.95 248.14,25.95C248.53,25.95 249.55,25.95 249.94,25.95C250.33,25.95 251.34,25.95 251.73,25.95C252.12,25.95 253.14,25.95 253.53,25.95C253.92,25.95 254.94,25.95 255.33,25.95C255.72,25.95 256.74,25.95 257.13,25.95C257.52,25.95 258.54,25.95 258.93,25.95C259.32,25.95 260.33,25.95 260.72,25.95C261.11,25.95 262.13,25.95 262.52,25.95C262.91,25.95 263.93,25.95 264.32,25.95C264.71,25.95 265.73,25.95 266.12,25.95C266.51,25.95 267.53,25.95 267.92,25.95C268.31,25.95 269.32,25.95 269.71,25.95C270.1,25.95 271.12,25.95 271.51,25.95C271.9,25.95 272.92,25.95 273.31,25.95C273.7,25.95 274.72,25.95 275.11,25.95C275.5,25.95 276.52,25.95 276.91,25.95C277.3,25.95 278.31,25.95 278.7,25.95C279.09,25.95 280.11,25.95 280.5,25.95C280.89,25.95 281.91,25.95 282.3,25.95C282.69,25.95 283.71,25.95 284.1,25.95C284.49,25.95 285.51,25.95 285.9,25.95C286.29,25.95 287.31,25.95 287.7,25.95C288.09,25.95 289.1,25.95 289.49,25.95C289.88,25.95 290.9,25.95 291.29,25.95C291.68,25.95 292.7,25.95 293.09,25.95C293.48,25.95 294.5,25.95 294.89,25.95C295.28,25.95 296.3,25.95 296.69,25.95C297.08,25.95 298.09,25.95 298.48,25.95C298.87,25.95 299.89,25.95 300.28,25.95C300.67,25.95 301.69,25.95 302.08,25.95C302.47,25.95 303.49,25.95 303.88,25.95C304.27,25.95 305.29,25.95 305.68,25.95C306.07,25.95 307.08,25.95 307.47,25.95C307.86,25.95 308.88,25.95 309.27,25.95C309.66,25.95 310.68,25.95 311.07,25.95C311.46,25.95 312.48,25.95 312.87,25.95C313.26,25.95 314.28,25.95 314.67,25.95C315.06,25.95 316.07,25.95 316.46,25.95C316.85,25.95 317.87,25.95 318.26,25.95C318.65,25.95 319.67,25.95 320.06,25.95C320.45,25.95 321.47,25.95 321.86,25.95C322.25,25.95 323.27,25.95 323.66,25.95C324.05,25.95 325.07,25.95 325.46,25.95C325.85,25.95 326.86,25.95 327.25,25.95C327.64,25.95 328.66,25.95 329.05,25.95C329.44,25.95 330.46,25.95 330.85,25.95C331.24,25.95 332.26,25.95 332.65,25.95C333.04,25.95 334.06,25.95 334.45,25.95C334.84,25.95 335.85,25.95 336.24,25.95C336.63,25.95 337.65,25.95 338.04,25.95C338.43,25.95 339.45,25.95 339.84,25.95C340.23,25.95 341.25,25.95 341.64,25.95C342.03,25.95 343.05,25.95 343.44,25.95C343.83,25.95 344.84,25.95 345.23,25.95C345.62,25.95 346.64,25.95 347.03,25.95C347.42,25.95 348.44,25.95 348.83,25.95C349.22,25.95 350.24,25.95 350.63,25.95C351.02,25.95 352.04,25.95 352.43,25.95C352.82,25.95 353.83,25.95 354.22,25.95C354.61,25.95 355.63,25.95 356.02,25.95C356.41,25.95 357.43,25.95 357.82,25.95C358.21,25.95 359.23,25.95 359.62,25.95C360.01,25.95 361.03,25.95 361.42,25.95C361.81,25.95 362.83,25.95 363.22,25.95C363.61,25.95 364.62,25.95 365.01,25.95C365.4,25.95 366.42,25.95 366.81,25.95C367.2,25.95 368.22,25.95 368.61,25.95C369,25.95 370.02,25.95 370.41,25.95C370.8,25.95 371.82,25.95 372.21,25.95C372.6,25.95 373.61,25.95 374,25.95C374.39,25.95 375.41,25.95 375.8,25.95C376.19,25.95 377.21,25.95 377.6,25.95C377.99,25.95 379.01,25.95 379.4,25.95C379.79,25.95 380.81,25.95 381.2,25.95C381.59,25.95 382.6,25.95 382.99,25.95C383.38,25.95 384.4,25.95 384.79,25.95C385.18,25.95 386.2,25.95 386.59,25.95C386.98,25.95 388,25.95 388.39,25.95C388.78,25.95 389.8,25.95 390.19,25.95C390.58,25.95 391.59,25.95 391.98,25.95C392.37,25.95 393.39,25.95 393.78,25.95C394.17,25.95 395.19,25.95 395.58,25.95C395.97,25.95 396.99,25.95 397.38,25.95C397.77,25.95 398.79,25.95 399.18,25.95C399.57,25.95 400.59,25.95 400.98,25.95C401.37,25.95 402.38,25.95 402.77,25.95C403.16,25.95 404.18,25.95 404.57,25.95C404.96,25.95 405.98,25.95 406.37,25.95C406.76,25.95 407.78,25.95 408.17,25.95C408.56,25.95 409.58,25.95 409.97,25.95C410.36,25.95 411.37,25.95 411.76,25.95C412.15,25.95 413.17,25.95 413.56,25.95C413.95,25.95 414.97,25.95 415.36,25.95C415.75,25.95 416.77,25.95 417.16,25.95C417.55,25.95 418.57,25.95 418.96,25.95C419.35,25.95 420.36,25.95 420.75,25.95C421.14,25.95 422.16,25.95 422.55,25.95C422.94,25.95 423.96,25.95 424.35,25.95C424.74,25.95 425.76,25.95 426.15,25.95C426.54,25.95 427.56,25.95 427.95,25.95C428.34,25.95 429.35,25.95 429.74,25.95C430.13,25.95 431.19,25.77 431.54,25.95C432,26.18 432.95,27.88 433.34,28.41C433.73,28.94 434.75,30.35 435.14,30.88C435.53,31.41 436.55,32.81 436.94,33.34C437.33,33.87 438.35,35.28 438.74,35.81C439.13,36.34 440.14,37.74 440.53,38.27C440.92,38.8 441.94,40.21 442.33,40.74C442.72,41.27 443.74,42.67 444.13,43.2C444.52,43.73 445.54,45.14 445.93,45.67C446.32,46.2 447.34,47.6 447.73,48.13C448.12,48.66 449.13,50.07 449.52,50.6C449.91,51.13 450.93,52.53 451.32,53.06C451.71,53.59 452.73,55 453.12,55.53C453.51,56.06 454.53,57.46 454.92,57.99C455.31,58.52 456.33,59.92 456.72,60.46C457.11,60.99 458.12,62.4 458.51,62.93C458.9,63.46 459.92,64.86 460.31,65.39C460.7,65.92 461.72,67.33 462.11,67.86C462.5,68.39 463.52,69.79 463.91,70.32C464.3,70.85 465.32,72.26 465.71,72.79C466.1,73.32 467.11,74.72 467.5,75.25C467.89,75.78 468.91,77.19 469.3,77.72C469.69,78.25 470.71,79.65 471.1,80.18C471.49,80.71 472.51,82.12 472.9,82.65C473.29,83.18 474.31,84.58 474.7,85.11C475.09,85.64 476.11,87.05 476.5,87.58C476.89,88.11 477.9,89.51 478.29,90.04C478.68,90.57 479.7,91.98 480.09,92.51C480.48,93.04 481.5,94.44 481.89,94.97C482.28,95.5 483.3,96.91 483.69,97.44C484.08,97.97 485.1,99.37 485.49,99.9C485.88,100.43 486.89,101.84 487.28,102.37C487.67,102.9 488.69,104.3 489.08,104.83C489.47,105.36 490.49,106.76 490.88,107.3C491.27,107.84 492.29,109.24 492.68,109.77C493.07,110.3 494.09,111.7 494.48,112.23C494.87,112.76 495.88,114.17 496.27,114.7C496.66,115.23 497.68,116.63 498.07,117.16C498.46,117.69 499.48,119.1 499.87,119.63C500.26,120.16 501.28,121.56 501.67,122.09C502.06,122.62 503.08,124.03 503.47,124.56C503.86,125.09 504.87,126.49 505.26,127.02C505.65,127.55 506.67,128.96 507.06,129.49C507.45,130.02 508.47,131.42 508.86,131.95C509.25,132.48 510.27,133.89 510.66,134.42C511.05,134.95 512.07,136.35 512.46,136.88C512.85,137.41 513.87,138.82 514.26,139.35C514.65,139.88 515.66,141.28 516.05,141.81C516.44,142.34 517.46,143.75 517.85,144.28C518.24,144.81 519.26,146.21 519.65,146.74C520.04,147.27 521.06,148.68 521.45,149.21C521.84,149.74 522.86,151.14 523.25,151.67C523.64,152.2 524.65,153.61 525.04,154.14C525.43,154.67 526.45,156.07 526.84,156.6C527.23,157.13 528.25,158.53 528.64,159.07C529.03,159.61 530.05,161.01 530.44,161.54C530.83,162.07 531.85,163.47 532.24,164C532.63,164.53 533.64,165.94 534.03,166.47C534.42,167 535.44,168.4 535.83,168.93C536.22,169.46 537.24,170.87 537.63,171.4C538.02,171.93 539.04,173.33 539.43,173.86C539.82,174.39 540.84,175.8 541.23,176.33C541.62,176.86 542.63,178.26 543.02,178.79C543.41,179.32 544.43,180.73 544.82,181.26C545.21,181.79 546.23,183.19 546.62,183.72C547.01,184.25 548.03,185.66 548.42,186.19C548.81,186.72 549.83,188.12 550.22,188.65C550.61,189.18 551.63,190.59 552.02,191.12C552.41,191.65 553.42,193.05 553.81,193.58C554.2,194.11 555.22,195.52 555.61,196.05C556,196.58 557.02,197.98 557.41,198.51C557.8,199.04 558.82,200.45 559.21,200.98C559.6,201.51 560.62,202.91 561.01,203.44C561.4,203.97 562.41,205.38 562.8,205.91C563.19,206.45 564.21,207.85 564.6,208.38C564.99,208.91 566.01,210.31 566.4,210.84C566.79,211.37 567.81,212.78 568.2,213.31C568.59,213.84 569.61,215.24 570,215.77C570.39,216.3 571.4,217.71 571.79,218.24C572.18,218.77 573.2,220.17 573.59,220.7C573.98,221.23 575,222.64 575.39,223.17C575.78,223.7 576.8,225.1 577.19,225.63C577.58,226.16 578.6,227.57 578.99,228.1C579.38,228.63 580.39,230.03 580.78,230.56C581.17,231.09 582.19,232.5 582.58,233.03C582.97,233.56 583.99,234.96 584.38,235.49C584.77,236.02 585.79,237.43 586.18,237.96C586.57,238.49 587.59,239.89 587.98,240.42C588.37,240.95 589.39,242.36 589.78,242.89C590.17,243.42 591.18,244.82 591.57,245.35C591.96,245.88 592.98,247.29 593.37,247.82C593.76,248.35 594.78,249.75 595.17,250.28C595.56,250.81 596.58,252.22 596.97,252.75C597.36,253.28 598.38,254.68 598.77,255.21C599.16,255.74 600.17,257.15 600.56,257.68C600.95,258.22 601.97,259.62 602.36,260.15C602.75,260.68 603.77,262.08 604.16,262.61C604.55,263.14 605.57,264.55 605.96,265.08C606.35,265.61 607.37,267.01 607.76,267.54C608.15,268.07 609.16,269.48 609.55,270.01C609.94,270.54 610.96,271.94 611.35,272.47C611.74,273 612.76,274.41 613.15,274.94C613.54,275.47 614.56,276.87 614.95,277.4C615.34,277.93 616.36,279.34 616.75,279.87C617.14,280.4 618.15,281.8 618.54,282.33C618.93,282.86 619.95,284.27 620.34,284.8C620.73,285.33 621.75,286.73 622.14,287.26C622.53,287.79 623.55,289.2 623.94,289.73C624.33,290.26 625.35,291.66 625.74,292.19C626.13,292.72 627.15,294.13 627.54,294.66C627.93,295.19 628.94,296.59 629.33,297.12C629.72,297.65 630.74,299.06 631.13,299.59C631.52,300.12 632.54,301.52 632.93,302.05C633.32,302.58 634.34,303.98 634.73,304.52C635.12,305.06 636.14,306.46 636.53,306.99C636.92,307.52 637.93,308.92 638.32,309.45C638.71,309.98 639.73,311.39 640.12,311.92C640.51,312.45 641.53,313.85 641.92,314.38C642.31,314.91 643.33,316.32 643.72,316.85C644.11,317.38 645.13,318.78 645.52,319.31C645.91,319.84 646.92,321.25 647.31,321.78C647.7,322.31 648.72,323.71 649.11,324.24C649.5,324.77 650.52,326.18 650.91,326.71C651.3,327.24 652.32,328.64 652.71,329.17C653.1,329.7 654.12,331.11 654.51,331.64C654.9,332.17 655.91,333.57 656.3,334.1C656.69,334.63 657.71,336.04 658.1,336.57C658.49,337.1 659.51,338.5 659.9,339.03C660.29,339.56 661.31,340.97 661.7,341.5C662.09,342.03 663.11,343.43 663.5,343.96C663.89,344.49 664.91,345.9 665.3,346.43C665.69,346.96 666.7,348.36 667.09,348.89C667.48,349.42 668.5,350.83 668.89,351.36C669.28,351.89 670.3,353.29 670.69,353.82C671.08,354.35 672.1,355.75 672.49,356.29C672.88,356.83 673.9,358.23 674.29,358.76C674.68,359.29 675.69,360.69 676.08,361.22C676.47,361.75 677.49,363.16 677.88,363.69C678.27,364.22 679.29,365.62 679.68,366.15C680.07,366.68 681.09,368.09 681.48,368.62C681.87,369.15 682.89,370.55 683.28,371.08C683.67,371.61 684.68,373.02 685.07,373.55C685.46,374.08 686.48,375.48 686.87,376.01C687.26,376.54 688.28,377.95 688.67,378.48C689.06,379.01 690.08,380.41 690.47,380.94C690.86,381.47 691.88,382.88 692.27,383.41C692.66,383.94 693.67,385.34 694.06,385.87C694.45,386.4 695.47,387.81 695.86,388.34C696.25,388.87 697.27,390.27 697.66,390.8C698.05,391.33 699.07,392.74 699.46,393.27C699.85,393.8 700.87,395.2 701.26,395.73C701.65,396.26 702.67,397.67 703.06,398.2C703.45,398.73 704.46,400.13 704.85,400.66C705.24,401.19 706.26,402.59 706.65,403.13C707.04,403.67 708.06,405.07 708.45,405.6C708.84,406.13 709.86,407.53 710.25,408.06C710.64,408.59 711.66,410 712.05,410.53C712.44,411.06 713.45,412.46 713.84,412.99C714.23,413.52 715.25,414.93 715.64,415.46C716.03,415.99 717.05,417.39 717.44,417.92C717.83,418.45 718.85,419.86 719.24,420.39C719.63,420.92 720.65,422.32 721.04,422.85C721.43,423.38 722.44,424.79 722.83,425.32C723.22,425.85 724.24,427.25 724.63,427.78C725.02,428.31 726.04,429.72 726.43,430.25C726.82,430.78 727.84,432.18 728.23,432.71C728.62,433.24 729.64,434.65 730.03,435.18C730.42,435.71 731.43,437.11 731.82,437.64C732.21,438.17 733.23,439.58 733.62,440.11C734.01,440.64 735.03,442.04 735.42,442.57C735.81,443.1 736.83,444.51 737.22,445.04C737.61,445.57 738.63,446.97 739.02,447.5C739.41,448.03 740.43,449.44 740.82,449.97C741.21,450.5 742.22,451.9 742.61,452.43C743,452.96 744.02,454.36 744.41,454.9C744.8,455.44 745.82,456.84 746.21,457.37C746.6,457.9 747.62,459.3 748.01,459.83C748.4,460.36 749.42,461.77 749.81,462.3C750.2,462.83 751.21,464.23 751.6,464.76C751.99,465.29 753.01,466.7 753.4,467.23C753.79,467.76 754.81,469.16 755.2,469.69C755.59,470.22 756.61,471.63 757,472.16C757.39,472.69 758.41,474.09 758.8,474.62C759.19,475.15 760.2,476.56 760.59,477.09C760.98,477.62 762,479.02 762.39,479.55C762.78,480.08 763.8,481.49 764.19,482.02C764.58,482.55 765.6,483.95 765.99,484.48C766.38,485.01 767.4,486.42 767.79,486.95C768.18,487.48 769.19,488.88 769.58,489.41C769.97,489.94 770.99,491.35 771.38,491.88C771.77,492.41 772.79,493.81 773.18,494.34C773.57,494.87 774.59,496.28 774.98,496.81C775.37,497.34 776.39,498.74 776.78,499.27C777.17,499.8 778.19,501.2 778.58,501.74C778.97,502.27 779.98,503.68 780.37,504.21C780.76,504.74 781.78,506.14 782.17,506.67C782.56,507.2 783.58,508.61 783.97,509.14C784.36,509.67 785.38,511.07 785.77,511.6C786.16,512.13 787.18,513.54 787.57,514.07C787.96,514.6 788.97,516 789.36,516.53C789.75,517.06 790.7,518.77 791.16,519C791.51,519.18 792.5,519 792.96,519C793.61,519 795.78,519 796.56,519C797.34,519 799.37,519 800.15,519C800.93,519 802.97,519 803.75,519C804.53,519 806.56,519 807.34,519C808.12,519 810.16,519 810.94,519C811.72,519 813.76,519 814.54,519C815.32,519 817.35,519 818.13,519C818.91,519 820.95,519 821.73,519C822.51,519 824.55,519 825.33,519C826.11,519 828.14,519 828.92,519C829.7,519 831.74,519 832.52,519C833.3,519 835.33,519 836.11,519C836.89,519 838.93,519 839.71,519C840.49,519 842.53,519 843.31,519C844.09,519 846.12,519 846.9,519C847.68,519 849.72,519 850.5,519C851.28,519 853.32,519 854.1,519C854.88,519 856.91,519 857.69,519C858.47,519 860.51,519 861.29,519C862.07,519 864.1,519 864.88,519C865.66,519 867.7,519 868.48,519C869.26,519 871.3,519 872.08,519C872.86,519 874.89,519 875.67,519C876.45,519 878.49,519 879.27,519C880.05,519 882.08,519 882.86,519C883.64,519 885.68,519 886.46,519C887.24,519 889.28,519 890.06,519C890.84,519 892.87,519 893.65,519C894.43,519 896.47,519 897.25,519C898.03,519 900.07,519 900.85,519C901.63,519 903.66,519 904.44,519C905.22,519 907.26,519 908.04,519C908.82,519 910.85,519 911.63,519C912.41,519 914.45,519 915.23,519C916.01,519 918.05,519 918.83,519C919.61,519 921.64,519 922.42,519C923.2,519 925.24,519 926.02,519C926.8,519 928.84,519 929.62,519C930.4,519 932.43,519 933.21,519C933.99,519 936.03,519 936.81,519C937.59,519 939.62,519 940.4,519Q941.18,519 944,519"></path></g><g class="points"></g><g class="text"></g></g></g></g><g class="overplot"></g><path class="xlines-above crisp" style="fill: none;" d="M0,0"></path><path class="ylines-above crisp" style="fill: none;" d="M0,0"></path><g class="overlines-above"></g><g class="xaxislayer-above"><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="00:00&lt;br&gt;+1d" data-math="N" transform="translate(60.39,0)"><tspan class="line" dy="0em" x="0" y="583">00:00</tspan><tspan class="line" dy="1.3em" x="0" y="583">+1d</tspan></text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="01:00" data-math="N" transform="translate(132.32,0)">01:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="02:00" data-math="N" transform="translate(204.24,0)">02:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="03:00" data-math="N" transform="translate(276.15999999999997,0)">03:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="04:00" data-math="N" transform="translate(348.09,0)">04:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="05:00" data-math="N" transform="translate(420.01,0)">05:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="06:00" data-math="N" transform="translate(491.94,0)">06:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="07:00" data-math="N" transform="translate(563.86,0)">07:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="08:00" data-math="N" transform="translate(635.78,0)">08:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="09:00" data-math="N" transform="translate(707.71,0)">09:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="10:00" data-math="N" transform="translate(779.63,0)">10:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="11:00" data-math="N" transform="translate(851.56,0)">11:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="12:00" data-math="N" transform="translate(923.48,0)">12:00</text></g><g class="xtick"><text text-anchor="middle" x="0" y="583" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 0;" data-unformatted="13:00" data-math="N" transform="translate(995.4,0)">13:00</text></g></g><g class="yaxislayer-above"><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="0" data-math="N" transform="translate(0,570)">0</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="20" data-math="N" transform="translate(0,510.83)">20</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="40" data-math="N" transform="translate(0,451.67)">40</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="60" data-math="N" transform="translate(0,392.5)">60</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="80" data-math="N" transform="translate(0,333.34)">80</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="100" data-math="N" transform="translate(0,274.16999999999996)">100</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="120" data-math="N" transform="translate(0,215)">120</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="140" data-math="N" transform="translate(0,155.84)">140</text></g><g class="ytick"><text text-anchor="end" x="51" y="4.199999999999999" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(156, 150, 170); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre; opacity: 1;" data-unformatted="160" data-math="N" transform="translate(0,96.67)">160</text></g></g><g class="overaxes-above"></g></g></g><g class="polarlayer"></g><g class="smithlayer"></g><g class="ternarylayer"></g><g class="geolayer"></g><g class="funnelarealayer"></g><g class="pielayer"></g><g class="iciclelayer"></g><g class="treemaplayer"></g><g class="sunburstlayer"></g><g class="glimages"></g></svg><div class="gl-container"></div><svg class="main-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1014" height="621.85"><defs id="topdefs-ac5ffe"><g class="clips"></g><clipPath id="legendac5ffe"><rect width="282" height="29" x="0" y="0"></rect></clipPath><clipPath id="hoverac5ffe"><rect width="213" height="126" x="1" y="1"></rect></clipPath></defs><g class="indicatorlayer"></g><g class="layer-above"><g class="imagelayer"></g><g class="shapelayer"></g></g><g class="selectionlayer"></g><g class="infolayer"><g class="g-gtitle"></g><g class="legend" pointer-events="all" transform="translate(52,11.61999999999999)"><rect class="bg" shape-rendering="crispEdges" style="stroke: rgb(68, 68, 68); stroke-opacity: 1; fill: rgb(0, 0, 0); fill-opacity: 0; stroke-width: 0px;" width="282" height="29" x="0" y="0"></rect><g class="scrollbox" transform="" clip-path="url(#legendac5ffe)"><g class="groups"><g class="traces" style="opacity: 1;" transform="translate(0,14.5)"><text class="legendtext" text-anchor="start" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(245, 243, 250); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre;" x="40" y="4.680000000000001" data-unformatted="Pregabalin" data-math="N">Pregabalin</text><g class="layers"><g class="legendfill"><path class="js-fill" d="M5,-2h30v6h-30z" style="stroke-width: 0px; fill: rgb(166, 124, 255); fill-opacity: 0.12;"></path></g><g class="legendlines"><path class="js-line" d="M5,-2h30" style="fill: none; stroke: rgb(166, 124, 255); stroke-opacity: 1; stroke-width: 3px;"></path></g><g class="legendsymbols"><g class="legendpoints"></g></g></g><rect class="legendtoggle" style="cursor: pointer; fill: rgb(0, 0, 0); fill-opacity: 0;" pointer-events="all" x="0" y="-9.5" width="116.5" height="19"></rect></g><g class="traces" style="opacity: 1;" transform="translate(119,14.5)"><text class="legendtext" text-anchor="start" style="font-family: Roboto Mono, monospace; font-size: 12px; fill: rgb(245, 243, 250); fill-opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre;" x="40" y="4.680000000000001" data-unformatted="Lisdexamfetamine" data-math="N">Lisdexamfetamine</text><g class="layers"><g class="legendfill"><path class="js-fill" d="M5,-2h30v6h-30z" style="stroke-width: 0px; fill: rgb(45, 212, 191); fill-opacity: 0.12;"></path></g><g class="legendlines"><path class="js-line" d="M5,-2h30" style="fill: none; stroke: rgb(45, 212, 191); stroke-opacity: 1; stroke-width: 3px;"></path></g><g class="legendsymbols"><g class="legendpoints"></g></g></g><rect class="legendtoggle" style="cursor: pointer; fill: rgb(0, 0, 0); fill-opacity: 0;" pointer-events="all" x="0" y="-9.5" width="159.6999969482422" height="19"></rect></g></g></g><rect class="scrollbar" rx="20" ry="3" width="0" height="0" style="fill: rgb(128, 139, 164); fill-opacity: 1;" x="0" y="0"></rect></g><g class="g-xtitle"></g><g class="g-ytitle"><text class="ytitle" transform="rotate(-90,20,310.5)" style="font-family: Roboto Mono, monospace; font-size: 11px; fill: rgb(156, 150, 170); opacity: 1; font-weight: normal; font-style: normal; font-variant: normal; white-space: pre;" x="20" y="310.5" text-anchor="middle" data-unformatted="Relative intensity" data-math="N">Relative intensity</text></g></g><g class="menulayer"></g><g class="zoomlayer"></g></svg><div class="modebar-container" style="position: absolute; top: 0px; right: 0px; width: 100%;"></div><svg class="main-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1014" height="621.85"><g class="hoverlayer"></g></svg></div></div></div>
+    </section>
 
-    </div>
+    
+  </div>
+
+  <aside class="contents xl:flex xl:flex-col xl:gap-5 xl:sticky xl:top-20 xl:col-start-1 xl:row-start-1 xl:min-h-[100%]">
+    <section class="glass rounded-sm p-4 sm:p-5 order-2 xl:order-none xl:min-h-[90vh]">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Add a dose</h2>
+        <button id="resetButton" type="button" class="btn btn-xs btn-ghost font-mono" aria-label="Reset timeline">reset</button>
+      </div>
+
+      <label class="font-mono text-[11px] text-[var(--muted)] block mb-1" for="input">Substance</label>
+      <div class="join w-full mb-1 relative">
+        <input id="input" autocomplete="off" placeholder="Search, e.g. caffeine" class="input input-sm join-item bg-[var(--surface-2)] border-[var(--line)] font-mono w-full">
+        <button id="searchButton" type="button" class="btn btn-sm join-item bg-[var(--surface-2)] border-[var(--line)]" aria-label="Search">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="--darkreader-inline-stroke: currentColor;" data-darkreader-inline-stroke=""><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <div id="sug" class="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--surface-2)] border border-[var(--line)] rounded-sm overflow-hidden" hidden="">
+          <div id="sugC" role="listbox"><button type="button" class="suggestion" role="option">Lisdexamfetamine</button></div>
+        </div>
+      </div>
+      <p id="status" class="font-mono text-[11px] text-[var(--muted)] mb-3">Lisdexamfetamine loaded · common dose 30 mg</p>
+
+      <section id="dosePanel" class="flex flex-col gap-3">
+        <div class="grid grid-cols-2 gap-2">
+          <label class="block">
+            <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Dose <span id="doseUnit">mg</span></span>
+            <input id="doseInput" type="number" inputmode="decimal" min="0" step="any" placeholder="300" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full">
+          </label>
+          <label class="block">
+            <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Time</span>
+            <input id="doseStartHour" type="time" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full">
+          </label>
+        </div>
+
+        <details id="releaseDetails" class="release-details">
+          <summary class="flex items-center justify-between cursor-pointer select-none border border-[var(--line)] rounded-sm bg-[var(--surface-2)] px-3 h-9 font-mono text-[11px] text-[var(--muted)]">
+            <span>Medication release: <strong id="releaseSummary" class="text-[var(--text)] font-medium">Immediate</strong></span>
+            <svg class="release-chevron w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="--darkreader-inline-stroke: currentColor;" data-darkreader-inline-stroke=""><path d="m6 9 6 6 6-6"></path></svg>
+          </summary>
+        <fieldset class="mt-2">
+          <legend class="sr-only">Medication release</legend>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="check-card selected border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="immediate" data-label="Immediate release" data-hours="0" checked="" class="checkbox checkbox-xs mt-0.5">
+              <span class="flex flex-col"><strong class="text-xs">Immediate</strong><small class="font-mono text-[10px] text-[var(--muted)]">Standard</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="retard" data-label="Retard / extended release" data-hours="12" class="checkbox checkbox-xs mt-0.5">
+              <span class="flex flex-col"><strong class="text-xs">Retard / XR</strong><small class="font-mono text-[10px] text-[var(--muted)]">Extended</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="depot" data-label="Depot / long-acting" data-hours="168" class="checkbox checkbox-xs mt-0.5">
+              <span class="flex flex-col"><strong class="text-xs">Depot</strong><small class="font-mono text-[10px] text-[var(--muted)]">Long-acting</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="modified" data-label="Other modified release" data-hours="24" class="checkbox checkbox-xs mt-0.5">
+              <span class="flex flex-col"><strong class="text-xs">Other MR</strong><small class="font-mono text-[10px] text-[var(--muted)]">Modified</small></span>
+            </label>
+          </div>
+        </fieldset>
+        </details>
+
+        <label id="releaseWindowField" class="block" hidden="">
+          <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Release window (hours)</span>
+          <input id="releaseWindow" type="number" min="0.5" max="8760" step="0.5" value="12" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full">
+        </label>
+
+        <p class="font-mono text-[10px] text-[var(--muted)] leading-relaxed border-t border-[var(--line)] pt-2">Visual estimate, not dosing guidance. Modified-release behavior varies by product and route.</p>
+        <button id="addDoseButton" type="button" class="btn btn-sm bg-[var(--violet)] hover:bg-[var(--violet)] hover:brightness-110 border-none text-[#160f24] font-mono font-medium">+ Add dose to timeline</button> <div class="flex flex-col ">
+  <section class="glass xl:min-h-[30rem] rounded-sm p-4 sm:p-5 order-4 xl:order-none">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Added doses <span id="doseCount" class="text-[var(--muted)] font-mono text-xs">2</span></h2>
+      </div>
+      <div id="doses" class="flex flex-col gap-2"><article class="dose-card" style="border-left: 3px solid rgb(166, 124, 255);"><time style="color: rgb(166, 124, 255);">23:53</time><div><strong>Pregabalin</strong><span>300 mg · Immediate release</span></div><button type="button" class="remove-dose" data-remove-dose="1" aria-label="Remove Pregabalin dose at 23:53">×</button></article><article class="dose-card" style="border-left: 3px solid rgb(45, 212, 191);"><time style="color: rgb(45, 212, 191);">23:53</time><div><strong>Lisdexamfetamine</strong><span>50 mg · Immediate release</span></div><button type="button" class="remove-dose" data-remove-dose="2" aria-label="Remove Lisdexamfetamine dose at 23:53">×</button></article></div>
+    </section>
+    <section id="substanceInfo" class="glass rounded-sm p-4 sm:p-6 order-5 xl:order-none xl:col-start-3 xl:row-start-1 xl:sticky xl:top-20 xl:min-h-[calc(100vh-7rem)]">
+      <div class="flex items-center gap-4 mb-4">
+        <img id="substanceImage" alt="Lisdexamfetamine reference" class="w-20 h-20 object-contain flex-none" src="https://psychonautwiki.org/w/thumb.php?f=Lisdexamfetamine.svg&amp;width=200">
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Selected substance</p>
+          <h3 id="substanceName" class="font-display text-base font-semibold">Lisdexamfetamine</h3>
+        </div>
+      </div>
+      <p id="substanceSummary" class="text-[#fff] text-sm leading-relaxed mb-6 p-3 border border-[var(--line)] bg-[var(--bg)]">Summary sheet: Lisdexamfetamine Lisdexamfetamine</p>
+      <p class="text-lg text-[var(--muted)] mb-6 pb-4 border-b-2 border-[var(--line)]">Addiction potential:<br><strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>
+      <div class="space-y-7">
+        <div><p class="text-base text-amber-300 mb-2">Caution</p><div data-interaction="caution"><span class="pill">Alcohol</span><span class="pill">GHB</span><span class="pill">GBL</span><span class="pill">Opioids</span><span class="pill">Cocaine</span><span class="pill">Cannabis</span><span class="pill">Caffeine</span><span class="pill">Ketamine</span><span class="pill">Methoxetamine</span><span class="pill">Psychedelics</span></div></div>
+        <div><p class="text-base text-orange-400 mb-2">Dangerous</p><div data-interaction="danger"><span class="pill">DXM</span><span class="pill">PCP</span><span class="pill">25x-NBOMe</span><span class="pill">2C-T-x</span><span class="pill">5-MeO-xxT</span><span class="pill">DOx</span></div></div>
+        <div><p class="text-base text-red-400 mb-2">Severe / do not combine</p><div data-interaction="severe"><span class="pill">Tramadol</span><span class="pill">aMT</span><span class="pill">MAOIs</span></div></div>
+      </div>
+    </section>
 </div>
-  <div id="contt">
+      </section>
+    <button id="saveButton" type="button" class="btn btn-sm h-12 fixed bottom-0 inset-x-0 order-6 xl:m-[15px] xl:order-none bg-[var(--surface)] border-[var(--line)] text-[var(--text)] font-mono disabled:opacity-40">Save data</button></section>
 
-                    <a href="/journal" class="option" id="journal">
-                        <img src="icons/journal.png" id="subicon"></img>
-                    </a>
-                    <a href="/Files" class="option" id="files">
-                        <img src="icons/files.png" id="subicon"></img>
-                    </a>
-                    <a href="/" class="option" id="home">
-                        <img src="icons/home.png" id="subicon"></img>
-                    </a>
-        </div>
-
-    </div>
-      <div id="plot">
-
-        <div id="plotdiv">
-            <div id="myPlot" class="js-plotly-plot"></div>
-            <script src="/Substance_files/plotly-latest.min.js"></script>
-            <div id="doses">
-            
-            
-            </div>
-            </div>
-
-    </div>
-   <div id="app">
-            <h2 class="title">Substance Timeline</h2>
-
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <input id="input" placeholder="Enter substance (e.g. lsd)" value="Pregabalin">
-                <button class="searchbtn" onclick="search()">Search</button>
-            </div>
-            
-            <div id="sug" style="visibility: collapse;">
-                <div id="sugC">
-                 </div>
-            </div>
-
-
-
-               <div id="dosePanel" style="display: flex;">
-                    <input id="doseInput" placeholder="Dose (e.g. 300)" value="300">
-                    <input id="doseStartHour" type="time" placeholder="Start hour" value="00:00">
-                    <button class="addbtn" onclick="addDose()">Add Dose</button>
-                    <button class="resetbtn" onclick="resetGraph()">Reset</button>
-               </div>
-
-            <p id="status">Choose Substance</p>
-            <div class="infocard"></div>
-            <div class="infocard1">
-
-                <div class="cat-header,cat-caution">
-                    <div class="cat-icon" aria-hidden="true">⚠</div>
-                    <span class="cat-title">Caution</span>
-                </div>
-                <div class="pills">
-                    
-                </div></div><div class="category cat-danger">
-                    
-                <div class="cat-header,cat-danger">
-                <div class="cat-icon" aria-hidden="true">♥</div>
-                <span class="cat-title">Dangerous</span>
-                </div>
-                <div class="pills">
-               
-                </div></div><div class="category cat-severe">
-
-                <div class="cat-header">
-                <div class="cat-icon" aria-hidden="true">✕</div>
-                <span class="cat-title">Severe / Do not combine</span>
-                </div>
-                <div class="pills">
-                </div>
-                
-
-                
-
-                
-
-            </div>
-            <div id="multiplierInfo" style="display: none;">
-                <h3 class="titlee">Dose Multipliers</h3>
-                <div id="multiplierList"></div>
-            </div>
-            
-            <div class="bottombar">
-                    <button class="btn" onclick="saveChart()">Save Data</button>
-                    <a class="btn" href="/journal">Back</a>
-                </div>
-            </div>
-
-        <script>
-
-        let timeout;
-        document.querySelector("#input").addEventListener("input", (e) => {
-            const value = e.target.value.trim();
-
-            if (value.length < 2) {
-                document.getElementById("sug").style.visibility = "collapse";
-                return;
-            }
-
-            clearTimeout(timeout);
-
-            timeout = setTimeout(() => {
-                searchSuggestions();
-            }, 500);
-        });
-
-        function searchSuggestions() {
-			value = document.querySelector("#input").value
-            if (value.length < 2) {
-                document.getElementById("sug").style.visibility = "collapse";
-                return;
-            }
-
-            const gql = `
-            {
-                substances(query: "${value}") {
-                    name
-                }
-            }`;
-
-            fetchGraphQL(gql).then(res => {
-                document.getElementById("sug").style.visibility = "visible";
-                document.getElementById("dosePanel").style.display = "none";
-                document.getElementById("status").textContent = ``;
-
-                showSuggestions(res.data.substances);
-            });
-        }
-
-        function showSuggestions(substances) {
-            const datalist = document.getElementById("sugC");
-            datalist.innerHTML = ""; 
-
-            substances.forEach(sub => {
-                const option = document.createElement("p");
-                option.textContent = sub.name;
-                option.id = "sug1";
-                datalist.appendChild(option);
-                
-                option.addEventListener("click", (e) => {
-                    const value = option.textContent;
-                    document.getElementById("input").value = value;
-                    search();
-                });
-            });
-
-			let index = -1
-			children = datalist.children
-			document.getElementById("input").addEventListener("keydown", (e) => {
-				for (let i=0;i<children.length;i++) {
-					if (children[i].classList.contains("Selected")) {
-						children[i].classList.remove("Selected")
-					}
-				}
-
-                function setPills(container, items) {
-                    try {
-                        const containerEl = typeof container === 'string' ? document.querySelector(container) : container;
-                        if (!containerEl) return;
-                        containerEl.innerHTML = '';
-
-                        if (!items || !items.length) return;
-
-                        items.forEach(it => {
-                            const name = (typeof it === 'string') ? it : (it && it.name) ? it.name : null;
-                            if (!name) return;
-                            const span = document.createElement('span');
-                            span.className = 'pill';
-                            span.textContent = name;
-                            containerEl.appendChild(span);
-                        });
-                    } catch (e) {
-                        console.error('setPills error', e);
-                    }
-                }
-
-                function renderInteractionCategories(substance) {
-                    if (!substance) return;
-
-                    // containers already present in the page (prefer explicit category classes)
-                    const cautionEl = document.querySelector('.cat-caution .pills') || document.querySelector('.infocard1 .pills');
-                    const dangerEl = document.querySelector('.cat-danger .pills');
-                    const severeEl = document.querySelector('.cat-severe .pills');
-
-                    // support both shapes: direct fields (uncertainInteractions...) or nested interactions{uncertain...}
-                    const uncertain = substance.uncertainInteractions || (substance.interactions && substance.interactions.uncertain) || [];
-                    const unsafe = substance.unsafeInteractions || (substance.interactions && substance.interactions.unsafe) || [];
-                    const dangerous = substance.dangerousInteractions || (substance.interactions && substance.interactions.dangerous) || [];
-
-                    setPills(cautionEl, uncertain);
-                    setPills(dangerEl, unsafe);
-                    setPills(severeEl, dangerous);
-                }
-
-				if (event.key == "ArrowDown") {
-					index += 1
-					if (index > children.length - 1) {
-						index = 0
-					}
-					children[index].classList.add("Selected")
-				}
-
-				if (event.key == "ArrowUp") {
-					index -= 1
-					if (index < 0) {
-						index = children.length - 1
-					}
-					children[index].classList.add("Selected")
-				}
-
-				if (event.key == "Enter") {
-                    document.getElementById("input").value = children[index].textContent;
-                    search();
-				}
-			})
-        }
-
-
-        let chart;
-        let currentSubstance = null;
-        let currentCommonDose = null;
-        let addedDoses = []; 
-
-        function setPills(container, items) {
-            try {
-                const containerEl = typeof container === 'string' ? document.querySelector(container) : container;
-                if (!containerEl) return;
-                containerEl.innerHTML = '';
-
-                if (!items || !items.length) return;
-
-                items.forEach(it => {
-                    const name = (typeof it === 'string') ? it : (it && it.name) ? it.name : null;
-                    if (!name) return;
-                    const span = document.createElement('span');
-                    span.className = 'pill';
-                    span.textContent = name;
-                    containerEl.appendChild(span);
-                });
-            } catch (e) {
-                console.error('setPills error', e);
-            }
-        }
-
-        function renderInteractionCategories(substance) {
-            if (!substance) return;
-
-            const cautionEl = document.querySelector('.cat-caution .pills') || document.querySelector('.infocard1 .pills');
-            const dangerEl = document.querySelector('.cat-danger .pills');
-            const severeEl = document.querySelector('.cat-severe .pills');
-
-            const uncertain = substance.uncertainInteractions || (substance.interactions && substance.interactions.uncertain) || [];
-            const unsafe = substance.unsafeInteractions || (substance.interactions && substance.interactions.unsafe) || [];
-            const dangerous = substance.dangerousInteractions || (substance.interactions && substance.interactions.dangerous) || [];
-
-            setPills(cautionEl, uncertain);
-            setPills(dangerEl, unsafe);
-            setPills(severeEl, dangerous);
-        }
-
-        // Simple helper: append a single <span class="pill"> to each category.
-        function addSpanToCategoryBySelector(categorySelector, text) {
-            const el = document.querySelector(categorySelector + ' .pills') || document.querySelector(categorySelector + '');
-            if (!el) return false;
-            const span = document.createElement('span');
-            span.className = 'pill';
-            span.textContent = text;
-            el.appendChild(span);
-            return true;
-        }
-
-        function addSpanToAll(cautionText, dangerText, severeText) {
-            // Try explicit selectors first, fall back to ordering of .pills containers
-            let ok1 = addSpanToCategoryBySelector('.cat-caution', cautionText);
-            let ok2 = addSpanToCategoryBySelector('.cat-danger', dangerText);
-            let ok3 = addSpanToCategoryBySelector('.cat-severe', severeText);
-
-            if (ok1 && ok2 && ok3) return;
-
-            const pills = Array.from(document.querySelectorAll('.pills'));
-            if (!pills.length) return;
-
-            if (!ok1 && pills[0]) {
-                const s = document.createElement('span'); s.className='pill'; s.textContent = cautionText; pills[0].appendChild(s);
-            }
-            if (!ok2 && pills[1]) {
-                const s = document.createElement('span'); s.className='pill'; s.textContent = dangerText; pills[1].appendChild(s);
-            }
-            if (!ok3 && pills[2]) {
-                const s = document.createElement('span'); s.className='pill'; s.textContent = severeText; pills[2].appendChild(s);
-            }
-        }
-
-        // Demo helper: call from console or wire to a button
-        function addDemoPills() {
-            addSpanToAll('Demo - Caution', 'Demo - Dangerous', 'Demo - Severe');
-        }
-
-        function fetchGraphQL(query) {
-            const url = "https://api.psychonautwiki.org";
-            return fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query })
-            }).then(r => r.json());
-        }
-
-        async function getData(substanceName) {
-            const query = `
-            {
-                substances(query: "${substanceName}") {
-                    name
-                    images{thumb}
-                    summary
-                    addictionPotential
-                    uncertainInteractions{name}
-				    unsafeInteractions{name}
-				    dangerousInteractions{name}
-
-                    roas {
-                        name
-                        duration {
-                            onset { min max units }
-                            comeup { min max units }
-                            peak { min max units }
-                            offset { min max units }
-                        }
-                        dose {
-                                units
-                                common {
-                                    min
-                                }
-                        }
-                    }
-                }
-            }`;
-            return fetchGraphQL(query);
-        }
-
-	function DurationsIntoHour(duration) {
-        let value;
-
-		if (duration.units == "minutes") {
-			value = ((duration.min + duration.max) / 2) / 60
-		} else {
-			value = ((duration.min + duration.max) / 2)
-		}
-
-        return Math.round(value * 2) / 2;
-        
-		}
-
-    function renderInfoCard(substance) {
-        const infocard = document.querySelector('.infocard') || document.getElementById('infoCard');
-        if (!infocard) return;
-
-        const imgUrl = substance?.images?.[0]?.thumb || '';
-        const summary = substance?.summary || 'No summary available.';
-        const addiction = substance?.addictionPotential ?? 'Unknown';
-
-        infocard.innerHTML = `
-            <div class="infocard-inner">
-                ${imgUrl ? `<img src="${imgUrl}" alt="${substance.name} image" style="max-width:100%;border-radius:8px;margin-bottom:8px;">` : ''}
-                <h3 style="margin:0 0 8px 0;color:#dbadff">${substance.name}</h3>
-                <div class="summary" style="font-size:14px;color:#ddd;margin-bottom:8px;">${summary}</div>
-                <div class="addiction" style="font-size:13px;color:#bbb">Addiction potential: <strong>${addiction}</strong></div>
-            </div>
-        `;
-    }
-
-		var units = ""
-
-		let onset = 0
-		let comeup = 0
-		let peak = 0
-		let offset = 0
-
-        async function search() {
-            const substanceName = document.getElementById("input").value.trim();
-            const status = document.getElementById("status");
-
-            if (!substanceName) return;
-
-            document.getElementById("sug").style.visibility = "collapse";
-            document.getElementById("sug").style.visibility = "collapse";
-
-            status.textContent = "Loading...";
-            const result = await getData(substanceName);
-            console.log("RAW RESPONSE:", result);
-
-            const substance = result?.data?.substances?.[0];
-            if (!substance) {
-                status.textContent = "No data found.";
-                return;
-            }
-
-            const duration = substance.roas?.[0]?.duration;
-            const dosage = substance.roas?.[0]?.dose;
-            units = dosage.units
-            
-            if (!duration) {
-                status.textContent = "No duration data.";
-                return;
-            }
-
-            const commonDose = dosage?.common?.min;
-            if (!commonDose) {
-                status.textContent = "No common dose data found for this substance.";
-                return;
-            }
-
-            currentSubstance = substance;
-            currentCommonDose = commonDose;
-            addedDoses = [];
-
-            onset = DurationsIntoHour(duration.onset)
-            comeup = DurationsIntoHour(duration.comeup)
-            peak = DurationsIntoHour(duration.peak)
-            offset = DurationsIntoHour(duration.offset)
-
-            status.textContent = `Loaded: ${substance.name} (common dose: ${commonDose})`;
-            document.getElementById("dosePanel").style.display = "flex";
-            document.getElementById("multiplierInfo").style.display = "none";
-            renderInfoCard(substance);
-            renderInteractionCategories(substance);
-
-            if (chart) chart.destroy();
-        }
-
-	function DurationsIntoPoints(steps = 10) {
-		doseStartHour = document.querySelector("#doseStartHour").value
-
-		let currentX = 0
-		if (doseStartHour != "") {
-			currentX = parseFloat(doseStartHour)
-		} else {
-			let now = new Date()
-			currentX = now.getHours() + now.getMinutes() / 60
-		}
-
-        intensityMultiplier = document.querySelector("#doseInput").value / currentCommonDose
-
-        xPoints = []
-        yPoints = []
-        
-        incrementalNum = 0.05
-
-		for (i=incrementalNum;i<=onset + 1e-9;i+=incrementalNum) {
-            xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push(0)
-		}
-		currentX += onset
-
-		for (i=incrementalNum;i<=comeup + 1e-9;i+=incrementalNum) {
-            xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push((i/comeup)*100*intensityMultiplier)
-
-		}
-		currentX += comeup
-        
-		for (i=incrementalNum;i<=peak + 1e-9;i+=incrementalNum) {
-            xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push(100*intensityMultiplier)
-		}
-		currentX += peak
-
-		for (i=incrementalNum;i<=offset + 1e-9;i+=incrementalNum) {
-            xPoints.push(Number(currentX+i).toFixed(2))
-            yPoints.push((1-(i/offset))*100*intensityMultiplier)
-		}
-
-        xPoints.push(Number(currentX+offset).toFixed(2))
-        yPoints.push(0);
-
-		return {xPoints: xPoints, yPoints: yPoints}
-	}
-
-	function addDose() {
-		let {xPoints, yPoints} = DurationsIntoPoints()
-        addedDoses.push({
-			x: xPoints,
-			y: yPoints,
-		})
-
-        dosesDiv = document.getElementById("doses")
-		time = document.querySelector("#doseStartHour").value
-
-		if (time == "") {
-			const now = new Date();
-			const hours = String(now.getHours()).padStart(2, "0");
-			const minutes = String(now.getMinutes()).padStart(2, "0");
-
-			time = `${hours}:${minutes}`;
-		} else {
-			time = formatTime(time)
-		}
-
-        newDoseDiv = document.createElement("div")
-        newDoseDiv.id = "dose"
-        newDoseDiv.innerHTML = ` 
-        <p id="consTime" class="drugT">${time}</p>
-        <p id="drugname" class="drugT">${currentSubstance.name}</p>
-        <p id="drugdose" class="drugT">${document.querySelector("#doseInput").value} ${units}</p>
-       
-        <input type="hidden" class="doseNumber" value='${dosesDiv.querySelectorAll(".dose").length+1}'>
-        <div id="delete" onclick="DeleteDose(this)"> 
-        <p class="closebtn">Delete</p> 
-        </div>
-        `
-        dosesDiv.appendChild(newDoseDiv)
-
-		if (chart) {
-			Plotly.purge('myPlot');
-		}
-		drawChart()
-	}
-
-    function DeleteDose(button) {
-        doses = button.parentElement.parentElement.querySelectorAll("#dose")
-
-        indexValue = button.parentElement.querySelector(".doseNumber").value;
-        addedDoses.splice(indexValue-1, 1);
-        button.parentElement.remove();
-        
-        if (doses.length == 1) {
-            Plotly.purge('myPlot');;
-            return
-        }
-
-        if (chart) {
-			Plotly.purge('myPlot');;
-		}
-		drawChart()
-    }
-
-    function formatTime(value) {
-        if (value.includes(":")) {
-            return value;
-        }
-
-        let hours = Math.floor(value);
-        let minutes = Math.round((value - hours) * 60);
-
-        
-        if (minutes === 60) {
-            hours += 1;
-            minutes = 0;
-        }
-
-        return `${hours}:${minutes.toString().padStart(2, "0")}`;
-}
-	
-    
-	
-	function drawChart() {
-        var allX = [];
-        addedDoses.forEach(dose => 
-        {
-            dose.x.forEach(x => {
-                if (!allX.includes(x)) {
-                    allX.push(x);
-               }
-            })
-        }
-        );
-
-		allTimeX = []
-		allX.forEach(x => {
-			let num = Number(x) % 24;
-
-			let hours = Math.floor(num);
-			let minutes = Math.round((num - hours) * 60);
-
-			let finalX = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-
-			allTimeX.push(finalX);
-		});
-
-        
-        var combinedY = [];
-        allX.forEach(x => {
-            yTotal = 0;
-            addedDoses.forEach(dose => {
-                if (dose.x.includes(x)) {
-                    yTotal += dose.y[dose.x.indexOf(x)];
-                }
-            });
-            combinedY.push(yTotal);
-        });
-
-
-        let minX = Math.floor(Math.min(...allX));
-        let maxX = Math.ceil(Math.max(...allX));
-        let tickVals = [];
-        for (let h = minX; h <= maxX; h++) {
-            tickVals.push(h);
-        }
-
-        let tickText = tickVals.map(x => {
-            let wrapped = x % 24;
-            let hour = Math.floor(wrapped);
-            let min = Math.round((wrapped - hour) * 60);
-            return hour.toString().padStart(2,'0') + ':' + min.toString().padStart(2,'0');
-        });
-
-
-        
-        var trace = {
-            x: allX,
-            y: combinedY,
-            mode: 'lines+markers',
-            type: 'scatter',
-            name: 'Combined Y-values',
-
-			hovertext: allTimeX,
-			hovertemplate: "Time: %{hovertext}<br>Intensity: %{y}<extra></extra>",
-        
-            line: {
-                color: 'rgb(107, 51, 150)',
-                width: 5,
-                dash: 'solid'
-            },
-             marker: {
-                size: 1,
-                color: 'rgb(139, 71, 192)',
-                opacity: 0.5,
-                symbol: 'circle' 
-               
-            },
-            fill: 'tozeroy', 
-            fillcolor: 'rgba(140, 71, 192, 0.47)', 
-            
-        };
-		
-        
-        
-		var layout = {
-			template: "simple_white",
-			margin: { t: 30, r: 20, b: 40, l: 40 },
-            
-            yaxis: {
-				automargin: true,
-			},
-
-            xaxis: {
-                automargin: true,
-                tickmode: 'array',
-                tickvals: tickVals,
-                ticktext: tickText,
-            },
-            
-            font: {
-                family: 'nerd',
-                size: 24,
-                color: '#fff'
-            },
-
-            paper_bgcolor: '#0a0a0a',
-            plot_bgcolor: '#0a0a0a',
-             
-        };
-
-        Plotly.newPlot('myPlot', [trace], layout, {modeBarButtonsToRemove: ['zoom2d', 'hoverClosestGl2d', 'hoverClosestPie', 'toggleSpikelines', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d']}), 
-        {
-            title: 'Combined Graph (Y-values summed)',
-        };
-	}
-    async function saveChart() {
-        data = {
-            DrugName: currentSubstance.name,
-			Unit: units,
-            Doses: [],
-        }
-        
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-
-        doses = document.querySelector("#doses").querySelectorAll("#dose")
-        for (let i=0;i<doses.length;i++) {
-            dose = doses[i]
-			hourMin = dose.querySelector("#consTime").textContent
-			const DateTaken = new Date(`${year}-${month}-${day}T${hourMin}:00`);
-
-            data.Doses.push({
-				Time: DateTaken.toISOString(),
-                DoseAmount: dose.querySelector("#drugdose").textContent.trim().split(" ")[0],
-                Unit: dose.querySelector("#drugdose").textContent.trim().split(" ")[1],
-                Method: dose.querySelector("#drugMethod").textContent.trim()
-            })
-        }
-
-        const json = JSON.stringify(data, null, 2);
-
-		const res = await fetch("/sub/saveData", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: json
-		})
-
-		if (res.ok) {
-			console.log("Succesfully saved data to acc")
-			
-		}
-    }
-        </script>
 
     
-<svg id="js-plotly-tester" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="position: absolute; left: -10000px; top: -10000px; width: 9000px; height: 9000px; z-index: 1;"><path class="js-reference-point" d="M0,0H1V1H0Z" style="stroke-width: 0px; fill: black;"></path></svg><style type="text/css"></style></body></html>
+  </aside>
+
+    <section id="substanceInfo" class="glass rounded-sm p-4 sm:p-6 order-5 xl:order-none xl:col-start-3 xl:row-start-1 xl:sticky xl:top-20 xl:min-h-[calc(100vh-7rem)]">
+      <div class="flex items-center gap-4 mb-4">
+        <img id="substanceImage" alt="Lisdexamfetamine reference" class="w-20 h-20 object-contain flex-none" src="https://psychonautwiki.org/w/thumb.php?f=Lisdexamfetamine.svg&amp;width=200">
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Selected substance</p>
+          <h3 id="substanceName" class="font-display text-base font-semibold">Lisdexamfetamine</h3>
+        </div>
+      </div>
+      <p id="substanceSummary" class="text-[#fff] text-sm leading-relaxed mb-6 p-3 border border-[var(--line)] bg-[var(--bg)]">Summary sheet: Lisdexamfetamine Lisdexamfetamine</p>
+      <p class="text-lg text-[var(--muted)] mb-6 pb-4 border-b-2 border-[var(--line)]">Addiction potential:<br><strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>
+      <div class="space-y-7">
+        <div><p class="text-base text-amber-300 mb-2">Caution</p><div data-interaction="caution"><span class="pill">Alcohol</span><span class="pill">GHB</span><span class="pill">GBL</span><span class="pill">Opioids</span><span class="pill">Cocaine</span><span class="pill">Cannabis</span><span class="pill">Caffeine</span><span class="pill">Ketamine</span><span class="pill">Methoxetamine</span><span class="pill">Psychedelics</span></div></div>
+        <div><p class="text-base text-orange-400 mb-2">Dangerous</p><div data-interaction="danger"><span class="pill">DXM</span><span class="pill">PCP</span><span class="pill">25x-NBOMe</span><span class="pill">2C-T-x</span><span class="pill">5-MeO-xxT</span><span class="pill">DOx</span></div></div>
+        <div><p class="text-base text-red-400 mb-2">Severe / do not combine</p><div data-interaction="severe"><span class="pill">Tramadol</span><span class="pill">aMT</span><span class="pill">MAOIs</span></div></div>
+      </div>
+    </section>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite">Immediate release dose added.</div>
+<script type="module" src="./ui.js"></script>
+
+
+<svg id="js-plotly-tester" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="position: absolute; left: -10000px; top: -10000px; width: 9000px; height: 9000px; z-index: 1;"><path class="js-reference-point" d="M0,0H1V1H0Z" style="stroke-width: 0px; fill: black;"></path></svg></body></html>

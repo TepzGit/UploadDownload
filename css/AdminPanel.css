@@ -1,46 +1,68 @@
-body {
-	background: #000000
-}
+/* Admin pages (html/AdminPanel.html, html/AdminPanelCreateUser.html).
+   Cards, buttons, inputs and the background come from oled.css. */
 
-.AdminPanelOptions {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	width: fit-content;
-	margin: 100px auto;
-}
+.xn-page.ad { max-width: 640px; }
 
+.AdminPanelOptions { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
 .AdminPanelOption {
-	margin: 5px 0 5px 0;
-	width: 500px;
-	font-family: nerd, sans-serif;
-	display: inline-block;
-	position: relative;
-	padding: 10px 20px;
-	border-radius: 7px;
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	border-top-color: rgba(255, 255, 255, 0.12);
-	border-right-color: rgba(255, 255, 255, 0.12);
-	border-bottom-color: rgba(255, 255, 255, 0.12);
-	border-left-color: rgba(255, 255, 255, 0.12);
-	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 28px 80px rgba(0, 0, 0, 0.55);
-	font-size: 14px;
-	font-weight: 600;
-	background: rgba(10,10,10,0.98);
-	color: #ddd;
-	overflow: hidden;
-	-webkit-transition: all 0.2s ease-in;
-	-moz-transition: all 0.2s ease-in;
-	transition: all 0.2s ease-in;
-	cursor: pointer;
-	text-decoration: none;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid var(--oled-line);
+  border-radius: 2px;
+  background: var(--oled-surface-2);
+  color: var(--oled-text);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
+@media (hover: hover) { .AdminPanelOption:hover { border-color: var(--oled-accent); background: #16161b; } }
+.AdminPanelOption:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.ad-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(166, 124, 255, 0.25);
+  border-radius: 2px;
+  background: var(--oled-accent-soft);
+  color: var(--oled-accent);
+}
+.ad-ico svg,
+.ad-chev {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ad-chev { width: 18px; height: 18px; color: var(--oled-muted); }
+.ad-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ad-text strong { font-size: 14px; font-weight: 600; }
+.ad-text span { font-size: 11px; color: var(--oled-muted); }
 
-.AdminPanelOption:hover {
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
-  -webkit-transition: all 0.2s ease-out;
-  -moz-transition: all 0.2s ease-out;
-  transition: all 0.2s ease-out;
-  border-color: rgba(255, 255, 255, 0.623);
+.ad-back {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--oled-muted);
+  text-decoration: none;
 }
+@media (hover: hover) { .ad-back:hover { color: var(--oled-text); } }
+.ad-form { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+.ad-form .xn-btn { margin-top: 4px; }
+.ad-result {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 2px;
+  background: rgba(74, 222, 128, 0.08);
+  color: #bbf7d0;
+  font-size: 12px;
+}
+.ad-result.is-error { border-color: #f8717155; background: rgba(248, 113, 113, 0.08); color: #fca5a5; }

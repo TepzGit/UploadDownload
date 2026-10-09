@@ -1,168 +1,193 @@
-<html><head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>Profile</title>
-        <meta name="description" content="User profile page with medication intake summary and totals.">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="profile.css">
-    </head>
-    <body>
-        <div id="container">
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Profile · Geek⁴u</title>
+  <meta name="description" content="User profile page with medication intake summary and totals.">
+  <link rel="stylesheet" href="/profile.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
 
-            <div class="popup" id="AP" style="display: flex;">
-                <div class="popcase">
-  <h1>Apperance</h1>
-  <div class="APcontent">
-  <h2>Substance graph colors:</h2>
-  <div id="drugcolor">
-       <p>Pregabalin</p>  <input type="color">   
-  </div>
-  <div id="drugcolor">
-       <p>lisdex</p>  <input type="color">   
-  </div>
-  <div id="drugcolor">
-       <p>lsd</p>  <input type="color">   
-  </div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pill" viewBox="0 0 16 16"><path fill="currentColor" d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"/></symbol>
+</svg>
+
+<main class="xn-page pf" id="container">
+  <section class="xn-card pf-head" id="header">
+    <div id="profile-pic" class="profile-avatar">
+      <img src="https://i.pinimg.com/736x/86/b5/34/86b53487e37122210591af58182596fb.jpg" alt="Profile picture">
+      <div class="avatar-overlay"><span>Edit</span></div>
     </div>
-  <a role="button" id="CSA" class="btn">Close</a>
-                </div>
-            </div>
-            
-            <div class="popup" id="DT" style="display: none;">
-                <div class="popcase">
-                    <h1>Data Settings</h1>
-  <div class="content">
-                     <a class="btn">Import Data</a>
-                     <a class="btn">Clear</a>
+    <div class="pf-who">
+      <p class="xn-eyebrow">Profile</p>
+      <h1 class="xn-h1" id="username">{{.Username}}</h1>
     </div>
-  <a role="button" class="btn" id="CSD">Done</a>
-                </div>
-            </div>
-
-            <div class="popup" id="PR">
-                <div class="popcase">
-                    <h1>pr</h1>
-                    <a role="button" id="CSP">Close</a>
-                </div>
-            </div>
-    <div id="options">
-  <a href="#" onclick="history.back(); return false;" class="option" id="back">Back</a>
-     <div id="middle">
-
-        <a role="button" class="option" id="APB">Apearance</a>
-        <a role="button" class="option" id="DTB">Data</a> 
-        <a role="button" class="option" id="PRB">Preferences</a>
+    <div class="pf-actions" id="options">
+      <button type="button" class="xn-btn option" id="APB">Appearance</button>
+      <button type="button" class="xn-btn option" id="DTB">Data</button>
+      <button type="button" class="xn-btn option" id="PRB">Preferences</button>
+      <form method="post" action="/logout" class="pf-signout"><button type="submit" class="xn-btn">Sign out</button></form>
     </div>
-  <a id="home" href="/"><svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 48 48" fill="#ffffff" width="32" height="32">
-<path d="M39.5,43h-9c-1.381,0-2.5-1.119-2.5-2.5v-9c0-1.105-0.895-2-2-2h-4c-1.105,0-2,0.895-2,2v9c0,1.381-1.119,2.5-2.5,2.5h-9	C7.119,43,6,41.881,6,40.5V21.413c0-2.299,1.054-4.471,2.859-5.893L23.071,4.321c0.545-0.428,1.313-0.428,1.857,0L39.142,15.52	C40.947,16.942,42,19.113,42,21.411V40.5C42,41.881,40.881,43,39.5,43z"></path>
-</svg></a>
-    </div>
-            <div id="profile">
-                <div id="header">
-                    <h1 id="username">test</h1>
-                    <div id="profile-pic" class="profile-avatar">
-                        <img src="https://i.pinimg.com/736x/86/b5/34/86b53487e37122210591af58182596fb.jpg" alt="Profile Picture">
-                        <div class="avatar-overlay">
-                            <span>Edit</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="profile-data">
-                <div id="dataa">
-  
-                    <h1 id="title">intake:</h1>
-                    <div id="intake">
+  </section>
 
-					{{range .RecentIntakes}}
-                    <div id="item">
-						<p id="textt">{{.Amount}}{{.Unit}} {{.DrugName}}</p><p id="textt">{{.TimeAgo}}</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
-                        <path d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"></path>
-                        </svg>
-                    </div>
-                    {{end}}
-
-                </div></div>
-
-                <div id="dataa">
-  
-                    <h1 id="title">Totals:</h1>
-                    <div id="intake">
-
-                    {{range $key, $value := .Totals}}
-                    <div id="item">
-                        <p id="textt">{{$key}}</p><p id="textt">total: {{$value.DisplayTotal}}{{$value.Unit}}</p><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-capsule-pill" viewBox="0 0 16 16">
-                        <path d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"></path>
-                        </svg>
-                    </div>
-                    {{end}}
- 
-
-                </div></div>
-        
-                </div>
-                    
-            </div>
-            
+  <div class="pf-grid" id="profile-data">
+    <section class="xn-card pf-box">
+      <div class="pf-box-head">
+        <h2 class="xn-h2">Recent intake</h2>
+        <span class="pf-note">Last 10 doses</span>
+      </div>
+      <div class="pf-rows" id="intake">
+        {{range .RecentIntakes}}
+        <div class="pf-row">
+          <span class="pf-ico"><svg aria-hidden="true"><use href="#i-pill"/></svg></span>
+          <span class="pf-main">
+            <strong>{{.DrugName}}</strong>
+            <span>{{.Amount}} {{.Unit}}{{if .Method_way}} · {{.Method_way}}{{end}}</span>
+          </span>
+          <span class="pf-when">{{.TimeAgo}}</span>
         </div>
-    
-<style type="text/css"></style>
+        {{else}}
+        <p class="xn-empty">No doses logged yet. Add some on the <a href="/">Graph</a> page.</p>
+        {{end}}
+      </div>
+    </section>
 
+    <section class="xn-card pf-box">
+      <div class="pf-box-head">
+        <h2 class="xn-h2">Totals</h2>
+        <span class="pf-note">From the last 10 doses</span>
+      </div>
+      <div class="pf-rows">
+        {{range $key, $value := .Totals}}
+        <div class="pf-row">
+          <span class="pf-ico"><svg aria-hidden="true"><use href="#i-pill"/></svg></span>
+          <span class="pf-main"><strong>{{$key}}</strong><span>total</span></span>
+          <span class="pf-total">{{$value.DisplayTotal}} {{$value.Unit}}</span>
+        </div>
+        {{else}}
+        <p class="xn-empty">Totals show up once you've logged a dose.</p>
+        {{end}}
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="popup" id="AP" role="dialog" aria-modal="true" aria-labelledby="APtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="APtitle">Appearance</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="APcontent">
+      <span class="xn-label">Substance graph colors</span>
+      <label class="drugcolor"><span>Pregabalin</span><input type="color" value="#a67cff"></label>
+      <label class="drugcolor"><span>lisdex</span><input type="color" value="#4c51ff"></label>
+      <label class="drugcolor"><span>lsd</span><input type="color" value="#e85ce6"></label>
+    </div>
+    <button type="button" id="CSA" class="xn-btn xn-btn-primary pop-done">Close</button>
+  </div>
+</div>
+
+<div class="popup" id="DT" role="dialog" aria-modal="true" aria-labelledby="DTtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="DTtitle">Data settings</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="content">
+      <button type="button" class="xn-btn">Import data</button>
+      <button type="button" class="xn-btn xn-btn-danger">Clear</button>
+    </div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSD">Done</button>
+  </div>
+</div>
+
+<div class="popup" id="PR" role="dialog" aria-modal="true" aria-labelledby="PRtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="PRtitle">Preferences</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <p class="xn-empty">Nothing to set here yet.</p>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSP">Close</button>
+  </div>
+</div>
 
 <script>
-    const AP = document.getElementById("AP");
-    const DT = document.getElementById("DT");
-    const PR = document.getElementById("PR");
+  const AP = document.getElementById("AP");
+  const DT = document.getElementById("DT");
+  const PR = document.getElementById("PR");
 
-    const openAP = document.getElementById("APB");
-    const openDT = document.getElementById("DTB");
-    const openPR = document.getElementById("PRB");
+  const openAP = document.getElementById("APB");
+  const openDT = document.getElementById("DTB");
+  const openPR = document.getElementById("PRB");
 
-    const closeBtnA = document.getElementById("CSA");
-    const closeBtnD = document.getElementById("CSD");
-    const closeBtnP = document.getElementById("CSP");
+  const closeBtnA = document.getElementById("CSA");
+  const closeBtnD = document.getElementById("CSD");
+  const closeBtnP = document.getElementById("CSP");
 
-    const popupTransitionMs = 240;
+  const popupTransitionMs = 240;
+  let openPopup = null;
+  let opener = null;
 
-    function showPopup(popup) {
-        popup.style.display = "flex";
-        requestAnimationFrame(() => {
-            popup.classList.add("active");
-        });
-    }
+  function showPopup(popup) {
+    opener = document.activeElement;
+    openPopup = popup;
+    popup.style.display = "flex";
+    document.documentElement.classList.add("xn-modal-open");
+    requestAnimationFrame(() => {
+      popup.classList.add("active");
+      popup.querySelector(".pop-done").focus({ preventScroll: true });
+    });
+  }
 
-    function hidePopup(popup) {
-        popup.classList.remove("active");
-        setTimeout(() => {
-            popup.style.display = "none";
-        }, popupTransitionMs);
-    }
+  function hidePopup(popup) {
+    popup.classList.remove("active");
+    openPopup = null;
+    document.documentElement.classList.remove("xn-modal-open");
+    setTimeout(() => {
+      if (!popup.classList.contains("active")) popup.style.display = "none";
+    }, popupTransitionMs);
+    if (opener) opener.focus({ preventScroll: true });
+  }
 
-    openAP.onclick = (e) => {
-        e.preventDefault();
-        showPopup(AP);
-    };
+  openAP.onclick = () => showPopup(AP);
+  openDT.onclick = () => showPopup(DT);
+  openPR.onclick = () => showPopup(PR);
 
-    openDT.onclick = (e) => {
-        e.preventDefault();
-        showPopup(DT);
-    };
+  closeBtnA.onclick = () => hidePopup(AP);
+  closeBtnD.onclick = () => hidePopup(DT);
+  closeBtnP.onclick = () => hidePopup(PR);
 
-    openPR.onclick = (e) => {
-        e.preventDefault();
-        showPopup(PR);
-    };
-
-    closeBtnA.onclick = () => {
-        hidePopup(AP);
-    };
-
-    closeBtnD.onclick = () => {
-        hidePopup(DT);
-    };
-
-    closeBtnP.onclick = () => {
-        hidePopup(PR);
-    };
+  [AP, DT, PR].forEach((popup) => {
+    popup.addEventListener("click", (e) => {
+      if (e.target === popup || e.target.closest("[data-close]")) hidePopup(popup);
+    });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && openPopup) hidePopup(openPopup);
+  });
 </script>
-<style type="text/css"></style><style type="text/css"></style><style type="text/css"></style></body><style type="text/css"></style></html>
+</body>
+</html>
