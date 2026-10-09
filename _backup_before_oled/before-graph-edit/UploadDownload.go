@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -145,26 +144,6 @@ CREATE TABLE IF NOT EXISTS liked_substances (
 	PRIMARY KEY(user_id, name),
 	FOREIGN KEY(user_id) REFERENCES users(id)
 );
-
-CREATE TABLE IF NOT EXISTS user_drug_color_settings (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	user_id INTEGER NOT NULL,
-	drug_id INTEGER NOT NULL,
-	color TEXT NOT NULL,
-	UNIQUE(user_id, drug_id),
-	FOREIGN KEY(user_id) REFERENCES users(id),
-	FOREIGN KEY(drug_id) REFERENCES drugs(id)
-);
-
-CREATE TABLE IF NOT EXISTS graph_experiences (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	user_id INTEGER NOT NULL,
-	started_at INTEGER NOT NULL,
-	updated_at INTEGER NOT NULL,
-	doses TEXT NOT NULL,
-	FOREIGN KEY(user_id) REFERENCES users(id)
-);
-CREATE INDEX IF NOT EXISTS graph_experiences_by_user ON graph_experiences(user_id, started_at);
 `
 
 // Profile pictures and banners live in profiles/<user id>/ and are served at /profiles/.
@@ -173,10 +152,6 @@ var ProfilePicturesDirName string = "profiles"
 const defaultProfilePic = "/profiles/Default/default.png"
 const maxPictureBytes = 6 << 20
 const maxLikes = 500
-
-// Graph sessions ("Experiences"): times are Unix milliseconds, the newest are kept.
-const maxExperiences = 300
-const maxExperienceDoses = 100
 
 var db *sql.DB
 
@@ -234,9 +209,6 @@ func main() {
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
 	http.HandleFunc("/profiles/", requireLogin(profileImage))
 	http.HandleFunc("/likes", requireLogin(likes))
-	// The Graph page is open to everyone, so this answers [] instead of redirecting when signed out.
-	http.HandleFunc("/graphColors", graphColors)
-	http.HandleFunc("/experiences", experiences)
 	http.HandleFunc("/sub/saveData", requireLogin(saveData))
 	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
 
@@ -311,10 +283,6 @@ func main() {
 	}
 	if _, err := db.Exec(profileSchema); err != nil {
 		panic("cannot create the liked substances table: " + err.Error())
-	}
-	// Keeps the name as PsychonautWiki writes it ("LSD"); drugs.name is lowercase.
-	if _, err := db.Exec("ALTER TABLE user_drug_color_settings ADD COLUMN display_name TEXT NOT NULL DEFAULT ''"); err != nil && !strings.Contains(err.Error(), "duplicate column") {
-		panic("cannot add the color name column: " + err.Error())
 	}
 	// Databases from before banners existed don't have the column yet.
 	if _, err := db.Exec("ALTER TABLE users ADD COLUMN pathToBanner TEXT NOT NULL DEFAULT ''"); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -2354,254 +2322,4 @@ func profilePicture(w http.ResponseWriter, r *http.Request) {
 	}
 	removeOwnPicture(old, uid)
 	writeJSON(w, map[string]string{"url": link})
-}
-
-var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
-
-// graphColors: GET lists the account's custom graph colors as [{name, color}],
-// POST {name, color} sets one, and an empty color goes back to the default.
-func graphColors(w http.ResponseWriter, r *http.Request) {
-	session, ok := sessionFromRequest(r)
-
-	switch r.Method {
-	case http.MethodGet:
-		type entry struct {
-			Name  string `json:"name"`
-			Color string `json:"color"`
-		}
-		out := []entry{}
-		if ok {
-			rows, err := db.Query(`
-			SELECT CASE WHEN c.display_name != '' THEN c.display_name ELSE d.name END, c.color
-			FROM user_drug_color_settings c
-			JOIN drugs d ON d.id = c.drug_id
-			WHERE c.user_id = ?
-			ORDER BY c.id DESC`, session.UserId)
-			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't load your colors.", http.StatusInternalServerError)
-				return
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var e entry
-				if err := rows.Scan(&e.Name, &e.Color); err == nil && hexColor.MatchString(e.Color) {
-					out = append(out, e)
-				}
-			}
-		}
-		writeJSON(w, out)
-
-	case http.MethodPost:
-		if !ok {
-			notSignedIn(w, r)
-			return
-		}
-		var in struct {
-			Name  string `json:"name"`
-			Color string `json:"color"`
-		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
-			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
-			return
-		}
-		name := cleanText(in.Name, 80)
-		if name == "" {
-			http.Error(w, "Pick a substance.", http.StatusBadRequest)
-			return
-		}
-		key := strings.ToLower(name)
-
-		if in.Color == "" {
-			_, err := db.Exec("DELETE FROM user_drug_color_settings WHERE user_id = ? AND drug_id = (SELECT id FROM drugs WHERE name = ?)", session.UserId, key)
-			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't save that.", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]string{"name": name, "color": ""})
-			return
-		}
-		if !hexColor.MatchString(in.Color) {
-			http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
-			return
-		}
-		color := strings.ToLower(in.Color)
-
-		if _, err := db.Exec("INSERT OR IGNORE INTO drugs (name) VALUES (?)", key); err != nil {
-			fmt.Println(err)
-			http.Error(w, "Couldn't save that.", http.StatusInternalServerError)
-			return
-		}
-		_, err := db.Exec(`INSERT INTO user_drug_color_settings (user_id, drug_id, color, display_name)
-			VALUES (?, (SELECT id FROM drugs WHERE name = ?), ?, ?)
-			ON CONFLICT(user_id, drug_id) DO UPDATE SET color = excluded.color, display_name = excluded.display_name`,
-			session.UserId, key, color, name)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Couldn't save that.", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]string{"name": name, "color": color})
-
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// One dose of a graph session, with the duration profile it was drawn
-// with so the curve can be redrawn without asking PsychonautWiki again.
-type experienceDose struct {
-	Substance    string  `json:"substance"`
-	Amount       float64 `json:"amount"`
-	Unit         string  `json:"unit"`
-	Formulation  string  `json:"formulation"`
-	ReleaseHours float64 `json:"releaseHours"`
-	Time         string  `json:"time"`
-	Profile      struct {
-		Base struct {
-			Onset  float64 `json:"onset"`
-			Comeup float64 `json:"comeup"`
-			Peak   float64 `json:"peak"`
-			Offset float64 `json:"offset"`
-		} `json:"base"`
-		CommonDose float64 `json:"commonDose"`
-	} `json:"profile"`
-}
-
-type experience struct {
-	ID        int64            `json:"id"`
-	StartedAt int64            `json:"startedAt"`
-	UpdatedAt int64            `json:"updatedAt"`
-	Doses     []experienceDose `json:"doses"`
-}
-
-var clockTime = regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
-
-func inRange(v, min, max float64) bool {
-	return !math.IsNaN(v) && v >= min && v <= max
-}
-
-// cleanExperienceDoses checks every field and drops what the graph could not draw.
-func cleanExperienceDoses(in []experienceDose) ([]experienceDose, bool) {
-	if len(in) == 0 || len(in) > maxExperienceDoses {
-		return nil, false
-	}
-	out := make([]experienceDose, 0, len(in))
-	for _, d := range in {
-		d.Substance = cleanText(d.Substance, 80)
-		d.Unit = cleanText(d.Unit, 12)
-		d.Formulation = cleanText(d.Formulation, 40)
-		b := d.Profile.Base
-		if d.Substance == "" || !clockTime.MatchString(d.Time) ||
-			!inRange(d.Amount, 0.000001, 1e6) || !inRange(d.ReleaseHours, 0, 48) ||
-			!inRange(d.Profile.CommonDose, 0.000001, 1e6) ||
-			!inRange(b.Onset, 0, 240) || !inRange(b.Comeup, 0, 240) || !inRange(b.Peak, 0, 240) || !inRange(b.Offset, 0, 240) {
-			return nil, false
-		}
-		out = append(out, d)
-	}
-	return out, true
-}
-
-// experiences: GET lists the account's graph sessions, newest first, as
-// {signedIn, items}. POST {id, startedAt, doses} saves one (id 0 = new) and
-// POST {id, delete: true} removes one.
-func experiences(w http.ResponseWriter, r *http.Request) {
-	session, ok := sessionFromRequest(r)
-
-	switch r.Method {
-	case http.MethodGet:
-		items := []experience{}
-		if ok {
-			rows, err := db.Query(`SELECT id, started_at, updated_at, doses FROM graph_experiences
-				WHERE user_id = ? ORDER BY started_at DESC, id DESC LIMIT ?`, session.UserId, maxExperiences)
-			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't load your experiences.", http.StatusInternalServerError)
-				return
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var e experience
-				var doses string
-				if err := rows.Scan(&e.ID, &e.StartedAt, &e.UpdatedAt, &doses); err != nil {
-					continue
-				}
-				if json.Unmarshal([]byte(doses), &e.Doses) == nil && len(e.Doses) > 0 {
-					items = append(items, e)
-				}
-			}
-		}
-		writeJSON(w, map[string]any{"signedIn": ok, "items": items})
-
-	case http.MethodPost:
-		if !ok {
-			notSignedIn(w, r)
-			return
-		}
-		var in struct {
-			experience
-			Delete bool `json:"delete"`
-		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 96<<10)).Decode(&in); err != nil {
-			http.Error(w, "Couldn't read that session.", http.StatusBadRequest)
-			return
-		}
-
-		if in.Delete {
-			if _, err := db.Exec("DELETE FROM graph_experiences WHERE id = ? AND user_id = ?", in.ID, session.UserId); err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't delete that.", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
-			return
-		}
-
-		doses, valid := cleanExperienceDoses(in.Doses)
-		if !valid {
-			http.Error(w, "That session has a dose the graph can't draw.", http.StatusBadRequest)
-			return
-		}
-		body, _ := json.Marshal(doses)
-		now := time.Now().UnixMilli()
-		started := in.StartedAt
-		if started <= 0 || started > now+86400000 {
-			started = now
-		}
-
-		saved := false
-		if in.ID > 0 {
-			res, err := db.Exec("UPDATE graph_experiences SET doses = ?, updated_at = ? WHERE id = ? AND user_id = ?",
-				string(body), now, in.ID, session.UserId)
-			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't save that session.", http.StatusInternalServerError)
-				return
-			}
-			n, _ := res.RowsAffected()
-			saved = n > 0
-		}
-		if !saved {
-			// New, or deleted on another device meanwhile: store it as a new one.
-			res, err := db.Exec("INSERT INTO graph_experiences (user_id, started_at, updated_at, doses) VALUES (?, ?, ?, ?)",
-				session.UserId, started, now, string(body))
-			if err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't save that session.", http.StatusInternalServerError)
-				return
-			}
-			in.ID, _ = res.LastInsertId()
-			db.Exec(`DELETE FROM graph_experiences WHERE user_id = ? AND id NOT IN
-				(SELECT id FROM graph_experiences WHERE user_id = ? ORDER BY started_at DESC, id DESC LIMIT ?)`,
-				session.UserId, session.UserId, maxExperiences)
-		} else {
-			db.QueryRow("SELECT started_at FROM graph_experiences WHERE id = ?", in.ID).Scan(&started)
-		}
-		writeJSON(w, experience{ID: in.ID, StartedAt: started, UpdatedAt: now, Doses: doses})
-
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
 }

@@ -57,7 +57,6 @@ function init() {
   initTracker();
   renderRecent();
   renderTracker();
-  initExperiences();
   loadCustomColors();
 }
 
@@ -75,7 +74,6 @@ async function loadCustomColors() {
     refreshChart();
     paintAddButton();
     renderTracker();
-    renderExperiences();
   } catch (_) {
     // Offline or old server: keep the default colors.
   }
@@ -117,7 +115,6 @@ function initConsent() {
     box.hidden = true;
     renderRecent();
     renderTracker();
-    experiencesConsentChanged();
   });
   document.getElementById("cookieDecline").addEventListener("click", () => {
     writeCookie(CONSENT_COOKIE, "no");
@@ -126,7 +123,6 @@ function initConsent() {
     box.hidden = true;
     renderRecent();
     renderTracker();
-    experiencesConsentChanged();
   });
 }
 
@@ -600,7 +596,6 @@ function bindEvents() {
     renderDoseList();
     refreshChart();
     renderTracker();
-    experienceChanged();
   });
 
   els.doseList.addEventListener("submit", (event) => {
@@ -617,7 +612,6 @@ function bindEvents() {
       renderDoseList();
       refreshChart();
       renderTracker();
-      experienceChanged();
       els.doseList.querySelector(`[data-edit-dose="${id}"]`)?.focus();
       showToast(`${dose.substance} dose updated.`);
     } catch (error) {
@@ -635,314 +629,6 @@ function bindEvents() {
 
   window.addEventListener("resize", () => plot.resizePlot("myPlot"));
   window.addEventListener("orientationchange", () => setTimeout(() => refreshChart(), 250));
-}
-
-// ------------------------------------------------------------
-// Experiences: every time the graph is used it is saved as a session
-// that can be opened again. Signed in, sessions are kept on the account
-// (/experiences); signed out, on this device after the cookie popup was
-// accepted.
-// ------------------------------------------------------------
-
-const EXP_KEY = "xn_experiences";
-const EXP_LOCAL_MAX = 100;
-let expMode = "loading"; // account | local | off
-let experiences = []; // newest first: { id, startedAt, updatedAt, doses }
-let activeExp = null; // the session on the timeline now: { id, startedAt }
-let expTimer = null;
-let expQueue = Promise.resolve();
-
-async function initExperiences() {
-  if (!document.getElementById("experiences")) return;
-  window.addEventListener("pagehide", flushExperience);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushExperience();
-  });
-  renderExperiences();
-  try {
-    const res = await fetch("/experiences", { headers: { Accept: "application/json" } });
-    if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
-      const data = await res.json();
-      if (data?.signedIn) {
-        expMode = "account";
-        experiences = Array.isArray(data.items) ? data.items : [];
-      }
-    }
-  } catch (_) {
-    // Offline or old server: fall back to this device.
-  }
-  if (expMode !== "account") {
-    expMode = hasConsent() ? "local" : "off";
-    experiences = readLocalExperiences();
-  }
-  renderExperiences();
-  // A dose added while the list was still loading.
-  if (logic.getState().addedDoses.length) experienceChanged();
-}
-
-function experiencesConsentChanged() {
-  if (expMode === "account" || expMode === "loading") return;
-  expMode = hasConsent() ? "local" : "off";
-  if (expMode === "off") {
-    try { localStorage.removeItem(EXP_KEY); } catch {}
-    experiences = [];
-    if (activeExp) activeExp.id = null;
-  } else {
-    experienceChanged(); // keep the timeline that is on screen now
-  }
-  renderExperiences();
-}
-
-function readLocalExperiences() {
-  if (!hasConsent()) return [];
-  try {
-    const list = JSON.parse(localStorage.getItem(EXP_KEY) || "[]");
-    if (!Array.isArray(list)) throw new Error("bad list");
-    return list
-      .filter((e) => e && typeof e.id === "string" && Number.isFinite(e.startedAt) && Array.isArray(e.doses) && e.doses.length)
-      .sort((a, b) => b.startedAt - a.startedAt);
-  } catch {
-    try { localStorage.removeItem(EXP_KEY); } catch {}
-    return [];
-  }
-}
-
-function writeLocalExperiences() {
-  try {
-    localStorage.setItem(EXP_KEY, JSON.stringify(experiences.slice(0, EXP_LOCAL_MAX)));
-  } catch {
-    showToast("This device is out of space, so this session wasn't saved.", true);
-  }
-}
-
-async function storeExperience(entry) {
-  if (expMode === "account") {
-    const res = await fetch("/experiences", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: entry.id || 0, startedAt: entry.startedAt, doses: entry.doses }),
-      keepalive: true,
-    });
-    if (res.status === 401) throw new Error("Log in again to keep saving your experiences.");
-    if (!res.ok) throw new Error((await res.text()).trim() || "This session couldn't be saved.");
-    return res.json();
-  }
-  const saved = {
-    id: entry.id || `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    startedAt: entry.startedAt,
-    updatedAt: Date.now(),
-    doses: entry.doses,
-  };
-  experiences = [saved, ...experiences.filter((e) => e.id !== saved.id)].sort((a, b) => b.startedAt - a.startedAt);
-  writeLocalExperiences();
-  return saved;
-}
-
-async function dropExperience(id) {
-  if (expMode === "account") {
-    const res = await fetch("/experiences", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, delete: true }),
-      keepalive: true,
-    });
-    if (res.status === 401) throw new Error("Log in again to change your experiences.");
-    if (!res.ok) throw new Error("That couldn't be deleted. Try again.");
-  }
-  experiences = experiences.filter((e) => e.id !== id);
-  if (expMode === "local") writeLocalExperiences();
-}
-
-/** Runs store writes one after another so a new session gets its id before the next save. */
-function queueExperience(task) {
-  expQueue = expQueue.then(task).catch((error) => showToast(error.message || "This session couldn't be saved.", true));
-  return expQueue;
-}
-
-/** Call after any change to the timeline; saves it a moment later. */
-function experienceChanged() {
-  clearTimeout(expTimer);
-  expTimer = setTimeout(flushExperience, 400);
-}
-
-/** Saves the timeline on screen now (the doses are read right away). */
-function flushExperience() {
-  clearTimeout(expTimer);
-  expTimer = null;
-  if (expMode !== "account" && expMode !== "local") return expQueue;
-  const doses = logic.snapshotDoses();
-  if (!doses.length && !activeExp) return expQueue;
-  if (!activeExp) activeExp = { id: null, startedAt: Date.now() };
-  const target = activeExp;
-  return queueExperience(async () => {
-    if (!doses.length) {
-      // Every dose was removed, so the session is gone too.
-      if (target.id) await dropExperience(target.id);
-      target.id = null;
-      if (activeExp === target) activeExp = null;
-    } else {
-      const saved = await storeExperience({ id: target.id, startedAt: target.startedAt, doses });
-      target.id = saved.id;
-      target.startedAt = saved.startedAt;
-      experiences = [saved, ...experiences.filter((e) => e.id !== saved.id)].sort((a, b) => b.startedAt - a.startedAt);
-    }
-    renderExperiences();
-  });
-}
-
-async function openExperience(id) {
-  await flushExperience();
-  const entry = experiences.find((e) => e.id === id);
-  if (!entry) return;
-  const doses = logic.loadDoses(entry.doses);
-  if (!doses.length) {
-    showToast("That session can't be drawn any more.", true);
-    return;
-  }
-  activeExp = { id: entry.id, startedAt: entry.startedAt };
-  logIdsByDose.clear(); // these doses were counted when they were first added
-  renderDoseList();
-  refreshChart();
-  renderRecent();
-  paintAddButton();
-  renderTracker();
-  showToast(`Opened your session from ${expDayLabel(entry.startedAt).toLowerCase()}.`);
-  if (window.matchMedia("(max-width: 1279px)").matches) {
-    document.getElementById("chartCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-}
-
-function expDayLabel(t) {
-  const day = startOfDay(t);
-  const today = startOfDay(Date.now());
-  if (day === today) return "Today";
-  if (day === startOfDay(today - DAY / 2)) return "Yesterday";
-  const d = new Date(t);
-  const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
-}
-
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-/** A tiny line per substance, scaled to the session's own peak. */
-function experienceSpark(preview, colors) {
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("class", "exp-spark");
-  svg.setAttribute("viewBox", "0 0 100 34");
-  svg.setAttribute("preserveAspectRatio", "none");
-  svg.setAttribute("aria-hidden", "true");
-  const base = document.createElementNS(SVG_NS, "line");
-  base.setAttribute("x1", "0");
-  base.setAttribute("x2", "100");
-  base.setAttribute("y1", "33");
-  base.setAttribute("y2", "33");
-  svg.appendChild(base);
-  preview.series.forEach((item, index) => {
-    const step = 100 / (item.y.length - 1);
-    const d = item.y
-      .map((value, i) => `${i ? "L" : "M"}${(i * step).toFixed(2)} ${(33 - (value / preview.peak) * 30).toFixed(2)}`)
-      .join("");
-    const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", d);
-    path.style.setProperty("--c", colors[index]);
-    svg.appendChild(path);
-  });
-  return svg;
-}
-
-function renderExperiences() {
-  const wrap = document.getElementById("experiences");
-  if (!wrap) return;
-  const list = wrap.querySelector("[data-exp-list]");
-  const note = wrap.querySelector("[data-exp-note]");
-  const count = wrap.querySelector("[data-exp-count]");
-  list.replaceChildren();
-  count.textContent = experiences.length ? String(experiences.length) : "";
-
-  note.hidden = true;
-  if (expMode === "off") {
-    note.hidden = false;
-    const undecided = readCookie(CONSENT_COOKIE) === null;
-    note.innerHTML = 'Your sessions aren\'t being saved. <a href="/Main?next=/">Log in</a> to keep them on your account' +
-      (undecided ? ", or accept the cookie popup to keep them on this device." : ".");
-  } else if (expMode === "local") {
-    note.hidden = false;
-    note.innerHTML = 'Saved on this device only. <a href="/Main?next=/">Log in</a> to keep them on your account.';
-  }
-
-  if (!experiences.length) {
-    if (expMode === "off") return;
-    const empty = el("p", "exp-empty", expMode === "loading" ? "Loading your experiences…" : "Each time you use the graph it's saved here, so you can open it again later.");
-    list.appendChild(empty);
-    return;
-  }
-
-  experiences.forEach((entry) => {
-    const preview = logic.previewTimeline(entry.doses);
-    if (!preview) return;
-    const colors = logic.previewColors(preview.names);
-    const times = entry.doses.map((d) => d.time).filter(Boolean).sort();
-    const first = times[0] || "";
-    const last = times[times.length - 1] || "";
-    const day = expDayLabel(entry.startedAt);
-    const doseWord = `${entry.doses.length} dose${entry.doses.length === 1 ? "" : "s"}`;
-
-    const item = el("div", "exp-item");
-    item.setAttribute("role", "listitem");
-    item.style.setProperty("--c", colors[0]);
-
-    const open = el("button", "exp-open");
-    open.type = "button";
-    open.setAttribute("aria-label", `Open session from ${day}, ${first}${last !== first ? ` to ${last}` : ""}: ${preview.names.join(", ")}, ${doseWord}`);
-    const top = el("span", "exp-top");
-    top.append(el("strong", "", day), el("span", "", last !== first ? `${first}–${last}` : first));
-    const subs = el("span", "exp-subs");
-    preview.names.forEach((name, index) => {
-      const tag = el("span");
-      const dot = el("i");
-      dot.style.setProperty("--c", colors[index]);
-      tag.append(dot, document.createTextNode(name));
-      subs.appendChild(tag);
-    });
-    const length = formatHours(preview.hours);
-    open.append(top, experienceSpark(preview, colors), subs, el("span", "exp-meta", length ? `${doseWord} · about ${length}` : doseWord));
-    open.addEventListener("click", () => openExperience(entry.id));
-
-    const del = el("button", "recent-del", "×");
-    del.type = "button";
-    const label = `Delete the session from ${day}${first ? ` at ${first}` : ""}`;
-    del.setAttribute("aria-label", label);
-    let armed = null;
-    const disarm = () => {
-      clearTimeout(armed);
-      armed = null;
-      del.classList.remove("is-confirm");
-      del.textContent = "×";
-      del.setAttribute("aria-label", label);
-    };
-    del.addEventListener("blur", disarm);
-    del.addEventListener("click", () => {
-      if (!armed) {
-        // First tap asks, second tap deletes.
-        del.classList.add("is-confirm");
-        del.textContent = "Delete?";
-        del.setAttribute("aria-label", `${label}? Tap again to delete`);
-        armed = setTimeout(disarm, 4000);
-        return;
-      }
-      disarm();
-      queueExperience(async () => {
-        await dropExperience(entry.id);
-        if (activeExp?.id === entry.id) activeExp = null;
-        renderExperiences();
-        showToast("Session deleted.");
-        document.querySelector("#experiences .exp-open, #experiences .exp-empty")?.focus?.();
-      });
-    });
-
-    item.append(open, del);
-    list.appendChild(item);
-  });
 }
 
 // ------------------------------------------------------------
@@ -1150,7 +836,6 @@ function handleAddDose() {
     renderTracker();
     renderDoseList();
     refreshChart();
-    experienceChanged();
     showToast(`${dose.formulation} dose added.`);
     // On phones the chart sits below the form, so bring it into view.
     if (window.matchMedia("(max-width: 1279px)").matches) {
@@ -1162,8 +847,6 @@ function handleAddDose() {
 }
 
 function handleReset() {
-  flushExperience(); // the timeline stays under Experiences
-  activeExp = null;
   logic.resetState();
   renderDoseList();
   plot.clearPlot("myPlot");
@@ -1172,7 +855,6 @@ function handleReset() {
   renderRecent(); // colors were reset, so hand them out again in recent-list order
   paintAddButton();
   renderTracker();
-  renderExperiences();
   showToast("Timeline reset.");
 }
 
@@ -1285,8 +967,7 @@ async function handleSave() {
   if (!addedDoses.length) return;
 
   // The journal stores one entry per substance, so send one request each.
-  // An opened experience keeps the day it happened on.
-  const now = activeExp?.startedAt ? new Date(activeExp.startedAt) : new Date();
+  const now = new Date();
   const bySubstance = new Map();
   addedDoses.forEach((dose) => {
     if (!bySubstance.has(dose.substance)) bySubstance.set(dose.substance, []);

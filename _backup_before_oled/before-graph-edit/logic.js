@@ -15,9 +15,7 @@ const state = {
   doseSequence: 0,
   addedDoses: [],
   baseDurations: { onset: 0, comeup: 0, peak: 0, offset: 0 },
-  currentRoa: null,
   substanceColors: {},
-  customColors: {}, // lowercased name -> color the account picked on Profile
 };
 
 /**
@@ -81,7 +79,6 @@ export async function fetchSubstanceData(name) {
                     comeup { min max units }
                     peak { min max units }
                     offset { min max units }
-                    total { min max units }
                 }
                 dose { units common { min } }
             }
@@ -99,7 +96,6 @@ export async function fetchSubstanceData(name) {
   }
 
   state.currentSubstance = substance;
-  state.currentRoa = roa;
   state.currentCommonDose = Number(roa.dose.common.min);
   state.units = roa.dose.units || "";
   state.baseDurations = {
@@ -111,7 +107,6 @@ export async function fetchSubstanceData(name) {
 
   return {
     substance,
-    roa,
     commonDose: state.currentCommonDose,
     units: state.units,
     durations: state.baseDurations,
@@ -147,14 +142,13 @@ export function currentTimeValue() {
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
-/** profile = the substance's { base, commonDose }; defaults to the one loaded now. */
-export function buildDoseCurve(startHour, doseAmount, releaseHours, profile = currentProfile()) {
-  const intensity = doseAmount / profile.commonDose;
+export function buildDoseCurve(startHour, doseAmount, releaseHours) {
+  const intensity = doseAmount / state.currentCommonDose;
   const adjusted = {
-    onset: profile.base.onset + releaseHours * 0.15,
-    comeup: profile.base.comeup + releaseHours * 0.25,
-    peak: profile.base.peak + releaseHours * 0.45,
-    offset: profile.base.offset + releaseHours * 0.15,
+    onset: state.baseDurations.onset + releaseHours * 0.15,
+    comeup: state.baseDurations.comeup + releaseHours * 0.25,
+    peak: state.baseDurations.peak + releaseHours * 0.45,
+    offset: state.baseDurations.offset + releaseHours * 0.15,
   };
   const total = Object.values(adjusted).reduce((sum, value) => sum + value, 0);
   const step = Math.max(0.05, total / 650);
@@ -209,10 +203,6 @@ function interpolateDose(dose, point) {
   return dose.y[left] + (dose.y[right] - dose.y[left]) * progress;
 }
 
-function currentProfile() {
-  return { base: { ...state.baseDurations }, commonDose: state.currentCommonDose };
-}
-
 // ------------------------------------------------------------
 // State mutation — required functions
 // ------------------------------------------------------------
@@ -237,9 +227,7 @@ export function addDoseToState({ amount, time, formulation }) {
   }
 
   const doseTime = time || currentTimeValue();
-  // Kept on the dose so it can be redrawn after an edit, even once another substance is loaded.
-  const profile = currentProfile();
-  const curve = buildDoseCurve(timeToHours(doseTime), numericAmount, formulation.releaseHours, profile);
+  const curve = buildDoseCurve(timeToHours(doseTime), numericAmount, formulation.releaseHours);
 
   const dose = {
     id: ++state.doseSequence,
@@ -252,113 +240,10 @@ export function addDoseToState({ amount, time, formulation }) {
     releaseHours: formulation.releaseHours,
     substance: state.currentSubstance.name,
     color: colorForSubstance(state.currentSubstance.name),
-    profile,
   };
 
   state.addedDoses.push(dose);
   return dose;
-}
-
-/** Changes an added dose's amount and/or time and redraws its curve. */
-export function updateDoseInState(id, { amount, time }) {
-  const dose = state.addedDoses.find((item) => item.id === id);
-  if (!dose) throw new Error("That dose is no longer on the timeline.");
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-    throw new Error("Enter a dose greater than zero.");
-  }
-  if (!/^\d{1,2}:\d{2}$/.test(String(time || ""))) {
-    throw new Error("Enter a time like 08:30.");
-  }
-  const curve = buildDoseCurve(timeToHours(time), numericAmount, dose.releaseHours, dose.profile);
-  dose.amount = numericAmount;
-  dose.time = time;
-  dose.x = curve.x;
-  dose.y = curve.y;
-  return dose;
-}
-
-/**
- * Graph sessions ("Experiences"). A saved dose keeps the duration profile
- * it was drawn with, so an old session redraws exactly as it looked.
- */
-export function snapshotDoses() {
-  return state.addedDoses.map((dose) => ({
-    substance: dose.substance,
-    amount: dose.amount,
-    unit: dose.unit || "",
-    formulation: dose.formulation || "",
-    releaseHours: dose.releaseHours || 0,
-    time: dose.time,
-    profile: { base: { ...dose.profile.base }, commonDose: dose.profile.commonDose },
-  }));
-}
-
-/** A saved dose in a shape buildDoseCurve can draw, or null if it can't be drawn. */
-function savedDose(raw) {
-  if (!raw || typeof raw.substance !== "string" || !raw.substance.trim()) return null;
-  const amount = Number(raw.amount);
-  const releaseHours = Number(raw.releaseHours) || 0;
-  const commonDose = Number(raw.profile?.commonDose);
-  const base = {};
-  for (const key of ["onset", "comeup", "peak", "offset"]) {
-    base[key] = Number(raw.profile?.base?.[key]) || 0;
-    if (base[key] < 0 || base[key] > 240) return null;
-  }
-  if (!(amount > 0) || !(commonDose > 0) || releaseHours < 0 || releaseHours > 48) return null;
-  if (!/^\d{1,2}:\d{2}$/.test(String(raw.time || ""))) return null;
-  return {
-    substance: raw.substance.trim().slice(0, 80),
-    amount,
-    unit: String(raw.unit || "").slice(0, 12),
-    formulation: String(raw.formulation || "").slice(0, 40),
-    releaseHours,
-    time: raw.time,
-    profile: { base, commonDose },
-  };
-}
-
-/** Replaces the timeline with a saved session's doses. Returns the doses drawn. */
-export function loadDoses(list) {
-  state.addedDoses = [];
-  state.substanceColors = {};
-  (Array.isArray(list) ? list : []).map(savedDose).filter(Boolean).forEach((saved) => {
-    const curve = buildDoseCurve(timeToHours(saved.time), saved.amount, saved.releaseHours, saved.profile);
-    state.addedDoses.push({
-      ...saved,
-      id: ++state.doseSequence,
-      x: curve.x,
-      y: curve.y,
-      color: colorForSubstance(saved.substance),
-    });
-  });
-  return state.addedDoses;
-}
-
-/** The colors a saved session's substances get once it is opened (same order rules as the graph). */
-export function previewColors(names) {
-  let next = 0;
-  return names.map((name) => state.customColors[String(name).toLowerCase()] || SERIES_COLORS[next++ % SERIES_COLORS.length]);
-}
-
-/** A small summary curve per substance for a saved session, sampled at `points` steps. */
-export function previewTimeline(list, points = 64) {
-  const curves = (Array.isArray(list) ? list : []).map(savedDose).filter(Boolean).map((saved) => ({
-    name: saved.substance,
-    ...buildDoseCurve(timeToHours(saved.time), saved.amount, saved.releaseHours, saved.profile),
-  }));
-  if (!curves.length) return null;
-  const start = Math.min(...curves.map((curve) => curve.x[0]));
-  const end = Math.max(...curves.map((curve) => curve.x[curve.x.length - 1]));
-  const span = end - start || 1;
-  const xs = Array.from({ length: points }, (_, index) => start + (span * index) / (points - 1));
-  const names = [...new Set(curves.map((curve) => curve.name))];
-  const series = names.map((name) => {
-    const mine = curves.filter((curve) => curve.name === name);
-    return { name, y: xs.map((point) => mine.reduce((sum, curve) => sum + interpolateDose(curve, point), 0)) };
-  });
-  const peak = Math.max(1, ...series.flatMap((item) => item.y));
-  return { names, series, peak, hours: end - start };
 }
 
 /** Old name: deleteDose(id) (state half only). */
@@ -382,26 +267,12 @@ export function resetState() {
 // One colour per substance, in the order they were first added.
 export const SERIES_COLORS = ["#a67cff", "#2dd4bf", "#fbbf24", "#f472b6", "#60a5fa", "#a3e635", "#fb923c", "#e879f9"];
 
-/** Colors picked on Profile › Preferences, as [{ name, color }]. */
-export function setCustomColors(list) {
-  state.customColors = {};
-  (list || []).forEach((item) => {
-    if (item && typeof item.name === "string" && /^#[0-9a-f]{6}$/i.test(item.color || "")) {
-      state.customColors[item.name.trim().toLowerCase()] = item.color;
-    }
-  });
-  // Doses already on the timeline take the new colors too.
-  state.addedDoses.forEach((dose) => { dose.color = colorForSubstance(dose.substance); });
-}
-
 /** The graph color a substance already has, without assigning a new one. */
 export function peekColor(name) {
-  return state.customColors[String(name).toLowerCase()] || state.substanceColors[name] || null;
+  return state.substanceColors[name] || null;
 }
 
 export function colorForSubstance(name) {
-  const custom = state.customColors[String(name).toLowerCase()];
-  if (custom) return custom;
   if (!state.substanceColors[name]) {
     const used = Object.keys(state.substanceColors).length;
     state.substanceColors[name] = SERIES_COLORS[used % SERIES_COLORS.length];
