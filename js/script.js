@@ -50,6 +50,15 @@ function byteConverter(size) {
 // ------------------------------------------------------------
 (function () {
 	const TYPE_ICON = { Dir: "i-folder", Image: "i-image", Video: "i-video", Audio: "i-audio", None: "i-file" }
+async function searchFiles(searchInput) {
+	const value = searchInput.value
+	const res = await fetch(`/search?q=${encodeURIComponent(value)}&path=${window.location.pathname}`)
+	console.log(`/search?q=${encodeURIComponent(value)}&path=${window.location.pathname}`)
+	try {
+		results = await res.json()
+		const itemsresult = document.querySelector("#itemsresults")
+		
+		itemsresult.innerHTML = ""
 
 	function toast(message, isError) {
 		if (window.xnToast) window.xnToast(message, isError)
