@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	// Time zone data built in, so the calendar can use the visitor's zone on Windows too.
 	_ "time/tzdata"
 	"unicode"
@@ -203,7 +204,13 @@ func main() {
 	http.HandleFunc("/search", requireAdminLogin(search))
 	http.HandleFunc("/delete", requireAdminLogin(Delete))
 	http.HandleFunc("/rename", requireAdminLogin(Rename))
-	http.HandleFunc("/getItems", requireAdminLogin(getItems))
+	http.HandleFunc("/upload", requireLogin(GetUploadData))
+	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
+	http.HandleFunc("/getFolders", requireLogin(getFolders))
+	http.HandleFunc("/search", requireLogin(search))
+	http.HandleFunc("/getItems", requireLogin(getItems))
+	http.HandleFunc("/delete", requireLogin(Delete))
+	http.HandleFunc("/rename", requireLogin(Rename))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
 	http.HandleFunc("/profile/doses", requireLogin(profileDoses))
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
@@ -1624,17 +1631,8 @@ func search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getItems answers a "Path: /Files/..." header with that folder's items as JSON,
-// or with the file itself. Like the other Files routes it stays inside UploadedFiles.
 func getItems(w http.ResponseWriter, r *http.Request) {
-	finalPath := UploadedFilesDirName
-	if p := r.Header.Get("Path"); strings.Trim(strings.TrimPrefix(p, "/Files"), "/") != "" {
-		var ok bool
-		if finalPath, ok = uploadPathFromURL(p); !ok {
-			http.Error(w, "File not found", http.StatusNotFound)
-			return
-		}
-	}
+	finalPath := urlPathToFile(r.Header.Get("Path"))
 	info, err := os.Stat(finalPath)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
