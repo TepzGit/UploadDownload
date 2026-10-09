@@ -324,7 +324,7 @@ func main() {
 		panic("cannot create " + ProfilePicturesDirName + ": " + err.Error())
 	}
 
-	port := 6767
+	port := 42067
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
 
 	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", nil)
