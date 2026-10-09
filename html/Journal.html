@@ -1,66 +1,87 @@
 
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>Journal</title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="/journal.css">
-    </head>
- <body>
-        <div class="main">
-            <div id="sidebar">
-                <div id="sideheader">
-                    <h1 id="xentara">Xentara</h1>
-                    <div id="butcont">
-                        <a href="/Profile" id="but">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M16 9C16 11.2091 14.2091 13 12 13C9.79086 13 8 11.2091 8 9C8 6.79086 9.79086 5 12 5C14.2091 5 16 6.79086 16 9ZM14 9C14 10.1046 13.1046 11 12 11C10.8954 11 10 10.1046 10 9C10 7.89543 10.8954 7 12 7C13.1046 7 14 7.89543 14 9Z" fill="currentColor"></path>
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23C18.0751 23 23 18.0751 23 12C23 5.92487 18.0751 1 12 1ZM3 12C3 14.0902 3.71255 16.014 4.90798 17.5417C6.55245 15.3889 9.14627 14 12.0645 14C14.9448 14 17.5092 15.3531 19.1565 17.4583C20.313 15.9443 21 14.0524 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12ZM12 21C9.84977 21 7.87565 20.2459 6.32767 18.9878C7.59352 17.1812 9.69106 16 12.0645 16C14.4084 16 16.4833 17.1521 17.7538 18.9209C16.1939 20.2191 14.1881 21 12 21Z" fill="currentColor"></path>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-                <div id="contt">
-                    <a href="/sub" class="option" id="journal">
-                        <img src="icons/sub.png" id="subicon"></img>
-                    </a>
-                    <a href="/Files" class="option" id="files">
-                        <img src="icons/files.png" id="subicon"></img>
-                    </a>
-                    <a href="/" class="option" id="home">
-                        <img src="icons/home.png" id="subicon"></img>
-                    </a>
-                </div>
-            </div>
-            <div class="cont">
-                <div class="Header">
-                    <h1 id="title">Journal</h1>
-                    <input placeholder="Search..." type="text" id="input">
-                </div>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Journal · Geek⁴u</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <style>
+    :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:#a67cff; }
+    body{ color:var(--text); }
+    .jr-head{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; }
+    .jr-search{ position:relative; width:100%; max-width:340px; }
+    .jr-search svg{ position:absolute; left:11px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted); pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; }
+    .jr-search .xn-input{ padding-left:34px; }
+    .Drugs{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap:8px; margin-top:20px; }
+    .Drug{ display:grid; grid-template-columns:56px minmax(0,1fr) auto; align-items:center; gap:14px; min-height:76px; padding:10px 10px 10px 10px; border:1px solid var(--line); border-radius:2px; background:var(--surface-2); color:var(--text); text-decoration:none; transition:border-color .15s ease, background-color .15s ease; }
+    @media (hover:hover){ .Drug:hover{ border-color:var(--violet); background:#16161b; } }
+    .Drug:focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
+    .drug-thumb{ display:flex; align-items:center; justify-content:center; width:56px; height:56px; overflow:hidden; border:1px solid var(--line); border-radius:2px; background:#000; color:var(--violet); font-size:20px; font-weight:600; }
+    /* Wiki structure drawings are black on white/clear; inverting them suits the black theme. */
+    .drug-thumb img{ width:100%; height:100%; object-fit:contain; padding:4px; filter:invert(1) hue-rotate(180deg); }
+    .drug-text{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .drugname{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
+    .drugclass{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
+    .drug-chev{ width:18px; height:18px; color:var(--muted); fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+    .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
+    .bottombar{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:20px; }
+    @media (max-width:640px){ .jr-search{ max-width:none; } .bottombar .xn-btn{ flex:1; } }
+  </style>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="min-h-screen xn-bg">
+  <header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
 
-                
+  <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+  <div class="xn-hatch" aria-hidden="true"></div>
 
+  <main class="xn-page">
+    <section class="xn-card">
+      <div class="jr-head">
+        <div>
+          <p class="xn-eyebrow">Journal</p>
+          <h1 class="xn-h1">Browse substances</h1>
+          <p class="xn-sub">Search and explore substances from the PsychonautWiki catalog.</p>
+        </div>
+        <label class="jr-search">
+          <span class="xn-sr">Search substances</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="input" type="search" placeholder="Search substances..." class="xn-input" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+        </label>
+      </div>
 
+      <div id="sug" class="mt-3 hidden">
+        <div id="sugC" class="rounded-sm border border-[#23202b] bg-[#121216] p-2"></div>
+      </div>
 
+      <div class="Drugs" aria-live="polite"><p class="jr-status">Loading substances…</p></div>
 
+      <div class="bottombar">
+        <button type="button" class="xn-btn" id="backBtn" onclick="previousPage()" disabled>← Back</button>
+        <button type="button" class="xn-btn" id="nextBtn" onclick="nextPage()" disabled>Forward →</button>
+      </div>
+    </section>
+  </main>
 
-                <div class="Drugs">
-                </div>
-
-            <div class="bottombar">
-                <button class="pagebtn" id="backBtn" onclick="previousPage()">← Back</button>
-                
-                <button class="pagebtn" id="nextBtn" onclick="nextPage()">Forward →</button>
-            </div>
-
-            </div>
-            
-                
-            
-
-            <script>
+  <script>
             let currentOffset = 0;
             let currentSearchQuery = "";
 
@@ -92,45 +113,62 @@
                 return fetchGraphQL(gql);
             }
 
+            let displaySeq = 0;
+
             async function displaySubstances(offset, query = "") {
+                const seq = ++displaySeq;
+                const drugsDiv = document.querySelector(".Drugs");
                 try {
                     const result = await getSubstances(offset, query);
+                    if (seq !== displaySeq) return; // a newer search is on its way
                     const substances = result?.data?.substances || [];
-                    
-                    const drugsDiv = document.querySelector(".Drugs");
+
                     drugsDiv.innerHTML = "";
-                    
+
                     substances.forEach(substance => {
-                        const drugDiv = document.createElement("div");
+                        const drugDiv = document.createElement("a");
                         const imgUrl = substance?.images?.[0]?.thumb || '';
 
                         const DrugName = substance?.name ?? "";
-                        const DrugClass = substance?.class?.chemical ?? "";
-                        const DrugImage = substance?.images?.[0]?.thumb ?? "";
+                        const DrugClass = [].concat(substance?.class?.chemical || []).join(", ");
 
                         drugDiv.className = "Drug";
+                        drugDiv.href = "/journal/Drug?drug=" + encodeURIComponent(DrugName);
                         drugDiv.dataset.drugname = DrugName;
                         drugDiv.dataset.drugclass = DrugClass;
-                        drugDiv.dataset.drugimage = DrugImage;
+                        drugDiv.dataset.drugimage = imgUrl;
                         drugDiv.innerHTML = `
-
-                            <p class="drugname">${DrugName}</p>
-                            <p class="drugname">${DrugClass}</p>
-                            ${imgUrl ? `<img src="${imgUrl}" style="max-width:100%;border-radius:8px;margin-bottom:8px;">` : ''}
-                            
+                            <span class="drug-thumb"></span>
+                            <span class="drug-text"><span class="drugname"></span><span class="drugclass"></span></span>
+                            <svg class="drug-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
                         `;
+                        drugDiv.querySelector(".drugname").textContent = DrugName;
+                        drugDiv.querySelector(".drugclass").textContent = DrugClass || "Substance";
+                        const thumb = drugDiv.querySelector(".drug-thumb");
+                        if (imgUrl) {
+                            const img = document.createElement("img");
+                            img.src = imgUrl;
+                            img.alt = "";
+                            img.loading = "lazy";
+                            img.onerror = () => { thumb.textContent = DrugName.charAt(0).toUpperCase(); };
+                            thumb.appendChild(img);
+                        } else {
+                            thumb.textContent = DrugName.charAt(0).toUpperCase();
+                        }
                         drugsDiv.appendChild(drugDiv);
-
-                        drugDiv.addEventListener("click", () => {
-                            window.location.href = "/journal/Drug?drug=" + drugDiv.dataset.drugname;
-                        });
                     });
+                    if (!substances.length) {
+                        drugsDiv.innerHTML = `<p class="jr-status"></p>`;
+                        drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”.` : "No substances on this page.";
+                    }
                     currentOffset = offset;
                     currentSearchQuery = query;
-                    document.getElementById("backBtn").disabled = offset === 0;
-                    document.getElementById("nextBtn").disabled = substances.length < 10;
+                    document.getElementById("backBtn").disabled = offset === 0 || !!query;
+                    document.getElementById("nextBtn").disabled = substances.length < 10 || !!query;
                 } catch (error) {
                     console.error("Error fetching substances:", error);
+                    if (seq !== displaySeq) return;
+                    drugsDiv.innerHTML = `<p class="jr-status">Couldn't reach PsychonautWiki. Check your connection and try again.</p>`;
                 }
             }
 

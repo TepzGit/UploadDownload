@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+	<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		
+	  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+	<body>
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+		<form action="/admin/createUser/AdminPanelCreateUserNow" method="POST" enctype="multipart/form-data">
+			<input name="username" type="text" class="AdminPanelCreateUserInput" required placeholder="Username">
+			<input name="password" type="password" class="AdminPanelCreateUserInput" required placeholder="Password">
+			<select required name="authority" id="AdminPanelCreateUserAuthority">
+				<option value="">Choose authority for the user</option>
+				<option value="User">User</option>
+				<option value="Admin">Admin</option>
+			</select>
+			<button type="submit">Create</button>
+		</form>
+	</body>
+</html>

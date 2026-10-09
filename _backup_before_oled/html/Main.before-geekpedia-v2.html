@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GeekPedia · Xentara</title>
+  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <style>
+    .gp {
+      --gp-card: #0a0a0c;
+      --gp-tile: #121216;
+      --gp-line: #23202b;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 8px 16px calc(40px + env(safe-area-inset-bottom));
+      color: var(--oled-text);
+    }
+    .gp *, .gp *::before, .gp *::after { box-sizing: border-box; }
+
+    .gp-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .gp-title {
+      margin: 0;
+      font-size: clamp(2.5rem, 5.5vw, 4.25rem);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .gp-clock {
+      margin: 0;
+      font-size: clamp(3.25rem, 11vw, 9rem);
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      width: 100%;
+    }
+
+    .gp-panel {
+      margin-top: 24px;
+      padding: clamp(20px, 5vw, 48px) clamp(16px, 5vw, 56px);
+      border: 1px solid var(--gp-line);
+      border-radius: 16px;
+      background: var(--gp-card);
+    }
+
+    .gp-team {
+      display: flex;
+      justify-content: center;
+      gap: clamp(16px, 12vw, 146px);
+      flex-wrap: wrap;
+    }
+    .gp-member {
+      width: 284px;
+      max-width: 100%;
+      margin: 0;
+      padding: 16px 16px 20px;
+      border: 1px solid var(--gp-line);
+      border-radius: 4px;
+      background: var(--gp-tile);
+      text-align: center;
+    }
+    .gp-photo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      background: #000;
+    }
+    .gp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gp-photo span { font-size: 5rem; font-weight: 600; color: var(--oled-accent); }
+    .gp-member figcaption { margin-top: 18px; font-size: 1rem; font-weight: 600; }
+
+    .gp-tile {
+      max-width: 1004px;
+      margin: clamp(32px, 7vw, 72px) auto 0;
+      padding: 24px 16px;
+      border: 1px solid var(--gp-line);
+      border-radius: 12px;
+      background: var(--gp-tile);
+      text-align: center;
+    }
+    .gp-label { font-size: 1rem; }
+    .gp-place { margin-top: 4px; font-size: 1.5rem; font-weight: 600; }
+    .gp-temp { margin: 28px 0 18px; font-size: clamp(3rem, 8vw, 4.25rem); line-height: 1; }
+    .gp-cond { font-size: 1.05rem; color: #c9c5d4; }
+    .gp-wind { margin-top: 4px; font-size: 0.9rem; color: var(--oled-muted); }
+
+    .gp-login { display: grid; gap: 10px; max-width: 360px; margin: 16px auto 0; text-align: left; }
+    .gp-login input {
+      width: 100%;
+      height: 46px;
+      padding: 0 14px;
+      border: 1px solid var(--gp-line);
+      border-radius: 10px;
+      background: #000;
+      color: var(--oled-text);
+      font: inherit;
+    }
+    .gp-login input:focus { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+    .gp-login button {
+      height: 46px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--oled-accent);
+      color: #160f24;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .gp-error { min-height: 1.2em; font-size: 0.9rem; color: #ff8b8b; }
+
+    @media (max-width: 640px) {
+      .gp-head { justify-content: center; text-align: center; }
+      .gp-member { width: 100%; max-width: 320px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="xn">
+  <a class="xn-brand" href="/Main">Xentara</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+    {{if eq .SessionInfo.Authority "admin"}}<a class="xn-admin" href="/admin">Admin</a>{{end}}
+  </nav>
+</header>
+
+  <main class="gp">
+    
+
+    <section class="gp-panel">
+      <div class="gp-team">
+        <!-- Photos: put files at assets/team/tepz.jpg and assets/team/hookey.jpg -->
+        <figure class="gp-member">
+          <div class="gp-photo"><img src="/team/tepz.jpg" alt="Tepz" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))"></div>
+          <figcaption>Tepz - Backend</figcaption>
+        </figure>
+        <figure class="gp-member">
+          <div class="gp-photo"><img src="/team/hookey.jpg" alt="Hookey" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
+          <figcaption>Hookey - Frontend</figcaption>
+        </figure>
+      </div>
+
+      {{if not .Login}}
+      <div class="gp-tile">
+        <div class="gp-label">Sign in</div>
+        <form class="gp-login" id="passwordEntry">
+          <input id="usernameInput" type="text" placeholder="Username" aria-label="Username" autocomplete="username" autocapitalize="off" />
+          <input id="passwordInput" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password" />
+          <button type="submit">Log in</button>
+          <div class="gp-error" id="passwordError" role="alert"></div>
+        </form>
+      </div>
+      {{end}}
+
+      <div class="gp-tile">
+        <div class="gp-label">Weather</div>
+        <div class="gp-place" id="weatherLocation">Copenhagen, DK</div>
+        <div class="gp-temp" id="weatherTemp">--°</div>
+        <div class="gp-cond" id="weatherCondition">Loading weather…</div>
+        <div class="gp-wind" id="weatherWind">Wind: -- m/s</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const timeDisplay = document.getElementById('timeDisplay')
+    const passwordEntry = document.getElementById('passwordEntry')
+    const usernameInput = document.getElementById('usernameInput')
+    const passwordInput = document.getElementById('passwordInput')
+    const passwordError = document.getElementById('passwordError')
+    const weatherLocation = document.getElementById('weatherLocation')
+    const weatherTemp = document.getElementById('weatherTemp')
+    const weatherCondition = document.getElementById('weatherCondition')
+    const weatherWind = document.getElementById('weatherWind')
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2,'0');
+      const minutes = String(now.getMinutes()).padStart(2,'0');
+      const seconds = String(now.getSeconds()).padStart(2,'0');
+      timeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    async function submitLogin() {
+      passwordError.textContent = '';
+      const password = passwordInput?.value.trim() || '';
+      const username = usernameInput?.value.trim() || '';
+      if (!password || !username) {
+        passwordError.textContent = 'Username or password cannot be empty.';
+        return;
+      }
+      const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password })});
+      if (!res.ok) {
+        passwordError.textContent = 'Incorrect login. Try again.';
+      } else {
+        window.location.reload();
+      }
+    }
+
+    async function fetchWeather(latitude, longitude) {
+      try {
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=celsius&windspeed_unit=ms`);
+        if (!response.ok) throw new Error('Weather API error');
+        const data = await response.json();
+        const weather = data.current_weather;
+        if (!weather) throw new Error('No weather data');
+        weatherTemp.textContent = `${Math.round(weather.temperature)}°C`;
+        weatherCondition.textContent = weather.weathercode === 0 ? 'Clear' : 'Cloudy / Windy';
+        weatherWind.textContent = `Wind: ${weather.windspeed.toFixed(1)} m/s`;
+      } catch (_) {
+        weatherLocation.textContent = 'Unable to load weather';
+        weatherTemp.textContent = '--°';
+        weatherCondition.textContent = 'Unavailable';
+        weatherWind.textContent = 'Wind: -- m/s';
+      }
+    }
+
+    if (passwordEntry) {
+      passwordEntry.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitLogin();
+      });
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    fetchWeather(55.6761, 12.5683);
+  </script>
+</body>
+</html>

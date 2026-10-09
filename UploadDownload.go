@@ -2,22 +2,27 @@ package main
 
 import (
 	"bytes"
+	cryptorand "crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	// Pure-Go SQLite driver: builds on Windows without a C compiler (mattn/go-sqlite3 needs cgo + gcc).
+	_ "modernc.org/sqlite"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -112,6 +117,19 @@ type psychonautwikiApiStruct struct {
 	} `json:"data"`
 }
 
+// Sessions are stored so a server restart doesn't sign everyone out.
+var sessionSchema string = `
+CREATE TABLE IF NOT EXISTS sessions (
+	token TEXT PRIMARY KEY,
+	user_id INTEGER NOT NULL,
+	created_at DATETIME NOT NULL,
+	expires_at DATETIME NOT NULL,
+	FOREIGN KEY(user_id) REFERENCES users(id)
+);
+`
+
+const sessionLifetime = 30 * 24 * time.Hour
+
 var db *sql.DB
 
 var UploadedFilesDirName string = "UploadedFiles"
@@ -128,30 +146,40 @@ func main() {
 
 	StartCookieCleaner()
 
+	// The upload folder is gitignored, so a fresh checkout has none and /Files/ 400s until it exists.
+	if err := os.MkdirAll(UploadedFilesDirName, 0755); err != nil {
+		panic("cannot create " + UploadedFilesDirName + ": " + err.Error())
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/Main", http.StatusSeeOther)
-			return
+		switch r.URL.Path {
+		case "/", "/index.html":
+			http.ServeFile(w, r, "html/index.html")
+		default:
+			http.NotFound(w, r)
 		}
 	})
 
 	http.HandleFunc("/Main", Main)
 	http.HandleFunc("/login", LoginData)
+	http.HandleFunc("/signup", Signup)
+	http.HandleFunc("/logout", Logout)
 	http.HandleFunc("/Profile", requireLogin(Profile))
-	http.HandleFunc("/Files/", requireLogin(Downloader))
-	http.HandleFunc("/Uploader", requireLogin(Uploader))
+	// Files is one shared folder that only admin accounts can open.
+	http.HandleFunc("/Files/", requireAdminLogin(Downloader))
+	http.HandleFunc("/Uploader", requireAdminLogin(Uploader))
 	http.HandleFunc("/journal", requireLogin(Journal))
 	http.HandleFunc("/journal/Drug", requireLogin(DrugInfo))
 	http.HandleFunc("/sub", requireLogin(Substance))
 	http.HandleFunc("/admin", requireAdminLogin(AdminPanel))
 	http.HandleFunc("/admin/createUser", requireAdminLogin(AdminPanelCreateUser))
 
-	http.HandleFunc("/upload", requireLogin(GetUploadData))
-	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
-	http.HandleFunc("/getFolders", requireLogin(getFolders))
-	http.HandleFunc("/search", requireLogin(search))
-	http.HandleFunc("/delete", requireLogin(Delete))
-	http.HandleFunc("/rename", requireLogin(Rename))
+	http.HandleFunc("/upload", requireAdminLogin(GetUploadData))
+	http.HandleFunc("/makeFolder", requireAdminLogin(makeFolder))
+	http.HandleFunc("/getFolders", requireAdminLogin(getFolders))
+	http.HandleFunc("/search", requireAdminLogin(search))
+	http.HandleFunc("/delete", requireAdminLogin(Delete))
+	http.HandleFunc("/rename", requireAdminLogin(Rename))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
 	http.HandleFunc("/sub/saveData", requireLogin(saveData))
 	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
@@ -161,9 +189,16 @@ func main() {
 	//		fmt.Fprint(w, styleCSS)
 	//	})
 
-	http.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "js/script.js")
-	})
+	jsFiles, err := os.ReadDir("js")
+	if err != nil {
+		panic(err)
+	}
+	for _, jsFile := range jsFiles {
+		jsName := jsFile.Name()
+		http.HandleFunc("/"+jsName, func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "js/"+jsName)
+		})
+	}
 
 	css, _ := os.ReadDir("css")
 	for _, stylefile := range css {
@@ -206,21 +241,20 @@ func main() {
 		})
 	} // TODO Make it recursive for the subfiles
 
-	cookies["test"] = cookiesStruct{
-		Time:             time.Now(),
-		Username:         "test",
-		OriginalUsername: "test",
-		Authority:        "admin",
-		UserId:           1,
-	}
-
-	db, err = sql.Open("sqlite3", DataBaseFileName)
+	// _time_format=sqlite stores times the same way mattn/go-sqlite3 did, so old rows still read back.
+	db, err = sql.Open("sqlite", DataBaseFileName+"?_time_format=sqlite")
 	if err != nil {
 		panic(err)
 	}
+	if err := db.Ping(); err != nil {
+		panic("cannot open database " + DataBaseFileName + ": " + err.Error())
+	}
 	db.Exec(schema)
+	if _, err := db.Exec(sessionSchema); err != nil {
+		panic("cannot create the sessions table: " + err.Error())
+	}
 
-	port := 8000
+	port := 6767
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
 
 	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", nil)
@@ -231,26 +265,14 @@ func main() {
 
 func Main(w http.ResponseWriter, r *http.Request) {
 
-	SessionId, err := r.Cookie("SessionID")
-
 	d := struct {
 		Login       bool
 		SessionInfo cookiesStruct
 	}{}
 
-	ip := r.RemoteAddr
-	if strings.Contains(ip, ":") {
-		ip, _, _ = net.SplitHostPort(ip)
-	}
-	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.SessionInfo.OriginalUsername, r.URL.Path)
-
-	if err == nil && SessionId != nil {
-		c, ok := cookies[SessionId.Value]
-		if ok {
-			d.Login = true
-			d.SessionInfo = c
-		}
-	}
+	d.SessionInfo, d.Login = sessionFromRequest(r)
+	setRoleHint(w, r, d.SessionInfo, d.Login)
+	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), d.SessionInfo.OriginalUsername, r.URL.Path)
 
 	tpl, err := template.ParseFiles("html/Main.html")
 	if err != nil {
@@ -294,12 +316,7 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		Totals: make(map[string]Totals),
 	}
 
-	userCookie, _ := r.Cookie("SessionID")
-	if err != nil {
-		http.Error(w, "no session", http.StatusUnauthorized)
-		return
-	}
-	session, ok := cookies[userCookie.Value]
+	session, ok := sessionFromRequest(r)
 	if !ok {
 		http.Error(w, "invalid session", http.StatusUnauthorized)
 		return
@@ -461,8 +478,8 @@ func journalImport(w http.ResponseWriter, r *http.Request) {
 	}
 	defer stmt2.Close()
 
-	usercookie, _ := r.Cookie("SessionID")
-	user_id := cookies[usercookie.Value].UserId
+	usersession, _ := sessionFromRequest(r)
+	user_id := usersession.UserId
 	cacheDrugId := map[string]int64{}
 
 	for _, experience := range journalData.Experiences {
@@ -875,8 +892,8 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	SessionId, err := r.Cookie("SessionID")
-	userId := cookies[SessionId.Value].UserId
+	usersession, _ := sessionFromRequest(r)
+	userId := usersession.UserId
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -943,11 +960,13 @@ func DrugInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginData(w http.ResponseWriter, r *http.Request) {
-	ip := r.RemoteAddr
-	if strings.Contains(ip, ":") {
-		ip, _, _ = net.SplitHostPort(ip)
-	}
+	ip := clientIP(r)
 	fmt.Printf("[%s] NEUTRAL IP=%s PATH=%s REASON=LogginIn\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
+
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/Main", http.StatusSeeOther)
+		return
+	}
 
 	var UserLoginData struct {
 		Username string `json:"username"`
@@ -956,7 +975,7 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&UserLoginData)
 	if err != nil {
-		http.Error(w, "Not valid folder data", http.StatusBadRequest)
+		http.Error(w, "Not valid login data", http.StatusBadRequest)
 		return
 	}
 
@@ -964,66 +983,286 @@ func LoginData(w http.ResponseWriter, r *http.Request) {
 	var authority string
 	var password string
 	var userId int
-	err = db.QueryRow("select originalUsername,authority,password_hash,id from users where username = ?", strings.ToLower(UserLoginData.Username)).Scan(&originalUsername, &authority, &password, &userId)
+	err = db.QueryRow("select originalUsername,authority,password_hash,id from users where username = ?", strings.ToLower(strings.TrimSpace(UserLoginData.Username))).Scan(&originalUsername, &authority, &password, &userId)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "User Dosent Exist", http.StatusBadRequest)
+			fmt.Printf("[%s] DENY IP=%s USER=%q REASON=no_such_user\n", time.Now().Format("2006-01-02 15:04:05"), ip, UserLoginData.Username)
+			http.Error(w, "Wrong username or password.", http.StatusUnauthorized)
 			return
 		} else {
+			fmt.Printf("[%s] ERROR login query failed for %q: %v\n", time.Now().Format("2006-01-02 15:04:05"), UserLoginData.Username, err)
 			http.Error(w, "Can not query from database rn", http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(UserLoginData.Password)); err != nil {
-		http.Error(w, "Wrong Password", http.StatusBadRequest)
+		fmt.Printf("[%s] DENY IP=%s USER=%q REASON=wrong_password\n", time.Now().Format("2006-01-02 15:04:05"), ip, UserLoginData.Username)
+		http.Error(w, "Wrong username or password.", http.StatusUnauthorized)
 		return
 	}
 
-	randomCookie := RandomCharacters()
-
-	cookie := &http.Cookie{
-		Name:   "SessionID",
-		Value:  randomCookie,
-		Path:   "/",
-		MaxAge: 86400,
+	endSession(w, r) // drop any older session this browser had
+	err = startSession(w, r, cookiesStruct{
+		Username:         strings.ToLower(originalUsername),
+		OriginalUsername: originalUsername,
+		Authority:        strings.ToLower(authority),
+		UserId:           userId,
+	})
+	if err != nil {
+		fmt.Printf("[%s] ERROR could not start session for %q: %v\n", time.Now().Format("2006-01-02 15:04:05"), originalUsername, err)
+		http.Error(w, "Could not sign you in right now", http.StatusInternalServerError)
+		return
 	}
-
-	http.SetCookie(w, cookie)
-
-	c := cookies[randomCookie]
-	c.Time = time.Now()
-	c.Username = strings.ToLower(UserLoginData.Username)
-	c.OriginalUsername = originalUsername
-	c.Authority = strings.ToLower(authority)
-	c.UserId = userId
-	cookies[randomCookie] = c
+	fmt.Printf("[%s] LOGIN IP=%s USER=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, originalUsername)
 
 	w.WriteHeader(http.StatusOK)
 }
 
+// Signup creates a normal ("user") account and signs the new user in.
+func Signup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/Main", http.StatusSeeOther)
+		return
+	}
+
+	var in struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "Not valid sign up data", http.StatusBadRequest)
+		return
+	}
+	in.Username = strings.TrimSpace(in.Username)
+	if msg := checkNewAccount(in.Username, in.Password); msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	userId, err := createUser(in.Username, in.Password, "user")
+	if errors.Is(err, errUserExists) {
+		http.Error(w, "That username is taken.", http.StatusConflict)
+		return
+	}
+	if err != nil {
+		fmt.Printf("[%s] ERROR sign up failed for %q: %v\n", time.Now().Format("2006-01-02 15:04:05"), in.Username, err)
+		http.Error(w, "Could not create the account right now", http.StatusInternalServerError)
+		return
+	}
+
+	endSession(w, r)
+	err = startSession(w, r, cookiesStruct{
+		Username:         strings.ToLower(in.Username),
+		OriginalUsername: in.Username,
+		Authority:        "user",
+		UserId:           userId,
+	})
+	if err != nil {
+		fmt.Printf("[%s] ERROR could not start session for %q: %v\n", time.Now().Format("2006-01-02 15:04:05"), in.Username, err)
+		http.Error(w, "Account created, but signing in failed. Try logging in.", http.StatusInternalServerError)
+		return
+	}
+	fmt.Printf("[%s] SIGNUP IP=%s USER=%s\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), in.Username)
+	w.WriteHeader(http.StatusOK)
+}
+
+// Logout ends the session. Only POST signs out, so a link preview or
+// prefetch of /logout can't.
+func Logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		endSession(w, r)
+	}
+	http.Redirect(w, r, "/Main", http.StatusSeeOther)
+}
+
+var errUserExists = errors.New("user already exists")
+
+var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,24}$`)
+
+// checkNewAccount returns a message for the user when the username or
+// password can't be used, or "" when both are fine.
+func checkNewAccount(username, password string) string {
+	if !usernamePattern.MatchString(username) {
+		return "Usernames are 3 to 24 letters, numbers, dots, dashes or underscores."
+	}
+	if len(password) < 8 {
+		return "Passwords need at least 8 characters."
+	}
+	if len(password) > 72 { // bcrypt ignores anything past 72 bytes
+		return "Passwords can be at most 72 characters."
+	}
+	return ""
+}
+
+// createUser stores a new account and returns its id.
+func createUser(username, password, authority string) (int, error) {
+	var exists bool
+	err := db.QueryRow("select exists(select 1 from users where username = ?)", strings.ToLower(username)).Scan(&exists)
+	if err != nil {
+		return 0, err
+	}
+	if exists {
+		return 0, errUserExists
+	}
+
+	HashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, err
+	}
+	res, err := db.Exec("insert into users (username, originalUsername, password_hash, pathToProfilePic, authority) values (?, ?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), "/profiles/Default/default.png", strings.ToLower(authority))
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return 0, errUserExists
+		}
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	return int(id), err
+}
+
+func clientIP(r *http.Request) string {
+	ip := r.RemoteAddr
+	if strings.Contains(ip, ":") {
+		ip, _, _ = net.SplitHostPort(ip)
+	}
+	return ip
+}
+
+// sessionFromRequest returns the signed-in user for the request's SessionID
+// cookie. The cookies map is a cache in front of the sessions table.
+func sessionFromRequest(r *http.Request) (cookiesStruct, bool) {
+	c, err := r.Cookie("SessionID")
+	if err != nil || c.Value == "" {
+		return cookiesStruct{}, false
+	}
+	token := c.Value
+
+	cookiesMu.Lock()
+	s, ok := cookies[token]
+	cookiesMu.Unlock()
+	if ok {
+		if time.Since(s.Time) < sessionLifetime {
+			return s, true
+		}
+		deleteSession(token)
+		return cookiesStruct{}, false
+	}
+
+	var created, expires time.Time
+	err = db.QueryRow(`
+	SELECT s.created_at, s.expires_at, u.username, u.originalUsername, u.authority, u.id
+	FROM sessions s
+	JOIN users u ON u.id = s.user_id
+	WHERE s.token = ?`, token).Scan(&created, &expires, &s.Username, &s.OriginalUsername, &s.Authority, &s.UserId)
+	if err != nil {
+		return cookiesStruct{}, false
+	}
+	if time.Now().After(expires) {
+		deleteSession(token)
+		return cookiesStruct{}, false
+	}
+	s.Time = created
+	s.Authority = strings.ToLower(s.Authority)
+
+	cookiesMu.Lock()
+	cookies[token] = s
+	cookiesMu.Unlock()
+	return s, true
+}
+
+// startSession stores a new session for s and sends its cookie.
+func startSession(w http.ResponseWriter, r *http.Request, s cookiesStruct) error {
+	b := make([]byte, 32)
+	if _, err := cryptorand.Read(b); err != nil {
+		return err
+	}
+	token := hex.EncodeToString(b)
+
+	now := time.Now().UTC()
+	s.Time = now
+	_, err := db.Exec("INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)", token, s.UserId, now, now.Add(sessionLifetime))
+	if err != nil {
+		return err
+	}
+
+	cookiesMu.Lock()
+	cookies[token] = s
+	cookiesMu.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "SessionID",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(sessionLifetime / time.Second),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+	})
+	setRoleHint(w, r, s, true)
+	return nil
+}
+
+// endSession forgets the request's session (if any) and clears its cookie.
+func endSession(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie("SessionID")
+	if err != nil || c.Value == "" {
+		return
+	}
+	deleteSession(c.Value)
+	http.SetCookie(w, &http.Cookie{Name: "SessionID", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	setRoleHint(w, r, cookiesStruct{}, false)
+}
+
+// setRoleHint keeps the xn_role cookie in step with the session so nav.js can
+// hide links the account can't open (Files is admin only). It is only a
+// display hint: every request is still checked against the session.
+func setRoleHint(w http.ResponseWriter, r *http.Request, s cookiesStruct, signedIn bool) {
+	c := &http.Cookie{Name: "xn_role", Path: "/", SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil}
+	if !signedIn {
+		c.MaxAge = -1
+	} else {
+		c.Value = "user"
+		if s.Authority == "admin" {
+			c.Value = "admin"
+		}
+		c.MaxAge = int(sessionLifetime / time.Second)
+	}
+	http.SetCookie(w, c)
+}
+
+func deleteSession(token string) {
+	cookiesMu.Lock()
+	delete(cookies, token)
+	cookiesMu.Unlock()
+	db.Exec("DELETE FROM sessions WHERE token = ?", token)
+}
+
+// notSignedIn sends page visits to the sign in box on /Main (coming back
+// afterwards) and answers scripts with 401 so they can say so.
+func notSignedIn(w http.ResponseWriter, r *http.Request) {
+	setRoleHint(w, r, cookiesStruct{}, false)
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		http.Redirect(w, r, "/Main?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
+		return
+	}
+	http.Error(w, "Please log in again.", http.StatusUnauthorized)
+}
+
 func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		if strings.Contains(ip, ":") {
-			ip, _, _ = net.SplitHostPort(ip)
-		}
+		ip := clientIP(r)
 
-		SessionId, err := r.Cookie("SessionID")
-		if err != nil || SessionId == nil {
-			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=no_cookie\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
-			http.Redirect(w, r, "/Main", http.StatusSeeOther)
-			return
-		}
-
-		// check if session exists in your map
-		d, ok := cookies[SessionId.Value]
+		d, ok := sessionFromRequest(r)
 		if !ok {
-			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=invalid_session\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
-			http.Redirect(w, r, "/Main", http.StatusSeeOther)
+			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=not_signed_in\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
+			notSignedIn(w, r)
 			return
 		}
 		fmt.Printf("[%s] ALLOW IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
+		if r.Method == http.MethodGet {
+			setRoleHint(w, r, d, true)
+		}
 
 		// all good → call the real handler
 		next(w, r)
@@ -1032,22 +1271,24 @@ func requireLogin(next http.HandlerFunc) http.HandlerFunc {
 
 func requireAdminLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		if strings.Contains(ip, ":") {
-			ip, _, _ = net.SplitHostPort(ip)
-		}
+		ip := clientIP(r)
 
-		SessionId, err := r.Cookie("SessionID")
-		if err != nil || SessionId == nil {
-			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=no_cookie\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
-			http.Redirect(w, r, "/Main", http.StatusSeeOther)
+		d, ok := sessionFromRequest(r)
+		if !ok {
+			fmt.Printf("[%s] DENY IP=%s PATH=%s REASON=not_signed_in\n", time.Now().Format("2006-01-02 15:04:05"), ip, r.URL.Path)
+			notSignedIn(w, r)
 			return
 		}
-
-		d, ok := cookies[SessionId.Value]
-		if !ok || strings.ToLower(d.Authority) != "admin" {
-			fmt.Printf("[%s] DENY IP=%s USER=%s PATH=%s REASON=invalid_sessionOrNoAuthority\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
-			http.Redirect(w, r, "/Main", http.StatusSeeOther)
+		if r.Method == http.MethodGet {
+			setRoleHint(w, r, d, true)
+		}
+		if d.Authority != "admin" {
+			fmt.Printf("[%s] DENY IP=%s USER=%s PATH=%s REASON=not_admin\n", time.Now().Format("2006-01-02 15:04:05"), ip, d.OriginalUsername, r.URL.Path)
+			if r.Method == http.MethodGet {
+				http.Redirect(w, r, "/Main?need=admin", http.StatusSeeOther)
+			} else {
+				http.Error(w, "Only admins can do that.", http.StatusForbidden)
+			}
 			return
 		}
 
@@ -1061,31 +1302,32 @@ func StartCookieCleaner() {
 		for {
 			time.Sleep(1 * time.Hour)
 
-			maxTimeHours := 744
-
 			cookiesMu.Lock()
 			for key, value := range cookies {
-				if time.Now().After(value.Time.Add(time.Hour * time.Duration(maxTimeHours))) {
+				if time.Since(value.Time) > sessionLifetime {
 					delete(cookies, key)
 				}
 			}
 			cookiesMu.Unlock()
+
+			rows, err := db.Query("SELECT token, expires_at FROM sessions")
+			if err != nil {
+				continue
+			}
+			var expired []string
+			for rows.Next() {
+				var token string
+				var expires time.Time
+				if rows.Scan(&token, &expires) == nil && time.Now().After(expires) {
+					expired = append(expired, token)
+				}
+			}
+			rows.Close()
+			for _, token := range expired {
+				db.Exec("DELETE FROM sessions WHERE token = ?", token)
+			}
 		}
 	}()
-}
-
-func RandomCharacters() string {
-	awailable := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
-
-	rand.Seed(time.Now().UnixNano())
-
-	length := 32
-	s := make([]rune, length)
-	for i := 0; i < length; i++ {
-		s[i] = awailable[rand.Intn(len(awailable))]
-	}
-
-	return string(s)
 }
 
 func Downloader(w http.ResponseWriter, r *http.Request) {
@@ -1117,14 +1359,14 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			IsRoot   bool
 			BackPath string
 		}{}
-		if path == "/Files/" {
+		if path == "/Files" {
 			d.IsRoot = true
 		} else {
 			pathSplit := strings.Split(path, "/")
 			if len(pathSplit) < 2 {
 				d.BackPath = "/"
 			} else {
-				d.BackPath = "/" + filepath.Join(pathSplit[:len(pathSplit)-1]...)
+				d.BackPath = strings.Join(pathSplit[:len(pathSplit)-1], "/")
 			}
 		}
 
@@ -1182,12 +1424,16 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No files uploaded", http.StatusBadRequest)
 		return
 	}
-	currentPath := r.FormValue("currentPath")
+	uploadDir, ok := insideUploads(r.FormValue("currentPath"))
+	if !ok {
+		http.Error(w, "Not a valid folder", http.StatusBadRequest)
+		return
+	}
 
-	os.Mkdir(UploadedFilesDirName, 0755)
+	os.MkdirAll(UploadedFilesDirName, 0755)
 	for _, file := range files {
 		f, _ := file.Open()
-		out, err := os.Create(filepath.Join(UploadedFilesDirName, currentPath, file.Filename))
+		out, err := os.Create(filepath.Join(uploadDir, filepath.Base(file.Filename)))
 		if err != nil {
 			http.Error(w, "Error Downloading File", http.StatusBadRequest)
 			f.Close()
@@ -1221,11 +1467,14 @@ func makeFolder(w http.ResponseWriter, r *http.Request) {
 
 	pathSplit := strings.Split(path, "/")
 
-	var dirPath string
+	var parts []string
 	if len(pathSplit) > 2 {
-		dirPath = filepath.Join(append([]string{UploadedFilesDirName}, pathSplit[2:]...)...)
-	} else {
-		dirPath = UploadedFilesDirName + "/."
+		parts = pathSplit[2:]
+	}
+	dirPath, ok := insideUploads(parts...)
+	if !ok || !validName(folderName) {
+		http.Error(w, "Not a valid folder name", http.StatusBadRequest)
+		return
 	}
 
 	FullPathDir := filepath.Join(dirPath, folderName)
@@ -1256,18 +1505,18 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 
 	currentPath := getFolderData.CurrentPath
 	FolderToGet := getFolderData.FolderToGet
-	if currentPath[:1] == "/" {
+	if strings.HasPrefix(currentPath, "/") {
 		currentPath = "./" + currentPath[1:]
 	}
 
-	Path := filepath.Join(UploadedFilesDirName, currentPath, FolderToGet)
-
-	Dirs, err := os.ReadDir(Path)
-	if err != nil {
+	Path, ok := insideUploads(currentPath, FolderToGet)
+	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if strings.Contains(Path, "..") || strings.Contains(Path, ".") {
+
+	Dirs, err := os.ReadDir(Path)
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -1277,7 +1526,8 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 			FoldersReturn.Folders = append(FoldersReturn.Folders, Dir.Name())
 		}
 	}
-	FoldersReturn.CurrentPath = filepath.Join(currentPath, FolderToGet)
+	rel, _ := filepath.Rel(UploadedFilesDirName, Path)
+	FoldersReturn.CurrentPath = filepath.ToSlash(rel)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(FoldersReturn)
@@ -1289,14 +1539,17 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	pathSplit := strings.Split(currentPath, "/")
 
-	var finalPath string
+	var parts []string
 	if len(pathSplit) > 2 {
-		finalPath = filepath.Join(append([]string{UploadedFilesDirName}, pathSplit[2:]...)...)
-	} else {
-		finalPath = UploadedFilesDirName + "/."
+		parts = pathSplit[2:]
+	}
+	finalPath, ok := insideUploads(parts...)
+	if !ok {
+		http.Error(w, "Cant find folder/file", http.StatusBadRequest)
+		return
 	}
 
-	var results []FileFolderInfo
+	results := []FileFolderInfo{}
 	if query != "" {
 		results = searchFileFolder(finalPath, query)
 	} else {
@@ -1435,9 +1688,39 @@ func urlPathToFile(urlPath string) string {
 }
 
 func FilePathToUrl(filePath string) string {
-	pathSplit := strings.Split(filePath, "/")
+	pathSplit := strings.Split(filepath.ToSlash(filePath), "/")
 	finalPath := "/Files/" + strings.Join(pathSplit[1:], "/")
-	return finalPath
+	return (&url.URL{Path: finalPath}).EscapedPath()
+}
+
+// insideUploads joins parts onto the upload folder and refuses anything that
+// would land outside it (a "..", an absolute path).
+func insideUploads(parts ...string) (string, bool) {
+	p := filepath.Join(append([]string{UploadedFilesDirName}, parts...)...)
+	rel, err := filepath.Rel(UploadedFilesDirName, p)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return p, true
+}
+
+// uploadPathFromURL maps a /Files/... link (a full URL or just the path,
+// percent-encoded or not) to the file or folder it points at.
+func uploadPathFromURL(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", false
+	}
+	rel, found := strings.CutPrefix(u.Path, "/Files/")
+	if !found || strings.Trim(rel, "/") == "" {
+		return "", false
+	}
+	return insideUploads(strings.Split(rel, "/")...)
+}
+
+// validName is true for a plain file or folder name with no path in it.
+func validName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\\")
 }
 
 func searchFileFolder(path string, query string) []FileFolderInfo {
@@ -1463,7 +1746,7 @@ func searchFileFolder(path string, query string) []FileFolderInfo {
 				var d FileFolderInfo
 				d.Name = info.Name()
 				d.IsDir, d.IsImg, d.IsVid, d.IsAudio = checkExtension(info.Name(), false)
-				d.Path = "/Files/" + relPath
+				d.Path = (&url.URL{Path: "/Files/" + filepath.ToSlash(relPath)}).EscapedPath()
 				d.Size = int(info.Size())
 				d.Date = info.ModTime()
 
@@ -1485,8 +1768,11 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pathSplit := strings.Split(deleteData.Path, "/")
-	path := filepath.Join(UploadedFilesDirName, strings.Join(pathSplit[4:], "/"))
+	path, ok := uploadPathFromURL(deleteData.Path)
+	if !ok {
+		http.Error(w, "Not a valid file", http.StatusBadRequest)
+		return
+	}
 	err = os.Remove(path)
 	if err != nil {
 		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
@@ -1499,7 +1785,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 func Rename(w http.ResponseWriter, r *http.Request) {
 	var renameData struct {
 		CurrentFilenamePath string `json:"currentFilenamePath"`
-		NewFileName         string `json"newFileName"`
+		NewFileName         string `json:"newFileName"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&renameData)
 	if err != nil {
@@ -1507,11 +1793,14 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentFilePathSplit := strings.Split(renameData.CurrentFilenamePath, "/")
-	currentFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:], "/"))
-	newFilePath := filepath.Join(UploadedFilesDirName, strings.Join(currentFilePathSplit[4:len(currentFilePathSplit)-1], "/"), renameData.NewFileName)
+	currentFilePath, ok := uploadPathFromURL(renameData.CurrentFilenamePath)
+	if !ok || !validName(renameData.NewFileName) {
+		http.Error(w, "Not a valid name", http.StatusBadRequest)
+		return
+	}
+	newFilePath := filepath.Join(filepath.Dir(currentFilePath), renameData.NewFileName)
 
-	curentFileName := currentFilePathSplit[len(currentFilePathSplit)-1]
+	curentFileName := filepath.Base(currentFilePath)
 	if curentFileName != renameData.NewFileName {
 		err := os.Rename(currentFilePath, newFilePath)
 		if err != nil {
@@ -1559,32 +1848,27 @@ func AdminPanelCreateUserData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Cant parse data", http.StatusBadRequest)
 		return
 	}
-	username := r.FormValue("username")
+	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
-	authority := r.FormValue("authority")
+	authority := strings.ToLower(r.FormValue("authority"))
 
-	var exists bool
-	err = db.QueryRow("select exists(select 1 from users where username = ?)", strings.ToLower(username)).Scan(&exists)
-	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Something went wrong with database, could not check if user exists or not", http.StatusInternalServerError)
+	if authority != "user" && authority != "admin" {
+		http.Error(w, "Choose User or Admin.", http.StatusBadRequest)
+		return
+	}
+	if msg := checkNewAccount(username, password); msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	if exists {
+	_, err = createUser(username, password, authority)
+	if errors.Is(err, errUserExists) {
 		http.Error(w, "User already exists", http.StatusBadRequest)
 		return
 	}
-
-	HashedPass, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, "Cant hash password", http.StatusBadRequest)
-		return
-	}
-	_, err = db.Exec("insert into users (username, originalUsername, password_hash, pathToProfilePic, authority) values (?, ?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), "/profiles/Default/default.png", strings.ToLower(authority))
 	if err != nil {
 		fmt.Println(err)
-		http.Error(w, "Could not create user", http.StatusBadRequest)
+		http.Error(w, "Could not create user", http.StatusInternalServerError)
 		return
 	}
 

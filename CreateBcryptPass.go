@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,6 +20,6 @@ func createPass() {
 	fmt.Println(string(hashedPassword))
 }
 
-func main() {
+func createPassMain() {
 	createPass()
 }

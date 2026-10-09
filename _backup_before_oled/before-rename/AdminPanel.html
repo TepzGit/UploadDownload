@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+	<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<link rel="stylesheet" href="AdminPanel.css">
+	  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+	<body>
+<header class="xn">
+  <a class="xn-brand" href="/Main">Xentara</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+		<div class="AdminPanelOptions">
+			<button class="AdminPanelOption" onclick="window.location.pathname='/admin/createUser'">Create User</button>
+		</div>
+	</body>
+</html>

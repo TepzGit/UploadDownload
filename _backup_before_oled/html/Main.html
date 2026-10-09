@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · Xentara</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body class="min-h-screen bg-[#05030a] text-[#f8f4ff]">
+  <header class="navbar border-b border-[#2a1638] bg-black/70 shadow-[0_0_40px_rgba(168,85,247,0.12)] backdrop-blur">
+    <div class="flex-1">
+      <a class="btn btn-ghost text-xl font-semibold text-[#f8f4ff]" href="/Main">Xentara</a>
+    </div>
+    <div class="flex-none gap-2">
+      <a class="btn btn-ghost text-[#f8f4ff]" href="/journal">Journal</a>
+      <a class="btn btn-ghost text-[#f8f4ff]" href="/sub">Graph</a>
+      <a class="btn btn-ghost text-[#f8f4ff]" href="/Files">Files</a>
+      <a class="btn btn-ghost text-[#f8f4ff]" href="/Profile">Profile</a>
+      {{if eq .SessionInfo.Authority "admin"}}<a class="btn btn-ghost text-[#ff7b7b]" href="/admin">Admin</a>{{end}}
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 py-8">
+    <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <section class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <p class="text-sm uppercase tracking-[0.25em] text-primary">Quick access</p>
+          <h1 class="text-3xl font-semibold">Welcome to your workspace</h1>
+          <p class="text-base-content/70">Check your journal, browse files, and review your substance timeline from one place.</p>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <a class="btn btn-primary" href="/journal">Open journal</a>
+            <a class="btn btn-outline" href="/Files">Manage files</a>
+            <a class="btn btn-outline" href="/Profile">View profile</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <div class="clock-card" id="clockWidget" tabindex="0">
+            <div class="text-sm uppercase tracking-[0.25em] text-base-content/60">Current time</div>
+            <div class="time text-4xl font-semibold" id="timeDisplay">--:--:--</div>
+            <div class="date text-sm text-base-content/70" id="dateDisplay">Loading date...</div>
+            {{if not .Login}}
+            <div class="mt-4 space-y-3" id="passwordEntry">
+              <input class="input input-bordered w-full" id="usernameInput" type="text" placeholder="Enter username" aria-label="Username" />
+              <input class="input input-bordered w-full" id="passwordInput" type="password" placeholder="Enter password" aria-label="Password" />
+              <div class="text-xs text-base-content/60">Press Enter to submit</div>
+              <div class="text-sm text-error" id="passwordError"></div>
+            </div>
+            {{end}}
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="mt-6 card border border-[#2a1638] bg-[#0d0714] shadow-[0_0_45px_rgba(168,85,247,0.12)]">
+      <div class="card-body grid gap-6 md:grid-cols-[1fr_1fr]">
+        <div>
+          <h2 class="text-xl font-semibold">Today at a glance</h2>
+          <p class="mt-2 text-base-content/70">Jump to the substances planner or your saved journal entries without leaving the dashboard.</p>
+        </div>
+        <div class="rounded-2xl border border-[#2a1638] bg-[#12091d] p-4">
+          <div class="text-sm uppercase tracking-[0.25em] text-base-content/60">Weather</div>
+          <div class="weather-location text-xl font-semibold" id="weatherLocation">Copenhagen, DK</div>
+          <div class="weather-temp text-3xl font-semibold" id="weatherTemp">--°</div>
+          <div class="weather-condition text-base-content/70" id="weatherCondition">Loading weather…</div>
+          <div class="weather-wind text-sm text-base-content/60" id="weatherWind">Wind: -- m/s</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const timeDisplay = document.getElementById('timeDisplay')
+    const dateDisplay = document.getElementById('dateDisplay')
+    const clockWidget = document.getElementById('clockWidget')
+    const usernameInput = document.getElementById('usernameInput')
+    const passwordInput = document.getElementById('passwordInput')
+    const passwordEntry = document.getElementById('passwordEntry')
+    const passwordError = document.getElementById('passwordError')
+    const weatherLocation = document.getElementById('weatherLocation')
+    const weatherTemp = document.getElementById('weatherTemp')
+    const weatherCondition = document.getElementById('weatherCondition')
+    const weatherWind = document.getElementById('weatherWind')
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2,'0');
+      const minutes = String(now.getMinutes()).padStart(2,'0');
+      const seconds = String(now.getSeconds()).padStart(2,'0');
+      timeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+      dateDisplay.textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    }
+
+    async function submitLogin() {
+      passwordError.textContent = '';
+      const password = passwordInput?.value.trim() || '';
+      const username = usernameInput?.value.trim() || '';
+      if (!password || !username) {
+        passwordError.textContent = 'Username or password cannot be empty.';
+        return;
+      }
+      const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password })});
+      if (!res.ok) {
+        passwordError.textContent = 'Incorrect login. Try again.';
+      } else {
+        window.location.reload();
+      }
+    }
+
+    async function fetchWeather(latitude, longitude) {
+      try {
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=celsius&windspeed_unit=ms`);
+        if (!response.ok) throw new Error('Weather API error');
+        const data = await response.json();
+        const weather = data.current_weather;
+        if (!weather) throw new Error('No weather data');
+        weatherTemp.textContent = `${Math.round(weather.temperature)}°C`;
+        weatherCondition.textContent = weather.weathercode === 0 ? 'Clear' : 'Cloudy / Windy';
+        weatherWind.textContent = `Wind: ${weather.windspeed.toFixed(1)} m/s`;
+      } catch (_) {
+        weatherLocation.textContent = 'Unable to load weather';
+        weatherTemp.textContent = '--°';
+        weatherCondition.textContent = 'Unavailable';
+        weatherWind.textContent = 'Wind: -- m/s';
+      }
+    }
+
+    if (passwordEntry && passwordInput) {
+      clockWidget.addEventListener('click', () => {
+        if (document.activeElement === usernameInput || document.activeElement === passwordInput) return;
+        passwordEntry.classList.toggle('hidden');
+      });
+      passwordInput.addEventListener('keydown', async (event) => {
+        if (event.key === 'Enter') {
+          await submitLogin();
+        }
+      });
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    fetchWeather(55.6761, 12.5683);
+  </script>
+</body>
+</html>

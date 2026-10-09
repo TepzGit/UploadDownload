@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+	<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>Info</title>
+		<link rel="stylesheet" href="/DruginfoPage.css">
+	  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+	<body>
+<header class="xn">
+  <a class="xn-brand" href="/Main">Xentara</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+		<label class="DrugInfoName"></label>
+		<div class="DrugInfoIntakeMethods">
+			
+		</div>
+	</body>
+	<script>
+
+	async function getDrugInfo() {
+		const url = "https://api.psychonautwiki.org";
+		const params = new URLSearchParams(window.location.search);
+		const drugName = params.get("drug");
+
+		const query = `
+		{
+			substances(query: "${drugName}") {
+				name
+
+				roas {
+					name
+
+					dose {
+						units
+						threshold
+						heavy
+						common { min max }
+						light { min max }
+						strong { min max }
+					}
+
+					duration {
+						afterglow { min max units }
+						comeup { min max units }
+						duration { min max units }
+						offset { min max units }
+						onset { min max units }
+						peak { min max units }
+						total { min max units }
+					}
+
+					bioavailability {
+						min max
+					}
+				}
+
+			}
+		}`;
+
+		res = await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ query })
+		});
+
+		info = await res.json()
+		return info
+	}
+
+	getDrugInfo().then(info => {
+		substances = info.data.substances[0];          // full response
+		roas = substances.roas
+
+		document.querySelector(".DrugInfoName").textContent = substances.name
+		DrugInfoIntakeMethods = document.querySelector(".DrugInfoIntakeMethods")
+
+		for (i=0; i<roas.length;i++) {
+			roa = roas[i]
+			console.log(roa)
+			newDiv = document.createElement("div")
+			newDiv.className = "DrugInfoIntakeMethod"
+
+			method = roa.name
+			methodElement = document.createElement("label")
+			methodElement.textContent = method
+			
+			bioavailability = roa.bioavailability
+			if (bioavailability == null) {
+				bioavailability = "N/A"
+			} else {
+				bioavailability = bioavailability.max + "%"
+			}
+
+			bioavailabilityElement = document.createElement("label")
+			bioavailabilityElement.textContent = "Bioavailability: " + bioavailability
+
+
+			newDiv.append(methodElement)
+			newDiv.append(bioavailabilityElement)
+			
+			DrugInfoIntakeMethods.append(newDiv)
+		}
+	});
+
+
+	</script>
+</html>

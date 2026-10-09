@@ -1,0 +1,17 @@
+<html>
+	<head>
+		
+	</head>
+	<body>
+		<form action="/admin/createUser/AdminPanelCreateUserNow" method="POST" enctype="multipart/form-data">
+			<input name="username" type="text" class="AdminPanelCreateUserInput" required placeholder="Username">
+			<input name="password" type="password" class="AdminPanelCreateUserInput" required placeholder="Password">
+			<select required name="authority" id="AdminPanelCreateUserAuthority">
+				<option value="">Choose authority for the user</option>
+				<option value="User">User</option>
+				<option value="Admin">Admin</option>
+			</select>
+			<button type="submit">Create</button>
+		</form>
+	</body>
+</html>
