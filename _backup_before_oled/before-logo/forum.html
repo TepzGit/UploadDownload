@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Forum · Geek⁴u</title>
+  <meta name="description" content="Posts with text and pictures from Geek⁴u members.">
+  <link rel="stylesheet" href="/forum.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <script src="/media.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page fm">
+  <header class="fm-intro">
+    
+    <h1 class="xn-h1">Geek Forum</h1>
+    <p class="xn-sub">post anything you want :D</p>
+  </header>
+
+  <div class="fm-layout">
+    <form class="xn-card fm-compose" id="compose" novalidate>
+      <div class="fm-compose-row">
+        <span class="fm-avatar" aria-hidden="true">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}{{.Initial}}{{end}}</span>
+        <label class="xn-sr" for="postBody">Write a post</label>
+        <textarea class="xn-input fm-text" id="postBody" rows="3" maxlength="2000" placeholder="Write something, {{.Name}}…"></textarea>
+      </div>
+      <div class="fm-previews" id="postPreviews" hidden></div>
+      <div class="fm-compose-bar">
+        <button type="button" class="xn-btn" id="postAddPics">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><circle cx="9" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg>
+          <span>Pictures</span>
+        </button>
+        <span class="fm-count" id="postCount" aria-live="polite"></span>
+        <button type="submit" class="xn-btn xn-btn-primary" id="postSend" disabled>Post</button>
+      </div>
+      <input type="file" class="fm-file" id="postFiles" accept="image/jpeg,image/png,image/gif,image/webp,image/*" multiple tabindex="-1" aria-hidden="true">
+    </form>
+
+    <aside class="xn-card fm-members" aria-labelledby="membersTitle">
+      <div class="fm-side-head">
+        <h2 class="xn-h2" id="membersTitle">Members</h2>
+        <span class="fm-count" id="membersCount"></span>
+      </div>
+      <div class="fr-group fm-requests" id="requests" hidden>
+        <p class="fm-requests-title" id="requestsTitle">Friend requests</p>
+        <div class="fr-list" id="requestList" aria-labelledby="requestsTitle"></div>
+      </div>
+      <ul class="fm-member-list" id="members" aria-busy="true"></ul>
+    </aside>
+
+    <section class="fm-feed-wrap" aria-label="Posts">
+      <div class="fm-feed" id="feed" aria-busy="true"></div>
+      <p class="xn-empty fm-empty" id="feedEmpty">Loading posts…</p>
+      <button type="button" class="xn-btn fm-more" id="feedMore" hidden>Show older posts</button>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+  import { mountFeed, avatar, profileLink } from "/forum.js";
+  import { renderRequests } from "/friends.js";
+
+  const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+  const MAX_CHARS = 2000;
+  const MAX_PICS = 4;
+
+  const feed = mountFeed({
+    list: document.getElementById("feed"),
+    more: document.getElementById("feedMore"),
+    empty: document.getElementById("feedEmpty"),
+    emptyText: "No posts yet. Write the first one above.",
+  });
+
+  // ---------------- Writing a post ----------------
+  const form = document.getElementById("compose");
+  const text = document.getElementById("postBody");
+  const count = document.getElementById("postCount");
+  const send = document.getElementById("postSend");
+  const addPics = document.getElementById("postAddPics");
+  const fileInput = document.getElementById("postFiles");
+  const previews = document.getElementById("postPreviews");
+  let pictures = []; // { file, url }
+  let sending = false;
+
+  function sync() {
+    const length = text.value.length;
+    count.textContent = length > MAX_CHARS - 200 ? length + " / " + MAX_CHARS : "";
+    send.disabled = sending || (!text.value.trim() && !pictures.length);
+    addPics.disabled = sending || pictures.length >= MAX_PICS;
+    addPics.querySelector("span").textContent = pictures.length ? "Pictures " + pictures.length + "/" + MAX_PICS : "Pictures";
+  }
+
+  function renderPreviews() {
+    previews.hidden = !pictures.length;
+    previews.replaceChildren(...pictures.map((picture, index) => {
+      const cell = document.createElement("div");
+      cell.className = "fm-preview";
+      const img = document.createElement("img");
+      img.src = picture.url;
+      img.alt = "";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "fm-preview-x";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "Remove picture " + (index + 1));
+      remove.addEventListener("click", () => {
+        URL.revokeObjectURL(picture.url);
+        pictures.splice(index, 1);
+        renderPreviews();
+        sync();
+        (previews.querySelector(".fm-preview-x") || addPics).focus({ preventScroll: true });
+      });
+      cell.append(img, remove);
+      return cell;
+    }));
+  }
+
+  function addFiles(files) {
+    const images = [...files].filter((file) => file.type.startsWith("image/"));
+    const room = MAX_PICS - pictures.length;
+    if (images.length > room) toast("A post holds 4 pictures, so only the first " + room + " were added.");
+    images.slice(0, room).forEach((file) => pictures.push({ file, url: URL.createObjectURL(file) }));
+    renderPreviews();
+    sync();
+  }
+
+  addPics.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    addFiles(fileInput.files || []);
+    fileInput.value = "";
+  });
+  text.addEventListener("paste", (e) => {
+    const files = [...(e.clipboardData?.files || [])];
+    if (files.length) addFiles(files);
+  });
+  text.addEventListener("input", sync);
+  text.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) form.requestSubmit();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (sending || (!text.value.trim() && !pictures.length)) return;
+    sending = true;
+    sync();
+    form.classList.add("is-busy");
+    try {
+      const body = new FormData();
+      body.append("body", text.value);
+      for (const picture of pictures) {
+        const small = await window.xnShrinkPicture(picture.file, [1600, 1600]);
+        body.append("image", small, small === picture.file ? picture.file.name : "picture.jpg");
+      }
+      const res = await fetch("/forum/posts", { method: "POST", body });
+      if (res.status === 401) throw new Error("Log in again to post.");
+      if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't post that. Try again.");
+      feed.prepend(await res.json());
+      pictures.forEach((picture) => URL.revokeObjectURL(picture.url));
+      pictures = [];
+      text.value = "";
+      renderPreviews();
+      toast("Posted.");
+      bumpMember();
+    } catch (error) {
+      toast(error.message, true);
+    } finally {
+      sending = false;
+      form.classList.remove("is-busy");
+      sync();
+    }
+  });
+  sync();
+
+  // ---------------- Members ----------------
+  const memberList = document.getElementById("members");
+  const myName = {{.Name}};
+
+  function bumpMember() {
+    const mine = memberList.querySelector('[data-name="' + CSS.escape(myName.toLowerCase()) + '"] .fm-member-posts');
+    if (!mine) return;
+    const posts = Number(mine.dataset.posts || 0) + 1;
+    mine.dataset.posts = String(posts);
+    mine.textContent = posts === 1 ? "1 post" : posts + " posts";
+  }
+
+  const FRIEND_TAGS = { friends: "Friend", incoming: "Wants to be friends", outgoing: "Request sent" };
+  const requests = document.getElementById("requests");
+
+  function loadMembers() {
+    return fetch("/forum/members", { headers: { Accept: "application/json" } })
+      .then((res) => (res.ok && (res.headers.get("content-type") || "").includes("json") ? res.json() : []))
+      .catch(() => [])
+      .then(showMembers);
+  }
+
+  function showMembers(members) {
+    memberList.removeAttribute("aria-busy");
+    document.getElementById("membersCount").textContent = members.length ? String(members.length) : "";
+    const asking = members.filter((member) => member.friend === "incoming");
+    requests.hidden = !renderRequests(document.getElementById("requestList"), asking, loadMembers);
+    memberList.replaceChildren(...members.map((member) => {
+      const item = document.createElement("li");
+      item.dataset.name = member.name.toLowerCase();
+      const link = document.createElement("a");
+      link.className = "fm-member";
+      link.href = profileLink(member.name);
+      const who = document.createElement("span");
+      who.className = "fm-member-text";
+      const name = document.createElement("strong");
+      name.textContent = member.name;
+      const posts = document.createElement("small");
+      posts.className = "fm-member-posts";
+      posts.dataset.posts = String(member.posts);
+      posts.textContent = member.posts === 1 ? "1 post" : member.posts + " posts";
+      who.append(name, posts);
+      const tag = member.self ? "You" : FRIEND_TAGS[member.friend];
+      if (tag) {
+        const small = document.createElement("small");
+        small.className = "fm-member-tag";
+        small.dataset.state = member.self ? "self" : member.friend;
+        small.textContent = tag;
+        who.append(small);
+      }
+      link.append(avatar(member), who);
+      item.append(link);
+      return item;
+    }));
+  }
+  loadMembers();
+</script>
+</body>
+</html>

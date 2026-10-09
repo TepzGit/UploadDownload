@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Create user · Geek⁴u</title>
+  <link rel="stylesheet" href="/AdminPanel.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page ad">
+  <section class="xn-card ad-card">
+    <a href="/admin" class="ad-back">← Admin panel</a>
+    <p class="xn-eyebrow">Admin</p>
+    <h1 class="xn-h1">Create user</h1>
+    <p class="xn-sub">The username is case-insensitive when signing in.</p>
+    <form id="createUser" class="ad-form" action="/admin/createUser/AdminPanelCreateUserNow" method="POST" enctype="multipart/form-data">
+      <label>
+        <span class="xn-label">Username</span>
+        <input name="username" type="text" class="xn-input AdminPanelCreateUserInput" required placeholder="Username" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </label>
+      <label>
+        <span class="xn-label">Password</span>
+        <input name="password" type="password" class="xn-input AdminPanelCreateUserInput" required placeholder="Password" autocomplete="new-password">
+      </label>
+      <label>
+        <span class="xn-label">Role</span>
+        <select required name="authority" id="AdminPanelCreateUserAuthority" class="xn-input">
+          <option value="">Choose authority for the user</option>
+          <option value="User">User</option>
+          <option value="Admin">Admin</option>
+        </select>
+      </label>
+      <button type="submit" class="xn-btn xn-btn-primary">Create</button>
+      <p class="ad-result" id="adResult" role="status" hidden></p>
+    </form>
+  </section>
+</main>
+
+<script>
+  // Send the form in the background so the answer shows here instead of on a blank page.
+  const form = document.getElementById("createUser");
+  const result = document.getElementById("adResult");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    let ok = false;
+    let text = "";
+    try {
+      const res = await fetch(form.action, { method: "POST", body: new FormData(form) });
+      ok = res.ok;
+      text = (await res.text()).trim();
+    } catch (err) {
+      text = "Couldn't reach the server.";
+    }
+    button.disabled = false;
+    result.hidden = false;
+    result.classList.toggle("is-error", !ok);
+    result.textContent = ok ? `Created ${form.username.value}.` : (text || "Couldn't create the user.");
+    if (ok) form.reset();
+  });
+</script>
+</body>
+</html>

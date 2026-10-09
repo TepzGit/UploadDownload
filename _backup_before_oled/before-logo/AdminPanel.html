@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Admin · Geek⁴u</title>
+  <link rel="stylesheet" href="/AdminPanel.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page ad">
+  <section class="xn-card ad-card">
+    <p class="xn-eyebrow">Admin</p>
+    <h1 class="xn-h1">Admin panel</h1>
+    <p class="xn-sub">Manage who can sign in.</p>
+    <div class="AdminPanelOptions">
+      <a class="AdminPanelOption" href="/admin/createUser">
+        <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/></svg></span>
+        <span class="ad-text"><strong>Create user</strong><span>Add an account and choose its role.</span></span>
+        <svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </a>
+    </div>
+  </section>
+</main>
+</body>
+</html>

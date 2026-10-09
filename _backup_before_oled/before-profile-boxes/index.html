@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Substance timeline · Geek⁴u</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // hover: styles only on devices that can hover, so taps on iPhone don't leave buttons stuck "hovered"
+  if (window.tailwind) tailwind.config = { future: { hoverOnlyWhenSupported: true } };
+</script>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:#a67cff; }
+  body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
+  .font-display{ font-family:'Space Grotesk',sans-serif; }
+  .font-mono{ font-family:'JetBrains Mono',monospace; }
+  .glass{ background:var(--surface); border:1px solid var(--line); }
+  .check-card{ cursor:pointer; }
+  .check-card.selected{ border-color:var(--violet); background:rgba(166,124,255,.12); }
+  .suggestion{ display:block; width:100%; text-align:left; padding:.5rem .75rem; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
+  .suggestion:hover{ background:rgba(255,255,255,.08); }
+  .dose-card{ display:flex; align-items:center; gap:.75rem; background:var(--surface-2); border:1px solid var(--line); border-radius:.125rem; padding:.6rem .5rem .6rem .8rem; }
+  .dose-card time{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--violet); flex:none; }
+  .dose-card div{ display:flex; flex-direction:column; min-width:0; flex:1; }
+  .dose-card strong{ font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dose-card span{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+  .remove-dose{ flex:none; width:40px; height:40px; border-radius:.125rem; color:var(--muted); font-size:20px; line-height:1; }
+  .remove-dose:hover, .remove-dose:focus-visible{ color:var(--text); background:rgba(255,255,255,.06); outline:none; }
+  .edit-dose svg{ width:16px; height:16px; margin:auto; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .dose-card .edit-dose{ margin-right:-.5rem; }
+  .dose-edit{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:.6rem; align-items:end; padding:.7rem .7rem .7rem .8rem; border-color:var(--violet); }
+  .dose-edit .dose-edit-title{ grid-column:1 / -1; display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; margin:0; min-width:0; }
+  .dose-edit .dose-edit-title span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dose-edit-field{ display:flex; flex-direction:column; gap:.25rem; min-width:0; }
+  .dose-edit-amount{ display:flex; align-items:center; gap:.4rem; }
+  .dose-edit-amount em{ font-style:normal; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+  .dose-edit-actions{ grid-column:1 / -1; display:flex; justify-content:flex-end; gap:.4rem; }
+  .dose-edit-save:hover{ filter:brightness(1.1); }
+  /* Duration tiles in the substance panel */
+  .sub-times{ padding:.85rem .9rem; border:1px solid var(--line); background:var(--bg); }
+  .sub-times-head{ display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; margin-bottom:.65rem; }
+  .sub-times-head h4{ font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; }
+  .sub-times-head span{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .sub-times-bar{ display:flex; gap:2px; height:6px; margin-bottom:.75rem; }
+  .sub-times-bar i{ flex:1 1 0; min-width:4px; border-radius:1px; background:var(--c, var(--violet)); }
+  .sub-times-bar i[hidden]{ display:none; }
+  .sub-times-bar [data-seg="onset"], .sub-key[data-key="onset"]{ opacity:.3; }
+  .sub-times-bar [data-seg="comeup"], .sub-key[data-key="comeup"]{ opacity:.6; }
+  .sub-times-bar [data-seg="offset"], .sub-key[data-key="offset"]{ opacity:.45; }
+  .sub-times-grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:.4rem; margin:0; }
+  .sub-times-grid > div{ padding:.45rem .55rem; background:var(--surface-2); border:1px solid var(--line); min-width:0; }
+  .sub-times-grid .wide{ grid-column:1 / -1; display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; }
+  .sub-times-grid dt{ display:flex; align-items:center; gap:.4rem; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); }
+  .sub-times-grid dd{ margin:.15rem 0 0; font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text); font-variant-numeric:tabular-nums; }
+  .sub-times-grid .wide dd{ margin:0; }
+  .sub-key{ width:8px; height:8px; flex:none; border-radius:1px; background:var(--c, var(--violet)); }
+  /* Laptops and tablets in landscape (1024-1279px): substance info goes to the
+     right of the graph once a substance is picked; the form sits under the graph. */
+  @media (min-width:1024px) and (max-width:1279.98px){
+    .tl-wrap.has-info{ display:grid; grid-template-columns:minmax(0,1fr) 320px; column-gap:1.25rem; row-gap:1.25rem; align-items:start; }
+    .tl-wrap.has-info #chartCard{ grid-column:1; grid-row:1; }
+    .tl-wrap.has-info #controlsCard{ grid-column:1; grid-row:2; }
+    .tl-wrap.has-info #saveButton{ grid-column:1; grid-row:3; }
+    .tl-wrap.has-info #substanceInfo{ grid-column:2; grid-row:1 / span 3; position:sticky; top:calc(var(--oled-nav-h, 56px) + 1rem); max-height:calc(100vh - var(--oled-nav-h, 56px) - 2rem); overflow-y:auto; }
+  }
+  .pill{ display:inline-block; margin:0 .3rem .3rem 0; padding:.2rem .55rem; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text); }
+  .pill.empty{ color:var(--muted); background:transparent; }
+  .dose-list-empty{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding:.5rem 0; }
+  .toast{ position:fixed; left:50%; bottom:calc(1.25rem + env(safe-area-inset-bottom)); max-width:calc(100vw - 2rem); text-align:center; transform:translate(-50%,20px); background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:.6rem 1rem; border-radius:.125rem; opacity:0; pointer-events:none; transition:.25s ease; z-index:60; }
+  .toast.visible{ opacity:1; transform:translate(-50%,0); }
+  .toast.error{ border-color:#f8717155; color:#fca5a5; }
+  .chart-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; min-height:var(--chart-h); padding:1.5rem 1rem; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center; }
+  :root{ --chart-h:360px; }
+  @media (min-width:1280px){ :root{ --chart-h:calc(100vh - var(--oled-nav-h) - 7.5rem); } }
+  @supports (height:100dvh){ @media (min-width:1280px){ :root{ --chart-h:calc(100dvh - var(--oled-nav-h) - 7.5rem); } } }
+  /* Side padding clears the notch in landscape on iPhone. */
+  .tl-wrap{ padding-left:max(1rem, env(safe-area-inset-left)); padding-right:max(1rem, env(safe-area-inset-right)); }
+  @media (min-width:640px){ .tl-wrap{ padding-left:max(1.5rem, env(safe-area-inset-left)); padding-right:max(1.5rem, env(safe-area-inset-right)); } }
+  @media (min-width:1280px){ .tl-wrap{ height:calc(100vh - var(--oled-nav-h)); height:calc(100dvh - var(--oled-nav-h)); } }
+  /* Inner scroll boxes don't drag the page along when they hit the end. */
+  #doses, #substanceInfo{ overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+  /* Draws the eye to Time after a recent dose is picked (iOS won't open the picker by itself). */
+  @keyframes tl-attn{ 0%,100%{ box-shadow:0 0 0 0 rgba(166,124,255,0); } 30%{ box-shadow:0 0 0 3px rgba(166,124,255,.55); } }
+  .tl-attn{ animation:tl-attn 1.4s ease-out 2; border-color:var(--violet) !important; }
+  .crosshatch{
+    position:fixed; top:-280px; left:-260px; right:0; bottom:0; z-index:0; pointer-events:none;
+    will-change:transform;
+    background-image:
+      linear-gradient(45deg, transparent 49%, #23202b 49%, #23202b 51%, transparent 51%),
+      linear-gradient(-45deg, transparent 49%, #23202b 49%, #23202b 51%, transparent 51%);
+    background-size: 20px 20px;
+    animation: hatch-drift 90s linear infinite;
+  }
+  /* 13 x 14 tiles = a 47.1deg path that ends on a whole tile, so the loop is seamless */
+  @keyframes hatch-drift{ from{ transform:translate3d(0,0,0); } to{ transform:translate3d(260px,280px,0); } }
+  @media (prefers-reduced-motion: reduce){ .crosshatch{ animation:none; } }
+  .recent-box{ border:1px solid var(--line); background:rgba(0,0,0,.55); border-radius:.125rem; padding:.9rem; }
+  .recent-item{ position:relative; }
+  .recent-item .recent-dose{ width:100%; padding-right:2.75rem; border-left:3px solid var(--c, var(--line)); background:var(--ct, var(--surface-2)); }
+  .recent-item .recent-dose strong{ color:var(--c, var(--text)); }
+  .recent-del{ position:absolute; top:50%; right:.25rem; transform:translateY(-50%); width:36px; height:36px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:18px; line-height:1; border-radius:.125rem; }
+  .recent-del:hover, .recent-del:focus-visible{ color:var(--text); background:rgba(255,255,255,.06); outline:none; }
+  /* Recent doses + Experiences sit side by side in the empty chart, stacked on phones. */
+  .chart-boxes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap:1rem; width:100%; max-width:56rem; margin-top:1.5rem; align-items:stretch; }
+  .chart-boxes > [hidden]{ display:none; }
+  .chart-boxes .recent-box{ display:flex; flex-direction:column; min-width:0; height:min(70vh, 44rem); }
+  /* Side by side the titles can wrap differently; same height keeps the lists level. */
+  .chart-boxes .box-head{ min-height:2.4rem; align-items:flex-start; }
+  .chart-boxes .box-list{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; align-content:start; scrollbar-width:thin; }
+  @media (max-width:1023.98px){
+    .chart-boxes .recent-box{ height:auto; }
+    .chart-boxes .box-head{ min-height:0; align-items:center; }
+    .chart-boxes .box-list{ flex:none; max-height:min(55vh, 30rem); }
+  }
+  .exp-list{ display:flex; flex-direction:column; gap:.5rem; }
+  .exp-note{ font-size:11px; line-height:1.55; color:var(--muted); margin-bottom:.75rem; }
+  .exp-note a{ color:var(--text); text-decoration:underline; text-underline-offset:2px; }
+  .exp-empty{ font-size:11px; line-height:1.6; color:var(--muted); padding:.25rem 0; }
+  .exp-item{ position:relative; }
+  .exp-open{ width:100%; display:flex; flex-direction:column; gap:.4rem; text-align:left; padding:.6rem 2.75rem .6rem .75rem; border:1px solid var(--line); border-left:3px solid var(--c, var(--line)); background:var(--surface-2); border-radius:.125rem; color:var(--text); transition:border-color .15s; min-height:44px; }
+  .exp-open:focus-visible{ border-color:var(--violet); outline:none; }
+  @media (hover:hover){ .exp-open:hover{ border-color:var(--violet); border-left-color:var(--c, var(--violet)); } }
+  .exp-top{ display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; width:100%; }
+  .exp-top strong{ font-size:13px; }
+  .exp-top span{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); white-space:nowrap; }
+  .exp-spark{ display:block; width:100%; height:34px; overflow:visible; }
+  .exp-spark path{ fill:none; stroke:var(--c); stroke-width:1.75; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+  .exp-spark line{ stroke:var(--line); stroke-width:1; vector-effect:non-scaling-stroke; }
+  .exp-subs{ display:flex; flex-wrap:wrap; gap:.15rem .7rem; font-size:12px; color:var(--text); }
+  .exp-subs span{ display:inline-flex; align-items:center; gap:.35rem; min-width:0; }
+  .exp-subs i{ width:7px; height:7px; border-radius:50%; background:var(--c); flex:none; }
+  .exp-meta{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); }
+  .exp-item .recent-del{ top:.75rem; transform:none; }
+  .exp-item .recent-del.is-confirm{ width:auto; padding:0 .6rem; font-size:11px; font-family:'JetBrains Mono',monospace; color:#fca5a5; background:rgba(248,113,113,.12); border:1px solid rgba(248,113,113,.35); }
+  .link-btn{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); text-decoration:underline; text-underline-offset:3px; padding:.25rem 0; flex:none; }
+  .link-btn:hover{ color:var(--text); }
+  .tracker-range{ display:flex; border:1px solid var(--line); border-radius:.125rem; overflow:hidden; flex:none; }
+  .tracker-range button{ font-family:'JetBrains Mono',monospace; font-size:10px; padding:.3rem .5rem; color:var(--muted); }
+  .tracker-range button + button{ border-left:1px solid var(--line); }
+  .tracker-range button[aria-selected="true"]{ background:var(--surface-2); color:var(--text); }
+  .tracker-range button:disabled{ opacity:.35; cursor:not-allowed; }
+  .tracker-open{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; width:100%; text-align:left; padding:.7rem .8rem; border:1px solid var(--line); background:var(--surface-2); border-radius:.125rem; color:var(--muted); transition:border-color .15s; }
+  @media (hover:hover){ .tracker-open:hover{ border-color:var(--violet); color:var(--text); } }
+  .tracker-open:focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
+  @media (hover:none) and (pointer:coarse){ .tracker-range button{ padding:.55rem .7rem; font-size:11px; } }
+
+  /* Tracker pane: centered window on desktop, bottom sheet on phones. */
+  html.xn-modal-open, html.xn-modal-open body{ overflow:hidden; }
+  .pane{ padding:0; border:0; background:transparent; color:var(--text); max-width:none; max-height:none; width:100%; height:100%; margin:0; inset:0; overflow:hidden; }
+  .pane:not([open]){ display:none; }
+  .pane[open]{ display:flex; align-items:center; justify-content:center; }
+  .pane::backdrop{ background:rgba(0,0,0,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .pane-inner{ display:flex; flex-direction:column; width:min(820px, calc(100vw - 2rem)); max-height:min(86vh, 900px); background:var(--surface); border:1px solid var(--line); border-radius:.125rem; box-shadow:0 30px 80px -30px rgba(166,124,255,.35); }
+  .pane[open] .pane-inner{ animation:pane-in .22s cubic-bezier(.2,.7,.2,1); }
+  @keyframes pane-in{ from{ opacity:0; transform:translateY(16px) scale(.98); } to{ opacity:1; transform:none; } }
+  .pane-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.1rem 1.25rem .75rem; }
+  .pane-close{ width:40px; height:40px; margin:-.4rem -.5rem 0 0; display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--muted); border-radius:.125rem; }
+  .pane-close:hover, .pane-close:focus-visible{ color:var(--text); background:var(--surface-2); outline:none; }
+  .pane-range{ margin:0 1.25rem .75rem; align-self:flex-start; }
+  .pane-body{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:.25rem 1.25rem 1rem; display:flex; flex-direction:column; gap:1.25rem; }
+  .pane-foot{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1.25rem calc(.9rem + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .pane-h{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:.6rem; }
+  .pane-stats{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:.5rem; }
+  .pane-stat{ display:flex; flex-direction:column; gap:.2rem; padding:.75rem .85rem; border:1px solid var(--line); background:var(--bg); border-radius:.125rem; min-width:0; }
+  .pane-stat-label{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
+  .pane-stat-value{ font-size:1.5rem; font-weight:600; line-height:1.1; overflow-wrap:anywhere; }
+  .pane-stat-sub{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pane-subs{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:.6rem; }
+  .pane-sub{ padding:.85rem .9rem; border:1px solid var(--line); border-left:3px solid var(--c); background:var(--surface-2); border-radius:.125rem; min-width:0; }
+  .pane-sub-head{ display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; margin-bottom:.6rem; }
+  .pane-sub-name{ display:flex; align-items:center; gap:.5rem; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pane-sub-total{ font-size:1.25rem; font-weight:600; flex:none; }
+  .pane-dot{ width:8px; height:8px; border-radius:50%; background:var(--c); flex:none; }
+  .pane-facts{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:.35rem .9rem; font-size:12px; }
+  .pane-facts div{ display:flex; justify-content:space-between; gap:.5rem; min-width:0; }
+  .pane-facts .wide{ grid-column:1 / -1; }
+  .pane-facts dt{ color:var(--muted); flex:none; }
+  .pane-facts dd{ font-family:'JetBrains Mono',monospace; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pane-bars{ display:flex; align-items:flex-end; gap:2px; height:64px; margin-top:.85rem; padding-bottom:1px; border-bottom:1px solid var(--line); }
+  .pane-bar{ position:relative; flex:1; height:100%; display:flex; align-items:flex-end; cursor:default; }
+  .pane-bar span{ display:block; width:100%; background:var(--c); border-radius:4px 4px 0 0; min-height:0; }
+  .pane-bar:hover span{ filter:brightness(1.25); }
+  .pane-bar:hover::after{ content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); white-space:nowrap; padding:.3rem .5rem; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:.125rem; pointer-events:none; z-index:2; }
+  .pane-bar:first-child:hover::after{ left:0; transform:none; }
+  .pane-bar:last-child:hover::after{ left:auto; right:0; transform:none; }
+  .pane-bars-axis{ display:flex; justify-content:space-between; margin-top:.3rem; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); }
+  .pane-log{ display:flex; flex-direction:column; gap:2px; }
+  .pane-log-row{ display:grid; grid-template-columns:8.5rem minmax(0,1fr) auto minmax(0,9rem) 36px; align-items:center; gap:.75rem; padding:.45rem .25rem .45rem .7rem; background:var(--surface-2); border-left:3px solid var(--c); font-size:12px; }
+  .pane-log-when{ font-family:'JetBrains Mono',monospace; color:var(--muted); white-space:nowrap; }
+  .pane-log-what{ display:flex; align-items:center; gap:.45rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pane-log-amt{ font-family:'JetBrains Mono',monospace; font-weight:600; text-align:right; white-space:nowrap; }
+  .pane-log-rel{ color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pane-log-row > .pane-log-del{ width:36px; height:32px; grid-column:5; }
+  @media (max-width:640px){
+    .pane[open]{ align-items:flex-end; }
+    .pane-inner{ width:100%; max-height:92vh; max-height:92dvh; border-left:0; border-right:0; border-bottom:0; padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); }
+    @keyframes pane-in{ from{ transform:translateY(40px); opacity:0; } to{ transform:none; opacity:1; } }
+    .pane-stats{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .pane-stats .pane-stat:last-child{ grid-column:1 / -1; }
+    .pane-facts{ grid-template-columns:1fr; }
+    .pane-log-row{ grid-template-columns:minmax(0,1fr) auto 36px; grid-template-areas:"what amt del" "when rel del"; row-gap:.1rem; }
+    .pane-log-what{ grid-area:what; } .pane-log-amt{ grid-area:amt; } .pane-log-when{ grid-area:when; font-size:11px; } .pane-log-rel{ grid-area:rel; text-align:right; }
+    .pane-log-row > .pane-log-del{ grid-area:del; grid-column:auto; }
+  }
+  @media (prefers-reduced-motion: reduce){ .pane[open] .pane-inner{ animation:none; } }
+  .recent-dose{ display:flex; flex-direction:column; align-items:flex-start; gap:.15rem; text-align:left; min-height:44px; padding:.55rem .75rem; border:1px solid var(--line); background:var(--surface-2); border-radius:.125rem; color:var(--text); transition:border-color .15s; }
+  .recent-dose:focus-visible{ border-color:var(--violet); outline:none; }
+  @media (hover:hover){ .recent-dose:hover{ border-color:var(--violet); } }
+  .recent-dose strong{ font-size:13px; }
+  .recent-dose span{ font-size:11px; color:var(--muted); }
+  .res-link{ display:flex; align-items:center; gap:.75rem; padding:.55rem .6rem; border:1px solid var(--line); background:var(--surface-2); border-radius:.125rem; transition:border-color .15s; }
+  @media (hover:hover){ .res-link:hover{ border-color:var(--violet); } }
+  .res-link img{ width:24px; height:24px; flex:none; border-radius:.125rem; background:#fff1; }
+  .chart-empty + #myPlot{ height:var(--chart-h); width:100%; }
+  .chart-empty:not([hidden]) + #myPlot{ display:none; }
+  .suggestion{ min-height:44px; }
+  input[type=time]{ -webkit-appearance:none; appearance:none; }
+  input[type=time]::-webkit-date-and-time-value{ text-align:left; }
+  @media (max-width: 640px){
+    :root{ --chart-h:260px; }
+  }
+  @media (hover:none) and (pointer:coarse){
+    .input-sm{ height:2.75rem; }
+    .btn-sm{ height:2.75rem; min-height:2.75rem; }
+    .btn-xs{ height:2.25rem; min-height:2.25rem; padding:0 .75rem; }
+    .check-card{ padding:.7rem; }
+  }
+  .input, .btn, .join-item, .checkbox{ border-radius:.125rem !important; }
+  #chartCard{ animation-delay:80ms; } #substanceInfo{ animation-delay:160ms; }
+  .release-details > summary{ list-style:none; }
+  .release-details > summary::-webkit-details-marker{ display:none; }
+  .release-details[open] .release-chevron{ transform:rotate(180deg); }
+  .release-chevron{ transition:transform .15s ease; }
+</style>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="min-h-screen bg-black text-[#f8f4ff]">
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="crosshatch" aria-hidden="true"></div>
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+
+<div class="tl-wrap relative z-[1] py-6 sm:py-8 xl:py-5 pb-[calc(2rem+env(safe-area-inset-bottom))] flex flex-col xl:grid xl:grid-cols-[340px_minmax(0,1fr)_340px] xl:items-stretch gap-5 xl:gap-x-12">
+  <div class="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0 xl:min-h-0 xl:col-start-2 xl:row-start-1">
+
+
+    <section id="chartCard" class="glass rounded-sm p-3 sm:p-5 order-1 xl:order-none min-w-0 xl:flex-1 scroll-mt-20">
+
+      <div id="chartEmpty" class="chart-empty">
+
+        <div class="chart-boxes">
+          <div id="recentDoses" class="recent-box text-left" hidden>
+            <div class="box-head flex items-center justify-between gap-3 mb-3">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Recent doses · tap to reuse</p>
+              <button id="recentClear" type="button" class="link-btn">Clear all</button>
+            </div>
+            <div data-recent-list class="box-list grid grid-cols-1 gap-2"></div>
+          </div>
+
+          <section id="experiences" class="recent-box exp-box text-left" aria-labelledby="expTitle">
+            <div class="box-head flex items-center justify-between gap-3 mb-3">
+              <h2 id="expTitle" class="font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[var(--muted)]">Experiences · tap to open</h2>
+              <span data-exp-count class="font-mono text-[10px] text-[var(--muted)]"></span>
+            </div>
+            <p data-exp-note class="exp-note" hidden></p>
+            <div data-exp-list class="box-list exp-list" role="list"></div>
+          </section>
+        </div>
+      </div>
+      <div id="myPlot"></div>
+    </section>
+
+  </div>
+
+  <aside class="contents xl:flex xl:flex-col xl:gap-5 xl:min-h-0 xl:col-start-1 xl:row-start-1">
+    <section id="controlsCard" class="glass rounded-sm p-4 sm:p-5 order-2 xl:order-none flex flex-col xl:flex-1 xl:min-h-0">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Add a dose</h2>
+        <button id="resetButton" type="button" class="btn btn-xs btn-ghost font-mono" aria-label="Reset timeline">reset</button>
+      </div>
+
+      <label class="font-mono text-[11px] text-[var(--muted)] block mb-1" for="input">Substance</label>
+      <div class="join w-full mb-1 relative">
+        <input id="input" autocomplete="off" placeholder="Search, e.g. caffeine" class="input input-sm join-item bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+        <button id="searchButton" type="button" class="btn btn-sm join-item bg-[var(--surface-2)] border-[var(--line)]" aria-label="Search">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <div id="sug" class="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--surface-2)] border border-[var(--line)] rounded-sm overflow-hidden" hidden>
+          <div id="sugC" role="listbox"></div>
+        </div>
+      </div>
+      <p id="status" class="font-mono text-[11px] text-[var(--muted)] mb-3">Search for a substance to begin.</p>
+
+      <section id="dosePanel" class="flex flex-col gap-3" hidden>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="block">
+            <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Dose <span id="doseUnit"></span></span>
+            <input id="doseInput" type="number" inputmode="decimal" min="0" step="any" placeholder="300" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+          </label>
+          <label class="block">
+            <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Time</span>
+            <input id="doseStartHour" type="time" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+          </label>
+        </div>
+
+        <details id="releaseDetails" class="release-details">
+          <summary class="flex items-center justify-between cursor-pointer select-none border border-[var(--line)] rounded-sm bg-[var(--surface-2)] px-3 h-9 font-mono text-[11px] text-[var(--muted)]">
+            <span>Medication release: <strong id="releaseSummary" class="text-[var(--text)] font-medium">Immediate</strong></span>
+            <svg class="release-chevron w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+        <fieldset class="mt-2">
+          <legend class="sr-only">Medication release</legend>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="check-card selected border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="immediate" data-label="Immediate release" data-hours="0" checked class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Immediate</strong><small class="font-mono text-[10px] text-[var(--muted)]">Standard</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="retard" data-label="Retard / extended release" data-hours="12" class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Retard / XR</strong><small class="font-mono text-[10px] text-[var(--muted)]">Extended</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="depot" data-label="Depot / long-acting" data-hours="168" class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Depot</strong><small class="font-mono text-[10px] text-[var(--muted)]">Long-acting</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-sm p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="modified" data-label="Other modified release" data-hours="24" class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Other MR</strong><small class="font-mono text-[10px] text-[var(--muted)]">Modified</small></span>
+            </label>
+          </div>
+        </fieldset>
+        </details>
+
+        <label id="releaseWindowField" class="block" hidden>
+          <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Release window (hours)</span>
+          <input id="releaseWindow" type="number" min="0.5" max="8760" step="0.5" value="12" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+        </label>
+
+        <p class="font-mono text-[10px] text-[var(--muted)] leading-relaxed border-t border-[var(--line)] pt-2">Visual estimate, not dosing guidance. Modified-release behavior varies by product and route.</p>
+        <button id="addDoseButton" type="button" class="btn btn-sm bg-[var(--violet)] hover:bg-[var(--violet)] hover:brightness-110 border-none text-[#160f24] font-mono font-medium">+ Add dose to timeline</button>
+      </section>
+    <div class="mt-4 pt-4 border-t border-[var(--line)] flex flex-col min-h-0 xl:flex-1">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Added doses <span id="doseCount" class="text-[var(--muted)] font-mono text-xs">0</span></h2>
+      </div>
+      <div id="doses" class="flex flex-col gap-2 xl:overflow-y-auto xl:min-h-0 xl:flex-1">
+        <p class="dose-list-empty">No doses added yet.</p>
+      </div>
+    </div>
+
+    <button id="trackerOpen" type="button" class="tracker-open mt-4 flex-none" aria-haspopup="dialog" aria-controls="trackerPane">
+      <span class="flex flex-col items-start gap-0.5 min-w-0">
+        <span class="font-display text-sm font-semibold text-[var(--text)]">Total consumed</span>
+        <span id="trackerPeek" class="font-mono text-[11px] text-[var(--muted)] truncate max-w-full">Today · nothing yet</span>
+      </span>
+      <svg class="flex-none" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    </section>
+
+
+    <button id="saveButton" type="button" disabled class="btn btn-sm h-12 order-6 xl:order-none bg-[var(--surface)] border-[var(--line)] text-[var(--text)] font-mono disabled:opacity-40">Save data</button>
+  </aside>
+
+  <aside class="contents xl:flex xl:flex-col xl:gap-5 xl:min-h-0 xl:col-start-3 xl:row-start-1">
+    <section id="substanceInfo" class="glass rounded-sm p-4 sm:p-6 order-5 xl:order-none xl:flex-1 xl:min-h-0 xl:overflow-y-auto" hidden>
+      <div class="flex items-center gap-4 mb-4">
+        <img id="substanceImage" alt="" hidden class="w-20 h-20 object-contain flex-none" />
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Selected substance</p>
+          <h3 id="substanceName" class="font-display text-base font-semibold"></h3>
+        </div>
+      </div>
+      <section id="substanceTimes" class="sub-times mb-6" aria-labelledby="substanceTimesTitle" hidden>
+        <div class="sub-times-head">
+          <h4 id="substanceTimesTitle">Duration</h4>
+          <span data-route></span>
+        </div>
+        <div class="sub-times-bar" aria-hidden="true"><i data-seg="onset"></i><i data-seg="comeup"></i><i data-seg="peak"></i><i data-seg="offset"></i></div>
+        <dl class="sub-times-grid">
+          <div><dt><i class="sub-key" data-key="onset"></i>Onset</dt><dd data-phase="onset"></dd></div>
+          <div><dt><i class="sub-key" data-key="comeup"></i>Come up</dt><dd data-phase="comeup"></dd></div>
+          <div><dt><i class="sub-key" data-key="peak"></i>Peak</dt><dd data-phase="peak"></dd></div>
+          <div><dt><i class="sub-key" data-key="offset"></i>Offset</dt><dd data-phase="offset"></dd></div>
+          <div class="wide"><dt>Total</dt><dd data-total></dd></div>
+        </dl>
+      </section>
+      <p id="substanceSummary" class="text-[#fff] text-sm leading-relaxed mb-6 p-3 border border-[var(--line)] bg-[var(--bg)]"></p>
+      <p class="text-lg text-[var(--muted)] mb-6 pb-4 border-b-2 border-[var(--line)]">Addiction potential:<br><strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>
+      <div class="space-y-7">
+        <div><p class="text-base text-amber-300 mb-2">Caution</p><div data-interaction="caution"></div></div>
+        <div><p class="text-base text-orange-400 mb-2">Dangerous</p><div data-interaction="danger"></div></div>
+        <div><p class="text-base text-red-400 mb-2">Severe / do not combine</p><div data-interaction="severe"></div></div>
+      </div>
+      <div class="mt-7 pt-5 border-t-2 border-[var(--line)]">
+        <h2 class="text-base text-[var(--text)] mb-3">Harm reduction resources</h2>
+        <div class="flex flex-col gap-2">
+          <a class="res-link" href="https://tripsit.me" data-home="https://tripsit.me" data-tpl="https://drugs.tripsit.me/{slug}" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/s2/favicons?domain=tripsit.me&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="min-w-0"><span class="block text-sm text-[var(--text)] underline-offset-2 hover:underline">TripSit</span><span class="block font-mono text-[10px] text-[var(--muted)] truncate">Combo chart and live chat</span></span></a>
+          <a class="res-link" href="https://psychonautwiki.org" data-home="https://psychonautwiki.org" data-tpl="https://psychonautwiki.org/wiki/{wiki}" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/s2/favicons?domain=psychonautwiki.org&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="min-w-0"><span class="block text-sm text-[var(--text)] underline-offset-2 hover:underline">PsychonautWiki</span><span class="block font-mono text-[10px] text-[var(--muted)] truncate">Doses, effects, durations</span></span></a>
+          <a class="res-link" href="https://erowid.org" data-home="https://erowid.org" data-tpl="https://www.erowid.org/search.php?q={q}" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/s2/favicons?domain=erowid.org&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="min-w-0"><span class="block text-sm text-[var(--text)] underline-offset-2 hover:underline">Erowid</span><span class="block font-mono text-[10px] text-[var(--muted)] truncate">Experience reports and library</span></span></a>
+          <a class="res-link" href="https://dancesafe.org" data-home="https://dancesafe.org" data-tpl="https://dancesafe.org/?s={q}" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/s2/favicons?domain=dancesafe.org&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="min-w-0"><span class="block text-sm text-[var(--text)] underline-offset-2 hover:underline">DanceSafe</span><span class="block font-mono text-[10px] text-[var(--muted)] truncate">Drug checking and test kits</span></span></a>
+          <a class="res-link" href="https://www.drugsand.me" data-home="https://www.drugsand.me" data-tpl="https://www.drugsand.me/en/?s={q}" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/s2/favicons?domain=www.drugsand.me&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="min-w-0"><span class="block text-sm text-[var(--text)] underline-offset-2 hover:underline">Drugs and Me</span><span class="block font-mono text-[10px] text-[var(--muted)] truncate">Interactions and safer use</span></span></a>
+          <a class="res-link" href="https://www.bluelight.org" data-home="https://www.bluelight.org" data-tpl="https://www.bluelight.org/community/search/?q={q}" target="_blank" rel="noopener noreferrer"><img src="https://www.google.com/s2/favicons?domain=www.bluelight.org&sz=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="min-w-0"><span class="block text-sm text-[var(--text)] underline-offset-2 hover:underline">Bluelight</span><span class="block font-mono text-[10px] text-[var(--muted)] truncate">Harm reduction forum</span></span></a>
+        </div>
+      </div>
+    </section>
+  </aside>
+
+
+
+  </div>
+<div id="cookieConsent" class="fixed z-[70] left-4 right-4 sm:left-auto sm:right-6 bottom-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-sm glass rounded-sm border border-[var(--line)] bg-[var(--surface)] p-4 shadow-2xl" role="dialog" aria-live="polite" aria-label="Cookie consent" hidden>
+  <p class="text-sm text-[var(--text)] mb-1">Remember your recent doses?</p>
+  <p class="font-mono text-[11px] text-[var(--muted)] leading-relaxed mb-3">We save your recent doses and your dose totals on this device (cookies and local storage) so you can reuse them with one tap. Nothing is shared.</p>
+  <div class="flex gap-2">
+    <button id="cookieAccept" type="button" class="btn btn-sm flex-1 bg-[var(--violet)] hover:bg-[var(--violet)] hover:brightness-110 border-none text-[#160f24] font-mono">Accept</button>
+    <button id="cookieDecline" type="button" class="btn btn-sm flex-1 bg-[var(--surface-2)] border-[var(--line)] text-[var(--text)] font-mono">Decline</button>
+  </div>
+</div>
+<dialog id="trackerPane" class="pane" aria-labelledby="paneTitle">
+  <div class="pane-inner">
+    <header class="pane-head">
+      <div>
+        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Dose tracker</p>
+        <h2 id="paneTitle" class="font-display text-lg font-semibold">Total consumed</h2>
+      </div>
+      <button type="button" class="pane-close" data-close aria-label="Close">×</button>
+    </header>
+    <div class="tracker-range pane-range" role="tablist" aria-label="Time range">
+      <button type="button" role="tab" data-range="timeline">Timeline</button>
+      <button type="button" role="tab" data-range="today">Today</button>
+      <button type="button" role="tab" data-range="week">7 days</button>
+      <button type="button" role="tab" data-range="month">30 days</button>
+    </div>
+    <div class="pane-body">
+      <div class="pane-stats" data-stats></div>
+      <section>
+        <h3 class="pane-h">By substance</h3>
+        <div class="pane-subs" data-substances></div>
+      </section>
+      <section data-log-wrap>
+        <h3 class="pane-h">Every dose</h3>
+        <ol class="pane-log" data-log></ol>
+      </section>
+    </div>
+    <footer class="pane-foot">
+      <p class="font-mono text-[10px] text-[var(--muted)] leading-relaxed" data-note></p>
+      <button id="trackerClear" type="button" class="link-btn" hidden>Clear history</button>
+    </footer>
+  </div>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="./ui.js"></script>
+<script>
+(() => {
+  const nameEl = document.getElementById("substanceName");
+  const sync = () => {
+    const n = (nameEl.textContent || "").trim();
+    document.querySelectorAll(".res-link").forEach((a) => {
+      a.href = n ? a.dataset.tpl
+        .replace("{slug}", encodeURIComponent(n.toLowerCase().replace(/\s+/g, "-")))
+        .replace("{wiki}", encodeURIComponent(n.replace(/\s+/g, "_")))
+        .replace("{q}", encodeURIComponent(n)) : a.dataset.home;
+    });
+  };
+  new MutationObserver(sync).observe(nameEl, { childList: true, characterData: true, subtree: true });
+  sync();
+})();
+</script>
+
+</body>
+</html>

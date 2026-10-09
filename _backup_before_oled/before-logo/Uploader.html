@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Upload · Geek⁴u</title>
+  <link rel="icon" href="https://i.ibb.co/fYVMHYdf/unavngivet.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/script.js"></script>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page up">
+  <div class="up-grid">
+    <form id="box" class="xn-card up-card" action="/upload" method="post" enctype="multipart/form-data">
+      <div class="up-head">
+        <div>
+          <p class="xn-eyebrow">Files</p>
+          <h1 class="xn-h1">Upload files</h1>
+          <p class="xn-sub">Pick files, choose a folder, then upload.</p>
+        </div>
+        <a href="/Files/" class="xn-btn filex">
+          <svg viewBox="0 0 24 24" class="up-ico" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg>
+          File explorer
+        </a>
+      </div>
+
+      <div id="drop-zone" class="up-drop" tabindex="0" role="button" aria-label="Choose files to upload">
+        <img id="img" src="https://i.pinimg.com/originals/ba/e3/0e/bae30e0c7acfec296e5a30d0a75af0f1.gif" alt="" onerror="this.remove()">
+        <svg viewBox="0 0 24 24" class="up-ico up-drop-ico" aria-hidden="true"><path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg>
+        <span id="drop-zone-text" class="up-drop-text">
+          <span class="up-when-mouse">Drag &amp; drop files here, or click to browse</span>
+          <span class="up-when-touch">Tap to choose files</span>
+        </span>
+        <span class="up-drop-hint up-when-mouse">You can also paste files</span>
+        <input id="file-input" type="file" name="files" multiple hidden>
+      </div>
+
+      <div class="up-picked">
+        <div class="up-picked-head">
+          <span class="xn-label">Selected files</span>
+          <span id="upCount" class="up-count"></span>
+        </div>
+        <div class="FileListings"><p class="xn-empty">No files picked yet.</p></div>
+      </div>
+
+      <p class="up-dest">Uploading to <strong id="upDest">/</strong> <a href="#folders" class="up-change">Change</a></p>
+
+      <div class="progress" id="progressBar" hidden>
+        <div class="up-bar"><div class="progress-bar" style="width: 0;"></div></div>
+        <span class="progress-number" aria-live="polite"></span>
+      </div>
+
+      <div id="success" role="status" hidden>
+        <svg viewBox="0 0 24 24" class="up-ico" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        <span class="success__title">Uploaded successfully!</span>
+        <button type="button" class="success__close" onclick="hideElement()" aria-label="Dismiss">×</button>
+      </div>
+
+      <button id="submit" type="submit" class="xn-btn xn-btn-primary up-submit" disabled>Upload</button>
+      <input type="hidden" name="currentPath" id="currentPathInput" value=".">
+    </form>
+
+    <section class="xn-card UploadExplorer" id="folders" data-path=".">
+      <h2 class="xn-h2">Destination folder</h2>
+      <p class="xn-sub">Tap a folder to open it. Files go to the folder you're in.</p>
+      <div class="up-path"><span class="CurrentPath">/</span></div>
+      <div class="UploadExplorerUploadItems"></div>
+      <button type="button" class="xn-btn backbut" onclick="getFolders('..')" disabled>
+        <svg viewBox="0 0 24 24" class="up-ico" aria-hidden="true"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></svg>
+        Up one folder
+      </button>
+    </section>
+  </div>
+</main>
+
+<script>
+  const FOLDER_ICON = '<svg viewBox="0 0 24 24" class="up-ico" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg>';
+
+  function escapeHTML(text) {
+    return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function listFiles() {
+    const fileInput = document.getElementById('file-input');
+    const files = fileInput.files;
+    const FileListingPart = document.querySelector('.FileListings');
+    let total = 0;
+
+    FileListingPart.innerHTML = '';
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      total += file.size;
+
+      const elem = document.createElement('div');
+      elem.className = 'file-item';
+      elem.innerHTML = '<span class="file-name"></span><span class="file-size"></span>';
+      elem.querySelector('.file-name').textContent = file.name;
+      elem.querySelector('.file-size').textContent = byteConverter(file.size);
+      FileListingPart.appendChild(elem);
+    }
+
+    if (!files.length) FileListingPart.innerHTML = '<p class="xn-empty">No files picked yet.</p>';
+    document.getElementById('upCount').textContent = files.length ? `${files.length} file${files.length === 1 ? '' : 's'} · ${byteConverter(total)}` : '';
+    document.getElementById('submit').disabled = !files.length;
+    if (files.length) hideElement();
+  }
+
+  function setInputFiles(files) {
+    const fileInput = document.getElementById('file-input');
+    const dataTransfer = new DataTransfer();
+
+    for (let i = 0; i < files.length; i++) {
+      dataTransfer.items.add(files[i]);
+    }
+    fileInput.files = dataTransfer.files;
+    listFiles();
+  }
+
+  function filesFromClipboard(event) {
+    const items = event.clipboardData ? event.clipboardData.items : [];
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') files.push(items[i].getAsFile());
+    }
+    return files;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    fileInput.addEventListener('change', listFiles);
+
+    dropZone.addEventListener('click', function() {
+      fileInput.click();
+    });
+    dropZone.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    dropZone.addEventListener('dragover', function(event) {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function() {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function(event) {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+
+      const files = event.dataTransfer.files;
+      if (files && files.length > 0) {
+        setInputFiles(files);
+      }
+    });
+
+    // Paste works anywhere on the page.
+    document.addEventListener('paste', function(event) {
+      const files = filesFromClipboard(event);
+      if (files.length > 0) {
+        setInputFiles(files);
+        event.preventDefault();
+      }
+    });
+
+    document.querySelector('.up-change').addEventListener('click', function(event) {
+      event.preventDefault();
+      document.getElementById('folders').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("success") == "true") {
+    document.querySelector('#success').hidden = false;
+  }
+
+  async function getFolders(arg) {
+    const UploadExplorer = document.querySelector(".UploadExplorer");
+    const UploadExplorerUploadItems = document.querySelector(".UploadExplorerUploadItems");
+
+    let folderName;
+    if (typeof arg === "string") {
+      folderName = arg;
+    } else {
+      folderName = arg.dataset.name;
+    }
+
+    let data;
+    try {
+      const res = await fetch("/getFolders", {
+        method: "POST",
+        body: JSON.stringify({
+          currentPath: UploadExplorer.dataset.path,
+          FolderToGet: folderName
+        }),
+        headers: {
+          "Content-type": "application/json; charset=UTF-8"
+        }
+      });
+      if (!res.ok) throw new Error(res.status);
+      data = await res.json();
+    } catch (e) {
+      console.log("Could Not find folder", e);
+      return;
+    }
+    const Folders = data.Folders || [];
+    const currentPath = data.CurrentPath || ".";
+    const shown = currentPath === "." ? "/" : "/" + currentPath;
+
+    UploadExplorerUploadItems.innerHTML = "";
+    for (let i = 0; i < Folders.length; i++) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "UploadExplorerUploadItem";
+      item.dataset.name = Folders[i];
+      item.onclick = function() { getFolders(this); };
+      item.innerHTML = `${FOLDER_ICON}<span class="filename">${escapeHTML(Folders[i])}</span>`;
+      UploadExplorerUploadItems.appendChild(item);
+    }
+    if (!Folders.length) UploadExplorerUploadItems.innerHTML = '<p class="xn-empty">No folders in here.</p>';
+
+    UploadExplorer.dataset.path = currentPath;
+    UploadExplorer.querySelector(".CurrentPath").textContent = shown;
+    UploadExplorer.querySelector(".backbut").disabled = currentPath === ".";
+    document.querySelector("#currentPathInput").value = currentPath;
+    document.querySelector("#upDest").textContent = shown;
+  }
+
+  getFolders(".");
+
+  function hideElement() {
+    const el = document.querySelector("#success");
+    if (el) el.hidden = true;
+  }
+
+  const form = document.getElementById("box");
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault(); // stay on the page and show progress instead
+    uploadFiles();
+  });
+
+  function uploadFiles() {
+    const fileInput = document.getElementById("file-input");
+    const files = fileInput.files;
+    if (!files.length) return;
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("files", files[i]);
+    }
+    formData.append("currentPath", document.getElementById("currentPathInput").value);
+
+    const submit = document.getElementById("submit");
+    const bar = document.querySelector(".progress-bar");
+    const number = document.querySelector(".progress-number");
+    const progress = document.getElementById("progressBar");
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/upload", true);
+    hideElement();
+    progress.hidden = false;
+    bar.style.width = "0%";
+    number.textContent = "Starting…";
+    submit.disabled = true;
+    submit.textContent = "Uploading…";
+
+    let lastLoaded = 0;
+    let lastTime = Date.now();
+
+    xhr.upload.onprogress = function (event) {
+      if (!event.lengthComputable) return;
+      const now = Date.now();
+      const percent = (event.loaded / event.total) * 100;
+      const timeDiff = Math.max((now - lastTime) / 1000, 0.001);
+      const speedKBs = (event.loaded - lastLoaded) / timeDiff / 1024;
+
+      bar.style.width = `${percent.toFixed(0)}%`;
+      number.textContent = speedKBs > 1024
+        ? `${percent.toFixed(0)}% · ${(speedKBs / 1024).toFixed(1)} MB/s`
+        : `${percent.toFixed(0)}% · ${speedKBs.toFixed(1)} KB/s`;
+      lastLoaded = event.loaded;
+      lastTime = now;
+    };
+
+    function done(ok) {
+      progress.hidden = true;
+      submit.textContent = "Upload";
+      if (ok) {
+        document.getElementById("success").hidden = false;
+        fileInput.value = "";
+        listFiles();
+      } else {
+        submit.disabled = false;
+        if (window.xnToast) window.xnToast("Upload failed. Try again.", true);
+      }
+    }
+
+    xhr.onload = function () { done(xhr.status === 200); };
+    xhr.onerror = function () { done(false); };
+    xhr.send(formData);
+  }
+</script>
+</body>
+</html>

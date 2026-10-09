@@ -111,6 +111,8 @@ body * {
 }
 
 .xn-brand {
+  display: inline-flex;
+  align-items: center;
   margin-right: auto;
   padding: 8px 0;
   color: var(--oled-text);
@@ -119,7 +121,10 @@ body * {
   letter-spacing: -0.01em;
 }
 
-/* The "4" in Geek⁴u: a real <sup> so it stays in Roboto Mono (the
+/* The logo is an inline SVG (letters drawn as paths, so no font is needed). */
+.xn-brand .xn-logo { display: block; width: auto; height: 26px; }
+
+/* Older pages may still have the text version. The "4" in Geek⁴u: a real <sup> so it stays in Roboto Mono (the
    self-hosted font has no ⁴ glyph). */
 .xn-brand sup {
   margin: 0 0.04em;
@@ -580,3 +585,33 @@ html.xn-js:not(.xn-admin) .xn-links a[href^="/Files"] { display: none; }
 .is-pop .xn-heart { animation: xn-like-pop 0.32s cubic-bezier(0.2, 0.7, 0.2, 1.4); }
 @keyframes xn-like-pop { 0% { transform: scale(1); } 45% { transform: scale(1.3); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .is-pop .xn-heart { animation: none; } }
+
+/* Full-size picture viewer (js/media.js, xnViewer.open). */
+.xn-viewer {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  border: 0;
+  background: rgba(0, 0, 0, 0.9);
+  color: var(--oled-text);
+  font-family: var(--oled-font);
+}
+.xn-viewer[open] { display: flex; align-items: center; justify-content: center; }
+.xn-viewer::backdrop { background: transparent; }
+.xn-viewer-case { display: flex; flex-direction: column; gap: 12px; width: min(1000px, 100%); max-height: 100%; }
+.xn-viewer img {
+  display: block;
+  min-height: 0;
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
+  margin: 0 auto;
+  object-fit: contain;
+}
+.xn-viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.xn-viewer-count { font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+.xn-viewer-nav { display: flex; gap: 8px; }
+.xn-viewer-nav .xn-btn { min-width: 44px; }

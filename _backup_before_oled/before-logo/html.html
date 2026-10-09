@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+    </head>
+    <body>
+        <div id="myPlot" style="width:700px;height:400px;"></div>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+  // Dataset 1
+  var x1 = [1.5, 2.5, 3.5, 4.5, 5.5];
+  var y1 = [10, 15, 13, 17, 20];
+
+  // Dataset 2
+  var x2 = [1, 2, 3, 4, 5];
+  var y2 = [10, 15, 13, 17, 20];
+
+ 
+  var allX = Array.from(new Set([...x1, ...x2])).sort((a, b) => a - b);
+
+
+  function interpolate(xArr, yArr, x) {
+    if (xArr.includes(x)) {
+      return yArr[xArr.indexOf(x)];
+    }
+ 
+    for (let i = 0; i < xArr.length - 1; i++) {
+      if (x > xArr[i] && x < xArr[i+1]) {
+        let slope = (yArr[i+1] - yArr[i]) / (xArr[i+1] - xArr[i]);
+        return yArr[i] + slope * (x - xArr[i]);
+      }
+    }
+ 
+    return 0;
+  }
+
+  // Step 3: Compute combined Y-values
+  var combinedY = allX.map(x => interpolate(x1, y1, x) + interpolate(x2, y2, x));
+
+  // Step 4: Plot
+  var trace = {
+    x: allX,
+    y: combinedY,
+    mode: 'lines+markers',
+    type: 'scatter',
+    name: 'Combined Y-values'
+  };
+
+  Plotly.newPlot('myPlot', [trace], {
+    title: 'Combined Graph (Y-values summed)',
+    xaxis: { title: 'X Axis' },
+    yaxis: { title: 'Y Axis' }
+  });
+</script>
+        <script src="" async defer></script>
+    </body>
+</html>

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Drug info · Geek⁴u</title>
+  <link rel="stylesheet" href="/DruginfoPage.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <script src="/likes.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page di">
+  <section class="xn-card di-head">
+    <a href="/journal" class="di-back">← Journal</a>
+    <div class="di-top">
+      <span class="di-thumb" id="diThumb" hidden></span>
+      <div class="di-titles">
+        <p class="xn-eyebrow" id="diClass">Drug info</p>
+        <h1 class="xn-h1 DrugInfoName">Loading…</h1>
+      </div>
+    </div>
+    <p class="di-summary" id="diSummary" hidden></p>
+    <div class="di-links" id="diLinks" hidden>
+      <button type="button" class="xn-btn di-like" id="diLike"><span data-like-label>Like</span></button>
+      <a class="xn-btn" id="diWiki" target="_blank" rel="noopener noreferrer">PsychonautWiki ↗</a>
+      <a class="xn-btn" id="diTripsit" target="_blank" rel="noopener noreferrer">TripSit ↗</a>
+    </div>
+  </section>
+
+  <div class="DrugInfoIntakeMethods" aria-live="polite"></div>
+  <p class="di-note">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
+</main>
+
+<script>
+  const DOSE_LEVELS = [["threshold", "Threshold"], ["light", "Light"], ["common", "Common"], ["strong", "Strong"], ["heavy", "Heavy"]];
+  const DURATION_PARTS = [["onset", "Onset"], ["comeup", "Come up"], ["peak", "Peak"], ["offset", "Offset"], ["afterglow", "After effects"], ["duration", "Duration"], ["total", "Total"]];
+
+  async function getDrugInfo(drugName) {
+    const url = "https://api.psychonautwiki.org";
+
+    const query = `
+    {
+      substances(query: ${JSON.stringify(drugName)}) {
+        name
+        summary
+        class { chemical psychoactive }
+        images { thumb }
+
+        roas {
+          name
+
+          dose {
+            units
+            threshold
+            heavy
+            common { min max }
+            light { min max }
+            strong { min max }
+          }
+
+          duration {
+            afterglow { min max units }
+            comeup { min max units }
+            duration { min max units }
+            offset { min max units }
+            onset { min max units }
+            peak { min max units }
+            total { min max units }
+          }
+
+          bioavailability {
+            min max
+          }
+        }
+      }
+    }`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query })
+    });
+    if (!res.ok) throw new Error("PsychonautWiki answered " + res.status);
+    return res.json();
+  }
+
+  function range(min, max) {
+    const has = (v) => v !== null && v !== undefined;
+    if (has(min) && has(max)) return min === max ? String(min) : `${min}–${max}`;
+    if (has(min)) return `${min}+`;
+    if (has(max)) return `up to ${max}`;
+    return "";
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function rows(list, entries) {
+    entries.forEach(([label, value]) => {
+      const row = el("div", "di-row");
+      row.append(el("dt", "", label), el("dd", "", value));
+      list.append(row);
+    });
+  }
+
+  function doseEntries(dose) {
+    if (!dose) return [];
+    const units = dose.units ? " " + dose.units : "";
+    const out = [];
+    DOSE_LEVELS.forEach(([key, label]) => {
+      const v = dose[key];
+      if (v === null || v === undefined) return;
+      let text = typeof v === "object" ? range(v.min, v.max) : String(v);
+      if (key === "heavy" && typeof v !== "object") text += "+";
+      if (text) out.push([label, text + units]);
+    });
+    return out;
+  }
+
+  function durationEntries(duration) {
+    if (!duration) return [];
+    const out = [];
+    DURATION_PARTS.forEach(([key, label]) => {
+      const v = duration[key];
+      if (!v) return;
+      const text = range(v.min, v.max);
+      if (text) out.push([label, `${text} ${v.units || ""}`.trim()]);
+    });
+    return out;
+  }
+
+  function showMessage(text) {
+    const box = document.querySelector(".DrugInfoIntakeMethods");
+    box.innerHTML = "";
+    box.append(el("p", "xn-card di-empty", text));
+  }
+
+  function render(substance) {
+    const name = substance.name;
+    document.title = name + " · Geek⁴u";
+    document.querySelector(".DrugInfoName").textContent = name;
+
+    const classes = [].concat(substance.class?.chemical || [], substance.class?.psychoactive || []);
+    if (classes.length) document.getElementById("diClass").textContent = classes.join(" · ");
+
+    if (substance.summary) {
+      const summary = document.getElementById("diSummary");
+      summary.textContent = substance.summary;
+      summary.hidden = false;
+    }
+
+    const thumbUrl = substance.images?.[0]?.thumb;
+    if (thumbUrl) {
+      const thumb = document.getElementById("diThumb");
+      const img = el("img");
+      img.src = thumbUrl;
+      img.alt = "";
+      img.onerror = () => { thumb.hidden = true; };
+      thumb.append(img);
+      thumb.hidden = false;
+    }
+
+    document.getElementById("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(name.replace(/\s+/g, "_"));
+    document.getElementById("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"));
+    document.getElementById("diLinks").hidden = false;
+
+    const sub = { name, image: thumbUrl || "", class: classes.join(", ") };
+    window.xnLikes.load().then((liked) => {
+      window.xnLikes.bind(document.getElementById("diLike"), sub, liked.has(window.xnLikes.key(name)));
+    });
+
+    const DrugInfoIntakeMethods = document.querySelector(".DrugInfoIntakeMethods");
+    DrugInfoIntakeMethods.innerHTML = "";
+    const roas = substance.roas || [];
+    if (!roas.length) return showMessage("PsychonautWiki has no dose or duration data for this substance.");
+
+    roas.forEach((roa) => {
+      const card = el("section", "xn-card DrugInfoIntakeMethod");
+      const head = el("div", "di-roa-head");
+      head.append(el("h2", "xn-h2 di-roa-name", roa.name || "Unknown route"));
+      const bio = roa.bioavailability ? range(roa.bioavailability.min, roa.bioavailability.max) : "";
+      head.append(el("span", "di-bio", "Bioavailability: " + (bio ? bio + "%" : "N/A")));
+      card.append(head);
+
+      const doses = doseEntries(roa.dose);
+      const durations = durationEntries(roa.duration);
+      if (doses.length) {
+        card.append(el("h3", "xn-label di-sub", "Dose"));
+        const list = el("dl", "di-list di-doses");
+        rows(list, doses);
+        card.append(list);
+      }
+      if (durations.length) {
+        card.append(el("h3", "xn-label di-sub", "Duration"));
+        const list = el("dl", "di-list");
+        rows(list, durations);
+        card.append(list);
+      }
+      if (!doses.length && !durations.length) card.append(el("p", "xn-empty", "No dose or duration data for this route."));
+      DrugInfoIntakeMethods.append(card);
+    });
+  }
+
+  const drugName = new URLSearchParams(window.location.search).get("drug");
+  if (!drugName) {
+    document.querySelector(".DrugInfoName").textContent = "No substance picked";
+    showMessage("Pick a substance from the Journal to see its details.");
+  } else {
+    getDrugInfo(drugName).then((info) => {
+      const substance = info?.data?.substances?.[0];
+      if (!substance) {
+        document.querySelector(".DrugInfoName").textContent = drugName;
+        return showMessage("PsychonautWiki doesn't have this substance.");
+      }
+      render(substance);
+    }).catch((error) => {
+      console.error(error);
+      document.querySelector(".DrugInfoName").textContent = drugName;
+      showMessage("Couldn't reach PsychonautWiki. Check your connection and try again.");
+    });
+  }
+</script>
+</body>
+</html>

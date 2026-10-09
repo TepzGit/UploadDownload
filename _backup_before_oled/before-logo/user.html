@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{.Name}} · Geek⁴u</title>
+  <meta name="description" content="A Geek⁴u member's profile and posts.">
+  <link rel="stylesheet" href="/profile.css">
+  <link rel="stylesheet" href="/forum.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <script src="/media.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page pf" id="container">
+{{if .Found}}
+  <section class="xn-card pf-head">
+    <div class="pf-banner">{{if .Banner}}<img src="{{.Banner}}" alt="">{{end}}</div>
+    <div class="pf-head-row">
+      <div class="profile-avatar pf-avatar-static">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}<span class="pf-initial" aria-hidden="true">{{.Initial}}</span>{{end}}</div>
+      <div class="pf-who">
+        <p class="xn-eyebrow">{{if .Admin}}Admin{{else}}Member{{end}}</p>
+        <h1 class="xn-h1">{{.Name}}</h1>
+        <p class="xn-sub">{{if eq .Posts 1}}1 post{{else}}{{.Posts}} posts{{end}} · {{len .Liked}} liked substances</p>
+      </div>
+      <div class="pf-actions">
+        {{if .IsSelf}}<a class="xn-btn xn-btn-primary" href="/Profile">Edit your profile</a>{{else}}<div class="pf-friend" id="friendButton" data-state="{{.Friend}}"></div>{{end}}
+        <a class="xn-btn" href="/Forum">Forum</a>
+      </div>
+    </div>
+  </section>
+
+  {{if .IsSelf}}<p class="pf-self-note">This is how other members see your profile. Your dose calendar, recent intake and totals stay private.</p>{{end}}
+
+  <div class="pf-grid pf-data" id="userBoxes" aria-label="Boxes" hidden></div>
+
+  <div class="fm-layout fm-user">
+    <section class="fm-feed-wrap" aria-labelledby="postsTitle">
+      <div class="fm-section-head">
+        <h2 class="xn-h2" id="postsTitle">Posts</h2>
+      </div>
+      <div class="fm-feed" id="feed" aria-busy="true"></div>
+      <p class="xn-empty fm-empty" id="feedEmpty">Loading posts…</p>
+      <button type="button" class="xn-btn fm-more" id="feedMore" hidden>Show older posts</button>
+    </section>
+
+    <aside class="xn-card pf-box fm-side" aria-labelledby="likedTitle">
+      <div class="pf-box-head">
+        <h2 class="xn-h2" id="likedTitle">Liked substances</h2>
+        <span class="pf-note">{{len .Liked}} liked</span>
+      </div>
+      <div class="pf-liked">
+        {{range .Liked}}
+        <div class="pf-like">
+          <a class="pf-like-link" href="/journal/Drug?drug={{.Name}}">
+            <span class="pf-like-thumb">{{if .Image}}<img src="{{.Image}}" alt="" loading="lazy">{{else}}{{.Initial}}{{end}}</span>
+            <span class="pf-main"><strong>{{.Name}}</strong><span>{{if .Class}}{{.Class}}{{else}}Substance{{end}}</span></span>
+          </a>
+        </div>
+        {{else}}
+        <p class="xn-empty">Nothing liked yet.</p>
+        {{end}}
+      </div>
+    </aside>
+  </div>
+{{else}}
+  <section class="xn-card fm-missing">
+    <p class="xn-eyebrow">Profile</p>
+    <h1 class="xn-h1">No member is called {{.Name}}</h1>
+    <p class="xn-sub">Check the spelling, or find them in the <a href="/Forum">Forum</a> members list.</p>
+  </section>
+{{end}}
+</main>
+
+{{if .Found}}
+<script type="module">
+  import { mountBoxes } from "/boxes.js";
+  import { mountFeed } from "/forum.js";
+  import { friendButton } from "/friends.js";
+
+  const name = {{.Name}};
+  const self = {{.IsSelf}};
+
+  const friend = document.getElementById("friendButton");
+  if (friend) friendButton(friend, name, friend.dataset.state);
+
+  mountFeed({
+    list: document.getElementById("feed"),
+    more: document.getElementById("feedMore"),
+    empty: document.getElementById("feedEmpty"),
+    user: name,
+    emptyText: self ? "You haven't posted yet. Your Forum posts show up here." : name + " hasn't posted yet.",
+  });
+
+  const grid = document.getElementById("userBoxes");
+  const boxes = await mountBoxes({ grid, user: name });
+  grid.hidden = boxes.count === 0;
+</script>
+{{end}}
+</body>
+</html>

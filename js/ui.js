@@ -647,8 +647,10 @@ function bindEvents() {
 const EXP_KEY = "xn_experiences";
 const EXP_LOCAL_MAX = 100;
 let expMode = "loading"; // account | local | off
-let experiences = []; // newest first: { id, startedAt, updatedAt, doses }
-let activeExp = null; // the session on the timeline now: { id, startedAt }
+let expUnreachable = false; // the server didn't answer /experiences (offline, or still running an older version)
+let experiences = []; // newest first: { id, startedAt, updatedAt, doses, people }
+let sharedExperiences = []; // friends' sessions they added this account to: { ..., owner }
+let activeExp = null; // the session on the timeline now: { id, startedAt, viewOnly?, owner? }
 let expTimer = null;
 let expQueue = Promise.resolve();
 
@@ -666,16 +668,32 @@ async function initExperiences() {
       if (data?.signedIn) {
         expMode = "account";
         experiences = Array.isArray(data.items) ? data.items : [];
+        sharedExperiences = Array.isArray(data.shared) ? data.shared : [];
       }
+    } else {
+      expUnreachable = true;
     }
   } catch (_) {
-    // Offline or old server: fall back to this device.
+    expUnreachable = true; // offline: fall back to this device
   }
   if (expMode !== "account") {
     expMode = hasConsent() ? "local" : "off";
     experiences = readLocalExperiences();
   }
   renderExperiences();
+  // /?exp=<id> comes from "Open in the Graph" on the Profile page.
+  const wanted = new URLSearchParams(location.search).get("exp");
+  if (wanted) {
+    history.replaceState(null, "", location.pathname + location.hash);
+    const entry = experiences.find((e) => String(e.id) === wanted);
+    const shared = sharedExperiences.find((e) => String(e.id) === wanted);
+    if ((entry || shared) && !logic.getState().addedDoses.length) {
+      await (entry ? openExperience(entry.id) : openSharedExperience(shared.id));
+      return;
+    }
+    if (shared) return;
+    if (!entry) showToast("That Graph session isn't saved on this account any more.", true);
+  }
   // A dose added while the list was still loading.
   if (logic.getState().addedDoses.length) experienceChanged();
 }
@@ -761,6 +779,11 @@ function queueExperience(task) {
 
 /** Call after any change to the timeline; saves it a moment later. */
 function experienceChanged() {
+  if (activeExp?.viewOnly) {
+    // A friend's session stays theirs; changing it starts your own copy.
+    activeExp.viewOnly = false;
+    if (expMode === "account" || expMode === "local") showToast(`Saved as your own copy of ${activeExp.owner}'s session.`);
+  }
   clearTimeout(expTimer);
   expTimer = setTimeout(flushExperience, 400);
 }
@@ -770,6 +793,7 @@ function flushExperience() {
   clearTimeout(expTimer);
   expTimer = null;
   if (expMode !== "account" && expMode !== "local") return expQueue;
+  if (activeExp?.viewOnly) return expQueue; // a friend's session, opened to look at
   const doses = logic.snapshotDoses();
   if (!doses.length && !activeExp) return expQueue;
   if (!activeExp) activeExp = { id: null, startedAt: Date.now() };
@@ -782,6 +806,7 @@ function flushExperience() {
       if (activeExp === target) activeExp = null;
     } else {
       const saved = await storeExperience({ id: target.id, startedAt: target.startedAt, doses });
+      if (!saved.people) saved.people = experiences.find((e) => e.id === saved.id)?.people || [];
       target.id = saved.id;
       target.startedAt = saved.startedAt;
       experiences = [saved, ...experiences.filter((e) => e.id !== saved.id)].sort((a, b) => b.startedAt - a.startedAt);
@@ -800,15 +825,132 @@ async function openExperience(id) {
     return;
   }
   activeExp = { id: entry.id, startedAt: entry.startedAt };
+  showOpenedSession();
+  showToast(`Opened your session from ${expDayLabel(entry.startedAt).toLowerCase()}.`);
+}
+
+/** Opens a friend's session to look at. Changing it saves your own copy. */
+async function openSharedExperience(id) {
+  await flushExperience();
+  const entry = sharedExperiences.find((e) => e.id === id);
+  if (!entry) return;
+  const doses = logic.loadDoses(entry.doses);
+  if (!doses.length) {
+    showToast("That session can't be drawn any more.", true);
+    return;
+  }
+  const owner = entry.owner?.name || "a friend";
+  activeExp = { id: null, startedAt: entry.startedAt, viewOnly: true, owner };
+  showOpenedSession();
+  showToast(`Opened ${owner}'s session from ${expDayLabel(entry.startedAt).toLowerCase()}.`);
+}
+
+function showOpenedSession() {
   logIdsByDose.clear(); // these doses were counted when they were first added
   renderDoseList();
   refreshChart();
   renderRecent();
   paintAddButton();
   renderTracker();
-  showToast(`Opened your session from ${expDayLabel(entry.startedAt).toLowerCase()}.`);
   if (window.matchMedia("(max-width: 1279px)").matches) {
     document.getElementById("chartCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+// ---- Who was there: friends added to a session (account mode only)
+
+function peopleText(people) {
+  const names = (people || []).map((p) => p.name);
+  if (!names.length) return "";
+  if (names.length <= 3) return "With " + names.join(", ");
+  return "With " + names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more";
+}
+
+let peopleDialog = null;
+
+async function editPeople(entry) {
+  if (!peopleDialog) {
+    peopleDialog = document.createElement("dialog");
+    peopleDialog.className = "ppl";
+    peopleDialog.setAttribute("aria-labelledby", "pplTitle");
+    peopleDialog.innerHTML = `
+      <form method="dialog" class="ppl-case">
+        <div>
+          <p class="ppl-eyebrow" data-ppl-day></p>
+          <h2 id="pplTitle">Who was with you?</h2>
+          <p class="ppl-sub">Friends you add see this session under "Shared with you" on their Graph page.</p>
+        </div>
+        <div class="ppl-list" data-ppl-list></div>
+        <div class="ppl-bar">
+          <button type="submit" value="cancel" class="ppl-btn">Cancel</button>
+          <button type="submit" value="save" class="ppl-btn ppl-primary" data-ppl-save>Save</button>
+        </div>
+      </form>`;
+    peopleDialog.addEventListener("click", (event) => {
+      if (event.target === peopleDialog) peopleDialog.close("cancel");
+    });
+    document.body.appendChild(peopleDialog);
+  }
+  const list = peopleDialog.querySelector("[data-ppl-list]");
+  const save = peopleDialog.querySelector("[data-ppl-save]");
+  peopleDialog.querySelector("[data-ppl-day]").textContent = "Session from " + expDayLabel(entry.startedAt).toLowerCase();
+  list.innerHTML = '<p class="ppl-note">Loading your friends…</p>';
+  save.hidden = true;
+  peopleDialog.showModal();
+
+  let friends = null;
+  try {
+    const res = await fetch("/friends", { headers: { Accept: "application/json" } });
+    if (res.ok && (res.headers.get("content-type") || "").includes("json")) friends = (await res.json()).friends || [];
+  } catch {}
+  // Closed while the friends were loading.
+  if (!peopleDialog.open) return;
+  if (!friends) {
+    list.innerHTML = '<p class="ppl-note">Couldn\'t load your friends. Try again in a moment.</p>';
+    return;
+  }
+  const chosen = new Set((entry.people || []).map((p) => p.name.toLowerCase()));
+  if (!friends.length) {
+    list.innerHTML = '<p class="ppl-note">You have no friends added yet. Open someone\'s profile from the <a href="/Forum">Forum</a> and tap Add friend.</p>';
+    return;
+  }
+  list.replaceChildren(...friends.map((friend) => {
+    const row = el("label", "ppl-row");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.value = friend.name;
+    box.checked = chosen.has(friend.name.toLowerCase());
+    const face = el("span", "ppl-face");
+    if (friend.avatar) {
+      const img = document.createElement("img");
+      img.src = friend.avatar;
+      img.alt = "";
+      face.appendChild(img);
+    } else {
+      face.textContent = friend.initial || "?";
+    }
+    row.append(box, face, el("span", "ppl-name", friend.name));
+    return row;
+  }));
+  save.hidden = false;
+  list.querySelector("input")?.focus();
+
+  const answer = await new Promise((done) => peopleDialog.addEventListener("close", () => done(peopleDialog.returnValue), { once: true }));
+  if (answer !== "save") return;
+  const people = [...list.querySelectorAll("input:checked")].map((box) => box.value);
+  try {
+    const res = await fetch("/experiences/people", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: entry.id, people }),
+    });
+    if (res.status === 401) throw new Error("Log in again to change who was there.");
+    if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save who was there. Try again.");
+    entry.people = (await res.json()).people || [];
+    renderExperiences();
+    showToast(entry.people.length ? peopleText(entry.people) + "." : "Nobody else is on this session now.");
+  } catch (error) {
+    showToast(error.message, true);
   }
 }
 
@@ -860,11 +1002,17 @@ function renderExperiences() {
   count.textContent = experiences.length ? String(experiences.length) : "";
 
   note.hidden = true;
-  if (expMode === "off") {
+  if (expMode === "off" && expUnreachable) {
+    note.hidden = false;
+    note.textContent = "Couldn't reach your saved experiences. Reload the page to try again.";
+  } else if (expMode === "off") {
     note.hidden = false;
     const undecided = readCookie(CONSENT_COOKIE) === null;
     note.innerHTML = 'Your sessions aren\'t being saved. <a href="/Main?next=/">Log in</a> to keep them on your account' +
       (undecided ? ", or accept the cookie popup to keep them on this device." : ".");
+  } else if (expMode === "local" && expUnreachable) {
+    note.hidden = false;
+    note.textContent = "Couldn't reach your saved experiences, so new ones stay on this device for now. Reload the page to try again.";
   } else if (expMode === "local") {
     note.hidden = false;
     note.innerHTML = 'Saved on this device only. <a href="/Main?next=/">Log in</a> to keep them on your account.';
@@ -874,7 +1022,6 @@ function renderExperiences() {
     if (expMode === "off") return;
     const empty = el("p", "exp-empty", expMode === "loading" ? "Loading your experiences…" : "Each time you use the graph it's saved here, so you can open it again later.");
     list.appendChild(empty);
-    return;
   }
 
   experiences.forEach((entry) => {
@@ -906,6 +1053,7 @@ function renderExperiences() {
     });
     const length = formatHours(preview.hours);
     open.append(top, experienceSpark(preview, colors), subs, el("span", "exp-meta", length ? `${doseWord} · about ${length}` : doseWord));
+    if (entry.people?.length) open.appendChild(el("span", "exp-with", peopleText(entry.people)));
     open.addEventListener("click", () => openExperience(entry.id));
 
     const del = el("button", "recent-del", "×");
@@ -941,6 +1089,51 @@ function renderExperiences() {
     });
 
     item.append(open, del);
+    if (expMode === "account") {
+      const ppl = el("button", "exp-ppl");
+      ppl.type = "button";
+      ppl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3.1 4.7"/></svg>';
+      ppl.setAttribute("aria-label", `Who was with you, session from ${day}`);
+      ppl.title = "Who was with you";
+      if (entry.people?.length) ppl.classList.add("has-people");
+      ppl.addEventListener("click", () => editPeople(entry));
+      item.appendChild(ppl);
+    }
+    list.appendChild(item);
+  });
+
+  if (!sharedExperiences.length) return;
+  list.appendChild(el("p", "exp-shared-title", "Shared with you"));
+  sharedExperiences.forEach((entry) => {
+    const preview = logic.previewTimeline(entry.doses);
+    if (!preview) return;
+    const colors = logic.previewColors(preview.names);
+    const times = entry.doses.map((d) => d.time).filter(Boolean).sort();
+    const first = times[0] || "";
+    const last = times[times.length - 1] || "";
+    const day = expDayLabel(entry.startedAt);
+    const owner = entry.owner?.name || "A friend";
+    const item = el("div", "exp-item is-shared");
+    item.setAttribute("role", "listitem");
+    item.style.setProperty("--c", colors[0]);
+    const open = el("button", "exp-open");
+    open.type = "button";
+    open.setAttribute("aria-label", `Open ${owner}'s session from ${day}: ${preview.names.join(", ")}`);
+    const top = el("span", "exp-top");
+    top.append(el("strong", "", day), el("span", "", last !== first ? `${first}–${last}` : first));
+    const subs = el("span", "exp-subs");
+    preview.names.forEach((name, index) => {
+      const tag = el("span");
+      const dot = el("i");
+      dot.style.setProperty("--c", colors[index]);
+      tag.append(dot, document.createTextNode(name));
+      subs.appendChild(tag);
+    });
+    const others = entry.people || []; // the server leaves you out
+    open.append(el("span", "exp-from", `${owner}'s session`), top, experienceSpark(preview, colors), subs);
+    if (others.length) open.appendChild(el("span", "exp-with", peopleText(others).replace(/^With/, "Also with")));
+    open.addEventListener("click", () => openSharedExperience(entry.id));
+    item.appendChild(open);
     list.appendChild(item);
   });
 }
@@ -1283,6 +1476,10 @@ function refreshChart() {
 async function handleSave() {
   const { addedDoses } = logic.getState();
   if (!addedDoses.length) return;
+  if (activeExp?.viewOnly) {
+    showToast(`These are ${activeExp.owner}'s doses, so they weren't saved to your journal.`, true);
+    return;
+  }
 
   // The journal stores one entry per substance, so send one request each.
   // An opened experience keeps the day it happened on.

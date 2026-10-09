@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Files · Geek⁴u</title>
+  <link rel="icon" href="https://i.ibb.co/fYVMHYdf/unavngivet.png" type="image/png">
+  <link rel="stylesheet" href="/downloader.css">
+  <script src="/script.js"></script>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<!-- Icons, used with <svg><use href="#i-..."/></svg> here and in script.js -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></symbol>
+  <symbol id="i-audio" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="2.5" y="5" width="14" height="14" rx="2.5"/><path d="m16.5 10 5-3v10l-5-3z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.5" r="1.3"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></symbol>
+</svg>
+
+<main class="xn-page fx">
+  <section class="xn-card fx-card">
+    <div class="fx-head">
+      <div class="fx-titles">
+        <p class="xn-eyebrow">Files</p>
+        <h1 class="xn-h1" id="title">File explorer</h1>
+        <nav class="fx-crumbs" id="fxCrumbs" aria-label="Folder path"></nav>
+      </div>
+      <div class="fx-actions">
+        {{if not .IsRoot}}
+        <a href="{{.BackPath}}" class="xn-btn"><svg class="fx-ico" aria-hidden="true"><use href="#i-back"/></svg>Back</a>
+        {{end}}
+        <a href="/Uploader" class="xn-btn xn-btn-primary"><svg class="fx-ico" aria-hidden="true"><use href="#i-upload"/></svg>Upload</a>
+      </div>
+    </div>
+
+    <div class="fx-toolbar">
+      <button type="button" class="xn-btn" id="fxNewFolder" aria-label="New folder"><svg class="fx-ico" aria-hidden="true"><use href="#i-plus"/></svg><span>New folder</span></button>
+      <label class="fx-search">
+        <span class="xn-sr">Search files</span>
+        <svg class="fx-ico" aria-hidden="true"><use href="#i-search"/></svg>
+        <input type="search" id="search" class="xn-input" placeholder="Search files..." autocomplete="off" enterkeyhint="search">
+      </label>
+    </div>
+
+    <div id="itemsresults" class="fx-list">
+      {{range .Files}}
+      <div class="item" tabindex="0" data-path="{{.Path}}" data-type="{{if .IsDir}}Dir{{else if .IsImg}}Image{{else if .IsVid}}Video{{else if .IsAudio}}Audio{{else}}None{{end}}">
+        <span class="fx-thumb">
+          {{if .IsDir}}<svg class="fx-ico" aria-hidden="true"><use href="#i-folder"/></svg>
+          {{else if .IsImg}}<img class="preview" src="{{.Path}}" alt="" loading="lazy" decoding="async">
+          {{else if .IsVid}}<svg class="fx-ico" aria-hidden="true"><use href="#i-video"/></svg>
+          {{else if .IsAudio}}<svg class="fx-ico" aria-hidden="true"><use href="#i-audio"/></svg>
+          {{else}}<svg class="fx-ico" aria-hidden="true"><use href="#i-file"/></svg>{{end}}
+        </span>
+        <span class="fileinfo">
+          <span class="filename">{{.Name}}</span>
+          {{if .IsDir}}<span class="fx-meta">Folder</span>
+          {{else}}<span class="fx-meta"><span class="uploadtime">{{.Date.Format "02/01/2006"}}</span> · <span class="filesize" data-bytes="{{.Size}}"></span></span>{{end}}
+        </span>
+        <span class="fx-row-actions">
+          {{if .IsDir}}<svg class="fx-ico fx-chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+          {{else}}<a class="down" href="{{.Path}}" download aria-label="Download {{.Name}}"><svg class="fx-ico" aria-hidden="true"><use href="#i-download"/></svg></a>{{end}}
+          <button type="button" class="fx-more" aria-label="More actions for {{.Name}}" aria-haspopup="menu"><svg class="fx-ico" aria-hidden="true"><use href="#i-more"/></svg></button>
+        </span>
+      </div>
+      {{else}}
+      <p class="xn-empty fx-empty">This folder is empty. Upload something or make a new folder.</p>
+      {{end}}
+    </div>
+  </section>
+</main>
+
+<div class="fx-menu" id="fxMenu" role="menu" hidden>
+  <button type="button" role="menuitem" data-act="open">Open</button>
+  <button type="button" role="menuitem" data-act="download">Download</button>
+  <button type="button" role="menuitem" data-act="rename">Rename</button>
+  <hr>
+  <button type="button" role="menuitem" data-act="delete" class="is-danger">Delete</button>
+</div>
+
+<div id="previewModal" class="fx-modal" role="dialog" aria-modal="true" aria-labelledby="modalName" hidden>
+  <div class="fx-modal-card">
+    <div class="fx-modal-head">
+      <p id="modalName" class="fx-modal-name"></p>
+      <a id="modalDownload" class="xn-btn" href="#" download><svg class="fx-ico" aria-hidden="true"><use href="#i-download"/></svg>Download</a>
+      <button id="closeModal" type="button" class="fx-modal-close" aria-label="Close preview">×</button>
+    </div>
+    <div class="fx-modal-body">
+      <img id="modalImage" src="" alt="" hidden />
+      <video id="modalVideo" controls playsinline preload="metadata" hidden></video>
+      <audio id="modalAudio" controls preload="metadata" hidden></audio>
+      <div id="modalNone" class="fx-modal-none" hidden>
+        <svg class="fx-ico" aria-hidden="true"><use href="#i-file"/></svg>
+        <span>No preview for this kind of file.</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

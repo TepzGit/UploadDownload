@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Login · Geek⁴u</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+</head>
+<body class="min-h-screen bg-black text-[#f8f4ff]">
+  <header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+
+  <main class="mx-auto flex min-h-[calc(100vh-64px)] max-w-5xl items-center justify-center px-4 py-8">
+    <div class="card w-full max-w-4xl border border-[#23202b] bg-[#0a0a0c]">
+      <div class="card-body grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        <div class="space-y-4">
+          <p class="text-sm uppercase tracking-[0.25em] text-primary">Secure access</p>
+          <h1 class="text-3xl font-semibold">Sign in to continue</h1>
+          <p class="text-base-content/70">Use your workspace credentials to access the journal, files, and planning tools.</p>
+        </div>
+
+        <div class="rounded-2xl border border-[#23202b] bg-[#121216] p-5">
+          <div class="clock-card" id="clockWidget" tabindex="0">
+            <div class="text-sm uppercase tracking-[0.25em] text-base-content/60">Current time</div>
+            <div class="time text-4xl font-semibold" id="timeDisplay">--:--:--</div>
+            <div class="date text-sm text-base-content/70" id="dateDisplay">Loading date...</div>
+            <div class="mt-4 space-y-3" id="passwordEntry">
+              <input class="input input-bordered w-full" id="usernameInput" type="text" placeholder="Enter username" aria-label="Username" />
+              <input class="input input-bordered w-full" id="passwordInput" type="password" placeholder="Enter password" aria-label="Password" />
+              <div class="text-xs text-base-content/60">Press Enter to submit</div>
+              <div class="text-sm text-error" id="passwordError"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const timeDisplay = document.getElementById('timeDisplay');
+    const dateDisplay = document.getElementById('dateDisplay');
+    const clockWidget = document.getElementById('clockWidget');
+    const passwordInput = document.getElementById('passwordInput');
+    const passwordError = document.getElementById('passwordError');
+    const usernameInput = document.getElementById('usernameInput');
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2,'0');
+      const minutes = String(now.getMinutes()).padStart(2,'0');
+      const seconds = String(now.getSeconds()).padStart(2,'0');
+      timeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+      dateDisplay.textContent = now.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+    }
+
+    async function submitPassword() {
+      passwordError.textContent = '';
+      const password = passwordInput.value.trim();
+      const username = usernameInput.value.trim();
+      if (!password || !username) {
+        passwordError.textContent = 'Username or password cannot be empty.';
+        return;
+      }
+      const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password }) });
+      if (!res.ok) {
+        passwordError.textContent = 'Incorrect password. Try again.';
+      } else {
+        window.location.href = '/Files';
+      }
+    }
+
+    clockWidget.addEventListener('click', () => {
+      if (document.activeElement === usernameInput || document.activeElement === passwordInput) return;
+      passwordInput.focus();
+    });
+
+    passwordInput.addEventListener('keydown', async (event) => {
+      if (event.key === 'Enter') {
+        await submitPassword();
+      }
+    });
+
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>
