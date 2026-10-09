@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	// Time zone data built in, so the calendar can use the visitor's zone on Windows too.
 	_ "time/tzdata"
 	"unicode"
@@ -203,6 +204,13 @@ func main() {
 	http.HandleFunc("/search", requireAdminLogin(search))
 	http.HandleFunc("/delete", requireAdminLogin(Delete))
 	http.HandleFunc("/rename", requireAdminLogin(Rename))
+	http.HandleFunc("/upload", requireLogin(GetUploadData))
+	http.HandleFunc("/makeFolder", requireLogin(makeFolder))
+	http.HandleFunc("/getFolders", requireLogin(getFolders))
+	http.HandleFunc("/search", requireLogin(search))
+	http.HandleFunc("/getItems", requireLogin(getItems))
+	http.HandleFunc("/delete", requireLogin(Delete))
+	http.HandleFunc("/rename", requireLogin(Rename))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
 	http.HandleFunc("/profile/doses", requireLogin(profileDoses))
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
@@ -1617,6 +1625,32 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(results)
+	if err != nil {
+		http.Error(w, "Failed to encode results", http.StatusInternalServerError)
+		return
+	}
+}
+
+func getItems(w http.ResponseWriter, r *http.Request) {
+	finalPath := urlPathToFile(r.Header.Get("Path"))
+	info, err := os.Stat(finalPath)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	if !info.IsDir() {
+		http.ServeFile(w, r, finalPath)
+		return
+	}
+
+	result, err := getItemsInPath(w, r, finalPath)
+	if err != nil {
+		http.Error(w, "Failed to get items", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(result)
 	if err != nil {
 		http.Error(w, "Failed to encode results", http.StatusInternalServerError)
 		return
