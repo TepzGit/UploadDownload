@@ -14,6 +14,7 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
+  <script src="/likes.js"></script>
 </head>
 <body class="xn-bg">
 <header class="xn">
@@ -30,26 +31,73 @@
 <div class="xn-hatch" aria-hidden="true"></div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-camera" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 7.5h3l1.6-2.5h6.8L17 7.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
   <symbol id="i-pill" viewBox="0 0 16 16"><path fill="currentColor" d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"/></symbol>
 </svg>
 
 <main class="xn-page pf" id="container">
   <section class="xn-card pf-head" id="header">
-    <div id="profile-pic" class="profile-avatar">
-      <img src="https://i.pinimg.com/736x/86/b5/34/86b53487e37122210591af58182596fb.jpg" alt="Profile picture">
-      <div class="avatar-overlay"><span>Edit</span></div>
+    <div class="pf-banner" id="pfBanner">
+      <img id="bannerImg" alt="" {{if .Banner}}src="{{.Banner}}"{{else}}hidden{{end}}>
+      <button type="button" class="xn-btn pf-banner-btn" data-pick="banner"><svg aria-hidden="true"><use href="#i-camera"/></svg><span>Change banner</span></button>
     </div>
-    <div class="pf-who">
-      <p class="xn-eyebrow">Profile</p>
-      <h1 class="xn-h1" id="username">{{.Username}}</h1>
+    <div class="pf-head-row">
+      <button type="button" id="profile-pic" class="profile-avatar" data-pick="avatar" aria-label="Change profile picture">
+        <img id="avatarImg" alt="" {{if .Avatar}}src="{{.Avatar}}"{{else}}hidden{{end}}>
+        <span class="pf-initial" id="avatarInitial" aria-hidden="true" {{if .Avatar}}hidden{{end}}>{{.Initial}}</span>
+        <span class="avatar-overlay"><svg aria-hidden="true"><use href="#i-camera"/></svg></span>
+      </button>
+      <div class="pf-who">
+        <p class="xn-eyebrow">Profile</p>
+        <h1 class="xn-h1" id="username">{{.Username}}</h1>
+      </div>
+      <div class="pf-actions" id="options">
+        <button type="button" class="xn-btn option" id="APB">Appearance</button>
+        <button type="button" class="xn-btn option" id="DTB">Data</button>
+        <button type="button" class="xn-btn option" id="PRB">Preferences</button>
+        <form method="post" action="/logout" class="pf-signout"><button type="submit" class="xn-btn">Sign out</button></form>
+      </div>
     </div>
-    <div class="pf-actions" id="options">
-      <button type="button" class="xn-btn option" id="APB">Appearance</button>
-      <button type="button" class="xn-btn option" id="DTB">Data</button>
-      <button type="button" class="xn-btn option" id="PRB">Preferences</button>
-      <form method="post" action="/logout" class="pf-signout"><button type="submit" class="xn-btn">Sign out</button></form>
-    </div>
+    <input type="file" class="pf-file" id="avatarFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
+    <input type="file" class="pf-file" id="bannerFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
   </section>
+
+  <div class="pf-grid">
+    <section class="xn-card pf-box pf-cal" aria-labelledby="calTitle">
+      <div class="pf-box-head">
+        <h2 class="xn-h2" id="calTitle">Dose calendar</h2>
+        <div class="cal-nav">
+          <button type="button" class="cal-step" id="calPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+          <span class="cal-month" id="calMonth" aria-live="polite"></span>
+          <button type="button" class="cal-step" id="calNext" aria-label="Next month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="cal-grid" id="calGrid" aria-busy="true"></div>
+      <div class="cal-foot">
+        <span class="pf-note" id="calNote">Loading your doses…</span>
+        <button type="button" class="xn-btn cal-jump" id="calJump" hidden></button>
+      </div>
+    </section>
+
+    <section class="xn-card pf-box" aria-labelledby="likedTitle">
+      <div class="pf-box-head">
+        <h2 class="xn-h2" id="likedTitle">Liked substances</h2>
+        <span class="pf-note" id="likedCount">{{len .Liked}} liked</span>
+      </div>
+      <div class="pf-liked" id="liked">
+        {{range .Liked}}
+        <div class="pf-like" data-name="{{.Name}}" data-image="{{.Image}}" data-class="{{.Class}}">
+          <a class="pf-like-link" href="/journal/Drug?drug={{.Name}}">
+            <span class="pf-like-thumb" data-initial="{{.Initial}}">{{if .Image}}<img src="{{.Image}}" alt="" loading="lazy">{{else}}{{.Initial}}{{end}}</span>
+            <span class="pf-main"><strong>{{.Name}}</strong><span>{{if .Class}}{{.Class}}{{else}}Substance{{end}}</span></span>
+          </a>
+          <button type="button" class="xn-like"></button>
+        </div>
+        {{end}}
+        <p class="xn-empty" id="likedEmpty" {{if .Liked}}hidden{{end}}>Tap the heart on a substance in the <a href="/journal">Journal</a> and it shows up here.</p>
+      </div>
+    </section>
+  </div>
 
   <div class="pf-grid" id="profile-data">
     <section class="xn-card pf-box">
@@ -100,6 +148,17 @@
       <button type="button" class="pop-x" data-close aria-label="Close">×</button>
     </div>
     <div class="APcontent">
+      <span class="xn-label">Pictures</span>
+      <div class="pf-pic-row">
+        <span>Profile picture</span>
+        <span class="pf-pic-btns"><button type="button" class="xn-btn" data-pick="avatar">Change</button><button type="button" class="xn-btn xn-btn-danger" data-remove="avatar" {{if not .Avatar}}disabled{{end}}>Remove</button></span>
+      </div>
+      <div class="pf-pic-row">
+        <span>Banner</span>
+        <span class="pf-pic-btns"><button type="button" class="xn-btn" data-pick="banner">Change</button><button type="button" class="xn-btn xn-btn-danger" data-remove="banner" {{if not .Banner}}disabled{{end}}>Remove</button></span>
+      </div>
+    </div>
+    <div class="APcontent">
       <span class="xn-label">Substance graph colors</span>
       <label class="drugcolor"><span>Pregabalin</span><input type="color" value="#a67cff"></label>
       <label class="drugcolor"><span>lisdex</span><input type="color" value="#4c51ff"></label>
@@ -131,6 +190,20 @@
     </div>
     <p class="xn-empty">Nothing to set here yet.</p>
     <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSP">Close</button>
+  </div>
+</div>
+
+<div class="popup" id="DAY" role="dialog" aria-modal="true" aria-labelledby="DAYtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <div>
+        <p class="xn-eyebrow" id="DAYsub"></p>
+        <h2 class="xn-h2" id="DAYtitle"></h2>
+      </div>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="pf-rows" id="DAYlist"></div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSDay">Close</button>
   </div>
 </div>
 
@@ -180,7 +253,10 @@
   closeBtnD.onclick = () => hidePopup(DT);
   closeBtnP.onclick = () => hidePopup(PR);
 
-  [AP, DT, PR].forEach((popup) => {
+  const DAY = document.getElementById("DAY");
+  document.getElementById("CSDay").onclick = () => hidePopup(DAY);
+
+  [AP, DT, PR, DAY].forEach((popup) => {
     popup.addEventListener("click", (e) => {
       if (e.target === popup || e.target.closest("[data-close]")) hidePopup(popup);
     });
@@ -188,6 +264,284 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && openPopup) hidePopup(openPopup);
   });
+
+  // ---------------- Dose calendar ----------------
+  (function calendar() {
+    const grid = document.getElementById("calGrid");
+    const monthLabel = document.getElementById("calMonth");
+    const note = document.getElementById("calNote");
+    const jump = document.getElementById("calJump");
+    const prev = document.getElementById("calPrev");
+    const next = document.getElementById("calNext");
+    const zone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (_) { return ""; } })();
+    // 0 = Sunday. Follows the browser's locale where it says, else Monday.
+    const weekStart = (() => {
+      try {
+        const loc = new Intl.Locale(navigator.language);
+        const info = loc.getWeekInfo ? loc.getWeekInfo() : loc.weekInfo;
+        if (info && info.firstDay) return info.firstDay % 7;
+      } catch (_) {}
+      return 1;
+    })();
+    const cache = new Map();
+    const today = new Date();
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let shown = thisMonth;
+    let loadSeq = 0;
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const monthKey = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1);
+    const dayKey = (d) => monthKey(d) + "-" + pad(d.getDate());
+    const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+
+    function weekdayNames() {
+      const fmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+      const sunday = new Date(2024, 0, 7);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + ((weekStart + i) % 7));
+        return fmt.format(d);
+      });
+    }
+    const WEEKDAYS = weekdayNames();
+
+    async function fetchMonth(first) {
+      const key = monthKey(first);
+      if (!cache.has(key)) {
+        const params = new URLSearchParams({ month: key, zone, tz: String(new Date(first.getFullYear(), first.getMonth(), 15).getTimezoneOffset()) });
+        cache.set(key, fetch("/profile/doses?" + params, { headers: { Accept: "application/json" } }).then((res) => {
+          const json = (res.headers.get("content-type") || "").includes("json");
+          if (!res.ok || !json) throw new Error(res.redirected || res.status === 401 ? "signed-out" : "failed");
+          return res.json();
+        }).catch((error) => { cache.delete(key); throw error; }));
+      }
+      return cache.get(key);
+    }
+
+    function render(first, data) {
+      grid.innerHTML = "";
+      WEEKDAYS.forEach((name) => {
+        const head = document.createElement("span");
+        head.className = "cal-wd";
+        head.textContent = name;
+        grid.append(head);
+      });
+      const lead = (first.getDay() - weekStart + 7) % 7;
+      for (let i = 0; i < lead; i++) {
+        const blank = document.createElement("span");
+        blank.className = "cal-day is-blank";
+        grid.append(blank);
+      }
+      const days = (data && data.days) || {};
+      const total = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+      const longDate = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" });
+      let doseDays = 0;
+      let doseCount = 0;
+      for (let n = 1; n <= total; n++) {
+        const date = new Date(first.getFullYear(), first.getMonth(), n);
+        const key = dayKey(date);
+        const doses = days[key] || [];
+        const cell = document.createElement(doses.length ? "button" : "span");
+        cell.className = "cal-day";
+        const num = document.createElement("span");
+        num.className = "cal-num";
+        num.textContent = n;
+        cell.append(num);
+        if (key === dayKey(today)) cell.classList.add("is-today");
+        if (date > today) cell.classList.add("is-future");
+        if (doses.length) {
+          doseDays++;
+          doseCount += doses.length;
+          cell.type = "button";
+          cell.classList.add("has-dose");
+          cell.setAttribute("aria-label", longDate.format(date) + ", " + plural(doses.length, "dose"));
+          const dots = document.createElement("span");
+          dots.className = "cal-dots";
+          dots.setAttribute("aria-hidden", "true");
+          for (let i = 0; i < Math.min(doses.length, 3); i++) dots.append(document.createElement("i"));
+          cell.append(dots);
+          cell.addEventListener("click", () => openDay(date, doses));
+        }
+        grid.append(cell);
+      }
+      grid.setAttribute("aria-busy", "false");
+
+      jump.hidden = true;
+      if (doseDays) {
+        note.textContent = plural(doseDays, "day") + " with doses, " + plural(doseCount, "dose") + " in all. Tap a marked day to see it.";
+      } else {
+        note.textContent = "No doses this month.";
+        if (data && data.latest && data.latest.slice(0, 7) !== monthKey(first)) {
+          const [y, m] = data.latest.split("-").map(Number);
+          const target = new Date(y, m - 1, 1);
+          jump.textContent = "Go to " + target.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+          jump.onclick = () => show(target);
+          jump.hidden = false;
+        }
+      }
+    }
+
+    async function show(first) {
+      shown = first;
+      const seq = ++loadSeq;
+      monthLabel.textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      next.disabled = first >= thisMonth;
+      grid.setAttribute("aria-busy", "true");
+      try {
+        const data = await fetchMonth(first);
+        if (seq === loadSeq) render(first, data);
+      } catch (error) {
+        if (seq !== loadSeq) return;
+        render(first, null);
+        note.textContent = error.message === "signed-out" ? "Log in again to see your doses." : "Couldn't load your doses. Try again in a moment.";
+      }
+    }
+
+    prev.addEventListener("click", () => show(new Date(shown.getFullYear(), shown.getMonth() - 1, 1)));
+    next.addEventListener("click", () => { if (shown < thisMonth) show(new Date(shown.getFullYear(), shown.getMonth() + 1, 1)); });
+
+    function openDay(date, doses) {
+      document.getElementById("DAYtitle").textContent = date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      const names = new Set(doses.map((d) => d.name.toLowerCase()));
+      document.getElementById("DAYsub").textContent = plural(doses.length, "dose") + " · " + plural(names.size, "substance");
+      const list = document.getElementById("DAYlist");
+      list.innerHTML = "";
+      doses.forEach((dose) => {
+        const row = document.createElement("div");
+        row.className = "pf-row";
+        row.innerHTML = '<span class="pf-ico"><svg aria-hidden="true"><use href="#i-pill"/></svg></span><span class="pf-main"><strong></strong><span></span></span><span class="pf-when"></span>';
+        row.querySelector("strong").textContent = dose.name;
+        row.querySelector(".pf-main span").textContent = dose.amount + " " + dose.unit + (dose.method ? " · " + dose.method : "");
+        row.querySelector(".pf-when").textContent = dose.time;
+        list.append(row);
+      });
+      showPopup(DAY);
+    }
+
+    show(thisMonth);
+  })();
+
+  // ---------------- Liked substances ----------------
+  (function liked() {
+    const box = document.getElementById("liked");
+    const empty = document.getElementById("likedEmpty");
+    const count = document.getElementById("likedCount");
+    function refresh() {
+      const n = box.querySelectorAll(".pf-like").length;
+      count.textContent = n + " liked";
+      empty.hidden = n > 0;
+    }
+    box.querySelectorAll(".pf-like").forEach((card) => {
+      const sub = { name: card.dataset.name, image: card.dataset.image, class: card.dataset.class };
+      const img = card.querySelector("img");
+      if (img) img.addEventListener("error", () => { const t = card.querySelector(".pf-like-thumb"); t.textContent = t.dataset.initial; });
+      window.xnLikes.bind(card.querySelector(".xn-like"), sub, true, (isLiked) => {
+        if (isLiked) return;
+        card.classList.add("is-leaving");
+        setTimeout(() => { card.remove(); refresh(); }, 200);
+      });
+    });
+  })();
+
+  // ---------------- Profile picture and banner ----------------
+  (function pictures() {
+    const LIMITS = { avatar: [640, 640], banner: [2000, 800] };
+    const files = { avatar: document.getElementById("avatarFile"), banner: document.getElementById("bannerFile") };
+    const holders = { avatar: document.getElementById("profile-pic"), banner: document.getElementById("pfBanner") };
+    const avatarImg = document.getElementById("avatarImg");
+    const bannerImg = document.getElementById("bannerImg");
+    const initial = document.getElementById("avatarInitial");
+    const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+
+    function showPicture(kind, url) {
+      if (kind === "avatar") {
+        avatarImg.hidden = !url;
+        initial.hidden = !!url;
+        if (url) avatarImg.src = url; else avatarImg.removeAttribute("src");
+      } else {
+        bannerImg.hidden = !url;
+        if (url) bannerImg.src = url; else bannerImg.removeAttribute("src");
+      }
+      document.querySelectorAll('[data-remove="' + kind + '"]').forEach((b) => { b.disabled = !url; });
+    }
+
+    // Phone photos are big and carry location data, so shrink and re-save
+    // them as JPEG first. GIFs keep their animation and go up as they are.
+    async function shrink(file, [maxW, maxH]) {
+      if (file.type === "image/gif") return file;
+      const url = URL.createObjectURL(file);
+      try {
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((done) => canvas.toBlob(done, "image/jpeg", 0.88));
+        return blob || file;
+      } catch (_) {
+        return file;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    async function send(kind, form) {
+      holders[kind].classList.add("is-busy");
+      try {
+        const res = await fetch("/profile/picture", { method: "POST", body: form });
+        if (!res.ok) throw new Error(res.status === 401 ? "Log in again to change pictures." : (await res.text()).trim() || "Couldn't save the picture.");
+        const data = await res.json();
+        showPicture(kind, data.url);
+        return data.url;
+      } finally {
+        holders[kind].classList.remove("is-busy");
+      }
+    }
+
+    Object.entries(files).forEach(([kind, input]) => {
+      input.addEventListener("change", async () => {
+        const file = input.files && input.files[0];
+        input.value = "";
+        if (!file) return;
+        const form = new FormData();
+        form.append("kind", kind);
+        const picture = await shrink(file, LIMITS[kind]);
+        form.append("image", picture, picture === file ? file.name : kind + ".jpg");
+        try {
+          await send(kind, form);
+          toast(kind === "avatar" ? "Profile picture saved." : "Banner saved.");
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-pick]").forEach((button) => {
+      button.addEventListener("click", () => files[button.dataset.pick].click());
+    });
+    document.querySelectorAll("[data-remove]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const kind = button.dataset.remove;
+        const form = new FormData();
+        form.append("kind", kind);
+        form.append("remove", "1");
+        try {
+          await send(kind, form);
+          toast(kind === "avatar" ? "Profile picture removed." : "Banner removed.");
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    });
+    avatarImg.addEventListener("error", () => showPicture("avatar", ""));
+    bannerImg.addEventListener("error", () => showPicture("banner", ""));
+  })();
 </script>
 </body>
 </html>
