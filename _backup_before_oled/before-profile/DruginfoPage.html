@@ -13,7 +13,6 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
-  <script src="/likes.js"></script>
 </head>
 <body class="xn-bg">
 <header class="xn">
@@ -41,7 +40,6 @@
     </div>
     <p class="di-summary" id="diSummary" hidden></p>
     <div class="di-links" id="diLinks" hidden>
-      <button type="button" class="xn-btn di-like" id="diLike"><span data-like-label>Like</span></button>
       <a class="xn-btn" id="diWiki" target="_blank" rel="noopener noreferrer">PsychonautWiki ↗</a>
       <a class="xn-btn" id="diTripsit" target="_blank" rel="noopener noreferrer">TripSit ↗</a>
     </div>
@@ -187,11 +185,6 @@
     document.getElementById("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(name.replace(/\s+/g, "_"));
     document.getElementById("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"));
     document.getElementById("diLinks").hidden = false;
-
-    const sub = { name, image: thumbUrl || "", class: classes.join(", ") };
-    window.xnLikes.load().then((liked) => {
-      window.xnLikes.bind(document.getElementById("diLike"), sub, liked.has(window.xnLikes.key(name)));
-    });
 
     const DrugInfoIntakeMethods = document.querySelector(".DrugInfoIntakeMethods");
     DrugInfoIntakeMethods.innerHTML = "";

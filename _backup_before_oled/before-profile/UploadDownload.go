@@ -20,10 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	// Time zone data built in, so the calendar can use the visitor's zone on Windows too.
-	_ "time/tzdata"
-	"unicode"
-	"unicode/utf8"
 
 	// Pure-Go SQLite driver: builds on Windows without a C compiler (mattn/go-sqlite3 needs cgo + gcc).
 	_ "modernc.org/sqlite"
@@ -134,25 +130,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 const sessionLifetime = 30 * 24 * time.Hour
 
-var profileSchema string = `
-CREATE TABLE IF NOT EXISTS liked_substances (
-	user_id INTEGER NOT NULL,
-	name TEXT NOT NULL COLLATE NOCASE,
-	image TEXT NOT NULL DEFAULT '',
-	class TEXT NOT NULL DEFAULT '',
-	liked_at DATETIME NOT NULL,
-	PRIMARY KEY(user_id, name),
-	FOREIGN KEY(user_id) REFERENCES users(id)
-);
-`
-
-// Profile pictures and banners live in profiles/<user id>/ and are served at /profiles/.
-var ProfilePicturesDirName string = "profiles"
-
-const defaultProfilePic = "/profiles/Default/default.png"
-const maxPictureBytes = 6 << 20
-const maxLikes = 500
-
 var db *sql.DB
 
 var UploadedFilesDirName string = "UploadedFiles"
@@ -204,10 +181,6 @@ func main() {
 	http.HandleFunc("/delete", requireAdminLogin(Delete))
 	http.HandleFunc("/rename", requireAdminLogin(Rename))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
-	http.HandleFunc("/profile/doses", requireLogin(profileDoses))
-	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
-	http.HandleFunc("/profiles/", requireLogin(profileImage))
-	http.HandleFunc("/likes", requireLogin(likes))
 	http.HandleFunc("/sub/saveData", requireLogin(saveData))
 	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
 
@@ -280,16 +253,6 @@ func main() {
 	if _, err := db.Exec(sessionSchema); err != nil {
 		panic("cannot create the sessions table: " + err.Error())
 	}
-	if _, err := db.Exec(profileSchema); err != nil {
-		panic("cannot create the liked substances table: " + err.Error())
-	}
-	// Databases from before banners existed don't have the column yet.
-	if _, err := db.Exec("ALTER TABLE users ADD COLUMN pathToBanner TEXT NOT NULL DEFAULT ''"); err != nil && !strings.Contains(err.Error(), "duplicate column") {
-		panic("cannot add the banner column: " + err.Error())
-	}
-	if err := os.MkdirAll(ProfilePicturesDirName, 0755); err != nil {
-		panic("cannot create " + ProfilePicturesDirName + ": " + err.Error())
-	}
 
 	port := 6767
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
@@ -347,10 +310,6 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 
 	d := struct {
 		Username      string
-		Initial       string
-		Avatar        string
-		Banner        string
-		Liked         []likedSubstance
 		RecentIntakes []dose
 		Totals        map[string]Totals
 	}{
@@ -365,19 +324,6 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 
 	d.Username = session.OriginalUsername
 	userId := session.UserId
-	if first, _ := utf8.DecodeRuneInString(d.Username); first != utf8.RuneError {
-		d.Initial = strings.ToUpper(string(first))
-	}
-
-	var avatar, banner string
-	db.QueryRow("SELECT pathToProfilePic, pathToBanner FROM users WHERE id = ?", userId).Scan(&avatar, &banner)
-	d.Avatar = existingPicture(avatar)
-	d.Banner = existingPicture(banner)
-
-	d.Liked, err = likedSubstances(userId)
-	if err != nil {
-		fmt.Println(err)
-	}
 
 	rows, err := db.Query(`
 	SELECT
@@ -1927,363 +1873,4 @@ func AdminPanelCreateUserData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("User Created"))
-}
-
-// ---- Profile: dose calendar, liked substances, pictures ----
-
-type likedSubstance struct {
-	Name  string `json:"name"`
-	Image string `json:"image"`
-	Class string `json:"class"`
-}
-
-// Initial is the letter shown when a liked substance has no picture.
-func (l likedSubstance) Initial() string {
-	first, _ := utf8.DecodeRuneInString(l.Name)
-	if first == utf8.RuneError {
-		return "?"
-	}
-	return strings.ToUpper(string(first))
-}
-
-func likedSubstances(userId int) ([]likedSubstance, error) {
-	rows, err := db.Query("SELECT name, image, class FROM liked_substances WHERE user_id = ? ORDER BY liked_at DESC", userId)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []likedSubstance{}
-	for rows.Next() {
-		var l likedSubstance
-		if err := rows.Scan(&l.Name, &l.Image, &l.Class); err != nil {
-			return nil, err
-		}
-		out = append(out, l)
-	}
-	return out, rows.Err()
-}
-
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v)
-}
-
-// cleanText trims s, drops control characters and cuts it to max characters.
-func cleanText(s string, max int) string {
-	s = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return -1
-		}
-		return r
-	}, strings.TrimSpace(s))
-	if utf8.RuneCountInString(s) > max {
-		s = string([]rune(s)[:max])
-	}
-	return s
-}
-
-// likes: GET lists the account's liked substances, POST {name, image, class, liked} adds or removes one.
-func likes(w http.ResponseWriter, r *http.Request) {
-	session, _ := sessionFromRequest(r)
-
-	switch r.Method {
-	case http.MethodGet:
-		list, err := likedSubstances(session.UserId)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Couldn't load your likes.", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, list)
-
-	case http.MethodPost:
-		var in struct {
-			likedSubstance
-			Liked bool `json:"liked"`
-		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
-			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
-			return
-		}
-		name := cleanText(in.Name, 80)
-		if name == "" {
-			http.Error(w, "Pick a substance.", http.StatusBadRequest)
-			return
-		}
-		if !in.Liked {
-			if _, err := db.Exec("DELETE FROM liked_substances WHERE user_id = ? AND name = ?", session.UserId, name); err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't save that.", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]bool{"liked": false})
-			return
-		}
-
-		var count int
-		db.QueryRow("SELECT COUNT(*) FROM liked_substances WHERE user_id = ?", session.UserId).Scan(&count)
-		if count >= maxLikes {
-			http.Error(w, fmt.Sprintf("You can like up to %d substances.", maxLikes), http.StatusBadRequest)
-			return
-		}
-		// Only keep structure pictures from PsychonautWiki itself.
-		image := strings.TrimSpace(in.Image)
-		if len(image) > 300 || !strings.HasPrefix(image, "https://psychonautwiki.org/") {
-			image = ""
-		}
-		_, err := db.Exec(`INSERT INTO liked_substances (user_id, name, image, class, liked_at) VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(user_id, name) DO UPDATE SET image = excluded.image, class = excluded.class`,
-			session.UserId, name, image, cleanText(in.Class, 120), time.Now().UTC())
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Couldn't save that.", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, map[string]bool{"liked": true})
-
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// profileDoses answers GET ?month=2026-10&zone=Europe/Amsterdam (or &tz=<minutes, as JS
-// getTimezoneOffset gives it>) with that month's doses grouped by day in the visitor's time zone.
-func profileDoses(w http.ResponseWriter, r *http.Request) {
-	session, _ := sessionFromRequest(r)
-	q := r.URL.Query()
-
-	month, err := time.Parse("2006-01", q.Get("month"))
-	if err != nil {
-		http.Error(w, "Pick a month like 2026-10.", http.StatusBadRequest)
-		return
-	}
-	tz, err := strconv.Atoi(q.Get("tz"))
-	if err != nil || tz < -840 || tz > 840 {
-		tz = 0
-	}
-	zone := time.FixedZone("visitor", -tz*60)
-	if name := q.Get("zone"); name != "" && name != "Local" {
-		if loc, err := time.LoadLocation(name); err == nil {
-			zone = loc
-		}
-	}
-	start := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, zone)
-	end := start.AddDate(0, 1, 0)
-
-	type entry struct {
-		Name   string `json:"name"`
-		Amount string `json:"amount"`
-		Unit   string `json:"unit"`
-		Method string `json:"method"`
-		Time   string `json:"time"`
-	}
-	out := struct {
-		Month  string             `json:"month"`
-		Days   map[string][]entry `json:"days"`
-		Latest string             `json:"latest"`
-	}{Month: start.Format("2006-01"), Days: map[string][]entry{}}
-
-	// taken_at is stored as text with its own UTC offset, so fetch a day either
-	// side by date and keep exactly this month's doses below.
-	rows, err := db.Query(`
-	SELECT drug.name, dose.amount, dose.unit, dose.method_way, dose.taken_at
-	FROM doses dose
-	JOIN drugs drug ON dose.drug_id = drug.id
-	WHERE dose.user_id = ? AND dose.taken_at >= ? AND dose.taken_at < ?
-	ORDER BY dose.taken_at`,
-		session.UserId, start.AddDate(0, 0, -1).UTC().Format("2006-01-02"), end.AddDate(0, 0, 2).UTC().Format("2006-01-02"))
-	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Couldn't load your doses.", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var e entry
-		var amount float64
-		var taken time.Time
-		if err := rows.Scan(&e.Name, &amount, &e.Unit, &e.Method, &taken); err != nil {
-			fmt.Println(err)
-			continue
-		}
-		taken = taken.In(zone)
-		if taken.Before(start) || !taken.Before(end) {
-			continue
-		}
-		e.Amount = strconv.FormatFloat(amount, 'f', -1, 64)
-		e.Time = taken.Format("15:04")
-		day := taken.Format("2006-01-02")
-		out.Days[day] = append(out.Days[day], e)
-	}
-
-	var latest time.Time
-	if err := db.QueryRow("SELECT taken_at FROM doses WHERE user_id = ? ORDER BY taken_at DESC LIMIT 1", session.UserId).Scan(&latest); err == nil {
-		out.Latest = latest.In(zone).Format("2006-01-02")
-	}
-	writeJSON(w, out)
-}
-
-// profileFile maps a /profiles/... link to its file inside the profiles folder.
-func profileFile(link string) (string, bool) {
-	rel, found := strings.CutPrefix(link, "/profiles/")
-	if !found || strings.Trim(rel, "/") == "" {
-		return "", false
-	}
-	p := filepath.Join(ProfilePicturesDirName, filepath.FromSlash(rel))
-	r, err := filepath.Rel(ProfilePicturesDirName, p)
-	if err != nil || r == "." || r == ".." || strings.HasPrefix(r, ".."+string(filepath.Separator)) {
-		return "", false
-	}
-	return p, true
-}
-
-// existingPicture returns link when it points at a picture that is really on disk, else "".
-func existingPicture(link string) string {
-	p, ok := profileFile(link)
-	if !ok {
-		return ""
-	}
-	if info, err := os.Stat(p); err != nil || info.IsDir() {
-		return ""
-	}
-	return link
-}
-
-func profileImage(w http.ResponseWriter, r *http.Request) {
-	p, ok := profileFile(r.URL.Path)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	switch strings.ToLower(filepath.Ext(p)) {
-	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
-	default:
-		http.NotFound(w, r)
-		return
-	}
-	if info, err := os.Stat(p); err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	http.ServeFile(w, r, p)
-}
-
-// removeOwnPicture deletes a replaced upload, but only one inside that account's own folder.
-func removeOwnPicture(link string, userId int) {
-	if !strings.HasPrefix(link, "/profiles/"+strconv.Itoa(userId)+"/") {
-		return
-	}
-	if p, ok := profileFile(link); ok {
-		os.Remove(p)
-	}
-}
-
-// profilePicture takes a multipart POST with kind=avatar|banner and either an
-// "image" file or remove=1, and answers {"url": "<new link or empty>"}.
-func profilePicture(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	session, _ := sessionFromRequest(r)
-	uid := session.UserId
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxPictureBytes+(64<<10))
-	if err := r.ParseMultipartForm(1 << 20); err != nil {
-		http.Error(w, "That picture is too big. Pick one under 6 MB.", http.StatusRequestEntityTooLarge)
-		return
-	}
-	defer r.MultipartForm.RemoveAll()
-
-	var column string
-	kind := r.FormValue("kind")
-	switch kind {
-	case "avatar":
-		column = "pathToProfilePic"
-	case "banner":
-		column = "pathToBanner"
-	default:
-		http.Error(w, "Unknown picture.", http.StatusBadRequest)
-		return
-	}
-	var old string
-	db.QueryRow("SELECT "+column+" FROM users WHERE id = ?", uid).Scan(&old)
-
-	if r.FormValue("remove") == "1" {
-		link := ""
-		if kind == "avatar" {
-			link = defaultProfilePic
-		}
-		if _, err := db.Exec("UPDATE users SET "+column+" = ? WHERE id = ?", link, uid); err != nil {
-			fmt.Println(err)
-			http.Error(w, "Couldn't remove the picture.", http.StatusInternalServerError)
-			return
-		}
-		removeOwnPicture(old, uid)
-		writeJSON(w, map[string]string{"url": ""})
-		return
-	}
-
-	file, _, err := r.FormFile("image")
-	if err != nil {
-		http.Error(w, "Pick a picture first.", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	head := make([]byte, 512)
-	n, _ := io.ReadFull(file, head)
-	var ext string
-	switch http.DetectContentType(head[:n]) {
-	case "image/jpeg":
-		ext = ".jpg"
-	case "image/png":
-		ext = ".png"
-	case "image/gif":
-		ext = ".gif"
-	case "image/webp":
-		ext = ".webp"
-	default:
-		http.Error(w, "Use a JPG, PNG, GIF or WebP picture.", http.StatusUnsupportedMediaType)
-		return
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		http.Error(w, "Couldn't read the picture.", http.StatusInternalServerError)
-		return
-	}
-
-	dir := filepath.Join(ProfilePicturesDirName, strconv.Itoa(uid))
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		fmt.Println(err)
-		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
-		return
-	}
-	b := make([]byte, 6)
-	cryptorand.Read(b)
-	name := kind + "-" + hex.EncodeToString(b) + ext
-	out, err := os.Create(filepath.Join(dir, name))
-	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
-		return
-	}
-	_, copyErr := io.Copy(out, file)
-	closeErr := out.Close()
-	if copyErr != nil || closeErr != nil {
-		os.Remove(filepath.Join(dir, name))
-		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
-		return
-	}
-
-	link := "/profiles/" + strconv.Itoa(uid) + "/" + name
-	if _, err := db.Exec("UPDATE users SET "+column+" = ? WHERE id = ?", link, uid); err != nil {
-		fmt.Println(err)
-		os.Remove(filepath.Join(dir, name))
-		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
-		return
-	}
-	removeOwnPicture(old, uid)
-	writeJSON(w, map[string]string{"url": link})
 }

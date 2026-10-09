@@ -15,9 +15,7 @@
     .jr-search svg{ position:absolute; left:11px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted); pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; }
     .jr-search .xn-input{ padding-left:34px; }
     .Drugs{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap:8px; margin-top:20px; }
-    .drug-item{ position:relative; }
-    .drug-item .drug-like{ position:absolute; top:50%; right:8px; transform:translateY(-50%); }
-    .Drug{ display:grid; grid-template-columns:56px minmax(0,1fr) 44px; align-items:center; gap:14px; min-height:76px; padding:10px 10px 10px 10px; border:1px solid var(--line); border-radius:2px; background:var(--surface-2); color:var(--text); text-decoration:none; transition:border-color .15s ease, background-color .15s ease; }
+    .Drug{ display:grid; grid-template-columns:56px minmax(0,1fr) auto; align-items:center; gap:14px; min-height:76px; padding:10px 10px 10px 10px; border:1px solid var(--line); border-radius:2px; background:var(--surface-2); color:var(--text); text-decoration:none; transition:border-color .15s ease, background-color .15s ease; }
     @media (hover:hover){ .Drug:hover{ border-color:var(--violet); background:#16161b; } }
     .Drug:focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
     .drug-thumb{ display:flex; align-items:center; justify-content:center; width:56px; height:56px; overflow:hidden; border:1px solid var(--line); border-radius:2px; background:#000; color:var(--violet); font-size:20px; font-weight:600; }
@@ -26,6 +24,7 @@
     .drug-text{ display:flex; flex-direction:column; gap:3px; min-width:0; }
     .drugname{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
     .drugclass{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
+    .drug-chev{ width:18px; height:18px; color:var(--muted); fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
     .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
     .bottombar{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:20px; }
     @media (max-width:640px){ .jr-search{ max-width:none; } .bottombar .xn-btn{ flex:1; } }
@@ -38,7 +37,6 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
-  <script src="/likes.js"></script>
 </head>
 <body class="min-h-screen xn-bg">
   <header class="xn">
@@ -121,7 +119,7 @@
                 const seq = ++displaySeq;
                 const drugsDiv = document.querySelector(".Drugs");
                 try {
-                    const [result, liked] = await Promise.all([getSubstances(offset, query), window.xnLikes.load()]);
+                    const result = await getSubstances(offset, query);
                     if (seq !== displaySeq) return; // a newer search is on its way
                     const substances = result?.data?.substances || [];
 
@@ -142,6 +140,7 @@
                         drugDiv.innerHTML = `
                             <span class="drug-thumb"></span>
                             <span class="drug-text"><span class="drugname"></span><span class="drugclass"></span></span>
+                            <svg class="drug-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
                         `;
                         drugDiv.querySelector(".drugname").textContent = DrugName;
                         drugDiv.querySelector(".drugclass").textContent = DrugClass || "Substance";
@@ -156,15 +155,7 @@
                         } else {
                             thumb.textContent = DrugName.charAt(0).toUpperCase();
                         }
-                        // The heart sits beside the link (not inside it) so tapping it doesn't open the page.
-                        const item = document.createElement("div");
-                        item.className = "drug-item";
-                        const like = document.createElement("button");
-                        like.type = "button";
-                        like.className = "xn-like drug-like";
-                        window.xnLikes.bind(like, { name: DrugName, image: imgUrl, class: DrugClass }, liked.has(window.xnLikes.key(DrugName)));
-                        item.append(drugDiv, like);
-                        drugsDiv.appendChild(item);
+                        drugsDiv.appendChild(drugDiv);
                     });
                     if (!substances.length) {
                         drugsDiv.innerHTML = `<p class="jr-status"></p>`;
