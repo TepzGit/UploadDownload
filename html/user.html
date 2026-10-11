@@ -35,7 +35,7 @@
 <div class="xn-hatch" aria-hidden="true"></div>
 <div class="pf-backdrop" aria-hidden="true" {{if .Background}}style="background-image:url('{{.Background}}')"{{else}}hidden{{end}}></div>
 
-<main class="xn-page pf" id="container">
+<main class="xn-page pf" id="container" style="--pf-clear: {{.Clear}}">
 {{if .Found}}
   <section class="xn-card pf-head">
     <div class="pf-banner">{{if .Banner}}<img src="{{.Banner}}" alt="">{{end}}</div>
@@ -43,7 +43,7 @@
       <div class="profile-avatar pf-avatar-static">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}<span class="pf-initial" aria-hidden="true">{{.Initial}}</span>{{end}}</div>
       <div class="pf-who">
         <p class="xn-eyebrow">{{if .Admin}}Admin{{else}}Member{{end}}</p>
-        <h1 class="xn-h1">{{.Name}}</h1>
+        <h1 class="xn-h1" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Name}}</h1>
         <p class="xn-sub">{{if eq .Posts 1}}1 post{{else}}{{.Posts}} posts{{end}} · {{len .Liked}} liked substances</p>
       </div>
       <div class="pf-actions">

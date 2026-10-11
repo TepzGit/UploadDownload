@@ -41,7 +41,7 @@
   <symbol id="i-pill" viewBox="0 0 16 16"><path fill="currentColor" d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"/></symbol>
 </svg>
 
-<main class="xn-page pf" id="container">
+<main class="xn-page pf" id="container" style="--pf-clear: {{.WidgetClear}}">
   <section class="xn-card pf-head" id="header">
     <div class="pf-banner" id="pfBanner">
       <img id="bannerImg" alt="" {{if .Banner}}src="{{.Banner}}"{{else}}hidden{{end}}>
@@ -55,7 +55,7 @@
       </button>
       <div class="pf-who">
         <p class="xn-eyebrow">Profile</p>
-        <h1 class="xn-h1" id="username">{{.Username}}</h1>
+        <h1 class="xn-h1" id="username" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Username}}</h1>
       </div>
       <div class="pf-actions" id="options">
         <button type="button" class="xn-btn option" id="APB">Appearance</button>
@@ -190,6 +190,49 @@
         <span class="pf-pic-btns"><button type="button" class="xn-btn" data-pick="background">Change</button><button type="button" class="xn-btn xn-btn-danger" data-remove="background" {{if not .Background}}disabled{{end}}>Remove</button></span>
       </div>
       <input type="file" class="pf-file" id="backgroundFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
+
+      <label class="xn-label pf-ap-label" for="clearRange">Widget transparency</label>
+      <div class="pf-range-row">
+        <input type="range" id="clearRange" class="pf-slider" min="0" max="100" step="5" value="{{.WidgetClear}}" aria-describedby="clearHint">
+        <output id="clearValue" for="clearRange">{{.WidgetClear}}%</output>
+      </div>
+      <p class="pf-note" id="clearHint">How see-through your cards are, here and on your public page. Looks best with a background.</p>
+
+      <span class="xn-label pf-ap-label" id="colorLabel">Site color</span>
+      <div class="pf-colors" role="radiogroup" aria-labelledby="colorLabel" id="colorPicks" data-current="{{.SiteColor}}">
+        <button type="button" role="radio" class="pf-swatch" data-color="#a67cff" style="--sw:#a67cff" aria-label="Violet (default)"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#60a5fa" style="--sw:#60a5fa" aria-label="Blue"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#2dd4bf" style="--sw:#2dd4bf" aria-label="Teal"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#a3e635" style="--sw:#a3e635" aria-label="Lime"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#fbbf24" style="--sw:#fbbf24" aria-label="Amber"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#fb923c" style="--sw:#fb923c" aria-label="Orange"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#f472b6" style="--sw:#f472b6" aria-label="Pink"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#e879f9" style="--sw:#e879f9" aria-label="Magenta"></button>
+        <label class="pf-swatch pf-swatch-custom" title="Pick any color">
+          <input type="color" id="colorCustom" value="#a67cff" aria-label="Pick any color">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </label>
+      </div>
+      <p class="pf-note">Changes the main color of the whole site for your account.</p>
+      {{if .IsAdmin}}
+      <span class="xn-label pf-ap-label" id="nameColorLabel">Name color <small class="pf-admin-tag">Admin</small></span>
+      <div class="pf-colors" role="radiogroup" aria-labelledby="nameColorLabel" id="namePicks" data-current="{{.NameColor}}">
+        <button type="button" role="radio" class="pf-swatch pf-swatch-none" data-color="" aria-label="No color (white)"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#a67cff" style="--sw:#a67cff" aria-label="Violet"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#60a5fa" style="--sw:#60a5fa" aria-label="Blue"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#2dd4bf" style="--sw:#2dd4bf" aria-label="Teal"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#a3e635" style="--sw:#a3e635" aria-label="Lime"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#fbbf24" style="--sw:#fbbf24" aria-label="Amber"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#fb923c" style="--sw:#fb923c" aria-label="Orange"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#f87171" style="--sw:#f87171" aria-label="Red"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#f472b6" style="--sw:#f472b6" aria-label="Pink"></button>
+        <label class="pf-swatch pf-swatch-custom" title="Pick any color">
+          <input type="color" id="nameCustom" value="#ffffff" aria-label="Pick any color for your name">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </label>
+      </div>
+      <p class="pf-note">Your name shows in this color everywhere: posts, comments, members, friends and your profile.</p>
+      {{end}}
     </div>
     <p class="pf-note">Graph colors for each substance are under Preferences.</p>
     <button type="button" id="CSA" class="xn-btn xn-btn-primary pop-done">Close</button>
@@ -797,6 +840,122 @@
         closeSug();
       }
     });
+  })();
+
+  // ---------------- Widget transparency and site color ----------------
+  (function appearance() {
+    const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+    const page = document.getElementById("container");
+    const range = document.getElementById("clearRange");
+    const value = document.getElementById("clearValue");
+    const picks = document.getElementById("colorPicks");
+    const swatches = [...picks.querySelectorAll("[data-color]")];
+    const custom = document.getElementById("colorCustom");
+    const site = window.xnSiteColor;
+    const timers = {};
+
+    function save(field, val, done) {
+      clearTimeout(timers[field]);
+      timers[field] = setTimeout(async () => {
+        try {
+          const res = await fetch("/profile/appearance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [field]: val }),
+          });
+          if (!res.ok) throw new Error(res.status === 401 ? "Log in again to save this." : (await res.text()).trim() || "Couldn't save that. Try again.");
+          if (done) toast(done);
+        } catch (error) {
+          toast(error.message, true);
+        }
+      }, 350);
+    }
+
+    function showClear() {
+      page.style.setProperty("--pf-clear", range.value);
+      range.style.setProperty("--fill", range.value + "%");
+      value.textContent = range.value + "%";
+    }
+    range.addEventListener("input", showClear);
+    showClear();
+    range.addEventListener("change", () => save("widgetClear", Number(range.value)));
+
+    function mark(hex) {
+      const color = (hex || site.DEFAULT).toLowerCase();
+      let hit = false;
+      swatches.forEach((sw) => {
+        const on = sw.dataset.color === color;
+        hit = hit || on;
+        sw.setAttribute("aria-checked", String(on));
+        sw.tabIndex = on ? 0 : -1;
+      });
+      custom.parentElement.classList.toggle("is-on", !hit);
+      if (!hit) custom.parentElement.style.setProperty("--sw", site.preview(color));
+      custom.value = color;
+      if (!hit) swatches[0].tabIndex = 0;
+    }
+    function pick(hex, announce) {
+      const color = hex.toLowerCase() === site.DEFAULT ? "" : hex.toLowerCase();
+      site.use(color);
+      mark(color);
+      save("siteColor", color, announce ? "Site color saved." : "");
+    }
+    swatches.forEach((sw) => sw.addEventListener("click", () => pick(sw.dataset.color, true)));
+    picks.addEventListener("keydown", (e) => {
+      const at = swatches.indexOf(document.activeElement);
+      if (at < 0 || !["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) return;
+      e.preventDefault();
+      const next = swatches[(at + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1) + swatches.length) % swatches.length];
+      next.focus();
+      next.click();
+    });
+    custom.addEventListener("input", () => { site.apply(custom.value); mark(custom.value); });
+    custom.addEventListener("change", () => pick(custom.value, true));
+    mark(picks.dataset.current);
+
+    // Admins: the color of their name across the site.
+    const namePicks = document.getElementById("namePicks");
+    if (namePicks) {
+      const nameSwatches = [...namePicks.querySelectorAll("[data-color]")];
+      const nameCustom = document.getElementById("nameCustom");
+      const heading = document.getElementById("username");
+      const paint = (hex) => {
+        heading.style.color = hex ? site.preview(hex) : "";
+        heading.classList.toggle("xn-named", !!hex);
+      };
+      const markName = (hex) => {
+        const color = (hex || "").toLowerCase();
+        let hit = false;
+        nameSwatches.forEach((sw) => {
+          const on = sw.dataset.color === color;
+          hit = hit || on;
+          sw.setAttribute("aria-checked", String(on));
+          sw.tabIndex = on ? 0 : -1;
+        });
+        nameCustom.parentElement.classList.toggle("is-on", !hit);
+        if (!hit) nameCustom.parentElement.style.setProperty("--sw", site.preview(color));
+        if (color) nameCustom.value = color;
+        if (!hit) nameSwatches[0].tabIndex = 0;
+      };
+      const pickName = (hex) => {
+        const color = (hex || "").toLowerCase();
+        paint(color);
+        markName(color);
+        save("nameColor", color, color ? "Name color saved." : "Name color removed.");
+      };
+      nameSwatches.forEach((sw) => sw.addEventListener("click", () => pickName(sw.dataset.color)));
+      namePicks.addEventListener("keydown", (e) => {
+        const at = nameSwatches.indexOf(document.activeElement);
+        if (at < 0 || !["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(e.key)) return;
+        e.preventDefault();
+        const next = nameSwatches[(at + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1) + nameSwatches.length) % nameSwatches.length];
+        next.focus();
+        next.click();
+      });
+      nameCustom.addEventListener("input", () => { paint(nameCustom.value); markName(nameCustom.value); });
+      nameCustom.addEventListener("change", () => pickName(nameCustom.value));
+      markName(namePicks.dataset.current);
+    }
   })();
 
   // ---------------- Profile picture and banner ----------------

@@ -279,10 +279,10 @@ function byteConverter(size) {
 			if (e.key === "Enter" || e.key === " ") {
 				e.preventDefault()
 				openItem(item)
-			} else if (e.key === "Delete") {
+			} else if (e.key === "Delete" && window.xnFilesCanEdit !== false) {
 				e.preventDefault()
 				deleteItem(item)
-			} else if (e.key === "F2") {
+			} else if (e.key === "F2" && window.xnFilesCanEdit !== false) {
 				e.preventDefault()
 				startRename(item)
 			}

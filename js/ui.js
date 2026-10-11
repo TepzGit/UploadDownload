@@ -154,6 +154,8 @@ function getRecent() {
       formulation: known.has(d.formulation) ? d.formulation : "immediate",
       label: typeof d.label === "string" ? d.label.slice(0, 40) : "",
       releaseHours: Number.isFinite(Number(d.releaseHours)) ? Number(d.releaseHours) : 0,
+      at: Number.isFinite(Number(d.at)) && Number(d.at) > 0 ? Number(d.at) : 0, // last used (ms)
+      n: Number.isInteger(Number(d.n)) && Number(d.n) > 0 ? Math.min(Number(d.n), 999) : 1, // times used
     }))
     .slice(0, RECENT_MAX);
 }
@@ -161,25 +163,79 @@ function getRecent() {
 function rememberDose(entry) {
   if (!hasConsent()) return;
   const key = (d) => `${d.substance}|${d.amount}|${d.formulation}`;
-  const list = [entry, ...getRecent().filter((d) => key(d) !== key(entry))].slice(0, RECENT_MAX);
+  const old = getRecent();
+  const before = old.find((d) => key(d) === key(entry));
+  const fresh = { ...entry, at: Date.now(), n: before ? before.n + 1 : 1 };
+  const list = [fresh, ...old.filter((d) => key(d) !== key(entry))].slice(0, RECENT_MAX);
   writeCookie(RECENT_COOKIE, JSON.stringify(list));
 }
 
 const recentKey = (d) => `${d.substance}|${d.amount}|${d.formulation}`;
 
+const stillMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Plays the "leaving" animation on items, then calls done (straight away for reduce motion).
+function animateOut(items, done) {
+  if (!items.length || stillMotion()) return done();
+  items.forEach((item, i) => {
+    item.style.animationDelay = `${i * 35}ms`;
+    item.classList.add("is-leaving");
+  });
+  setTimeout(done, 260 + items.length * 35);
+}
+
 function initRecentControls() {
-  document.getElementById("recentClear")?.addEventListener("click", () => {
-    document.cookie = `${RECENT_COOKIE}=; max-age=0; path=/`;
-    renderRecent();
-    showToast("Recent doses cleared.");
+  const clear = document.getElementById("recentClear");
+  if (!clear) return;
+  let armed = null;
+  const disarm = () => {
+    clearTimeout(armed);
+    armed = null;
+    clear.textContent = "Clear all";
+    clear.classList.remove("is-confirm");
+  };
+  clear.addEventListener("click", () => {
+    // First tap asks, second tap clears, so a stray tap can't wipe the list.
+    if (!armed) {
+      clear.textContent = "Tap again to clear";
+      clear.classList.add("is-confirm");
+      armed = setTimeout(disarm, 3000);
+      return;
+    }
+    disarm();
+    const items = [...document.querySelectorAll("#recentDoses .recent-item")];
+    animateOut(items, () => {
+      document.cookie = `${RECENT_COOKIE}=; max-age=0; path=/`;
+      renderRecent();
+      showToast("Recent doses cleared.");
+    });
   });
 }
 
-function removeRecent(entry) {
-  const list = getRecent().filter((d) => recentKey(d) !== recentKey(entry));
-  if (list.length) writeCookie(RECENT_COOKIE, JSON.stringify(list));
-  else document.cookie = `${RECENT_COOKIE}=; max-age=0; path=/`;
-  renderRecent();
+function removeRecent(entry, item) {
+  animateOut(item ? [item] : [], () => {
+    const list = getRecent().filter((d) => recentKey(d) !== recentKey(entry));
+    if (list.length) writeCookie(RECENT_COOKIE, JSON.stringify(list));
+    else document.cookie = `${RECENT_COOKIE}=; max-age=0; path=/`;
+    renderRecent();
+  });
+}
+
+// "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago"
+function agoLabel(at) {
+  if (!at) return "";
+  const min = Math.round((Date.now() - at) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h ago`;
+  const days = Math.round(h / 24);
+  return days === 1 ? "yesterday" : `${days} days ago`;
+}
+
+function releaseLabel(d) {
+  const box = els.formulationInputs.find((c) => c.value === d.formulation);
+  return box?.dataset.label || d.label || d.formulation;
 }
 
 function renderRecent() {
@@ -187,32 +243,60 @@ function renderRecent() {
   if (!wrap) return;
   const list = getRecent();
   const box = wrap.querySelector("[data-recent-list]");
+  const count = wrap.querySelector("[data-recent-count]");
   box.replaceChildren();
   wrap.hidden = list.length === 0;
-  list.forEach((d) => {
+  if (count) count.textContent = list.length ? String(list.length) : "";
+  list.forEach((d, i) => {
     // Same color the substance gets on the graph (assigned now if it has none yet).
     const color = logic.colorForSubstance(d.substance);
     const item = document.createElement("div");
     item.className = "recent-item";
     item.style.setProperty("--c", color);
     item.style.setProperty("--ct", `${color}14`);
+    item.style.setProperty("--i", String(i));
 
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "recent-dose";
+    const tile = document.createElement("span");
+    tile.className = "recent-tile";
+    tile.setAttribute("aria-hidden", "true");
+    tile.textContent = d.substance.slice(0, 1).toUpperCase();
+    const text = document.createElement("span");
+    text.className = "recent-text";
     const name = document.createElement("strong");
     name.textContent = d.substance;
     const meta = document.createElement("span");
-    meta.textContent = `${d.amount} ${d.unit || ""} · ${d.label || d.formulation}`;
-    btn.append(name, meta);
-    btn.addEventListener("click", () => useRecent(d));
+    meta.className = "recent-meta";
+    const amount = document.createElement("b");
+    amount.textContent = `${d.amount} ${d.unit || ""}`.trim();
+    meta.append(amount, ` · ${releaseLabel(d)}`);
+    const when = document.createElement("span");
+    when.className = "recent-when";
+    const ago = agoLabel(d.at);
+    when.textContent = [d.n > 1 ? `${d.n}×` : "", ago].filter(Boolean).join(" · ");
+    if (d.n > 1) when.title = `Used ${d.n} times`;
+    const add = document.createElement("span");
+    add.className = "recent-add";
+    add.setAttribute("aria-hidden", "true");
+    add.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+    text.append(name, when, meta);
+    btn.append(tile, text, add);
+    btn.setAttribute("aria-label", `Add ${d.substance} ${amount.textContent}, ${releaseLabel(d)}, again${ago ? `. Last used ${ago}` : ""}`);
+    btn.addEventListener("click", () => {
+      item.classList.remove("is-picked");
+      void item.offsetWidth; // restart the pulse
+      item.classList.add("is-picked");
+      useRecent(d);
+    });
 
     const del = document.createElement("button");
     del.type = "button";
     del.className = "recent-del";
     del.textContent = "×";
     del.setAttribute("aria-label", `Remove ${d.substance} ${d.amount} ${d.unit || ""} from recent doses`);
-    del.addEventListener("click", () => removeRecent(d));
+    del.addEventListener("click", () => removeRecent(d, item));
 
     item.append(btn, del);
     box.appendChild(item);
@@ -1466,8 +1550,19 @@ function refreshChart() {
     return;
   }
   els.chartEmpty.hidden = true;
-  plot.renderPlot(timeline, "myPlot");
+  // The white "now" line only belongs on a session that is still going
+  // (a new one, or one started in the last day and a half), not an old one.
+  const live = !activeExp?.startedAt || Date.now() - activeExp.startedAt < 36 * 3600000;
+  plot.renderPlot(timeline, "myPlot", { live });
 }
+
+// Moves the "now" line along once a minute while the page is open.
+setInterval(() => {
+  if (!document.hidden && plot.isPlotVisible()) refreshChart();
+}, 60000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && plot.isPlotVisible()) refreshChart();
+});
 
 // ------------------------------------------------------------
 // Save

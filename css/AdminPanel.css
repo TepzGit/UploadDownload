@@ -26,7 +26,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(166, 124, 255, 0.25);
+  border: 1px solid rgba(var(--xn-accent-rgb), 0.25);
   border-radius: 2px;
   background: var(--oled-accent-soft);
   color: var(--oled-accent);
@@ -66,3 +66,54 @@
   font-size: 12px;
 }
 .ad-result.is-error { border-color: #f8717155; background: rgba(248, 113, 113, 0.08); color: #fca5a5; }
+
+/* Files access (AdminPanel.html). */
+.ad-card + .ad-card { margin-top: 16px; }
+.ad-h2 { font-size: 1.35rem; }
+.ad-find { display: block; margin-top: 16px; }
+.fa-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.fa-empty { margin: 0; padding: 28px 12px; text-align: center; font-size: 12px; color: var(--oled-muted); }
+.fa-user { border: 1px solid var(--oled-line); border-radius: 2px; background: var(--oled-surface-2); }
+.fa-user[hidden] { display: none; }
+.fa-user[open] { border-color: var(--oled-line-strong); }
+.fa-user summary {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.fa-user summary::-webkit-details-marker { display: none; }
+.fa-user summary:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
+.fa-user .ad-chev { transition: transform 0.2s ease; }
+.fa-user[open] .ad-chev { transform: rotate(90deg); }
+.fa-face { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--oled-surface); color: var(--oled-muted); font-size: 13px; font-weight: 600; }
+.fa-user.has-access .fa-face { background: var(--oled-accent-soft); color: var(--oled-accent); }
+.fa-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fa-who strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+.fa-state { font-size: 11px; color: var(--oled-muted); }
+.fa-user.has-access .fa-state { color: var(--oled-text); }
+.fa-body { display: flex; flex-direction: column; gap: 4px; padding: 4px 12px 14px 56px; }
+.fa-note { margin: 0; padding: 0 12px 14px 56px; font-size: 12px; color: var(--oled-muted); }
+.fa-body .fa-note { padding: 4px 0; }
+.fa-more { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.fa-more[hidden] { display: none; }
+.fa-toggle, .fa-radio, .fa-folder { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 13px; cursor: pointer; }
+.fa-toggle span { display: flex; flex-direction: column; gap: 2px; }
+.fa-toggle small { font-size: 11px; color: var(--oled-muted); }
+.fa-toggle input, .fa-radio input, .fa-folder input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--oled-accent); }
+.fa-folders { display: flex; flex-direction: column; margin: 0 0 6px 28px; padding: 4px 0 4px 10px; border-left: 1px solid var(--oled-line); max-height: 320px; overflow-y: auto; }
+.fa-folders[hidden] { display: none; }
+.fa-folder { min-height: 36px; padding-left: calc(var(--depth, 0) * 18px); }
+.fa-folder svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--oled-muted); stroke-width: 1.75; stroke-linejoin: round; }
+.fa-folder input:checked ~ svg { stroke: var(--oled-accent); }
+.fa-folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-folder.is-covered { color: var(--oled-muted); cursor: default; }
+@media (max-width: 480px) {
+  .fa-body, .fa-note { padding-left: 12px; }
+  .fa-folders { margin-left: 4px; }
+}

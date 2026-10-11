@@ -13,13 +13,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:#a67cff; }
+  :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:var(--oled-accent); }
   body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
   .font-display{ font-family:'Space Grotesk',sans-serif; }
   .font-mono{ font-family:'JetBrains Mono',monospace; }
   .glass{ background:var(--surface); border:1px solid var(--line); }
   .check-card{ cursor:pointer; }
-  .check-card.selected{ border-color:var(--violet); background:rgba(166,124,255,.12); }
+  .check-card.selected{ border-color:var(--violet); background:rgba(var(--xn-accent-rgb), .12); }
   .suggestion{ display:block; width:100%; text-align:left; padding:.5rem .75rem; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
   .suggestion:hover{ background:rgba(255,255,255,.08); }
   .dose-card{ display:flex; align-items:center; gap:.75rem; background:var(--surface-2); border:1px solid var(--line); border-radius:.125rem; padding:.6rem .5rem .6rem .8rem; }
@@ -83,7 +83,7 @@
   /* Inner scroll boxes don't drag the page along when they hit the end. */
   #doses, #substanceInfo{ overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
   /* Draws the eye to Time after a recent dose is picked (iOS won't open the picker by itself). */
-  @keyframes tl-attn{ 0%,100%{ box-shadow:0 0 0 0 rgba(166,124,255,0); } 30%{ box-shadow:0 0 0 3px rgba(166,124,255,.55); } }
+  @keyframes tl-attn{ 0%,100%{ box-shadow:0 0 0 0 rgba(var(--xn-accent-rgb), 0); } 30%{ box-shadow:0 0 0 3px rgba(var(--xn-accent-rgb), .55); } }
   .tl-attn{ animation:tl-attn 1.4s ease-out 2; border-color:var(--violet) !important; }
   .crosshatch{
     position:fixed; top:-280px; left:-260px; right:0; bottom:0; z-index:0; pointer-events:none;
@@ -98,9 +98,34 @@
   @keyframes hatch-drift{ from{ transform:translate3d(0,0,0); } to{ transform:translate3d(260px,280px,0); } }
   @media (prefers-reduced-motion: reduce){ .crosshatch{ animation:none; } }
   .recent-box{ border:1px solid var(--line); background:rgba(0,0,0,.55); border-radius:.125rem; padding:.9rem; }
-  .recent-item{ position:relative; }
-  .recent-item .recent-dose{ width:100%; padding-right:2.75rem; border-left:3px solid var(--c, var(--line)); background:var(--ct, var(--surface-2)); }
-  .recent-item .recent-dose strong{ color:var(--c, var(--text)); }
+  /* Recent doses: color tile, name, amount, when it was last used, and a + to add it again. */
+  .recent-tools{ display:flex; align-items:center; gap:.75rem; flex:none; }
+  #recentClear.is-confirm{ color:#fca5a5; text-decoration-color:rgba(248,113,113,.6); }
+  #recentDoses{ container-type:inline-size; }
+  .recent-item{ position:relative; border-radius:.125rem; }
+  .recent-item .recent-dose{ display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; column-gap:.75rem; width:100%; min-height:58px; padding:.55rem 2.9rem .55rem .6rem; border-left:3px solid var(--c, var(--line)); background:linear-gradient(90deg, var(--ct, transparent), transparent 70%), var(--surface-2); transition:border-color .15s, background-color .15s, transform .12s ease; }
+  .recent-item .recent-dose:active{ transform:scale(.985); }
+  .recent-tile{ display:grid; place-items:center; width:34px; height:34px; border-radius:.125rem; background:color-mix(in srgb, var(--c, var(--violet)) 18%, transparent); border:1px solid color-mix(in srgb, var(--c, var(--violet)) 45%, transparent); color:var(--c, var(--violet)); font:600 14px 'JetBrains Mono',monospace; }
+  .recent-text{ display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:.6rem; row-gap:.15rem; min-width:0; }
+  .recent-text .recent-meta{ grid-column:1 / -1; }
+  .recent-item .recent-dose strong{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:var(--c, var(--text)); }
+  .recent-item .recent-meta{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
+  .recent-meta b{ font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--text); }
+  .recent-item .recent-when{ align-self:center; font:10px 'JetBrains Mono',monospace; color:var(--muted); white-space:nowrap; }
+  .recent-item .recent-tile{ color:var(--c, var(--violet)); font-size:14px; }
+  .recent-add{ display:grid; place-items:center; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); color:var(--muted); transition:color .15s, border-color .15s, background-color .15s, transform .2s ease; }
+  .recent-add svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+  @media (hover:hover){ .recent-item .recent-dose:hover .recent-add{ color:#0b0716; background:var(--c, var(--violet)); border-color:var(--c, var(--violet)); transform:rotate(90deg); } }
+  .recent-item .recent-dose:focus-visible .recent-add{ color:#0b0716; background:var(--c, var(--violet)); border-color:var(--c, var(--violet)); }
+  @container (max-width: 330px){ .recent-item .recent-dose{ grid-template-columns:auto minmax(0,1fr); column-gap:.6rem; } .recent-add{ display:none; } .recent-tile{ width:28px; height:28px; } .recent-text{ grid-template-columns:minmax(0,1fr); } .recent-item .recent-when{ order:3; align-self:start; } }
+  @media (prefers-reduced-motion: no-preference){
+    .recent-item{ animation:recent-in .38s cubic-bezier(.2,.7,.2,1) backwards; animation-delay:calc(var(--i, 0) * 45ms); }
+    .recent-item.is-leaving{ animation:recent-out .24s ease-in forwards; pointer-events:none; }
+    .recent-item.is-picked .recent-dose{ animation:recent-pick .5s ease-out; }
+  }
+  @keyframes recent-in{ from{ opacity:0; transform:translateX(-10px); } }
+  @keyframes recent-out{ to{ opacity:0; transform:translateX(16px); } }
+  @keyframes recent-pick{ 0%{ box-shadow:0 0 0 0 var(--c, var(--violet)); } 100%{ box-shadow:0 0 0 8px transparent; } }
   .recent-del{ position:absolute; top:50%; right:.25rem; transform:translateY(-50%); width:36px; height:36px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:18px; line-height:1; border-radius:.125rem; }
   .recent-del:hover, .recent-del:focus-visible{ color:var(--text); background:rgba(255,255,255,.06); outline:none; }
   /* Recent doses + Experiences sit side by side in the empty chart, stacked on phones. */
@@ -159,7 +184,7 @@
   .exp-shared-title{ margin:.5rem 0 0; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
   .exp-item.is-shared .exp-open{ padding-right:.75rem; border-style:dashed; border-left-style:solid; }
   .exp-from{ font-size:11px; color:var(--violet); }
-  .ppl{ width:min(26rem, calc(100% - 2rem)); max-height:min(80vh, 36rem); padding:0; border:1px solid var(--line); border-radius:2px; background:var(--surface); color:var(--text); box-shadow:0 30px 80px -30px rgba(166,124,255,.35); }
+  .ppl{ width:min(26rem, calc(100% - 2rem)); max-height:min(80vh, 36rem); padding:0; border:1px solid var(--line); border-radius:2px; background:var(--surface); color:var(--text); box-shadow:0 30px 80px -30px rgba(var(--xn-accent-rgb), .35); }
   .ppl::backdrop{ background:rgba(0,0,0,.72); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
   .ppl-case{ display:flex; flex-direction:column; gap:14px; padding:20px; }
   .ppl h2{ margin:4px 0 0; font-size:15px; font-weight:600; }
@@ -168,9 +193,9 @@
   .ppl-note a{ color:var(--text); text-decoration:underline; text-underline-offset:2px; }
   .ppl-list{ display:flex; flex-direction:column; gap:6px; max-height:18rem; overflow-y:auto; }
   .ppl-row{ display:flex; align-items:center; gap:10px; min-height:48px; padding:6px 10px; border:1px solid var(--line); border-radius:2px; background:var(--surface-2); cursor:pointer; }
-  .ppl-row:has(input:checked){ border-color:rgba(166,124,255,.6); background:rgba(166,124,255,.08); }
+  .ppl-row:has(input:checked){ border-color:rgba(var(--xn-accent-rgb), .6); background:rgba(var(--xn-accent-rgb), .08); }
   .ppl-row input{ width:18px; height:18px; accent-color:var(--violet); }
-  .ppl-face{ width:32px; height:32px; flex:none; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:50%; background:linear-gradient(135deg,#2a1d4a,#0d0a16); font-size:13px; font-weight:600; color:#e9e0ff; }
+  .ppl-face{ width:32px; height:32px; flex:none; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:50%; background:linear-gradient(135deg,rgba(var(--xn-accent-rgb),.3),#0d0a16); font-size:13px; font-weight:600; color:#e9e0ff; }
   .ppl-face img{ width:100%; height:100%; object-fit:cover; }
   .ppl-name{ font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ppl-bar{ display:flex; justify-content:flex-end; gap:8px; }
@@ -195,7 +220,7 @@
   .pane:not([open]){ display:none; }
   .pane[open]{ display:flex; align-items:center; justify-content:center; }
   .pane::backdrop{ background:rgba(0,0,0,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
-  .pane-inner{ display:flex; flex-direction:column; width:min(820px, calc(100vw - 2rem)); max-height:min(86vh, 900px); background:var(--surface); border:1px solid var(--line); border-radius:.125rem; box-shadow:0 30px 80px -30px rgba(166,124,255,.35); }
+  .pane-inner{ display:flex; flex-direction:column; width:min(820px, calc(100vw - 2rem)); max-height:min(86vh, 900px); background:var(--surface); border:1px solid var(--line); border-radius:.125rem; box-shadow:0 30px 80px -30px rgba(var(--xn-accent-rgb), .35); }
   .pane[open] .pane-inner{ animation:pane-in .22s cubic-bezier(.2,.7,.2,1); }
   @keyframes pane-in{ from{ opacity:0; transform:translateY(16px) scale(.98); } to{ opacity:1; transform:none; } }
   .pane-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.1rem 1.25rem .75rem; }
@@ -312,13 +337,13 @@
       <div id="chartEmpty" class="chart-empty">
 
         <div class="chart-boxes">
-          <div id="recentDoses" class="recent-box text-left" hidden>
+          <section id="recentDoses" class="recent-box text-left" aria-labelledby="recentTitle" hidden>
             <div class="box-head flex items-center justify-between gap-3 mb-3">
-              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Recent doses · tap to reuse</p>
-              <button id="recentClear" type="button" class="link-btn">Clear all</button>
+              <h2 id="recentTitle" class="font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[var(--muted)]">Recent doses · tap to reuse</h2>
+              <span class="recent-tools"><span data-recent-count class="font-mono text-[10px] text-[var(--muted)]"></span><button id="recentClear" type="button" class="link-btn">Clear all</button></span>
             </div>
             <div data-recent-list class="box-list grid grid-cols-1 gap-2"></div>
-          </div>
+          </section>
 
           <section id="experiences" class="recent-box exp-box text-left" aria-labelledby="expTitle">
             <div class="box-head flex items-center justify-between gap-3 mb-3">

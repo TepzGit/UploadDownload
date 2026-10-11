@@ -12,6 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
+  {{if .IsAdmin}}<script src="/media.js"></script>{{end}}
   <style>
     .gp {
       --gp-card: #0a0a0c;
@@ -79,7 +80,7 @@
       position: relative;
       z-index: 1;
       will-change: opacity, transform;
-      box-shadow: 0 -30px 80px -40px rgba(166, 124, 255, var(--gp-glow, 0));
+      box-shadow: 0 -30px 80px -40px rgba(var(--xn-accent-rgb), var(--gp-glow, 0));
       margin-top: clamp(24px, 4vw, 40px);
       padding: clamp(18px, 4.5vw, 48px);
       border: 1px solid var(--gp-line);
@@ -126,7 +127,19 @@
       background: #000;
     }
     .gp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .gp-photo span { font-size: 5rem; font-weight: 600; color: var(--oled-accent); }
+    .gp-photo { position: relative; }
+    .gp-pic-tools { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+    .gp-pic-tools button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 36px; padding: 0 10px; border: 1px solid rgba(255,255,255,0.18); border-radius: 18px;
+      background: rgba(0,0,0,0.72); color: #fff; font: inherit; font-size: 12px; cursor: pointer;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .gp-pic-tools button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .gp-pic-tools button:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+    @media (hover: hover) { .gp-pic-tools button:hover { border-color: var(--oled-accent); } }
+    .gp-photo.is-busy img { opacity: 0.4; }
+    .gp-photo > span { font-size: 5rem; font-weight: 600; color: var(--oled-accent); }
     .gp-member figcaption { margin-top: 14px; }
     .gp-name { display: block; font-size: 1.1rem; font-weight: 600; }
     .gp-role {
@@ -292,11 +305,11 @@
       
       <div class="gp-team">
         <figure class="gp-member">
-          <div class="gp-photo"><img src="/hookey.jpg" alt="Hookey" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
+          <div class="gp-photo" data-slot="member1"><img src="{{index .Pictures "member1"}}" alt="Hookey" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
           <figcaption><span class="gp-name">Hookey</span><span class="gp-role">Frontend</span></figcaption>
         </figure>
         <figure class="gp-member">
-          <div class="gp-photo"><img src="/tepz.jpg" alt="Tepz" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))"></div>
+          <div class="gp-photo" data-slot="member2"><img src="{{index .Pictures "member2"}}" alt="Tepz" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))"></div>
           <figcaption><span class="gp-name">Tepz</span><span class="gp-role">Backend</span></figcaption>
         </figure>
       </div>
@@ -350,6 +363,70 @@
     </section>
   </main>
 
+  {{if .IsAdmin}}
+  <script>
+    // Admins: change or reset the team pictures on this page.
+    (function () {
+      const CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+      const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+      document.querySelectorAll(".gp-photo[data-slot]").forEach((photo) => {
+        const slot = photo.dataset.slot;
+        const who = photo.closest("figure").querySelector(".gp-name").textContent.trim();
+        const tools = document.createElement("div");
+        tools.className = "gp-pic-tools";
+        tools.innerHTML = '<button type="button" data-change>' + CAMERA + '<span>Change</span></button>' +
+          '<button type="button" data-reset>Reset</button>' +
+          '<input type="file" accept="image/*" hidden>';
+        const input = tools.querySelector("input");
+        tools.querySelector("[data-change]").setAttribute("aria-label", "Change " + who + "'s picture");
+        tools.querySelector("[data-reset]").setAttribute("aria-label", "Reset " + who + "'s picture to the original");
+        photo.append(tools);
+
+        function show(url) {
+          let img = photo.querySelector("img");
+          if (!img) {
+            img = document.createElement("img");
+            img.alt = who;
+            photo.querySelector(":scope > span")?.remove();
+            photo.prepend(img);
+          }
+          img.src = url;
+        }
+        async function send(form, done) {
+          photo.classList.add("is-busy");
+          try {
+            const res = await fetch("/site/picture", { method: "POST", body: form });
+            if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save the picture. Try again.");
+            const data = await res.json();
+            show(data.url);
+            toast(done);
+          } catch (error) {
+            toast(error.message, true);
+          } finally {
+            photo.classList.remove("is-busy");
+          }
+        }
+        tools.querySelector("[data-change]").addEventListener("click", () => input.click());
+        input.addEventListener("change", async () => {
+          const file = input.files[0];
+          input.value = "";
+          if (!file) return;
+          const picture = window.xnShrinkPicture ? await window.xnShrinkPicture(file, [1200, 1200]) : file;
+          const form = new FormData();
+          form.append("slot", slot);
+          form.append("image", picture, picture.name || "picture.jpg");
+          send(form, who + "'s picture changed.");
+        });
+        tools.querySelector("[data-reset]").addEventListener("click", () => {
+          const form = new FormData();
+          form.append("slot", slot);
+          form.append("remove", "1");
+          send(form, who + "'s picture is back to the original.");
+        });
+      });
+    })();
+  </script>
+  {{end}}
   <script>
     const timeDisplay = document.getElementById('timeDisplay')
     const secDisplay = document.getElementById('secDisplay')

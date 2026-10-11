@@ -80,7 +80,7 @@
 </main>
 
 <script type="module">
-  import { mountFeed, avatar, profileLink } from "/forum.js";
+  import { mountFeed, avatar, profileLink, paintName, focusPost } from "/forum.js";
   import { renderRequests } from "/friends.js";
 
   const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
@@ -93,6 +93,7 @@
     empty: document.getElementById("feedEmpty"),
     emptyText: "No posts yet. Write the first one above.",
   });
+  focusPost(document.getElementById("feed"), new URLSearchParams(location.search).get("post"));
 
   // ---------------- Writing a post ----------------
   const form = document.getElementById("compose");
@@ -231,6 +232,7 @@
       who.className = "fm-member-text";
       const name = document.createElement("strong");
       name.textContent = member.name;
+      paintName(name, member);
       const posts = document.createElement("small");
       posts.className = "fm-member-posts";
       posts.dataset.posts = String(member.posts);

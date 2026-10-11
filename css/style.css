@@ -41,7 +41,7 @@
   border: 1px dashed var(--oled-line-strong);
   border-radius: 2px;
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(166, 124, 255, 0.08), transparent 70%),
+    radial-gradient(120% 90% at 50% 0%, rgba(var(--xn-accent-rgb), 0.08), transparent 70%),
     #000;
   color: var(--oled-muted);
   text-align: center;
@@ -50,13 +50,13 @@
 }
 @media (hover: hover) { .up-drop:hover { border-color: var(--oled-accent); } }
 .up-drop:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
-.up-drop.dragover { border-style: solid; border-color: var(--oled-accent); background-color: rgba(166, 124, 255, 0.08); }
+.up-drop.dragover { border-style: solid; border-color: var(--oled-accent); background-color: rgba(var(--xn-accent-rgb), 0.08); }
 .up-drop #img { display: block; max-width: 160px; max-height: 96px; border-radius: 2px; object-fit: contain; }
 .up-drop-ico {
   width: 40px;
   height: 40px;
   padding: 9px;
-  border: 1px solid rgba(166, 124, 255, 0.25);
+  border: 1px solid rgba(var(--xn-accent-rgb), 0.25);
   border-radius: 2px;
   background: var(--oled-accent-soft);
   color: var(--oled-accent);
@@ -116,7 +116,7 @@
 .progress-bar {
   height: 100%;
   background: var(--oled-accent);
-  box-shadow: 0 0 12px rgba(166, 124, 255, 0.6);
+  box-shadow: 0 0 12px rgba(var(--xn-accent-rgb), 0.6);
   transition: width 0.2s ease;
 }
 .progress-number { font-size: 11px; color: var(--oled-muted); }

@@ -60,12 +60,12 @@
         {{if not .IsRoot}}
         <a href="{{.BackPath}}" class="xn-btn"><svg class="fx-ico" aria-hidden="true"><use href="#i-back"/></svg>Back</a>
         {{end}}
-        <a href="/Uploader" class="xn-btn xn-btn-primary"><svg class="fx-ico" aria-hidden="true"><use href="#i-upload"/></svg>Upload</a>
+        {{if .CanEdit}}<a href="/Uploader" class="xn-btn xn-btn-primary"><svg class="fx-ico" aria-hidden="true"><use href="#i-upload"/></svg>Upload</a>{{end}}
       </div>
     </div>
 
     <div class="fx-toolbar">
-      <button type="button" class="xn-btn" id="fxNewFolder" aria-label="New folder"><svg class="fx-ico" aria-hidden="true"><use href="#i-plus"/></svg><span>New folder</span></button>
+      <button type="button" class="xn-btn" id="fxNewFolder" aria-label="New folder"{{if not .CanEdit}} hidden{{end}}><svg class="fx-ico" aria-hidden="true"><use href="#i-plus"/></svg><span>New folder</span></button>
       <label class="fx-search">
         <span class="xn-sr">Search files</span>
         <svg class="fx-ico" aria-hidden="true"><use href="#i-search"/></svg>
@@ -104,10 +104,13 @@
 <div class="fx-menu" id="fxMenu" role="menu" hidden>
   <button type="button" role="menuitem" data-act="open">Open</button>
   <button type="button" role="menuitem" data-act="download">Download</button>
+  {{if .CanEdit}}
   <button type="button" role="menuitem" data-act="rename">Rename</button>
   <hr>
   <button type="button" role="menuitem" data-act="delete" class="is-danger">Delete</button>
+  {{end}}
 </div>
+<script>window.xnFilesCanEdit = {{if .CanEdit}}true{{else}}false{{end}};</script>
 
 <div id="previewModal" class="fx-modal" role="dialog" aria-modal="true" aria-labelledby="modalName" hidden>
   <div class="fx-modal-card">

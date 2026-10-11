@@ -26,6 +26,24 @@ const ICON = {
   down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
 };
 
+// FLIP: remember where every card is, let change() move them in the DOM,
+// then slide each card from its old spot to its new one.
+function slide(grid, change, skip) {
+  const cards = cardsIn(grid);
+  const before = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
+  change();
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  cards.forEach((card) => {
+    if (card === skip) return;
+    const a = before.get(card);
+    const b = card.getBoundingClientRect();
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    if (!dx && !dy) return;
+    card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 260, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" });
+  });
+}
+
 export function mountArrange({ grid, toggle }) {
   let on = false;
   let saveTimer = null;
@@ -56,8 +74,10 @@ export function mountArrange({ grid, toggle }) {
     const cards = cardsIn(grid);
     const to = cards.indexOf(card) + by;
     if (to < 0 || to >= cards.length) return;
-    if (by < 0) grid.insertBefore(card, cards[to]);
-    else grid.insertBefore(card, cards[to].nextSibling);
+    slide(grid, () => {
+      if (by < 0) grid.insertBefore(card, cards[to]);
+      else grid.insertBefore(card, cards[to].nextSibling);
+    });
     refreshButtons();
     saveSoon();
   }
@@ -126,9 +146,12 @@ export function mountArrange({ grid, toggle }) {
       lastY = ev.clientY;
       const under = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".pf-box");
       if (!under || under === card || under.parentElement !== grid || !keyOf(under)) return;
+      if (under.getAnimations && under.getAnimations().length) return; // still sliding; wait so cards don't flip back and forth
       const cards = cardsIn(grid);
-      if (cards.indexOf(card) < cards.indexOf(under)) grid.insertBefore(card, under.nextSibling);
-      else grid.insertBefore(card, under);
+      slide(grid, () => {
+        if (cards.indexOf(card) < cards.indexOf(under)) grid.insertBefore(card, under.nextSibling);
+        else grid.insertBefore(card, under);
+      }, card);
     };
     const onEnd = () => {
       cancelAnimationFrame(scroller);
