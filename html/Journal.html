@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
   <style>
-    :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:#a67cff; }
+    :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:var(--oled-accent); }
     body{ color:var(--text); }
     .jr-head{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; }
     .jr-search{ position:relative; width:100%; max-width:340px; }
@@ -27,6 +27,15 @@
     .drugname{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
     .drugclass{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
     .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
+    .jr-classes{ display:flex; gap:6px; margin-top:16px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
+    .jr-classes[hidden]{ display:none; }
+    .jr-chip{ flex:none; display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 12px; border:1px solid var(--line); border-radius:18px; background:transparent; color:var(--muted); font:inherit; font-size:12px; cursor:pointer; white-space:nowrap; transition:color .15s ease, border-color .15s ease, background-color .15s ease; -webkit-tap-highlight-color:transparent; }
+    .jr-chip small{ font-size:10px; opacity:.75; font-variant-numeric:tabular-nums; }
+    .jr-chip[aria-pressed="true"]{ border-color:var(--oled-accent); background:var(--oled-accent-soft); color:var(--text); }
+    @media (hover:hover){ .jr-chip:hover{ color:var(--text); border-color:var(--oled-line-strong); } }
+    .jr-chip:focus-visible{ outline:2px solid var(--oled-accent); outline-offset:1px; }
+    .jr-count{ margin:12px 0 0; font-size:12px; color:var(--muted); }
+    .jr-count:empty{ display:none; }
     .bottombar{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:20px; }
     @media (max-width:640px){ .jr-search{ max-width:none; } .bottombar .xn-btn{ flex:1; } }
   </style>
@@ -77,6 +86,9 @@
         <div id="sugC" class="rounded-sm border border-[#23202b] bg-[#121216] p-2"></div>
       </div>
 
+      <div class="jr-classes" id="classChips" role="group" aria-label="Filter by class" hidden></div>
+      <p class="jr-count" id="classCount" aria-live="polite"></p>
+
       <div class="Drugs" aria-live="polite"><p class="jr-status">Loading substances…</p></div>
 
       <div class="bottombar">
@@ -87,8 +99,11 @@
   </main>
 
   <script>
+            const PAGE = 10;
             let currentOffset = 0;
             let currentSearchQuery = "";
+            let currentClass = "";
+            let catalog = null; // every substance, once loaded; null = use the API page by page
 
             async function getSubstances(offset, query = "") {
                 let gql;
@@ -118,15 +133,121 @@
                 return fetchGraphQL(gql);
             }
 
+            // The class filter needs the whole catalog, so it's fetched once
+            // (a few big pages) and kept for this browser tab.
+            const CATALOG_KEY = "xn_pw_catalog_v1";
+            async function loadCatalog() {
+                try {
+                    const saved = JSON.parse(sessionStorage.getItem(CATALOG_KEY) || "null");
+                    if (saved && saved.length) return saved;
+                } catch (_) {}
+                const all = [];
+                for (let offset = 0; offset < 4000; offset += 250) {
+                    const result = await fetchGraphQL(`{
+                      substances(limit: 250 offset: ${offset}) {
+                        name
+                        commonNames
+                        class{ chemical psychoactive }
+                        images{ thumb }
+                      }
+                    }`);
+                    const page = result?.data?.substances;
+                    if (!Array.isArray(page)) throw new Error("catalog page failed");
+                    all.push(...page);
+                    if (page.length < 250) break;
+                }
+                if (!all.length) throw new Error("empty catalog");
+                try { sessionStorage.setItem(CATALOG_KEY, JSON.stringify(all)); } catch (_) {}
+                return all;
+            }
+
+            // "Stimulants" and "stimulant" are the same class.
+            const classKey = (name) => String(name || "").trim().toLowerCase().replace(/s$/, "");
+            const classesOf = (substance) => [].concat(substance?.class?.psychoactive || []).filter(Boolean);
+
+            function buildChips() {
+                const counts = new Map();
+                catalog.forEach((substance) => {
+                    new Set(classesOf(substance).map(classKey)).forEach((key) => {
+                        const label = classesOf(substance).find((c) => classKey(c) === key).trim();
+                        const entry = counts.get(key) || { key, count: 0, labels: new Map() };
+                        entry.count++;
+                        entry.labels.set(label, (entry.labels.get(label) || 0) + 1);
+                        counts.set(key, entry);
+                    });
+                });
+                const list = [...counts.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+                const box = document.getElementById("classChips");
+                box.innerHTML = "";
+                const chip = (key, label, count) => {
+                    const b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "jr-chip";
+                    b.dataset.class = key;
+                    b.setAttribute("aria-pressed", String(key === currentClass));
+                    b.append(label);
+                    if (count != null) {
+                        const small = document.createElement("small");
+                        small.textContent = count;
+                        b.append(small);
+                    }
+                    b.addEventListener("click", () => {
+                        currentClass = key;
+                        box.querySelectorAll(".jr-chip").forEach((c) => c.setAttribute("aria-pressed", String(c === b)));
+                        displaySubstances(0, currentSearchQuery);
+                    });
+                    return b;
+                };
+                box.append(chip("", "All", catalog.length));
+                list.forEach((entry) => {
+                    const label = [...entry.labels.entries()].sort((a, b) => b[1] - a[1])[0][0];
+                    box.append(chip(entry.key, label.charAt(0).toUpperCase() + label.slice(1), entry.count));
+                });
+                box.hidden = list.length === 0;
+            }
+
+            function filtered(query) {
+                const q = query.toLowerCase();
+                return catalog.filter((substance) => {
+                    if (currentClass && !classesOf(substance).some((c) => classKey(c) === currentClass)) return false;
+                    if (!q) return true;
+                    return (substance.name || "").toLowerCase().includes(q) ||
+                        [].concat(substance.commonNames || []).some((n) => String(n).toLowerCase().includes(q));
+                }).sort((a, b) => {
+                    if (!q) return 0;
+                    // Names starting with the search come first.
+                    const sa = (a.name || "").toLowerCase().startsWith(q) ? 0 : 1;
+                    const sb = (b.name || "").toLowerCase().startsWith(q) ? 0 : 1;
+                    return sa - sb;
+                });
+            }
+
             let displaySeq = 0;
 
             async function displaySubstances(offset, query = "") {
                 const seq = ++displaySeq;
                 const drugsDiv = document.querySelector(".Drugs");
                 try {
-                    const [result, liked] = await Promise.all([getSubstances(offset, query), window.xnLikes.load()]);
+                    let substances, more;
+                    const likesLoad = window.xnLikes.load();
+                    if (catalog) {
+                        const matches = filtered(query);
+                        if (offset >= matches.length) offset = Math.max(0, Math.floor((matches.length - 1) / PAGE) * PAGE);
+                        substances = matches.slice(offset, offset + PAGE);
+                        more = offset + PAGE < matches.length;
+                        const pages = Math.max(1, Math.ceil(matches.length / PAGE));
+                        const chip = document.querySelector(`.jr-chip[data-class="${CSS.escape(currentClass)}"]`);
+                        const what = currentClass && chip ? chip.firstChild.textContent : "";
+                        document.getElementById("classCount").textContent = (currentClass || query)
+                            ? `${matches.length} ${matches.length === 1 ? "substance" : "substances"}${what ? " in " + what : ""}${query ? ` matching “${query}”` : ""} · page ${Math.floor(offset / PAGE) + 1} of ${pages}`
+                            : "";
+                    } else {
+                        const result = await getSubstances(offset, query);
+                        substances = result?.data?.substances || [];
+                        more = !query && substances.length >= PAGE;
+                    }
+                    const liked = await likesLoad;
                     if (seq !== displaySeq) return; // a newer search is on its way
-                    const substances = result?.data?.substances || [];
 
                     drugsDiv.innerHTML = "";
 
@@ -136,6 +257,7 @@
 
                         const DrugName = substance?.name ?? "";
                         const DrugClass = [].concat(substance?.class?.chemical || []).join(", ");
+                        const Psycho = classesOf(substance).join(", ");
 
                         drugDiv.className = "Drug";
                         drugDiv.href = "/journal/Drug?drug=" + encodeURIComponent(DrugName);
@@ -147,7 +269,7 @@
                             <span class="drug-text"><span class="drugname"></span><span class="drugclass"></span></span>
                         `;
                         drugDiv.querySelector(".drugname").textContent = DrugName;
-                        drugDiv.querySelector(".drugclass").textContent = DrugClass || "Substance";
+                        drugDiv.querySelector(".drugclass").textContent = [Psycho, DrugClass].filter(Boolean).join(" · ") || "Substance";
                         const thumb = drugDiv.querySelector(".drug-thumb");
                         if (imgUrl) {
                             const img = document.createElement("img");
@@ -171,12 +293,12 @@
                     });
                     if (!substances.length) {
                         drugsDiv.innerHTML = `<p class="jr-status"></p>`;
-                        drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”.` : "No substances on this page.";
+                        drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”${currentClass ? " in this class" : ""}.` : currentClass ? "No substances in this class." : "No substances on this page.";
                     }
                     currentOffset = offset;
                     currentSearchQuery = query;
-                    document.getElementById("backBtn").disabled = offset === 0 || !!query;
-                    document.getElementById("nextBtn").disabled = substances.length < 10 || !!query;
+                    document.getElementById("backBtn").disabled = offset === 0 || (!catalog && !!query);
+                    document.getElementById("nextBtn").disabled = !more;
                 } catch (error) {
                     console.error("Error fetching substances:", error);
                     if (seq !== displaySeq) return;
@@ -185,18 +307,23 @@
             }
 
             function nextPage() {
-                displaySubstances(currentOffset + 10, currentSearchQuery);
+                displaySubstances(currentOffset + PAGE, currentSearchQuery);
             }
 
             function previousPage() {
-                if (currentOffset >= 10) {
-                    displaySubstances(currentOffset - 10, currentSearchQuery);
+                if (currentOffset >= PAGE) {
+                    displaySubstances(currentOffset - PAGE, currentSearchQuery);
                 }
             }
 
             document.addEventListener("DOMContentLoaded", () => {
                 displaySubstances(0);
-                
+                loadCatalog().then((all) => {
+                    catalog = all;
+                    buildChips();
+                    displaySubstances(currentSearchQuery ? 0 : currentOffset, currentSearchQuery);
+                }).catch((error) => console.warn("Class filter unavailable:", error));
+
                 const inputField = document.getElementById("input");
                 let searchTimeout;
                 
@@ -208,10 +335,10 @@
                         searchTimeout = setTimeout(() => {
                             displaySubstances(0);
                         }, 300);
-                    } else if (value.length >= 2) {
+                    } else if (value.length >= (catalog ? 1 : 2)) {
                         searchTimeout = setTimeout(() => {
                             displaySubstances(0, value);
-                        }, 300);
+                        }, catalog ? 120 : 300);
                     }
                 });
             });

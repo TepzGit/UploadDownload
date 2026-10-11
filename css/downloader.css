@@ -105,7 +105,7 @@
 }
 .item[data-type="Dir"] .fx-thumb {
   color: var(--oled-accent);
-  border-color: rgba(166, 124, 255, 0.25);
+  border-color: rgba(var(--xn-accent-rgb), 0.25);
   background: var(--oled-accent-soft);
 }
 .fx-thumb .preview { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -160,7 +160,7 @@
   border: 1px solid var(--oled-line-strong);
   border-radius: 2px;
   background: var(--oled-surface);
-  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(166, 124, 255, 0.06);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(var(--xn-accent-rgb), 0.06);
   animation: fx-menu-in 0.14s ease-out;
 }
 .fx-menu button {
@@ -206,7 +206,7 @@
   border: 1px solid var(--oled-line);
   border-radius: 2px;
   background: var(--oled-surface);
-  box-shadow: 0 30px 80px -30px rgba(166, 124, 255, 0.35);
+  box-shadow: 0 30px 80px -30px rgba(var(--xn-accent-rgb), 0.35);
   animation: fx-pop 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 @keyframes fx-pop { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }

@@ -26,6 +26,14 @@ export function postTime(t) {
   return d.toLocaleDateString([], { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) }) + ", " + time;
 }
 
+/** Gives an admin's name the color they picked (lightened if too dark to read). */
+export function paintName(el, who) {
+  if (!who || !who.color) return el;
+  el.style.color = (window.xnSiteColor && window.xnSiteColor.preview(who.color)) || who.color;
+  el.classList.add("xn-named");
+  return el;
+}
+
 export function profileLink(name) {
   return "/u/" + encodeURIComponent(name);
 }
@@ -113,6 +121,7 @@ function commentItem(comment, onRemoved) {
   name.className = "fm-comment-name";
   name.href = profileLink(comment.author.name);
   name.textContent = comment.author.name;
+  paintName(name, comment.author);
   const when = document.createElement("time");
   when.className = "fm-time";
   when.dateTime = new Date(comment.createdAt).toISOString();
@@ -262,6 +271,7 @@ export function postCard(post, { onRemoved } = {}) {
   author.href = profileLink(post.author.name);
   const name = document.createElement("strong");
   name.textContent = post.author.name;
+  paintName(name, post.author);
   author.append(avatar(post.author), name);
   head.append(author);
   if (post.author.admin) {
@@ -395,4 +405,36 @@ export function mountFeed({ list, more, empty, user = "", emptyText = "No posts 
       checkEmpty();
     },
   };
+}
+
+/**
+ * Brings one post into view (the letter icon links to /Forum?post=<id>):
+ * waits for the feed, fetches the post on its own if it's older than the
+ * first page, then scrolls to it, lights it up and opens its comments.
+ */
+export async function focusPost(list, id) {
+  if (!id) return;
+  let card = null;
+  for (let i = 0; i < 40 && !card; i++) {
+    card = list.querySelector('[data-post="' + id + '"]');
+    if (!card && list.getAttribute("aria-busy") === "false") break;
+    if (!card) await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!card) {
+    try {
+      const res = await fetch("/forum/posts?id=" + encodeURIComponent(id), { headers: { Accept: "application/json" } });
+      const post = res.ok ? (await res.json()).posts?.[0] : null;
+      if (!post) return toast("That post was deleted.", true);
+      card = postCard(post);
+      list.prepend(card);
+    } catch (_) {
+      return;
+    }
+  }
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  card.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+  card.classList.add("is-focus");
+  setTimeout(() => card.classList.remove("is-focus"), 2600);
+  const toggle = card.querySelector(".fm-comment-toggle");
+  if (toggle && toggle.getAttribute("aria-expanded") !== "true") toggle.click();
 }

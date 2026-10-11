@@ -1,6 +1,6 @@
 // friends.js: friend requests. The friend button on /u/<name>, the Friends
 // box on Profile and the requests on the Forum all use these.
-import { avatar, profileLink } from "/forum.js";
+import { avatar, profileLink, paintName } from "/forum.js";
 
 const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
 
@@ -108,6 +108,7 @@ export function personRow(who, note = "", actions = []) {
   text.className = "fr-text";
   const strong = document.createElement("strong");
   strong.textContent = who.name;
+  paintName(strong, who);
   text.append(strong);
   if (note) {
     const small = document.createElement("small");

@@ -32,7 +32,7 @@ export function loadPlotly() {
  * `timeline` is exactly what logic.computeTimeline() returns:
  * { x, y, hoverTimes, tickValues, tickText }
  */
-export async function renderPlot(timeline, containerId = "myPlot") {
+export async function renderPlot(timeline, containerId = "myPlot", { live = false } = {}) {
   const Plotly = await loadPlotly();
   const container = document.getElementById(containerId);
   const narrow = (container?.clientWidth || window.innerWidth) < 560;
@@ -92,9 +92,49 @@ export async function renderPlot(timeline, containerId = "myPlot") {
     hovermode: multi ? "x unified" : "closest",
   };
   if (multi) layout.margin.t = narrow ? 36 : 40;
+  if (live) addNowLine(layout, timeline, narrow);
 
   await Plotly.react(containerId, traces, layout, { displayModeBar: false, responsive: true, scrollZoom: false });
   hasPlot = true;
+}
+
+/**
+ * The white "now" line: where the clock is on the timeline, with the
+ * stretch since the first dose softly lit and the time passed as a label.
+ * The x axis is clock hours (past midnight it runs on as 24, 25, ...), so the
+ * clock is tried as is and a day later. Nothing is drawn when now is before
+ * the first dose or after everything wore off.
+ */
+function addNowLine(layout, timeline, narrow) {
+  if (!timeline.x.length) return;
+  const clock = new Date();
+  const hours = clock.getHours() + clock.getMinutes() / 60 + clock.getSeconds() / 3600;
+  const first = timeline.x[0];
+  const last = timeline.x[timeline.x.length - 1];
+  const now = [hours, hours + 24].find((h) => h >= first && h <= last);
+  if (now === undefined) return;
+  const passed = Math.round((now - first) * 60);
+  const h = Math.floor(passed / 60);
+  const m = passed % 60;
+  const label = h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
+  layout.shapes = [
+    { type: "rect", xref: "x", yref: "paper", x0: first, x1: now, y0: 0, y1: 1, fillcolor: "rgba(255,255,255,0.045)", line: { width: 0 }, layer: "below" },
+    { type: "line", xref: "x", yref: "paper", x0: now, x1: now, y0: 0, y1: 1, line: { color: "#ffffff", width: 2 } },
+  ];
+  layout.annotations = [{
+    x: now,
+    xref: "x",
+    y: 1,
+    yref: "paper",
+    yanchor: "top",
+    xanchor: now - first > (last - first) * 0.75 ? "right" : "left",
+    xshift: now - first > (last - first) * 0.75 ? -4 : 4,
+    text: `<b>Now</b> · ${label} since dose`,
+    showarrow: false,
+    font: { color: "#ffffff", size: narrow ? 10 : 11 },
+    bgcolor: "rgba(0,0,0,0.75)",
+    borderpad: 3,
+  }];
 }
 
 function hexToRgba(hex, alpha) {

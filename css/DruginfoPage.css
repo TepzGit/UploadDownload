@@ -71,10 +71,10 @@
 .di-row dt { color: var(--oled-muted); }
 .di-row dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 /* Dose levels get a violet marker that deepens from threshold to heavy. */
-.di-doses .di-row { border-left: 3px solid rgba(166, 124, 255, 0.25); }
-.di-doses .di-row:nth-child(2) { border-left-color: rgba(166, 124, 255, 0.45); }
-.di-doses .di-row:nth-child(3) { border-left-color: rgba(166, 124, 255, 0.65); }
-.di-doses .di-row:nth-child(4) { border-left-color: rgba(166, 124, 255, 0.85); }
+.di-doses .di-row { border-left: 3px solid rgba(var(--xn-accent-rgb), 0.25); }
+.di-doses .di-row:nth-child(2) { border-left-color: rgba(var(--xn-accent-rgb), 0.45); }
+.di-doses .di-row:nth-child(3) { border-left-color: rgba(var(--xn-accent-rgb), 0.65); }
+.di-doses .di-row:nth-child(4) { border-left-color: rgba(var(--xn-accent-rgb), 0.85); }
 .di-doses .di-row:nth-child(5) { border-left-color: #a67cff; }
 
 .xn-card.di-empty { margin: 0; grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--oled-muted); }

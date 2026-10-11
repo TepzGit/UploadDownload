@@ -35,7 +35,7 @@
   <section class="xn-card ad-card">
     <p class="xn-eyebrow">Admin</p>
     <h1 class="xn-h1">Admin panel</h1>
-    <p class="xn-sub">Manage who can sign in.</p>
+    <p class="xn-sub">Manage who can sign in and who can open Files.</p>
     <div class="AdminPanelOptions">
       <a class="AdminPanelOption" href="/admin/createUser">
         <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/></svg></span>
@@ -44,6 +44,182 @@
       </a>
     </div>
   </section>
+
+  <section class="xn-card ad-card" aria-labelledby="faTitle">
+    <p class="xn-eyebrow">Files</p>
+    <h2 class="xn-h1 ad-h2" id="faTitle">Files access</h2>
+    <p class="xn-sub">Pick who can open Files and which folders they see. Admins can always open everything. Changes save by themselves.</p>
+    <label class="ad-find">
+      <span class="xn-sr">Find an account</span>
+      <input class="xn-input" id="faFind" type="search" placeholder="Find an account…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </label>
+    <div class="fa-list" id="faList" aria-live="polite"><p class="fa-empty">Loading accounts…</p></div>
+  </section>
 </main>
+<script>
+  // Files access: one row per account. Opening a row shows its settings.
+  (function () {
+    const list = document.getElementById("faList");
+    const find = document.getElementById("faFind");
+    const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+    let folders = [];
+
+    function summary(user) {
+      if (user.admin) return "Admin · every folder";
+      const a = user.access;
+      if (!a) return "No access";
+      const where = a.all ? "Every folder" : a.folders.length === 1 ? "1 folder" : a.folders.length + " folders";
+      return where + (a.canEdit ? " · can change files" : " · view and download");
+    }
+
+    function row(user) {
+      const item = document.createElement("details");
+      item.className = "fa-user";
+      item.dataset.name = user.name.toLowerCase();
+      item.innerHTML =
+        '<summary><span class="fa-face" aria-hidden="true"></span><span class="fa-who"><strong></strong><span class="fa-state"></span></span>' +
+        '<svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></summary>';
+      item.querySelector(".fa-face").textContent = user.name.charAt(0).toUpperCase();
+      item.querySelector("strong").textContent = user.name;
+      const state = item.querySelector(".fa-state");
+      const paintState = () => {
+        state.textContent = summary(user);
+        item.classList.toggle("has-access", !!user.access || user.admin);
+      };
+      paintState();
+      if (user.admin) {
+        item.classList.add("is-admin");
+        const body = document.createElement("p");
+        body.className = "fa-note";
+        body.textContent = "Admins can always open, upload to and change every folder.";
+        item.append(body);
+        return item;
+      }
+
+      const id = "fa" + user.id;
+      const body = document.createElement("div");
+      body.className = "fa-body";
+      body.innerHTML =
+        '<label class="fa-toggle"><input type="checkbox" data-on><span>Can open Files</span></label>' +
+        '<fieldset class="fa-more"><legend class="xn-sr">Which folders</legend>' +
+        '<label class="fa-radio"><input type="radio" name="' + id + 'where" value="all"><span>Every folder</span></label>' +
+        '<label class="fa-radio"><input type="radio" name="' + id + 'where" value="some"><span>Only these folders</span></label>' +
+        '<div class="fa-folders"></div>' +
+        '<label class="fa-toggle"><input type="checkbox" data-edit><span>Can upload, rename and delete<small>Otherwise they can only look and download.</small></span></label>' +
+        "</fieldset>";
+      item.append(body);
+      const on = body.querySelector("[data-on]");
+      const more = body.querySelector(".fa-more");
+      const radios = [...body.querySelectorAll('input[type="radio"]')];
+      const edit = body.querySelector("[data-edit]");
+      const box = body.querySelector(".fa-folders");
+
+      if (!folders.length) {
+        box.innerHTML = '<p class="fa-note">There are no folders in Files yet. Make one on the Files page first.</p>';
+      }
+      const checks = folders.map((path) => {
+        const parts = path.split("/");
+        const label = document.createElement("label");
+        label.className = "fa-folder";
+        label.style.setProperty("--depth", parts.length - 1);
+        label.innerHTML = '<input type="checkbox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span></span>';
+        label.querySelector("span").textContent = parts[parts.length - 1];
+        label.title = path;
+        const input = label.querySelector("input");
+        input.value = path;
+        box.append(label);
+        return input;
+      });
+
+      // A checked folder includes everything inside it.
+      function paintFolders() {
+        const chosen = checks.filter((c) => c.checked && !c.disabled).map((c) => c.value);
+        checks.forEach((c) => {
+          const covered = chosen.some((p) => c.value.startsWith(p + "/"));
+          c.disabled = covered;
+          if (covered) c.checked = true;
+          c.parentElement.classList.toggle("is-covered", covered);
+        });
+      }
+      function show() {
+        const a = user.access;
+        on.checked = !!a;
+        more.disabled = !a;
+        more.hidden = !a;
+        radios[0].checked = !a || a.all;
+        radios[1].checked = !!a && !a.all;
+        box.hidden = !a || a.all;
+        edit.checked = !!a && a.canEdit;
+        checks.forEach((c) => { c.disabled = false; c.checked = !!a && !a.all && a.folders.includes(c.value); });
+        paintFolders();
+        paintState();
+      }
+
+      function read() {
+        if (!on.checked) return null;
+        const all = radios[0].checked;
+        return {
+          all,
+          folders: all ? [] : checks.filter((c) => c.checked && !c.disabled).map((c) => c.value),
+          canEdit: edit.checked,
+        };
+      }
+      let timer = 0;
+      async function save() {
+        const access = read();
+        try {
+          const res = await fetch("/admin/files-access", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: user.id, access }),
+          });
+          if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save. Try again.");
+          const data = await res.json();
+          user.access = data.access || null;
+          if (user.access && !user.access.folders) user.access.folders = [];
+          paintState();
+          toast(user.name + ": " + summary(user) + ".");
+        } catch (error) {
+          toast(error.message, true);
+          show();
+        }
+      }
+      function changed() {
+        more.disabled = !on.checked;
+        more.hidden = !on.checked;
+        box.hidden = !on.checked || radios[0].checked;
+        paintFolders();
+        user.access = read();
+        paintState();
+        clearTimeout(timer);
+        timer = setTimeout(save, 450);
+      }
+      body.addEventListener("change", changed);
+      show();
+      return item;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch("/admin/files-access", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't load the accounts.");
+        const data = await res.json();
+        folders = (data.folders || []).slice().sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+        const users = data.users || [];
+        list.innerHTML = "";
+        users.forEach((u) => list.append(row(u)));
+        if (!users.length) list.innerHTML = '<p class="fa-empty">No accounts yet.</p>';
+      } catch (error) {
+        list.innerHTML = '<p class="fa-empty"></p>';
+        list.firstChild.textContent = error.message;
+      }
+    }
+    find.addEventListener("input", () => {
+      const q = find.value.trim().toLowerCase();
+      list.querySelectorAll(".fa-user").forEach((item) => { item.hidden = !!q && !item.dataset.name.includes(q); });
+    });
+    load();
+  })();
+</script>
 </body>
 </html>

@@ -22,8 +22,13 @@
   --oled-line-strong: #2f2a3a;
   --oled-text: #f5f3fa;
   --oled-muted: #9c96aa;
-  --oled-accent: #a67cff;
-  --oled-accent-soft: rgba(166, 124, 255, 0.14);
+  /* The main color. Profile > Appearance > Site color changes it for the
+     account (nav.js sets --xn-accent-rgb on <html>); everything else reads
+     these three. */
+  --xn-accent-rgb: 166, 124, 255;
+  --oled-accent: rgb(var(--xn-accent-rgb));
+  --logo-pill: var(--oled-accent);
+  --oled-accent-soft: rgba(var(--xn-accent-rgb), 0.14);
   --oled-nav-h: 56px;
 
   /* Tokens the Tailwind pages read */
@@ -297,16 +302,40 @@ html { scroll-padding-top: calc(var(--oled-nav-h) + env(safe-area-inset-top) + 1
   .gp-tile,
   .Drugs > *,
   .card,
-  .recent-dose,
   .res-link,
   #doses > .dose-card:last-child {
     animation: xn-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
-  :is(.gp-member, .gp-tile, .Drugs > *, .recent-dose, .res-link):nth-child(2) { animation-delay: 60ms; }
-  :is(.gp-member, .gp-tile, .Drugs > *, .recent-dose, .res-link):nth-child(3) { animation-delay: 120ms; }
-  :is(.gp-member, .gp-tile, .Drugs > *, .recent-dose, .res-link):nth-child(4) { animation-delay: 180ms; }
-  :is(.gp-member, .gp-tile, .Drugs > *, .recent-dose, .res-link):nth-child(5) { animation-delay: 240ms; }
-  :is(.gp-member, .gp-tile, .Drugs > *, .recent-dose, .res-link):nth-child(n+6) { animation-delay: 300ms; }
+  :is(.gp-member, .gp-tile, .Drugs > *, .res-link):nth-child(2) { animation-delay: 60ms; }
+  :is(.gp-member, .gp-tile, .Drugs > *, .res-link):nth-child(3) { animation-delay: 120ms; }
+  :is(.gp-member, .gp-tile, .Drugs > *, .res-link):nth-child(4) { animation-delay: 180ms; }
+  :is(.gp-member, .gp-tile, .Drugs > *, .res-link):nth-child(5) { animation-delay: 240ms; }
+  :is(.gp-member, .gp-tile, .Drugs > *, .res-link):nth-child(n+6) { animation-delay: 300ms; }
+
+  /* Profile cards, rows inside them and Forum posts stagger in too. */
+  .pf-grid > *,
+  .pf-rows > *,
+  .fm-feed > article,
+  .xn-page > .xn-card {
+    animation: xn-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  :is(.pf-grid, .pf-rows) > :nth-child(2) { animation-delay: 50ms; }
+  :is(.pf-grid, .pf-rows) > :nth-child(3) { animation-delay: 100ms; }
+  :is(.pf-grid, .pf-rows) > :nth-child(4) { animation-delay: 150ms; }
+  :is(.pf-grid, .pf-rows) > :nth-child(5) { animation-delay: 200ms; }
+  :is(.pf-grid, .pf-rows) > :nth-child(n+6) { animation-delay: 250ms; }
+
+  /* Cards answer the pointer: a soft glow in the main color. */
+  .xn-card { transition: border-color 0.2s ease, box-shadow 0.25s ease, background-color 0.2s ease; }
+  @media (hover: hover) {
+    .pf-box:hover,
+    .fm-feed > article:hover { border-color: rgba(var(--xn-accent-rgb), 0.35); box-shadow: 0 10px 30px -18px rgba(var(--xn-accent-rgb), 0.55); }
+  }
+
+  /* A new main color fades in instead of snapping. */
+  .xn-links a, .xn-btn, .xn-eyebrow { transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, filter 0.15s ease, transform 0.1s ease; }
+  /* Cards being moved in Arrange slide (arrange.js) instead of replaying the entrance. */
+  .pf-grid.is-arranging > * { animation: none; }
 
   /* Small press feedback on nav links (daisyUI buttons already have one). */
   .xn-links a { transition: color 0.15s ease, background-color 0.15s ease, transform 0.1s ease; }
@@ -337,7 +366,7 @@ html { scroll-padding-top: calc(var(--oled-nav-h) + env(safe-area-inset-top) + 1
 }
 .xn-fluid .xn-b1 {
   top: -28vmax; left: -22vmax;
-  background: radial-gradient(circle, rgba(166, 124, 255, 0.42) 0%, rgba(166, 124, 255, 0) 65%);
+  background: radial-gradient(circle, rgba(var(--xn-accent-rgb), 0.42) 0%, rgba(var(--xn-accent-rgb), 0) 65%);
   animation: xn-drift-1 26s ease-in-out infinite alternate;
 }
 .xn-fluid .xn-b2 {
@@ -554,7 +583,7 @@ html.xn-modal-open body { overflow: hidden; }
 
 /* Files is admin only. nav.js adds .xn-admin from the xn_role cookie;
    without JS the link stays and the server answers instead. */
-html.xn-js:not(.xn-admin) .xn-links a[href^="/Files"] { display: none; }
+html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: none; }
 
 /* Like (heart) buttons: Journal cards, Drug info, Profile. js/likes.js wires them. */
 .xn-like {
@@ -615,3 +644,88 @@ html.xn-js:not(.xn-admin) .xn-links a[href^="/Files"] { display: none; }
 .xn-viewer-count { font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
 .xn-viewer-nav { display: flex; gap: 8px; }
 .xn-viewer-nav .xn-btn { min-width: 44px; }
+
+/* An admin's colored name (forum.js paintName) glows softly in its own color. */
+.xn-named { text-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent); }
+
+/* The letter next to the logo (nav.js initMail): unread comments on your posts. */
+.xn.has-mail .xn-brand { margin-right: 0; }
+.xn.has-mail .xn-mail { margin-right: auto; }
+.xn-mail {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--oled-accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.xn-mail[hidden] { display: none; }
+.xn-mail svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.xn-mail-count {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--oled-accent);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--oled-bg);
+}
+@media (hover: hover) { .xn-mail:hover { background: var(--oled-surface-2); } }
+.xn-mail:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.xn-mail.is-pop { animation: xn-mail-pop 0.6s cubic-bezier(0.2, 0.7, 0.2, 1.4); }
+.xn-mail.is-pop svg { animation: xn-mail-wiggle 0.6s ease 0.15s; }
+@keyframes xn-mail-pop { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes xn-mail-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 50% { transform: rotate(10deg); } 75% { transform: rotate(-5deg); } }
+@media (prefers-reduced-motion: reduce) { .xn-mail.is-pop, .xn-mail.is-pop svg { animation: none; } }
+
+.xn-inbox {
+  width: min(460px, calc(100% - 32px));
+  max-height: min(640px, calc(100dvh - 32px));
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--oled-line-strong);
+  border-radius: 6px;
+  background: var(--oled-surface);
+  color: var(--oled-text);
+  font-family: var(--oled-font);
+  overflow: hidden;
+}
+.xn-inbox[open] { display: flex; flex-direction: column; animation: xn-inbox-in 0.22s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.xn-inbox::backdrop { background: rgba(0, 0, 0, 0.72); }
+@keyframes xn-inbox-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .xn-inbox[open] { animation: none; } }
+.xn-inbox-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px 12px 16px; border-bottom: 1px solid var(--oled-line); }
+.xn-inbox-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.xn-inbox-close { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: 4px; background: transparent; color: var(--oled-muted); cursor: pointer; }
+.xn-inbox-close svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; fill: none; }
+@media (hover: hover) { .xn-inbox-close:hover { color: var(--oled-text); background: var(--oled-surface-2); } }
+.xn-inbox-list { overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
+.xn-inbox-empty { margin: 0; padding: 24px 12px; color: var(--oled-muted); font-size: 13px; text-align: center; }
+.xn-inbox-item { display: flex; gap: 10px; padding: 10px; border-radius: 4px; color: inherit; text-decoration: none; }
+.xn-inbox-item + .xn-inbox-item { margin-top: 2px; }
+.xn-inbox-item.is-new { background: var(--oled-accent-soft); }
+@media (hover: hover) { .xn-inbox-item:hover { background: var(--oled-surface-2); } }
+.xn-inbox-item:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
+.xn-inbox-face { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--oled-surface-2); color: var(--oled-accent); font-size: 14px; font-weight: 600; }
+.xn-inbox-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 13px; line-height: 1.4; }
+.xn-inbox-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; color: var(--oled-muted); }
+.xn-inbox-line b { color: var(--oled-text); font-weight: 600; }
+.xn-inbox-line time { margin-left: auto; font-size: 11px; }
+.xn-inbox-body { color: var(--oled-text); overflow-wrap: anywhere; white-space: pre-line; }
+.xn-inbox-post { color: var(--oled-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

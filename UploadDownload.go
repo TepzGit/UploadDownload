@@ -186,6 +186,19 @@ CREATE TABLE IF NOT EXISTS forum_posts (
 );
 CREATE INDEX IF NOT EXISTS forum_posts_by_user ON forum_posts(user_id, id);
 
+CREATE TABLE IF NOT EXISTS file_access (
+	user_id INTEGER PRIMARY KEY,
+	all_folders INTEGER NOT NULL DEFAULT 0,
+	folders TEXT NOT NULL DEFAULT '[]',
+	can_edit INTEGER NOT NULL DEFAULT 0,
+	FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS site_pictures (
+	slot TEXT PRIMARY KEY,
+	path TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS forum_comments (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	post_id INTEGER NOT NULL,
@@ -286,26 +299,31 @@ func main() {
 	http.HandleFunc("/logout", Logout)
 	http.HandleFunc("/Profile", requireLogin(Profile))
 	// Files is one shared folder that only admin accounts can open.
-	http.HandleFunc("/Files/", requireAdminLogin(Downloader))
-	http.HandleFunc("/Uploader", requireAdminLogin(Uploader))
+	http.HandleFunc("/Files/", requireFilesLogin(Downloader))
+	http.HandleFunc("/Uploader", requireFilesLogin(Uploader))
 	http.HandleFunc("/journal", requireLogin(Journal))
 	http.HandleFunc("/journal/Drug", requireLogin(DrugInfo))
 	http.HandleFunc("/sub", requireLogin(Substance))
 	http.HandleFunc("/admin", requireAdminLogin(AdminPanel))
 	http.HandleFunc("/admin/createUser", requireAdminLogin(AdminPanelCreateUser))
 
-	http.HandleFunc("/upload", requireAdminLogin(GetUploadData))
-	http.HandleFunc("/makeFolder", requireAdminLogin(makeFolder))
-	http.HandleFunc("/getFolders", requireAdminLogin(getFolders))
-	http.HandleFunc("/search", requireAdminLogin(search))
-	http.HandleFunc("/delete", requireAdminLogin(Delete))
-	http.HandleFunc("/rename", requireAdminLogin(Rename))
-	http.HandleFunc("/getItems", requireAdminLogin(getItems))
+	http.HandleFunc("/upload", requireFilesLogin(GetUploadData))
+	http.HandleFunc("/makeFolder", requireFilesLogin(makeFolder))
+	http.HandleFunc("/getFolders", requireFilesLogin(getFolders))
+	http.HandleFunc("/search", requireFilesLogin(search))
+	http.HandleFunc("/delete", requireFilesLogin(Delete))
+	http.HandleFunc("/rename", requireFilesLogin(Rename))
+	http.HandleFunc("/getItems", requireFilesLogin(getItems))
+	http.HandleFunc("/admin/files-access", requireAdminLogin(adminFilesAccess))
+	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
+	http.HandleFunc("/sitepic/", sitePicture)
+	http.HandleFunc("/notifications", requireLogin(notifications))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
 	http.HandleFunc("/profile/doses", requireLogin(profileDoses))
 	http.HandleFunc("/profile/intake", requireLogin(profileIntake))
 	http.HandleFunc("/profile/boxes", requireLogin(profileBoxes))
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
+	http.HandleFunc("/profile/appearance", requireLogin(profileAppearance))
 	http.HandleFunc("/profiles/", requireLogin(profileImage))
 	http.HandleFunc("/u/", requireLogin(publicProfile))
 	http.HandleFunc("/Forum", requireLogin(Forum))
@@ -404,7 +422,11 @@ func main() {
 		panic("cannot add the banner column: " + err.Error())
 	}
 	// The order of the Profile cards (JSON list of keys) and a custom page background.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''"} {
+	// siteColor is the account's main color for the whole site ('' = the default violet);
+	// widgetClear is how see-through its Profile cards are, 0 to 100 percent.
+	// nameColor: an admin's name color everywhere it shows; notesSeenAt: when the
+	// letter icon (comments on your posts) was last opened, in ms.
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
@@ -420,6 +442,7 @@ func main() {
 	}
 
 	port := 8000
+	loadNameColors()
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
 
 	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", nil)
@@ -433,9 +456,16 @@ func Main(w http.ResponseWriter, r *http.Request) {
 	d := struct {
 		Login       bool
 		SessionInfo cookiesStruct
+		IsAdmin     bool
+		Pictures    map[string]string
 	}{}
 
 	d.SessionInfo, d.Login = sessionFromRequest(r)
+	d.IsAdmin = d.Login && d.SessionInfo.Authority == "admin"
+	d.Pictures = map[string]string{}
+	for slot := range sitePictureSlots {
+		d.Pictures[slot] = sitePictureLink(slot)
+	}
 	setRoleHint(w, r, d.SessionInfo, d.Login)
 	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), d.SessionInfo.OriginalUsername, r.URL.Path)
 
@@ -480,6 +510,10 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		Banner        string
 		Background    string
 		Layout        string
+		SiteColor     string
+		WidgetClear   int
+		NameColor     string
+		IsAdmin       bool
 		Liked         []likedSubstance
 		RecentIntakes []dose
 		Totals        map[string]Totals
@@ -500,7 +534,11 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var avatar, banner, background, layout string
-	db.QueryRow("SELECT pathToProfilePic, pathToBanner, pathToBackground, profileLayout FROM users WHERE id = ?", userId).Scan(&avatar, &banner, &background, &layout)
+	db.QueryRow("SELECT pathToProfilePic, pathToBanner, pathToBackground, profileLayout, siteColor, widgetClear, nameColor FROM users WHERE id = ?", userId).Scan(&avatar, &banner, &background, &layout, &d.SiteColor, &d.WidgetClear, &d.NameColor)
+	d.IsAdmin = session.Authority == "admin"
+	if !d.IsAdmin {
+		d.NameColor = ""
+	}
 	d.Avatar = existingPicture(avatar)
 	d.Banner = existingPicture(banner)
 	d.Background = existingPicture(background)
@@ -1411,6 +1449,8 @@ func setRoleHint(w http.ResponseWriter, r *http.Request, s cookiesStruct, signed
 		c.Value = "user"
 		if s.Authority == "admin" {
 			c.Value = "admin"
+		} else if _, ok := filesGrantFor(s); ok {
+			c.Value = "files" // may open Files (some folders), so the nav shows the link
 		}
 		c.MaxAge = int(sessionLifetime / time.Second)
 	}
@@ -1526,7 +1566,14 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dirPath := urlPathToFile(path)
+	session, _ := sessionFromRequest(r)
+	grant, _ := filesGrantFor(session)
+	dirPath, ok := insideUploads(strings.Split(strings.TrimPrefix(strings.TrimPrefix(path, "/Files"), "/"), "/")...)
+	if !ok {
+		http.Error(w, "Cant find folder/file, it dosent exit", http.StatusBadRequest)
+		return
+	}
+	rel := uploadRel(dirPath)
 
 	info, err := os.Stat(dirPath)
 	if err != nil {
@@ -1539,12 +1586,18 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if info.IsDir() && !grant.canSee(rel) || !info.IsDir() && !grant.allows(rel) {
+		http.Error(w, "You don't have access to that folder.", http.StatusForbidden)
+		return
+	}
+
 	if info.IsDir() {
 		d := struct {
 			Files    []FileFolderInfo
 			IsRoot   bool
 			BackPath string
-		}{}
+			CanEdit  bool
+		}{CanEdit: grant.canChangeIn(rel)}
 		if path == "/Files" {
 			d.IsRoot = true
 		} else {
@@ -1561,6 +1614,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 			return
 		}
+		d.Files = grant.visible(d.Files, rel)
 
 		tpl, err := template.ParseFiles("html/Downloader.html")
 		if err != nil {
@@ -1581,6 +1635,11 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 }
 
 func Uploader(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	if grant, _ := filesGrantFor(session); !grant.CanEdit {
+		http.Redirect(w, r, "/Files/", http.StatusSeeOther)
+		return
+	}
 
 	//tpl.ExecuteTemplate(w, "Upload", nil)
 
@@ -1613,6 +1672,10 @@ func GetUploadData(w http.ResponseWriter, r *http.Request) {
 	uploadDir, ok := insideUploads(r.FormValue("currentPath"))
 	if !ok {
 		http.Error(w, "Not a valid folder", http.StatusBadRequest)
+		return
+	}
+	if !filesGrantOf(r).canChangeIn(uploadRel(uploadDir)) {
+		http.Error(w, "You can't upload to that folder.", http.StatusForbidden)
 		return
 	}
 
@@ -1662,6 +1725,10 @@ func makeFolder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not a valid folder name", http.StatusBadRequest)
 		return
 	}
+	if !filesGrantOf(r).canChangeIn(uploadRel(dirPath)) {
+		http.Error(w, "You can't make folders here.", http.StatusForbidden)
+		return
+	}
 
 	FullPathDir := filepath.Join(dirPath, folderName)
 	err = os.MkdirAll(FullPathDir, 0755)
@@ -1696,7 +1763,8 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Path, ok := insideUploads(currentPath, FolderToGet)
-	if !ok {
+	grant := filesGrantOf(r)
+	if !ok || !grant.canSee(uploadRel(Path)) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -1708,7 +1776,7 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, Dir := range Dirs {
-		if Dir.IsDir() {
+		if Dir.IsDir() && grant.canSee(joinRel(uploadRel(Path), Dir.Name())) {
 			FoldersReturn.Folders = append(FoldersReturn.Folders, Dir.Name())
 		}
 	}
@@ -1730,7 +1798,8 @@ func search(w http.ResponseWriter, r *http.Request) {
 		parts = pathSplit[2:]
 	}
 	finalPath, ok := insideUploads(parts...)
-	if !ok {
+	grant := filesGrantOf(r)
+	if !ok || !grant.canSee(uploadRel(finalPath)) {
 		http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 		return
 	}
@@ -1746,6 +1815,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 		}
 		results = append(results, FileFolders...)
 	}
+	results = grant.visible(results, "")
 
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(results)
@@ -1767,7 +1837,9 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	info, err := os.Stat(finalPath)
-	if err != nil {
+	grant := filesGrantOf(r)
+	rel := uploadRel(finalPath)
+	if err != nil || info.IsDir() && !grant.canSee(rel) || !info.IsDir() && !grant.allows(rel) {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
@@ -1781,6 +1853,7 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get items", http.StatusInternalServerError)
 		return
 	}
+	result = grant.visible(result, rel)
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(result)
@@ -1994,6 +2067,10 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not a valid file", http.StatusBadRequest)
 		return
 	}
+	if !filesGrantOf(r).canChange(uploadRel(path)) {
+		http.Error(w, "You can't delete that.", http.StatusForbidden)
+		return
+	}
 	err = os.Remove(path)
 	if err != nil {
 		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
@@ -2017,6 +2094,10 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 	currentFilePath, ok := uploadPathFromURL(renameData.CurrentFilenamePath)
 	if !ok || !validName(renameData.NewFileName) {
 		http.Error(w, "Not a valid name", http.StatusBadRequest)
+		return
+	}
+	if !filesGrantOf(r).canChange(uploadRel(currentFilePath)) {
+		http.Error(w, "You can't rename that.", http.StatusForbidden)
 		return
 	}
 	newFilePath := filepath.Join(filepath.Dir(currentFilePath), renameData.NewFileName)
@@ -2598,6 +2679,16 @@ func removeOwnPicture(link string, userId int) {
 // <prefix>-<random>.<ext> and returns its /profiles/ link, or an HTTP status
 // and message when it can't.
 func saveProfileImage(file io.ReadSeeker, uid int, prefix string) (string, int, string) {
+	name, status, msg := saveImageIn(file, filepath.Join(ProfilePicturesDirName, strconv.Itoa(uid)), prefix)
+	if status != 0 {
+		return "", status, msg
+	}
+	return "/profiles/" + strconv.Itoa(uid) + "/" + name, 0, ""
+}
+
+// saveImageIn stores an uploaded JPG/PNG/GIF/WebP in dir as
+// <prefix>-<random>.<ext> and returns the file name.
+func saveImageIn(file io.ReadSeeker, dir, prefix string) (string, int, string) {
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(file, head)
 	var ext string
@@ -2617,7 +2708,6 @@ func saveProfileImage(file io.ReadSeeker, uid int, prefix string) (string, int, 
 		return "", http.StatusInternalServerError, "Couldn't read the picture."
 	}
 
-	dir := filepath.Join(ProfilePicturesDirName, strconv.Itoa(uid))
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		fmt.Println(err)
 		return "", http.StatusInternalServerError, "Couldn't save the picture."
@@ -2636,7 +2726,7 @@ func saveProfileImage(file io.ReadSeeker, uid int, prefix string) (string, int, 
 		os.Remove(filepath.Join(dir, name))
 		return "", http.StatusInternalServerError, "Couldn't save the picture."
 	}
-	return "/profiles/" + strconv.Itoa(uid) + "/" + name, 0, ""
+	return name, 0, ""
 }
 
 // profilePicture takes a multipart POST with kind=avatar|banner and either an
@@ -3306,6 +3396,8 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		Avatar     string
 		Banner     string
 		Background string
+		Clear      int
+		NameColor  string
 		Admin      bool
 		IsSelf     bool
 		Posts      int
@@ -3315,7 +3407,7 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 
 	var id int
 	var avatar, banner, background, authority string
-	err := db.QueryRow("SELECT id, originalUsername, pathToProfilePic, pathToBanner, pathToBackground, authority FROM users WHERE username = ?", strings.ToLower(name)).Scan(&id, &d.Name, &avatar, &banner, &background, &authority)
+	err := db.QueryRow("SELECT id, originalUsername, pathToProfilePic, pathToBanner, pathToBackground, widgetClear, authority FROM users WHERE username = ?", strings.ToLower(name)).Scan(&id, &d.Name, &avatar, &banner, &background, &d.Clear, &authority)
 	if err == nil {
 		d.Found = true
 		d.Initial = initialOf(d.Name)
@@ -3323,6 +3415,7 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		d.Banner = existingPicture(banner)
 		d.Background = existingPicture(background)
 		d.Admin = authority == "admin"
+		d.NameColor = adminNameColor(d.Name, authority)
 		d.IsSelf = id == session.UserId
 		d.Friend = friendState(session.UserId, id)
 		db.QueryRow("SELECT COUNT(*) FROM forum_posts WHERE user_id = ?", id).Scan(&d.Posts)
@@ -3372,6 +3465,7 @@ type postAuthor struct {
 	Initial string `json:"initial"`
 	Avatar  string `json:"avatar"`
 	Admin   bool   `json:"admin"`
+	Color   string `json:"color,omitempty"` // an admin's name color
 }
 
 type forumPost struct {
@@ -3397,6 +3491,7 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		q := r.URL.Query()
 		before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
+		only, _ := strconv.ParseInt(q.Get("id"), 10, 64) // ?id= answers just that post (letter icon links)
 		owner := 0
 		if name := q.Get("user"); name != "" {
 			id, ok := userByName(name)
@@ -3411,9 +3506,9 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			(SELECT COUNT(*) FROM forum_comments c WHERE c.post_id = p.id)
 		FROM forum_posts p
 		JOIN users u ON u.id = p.user_id
-		WHERE (? = 0 OR p.id < ?) AND (? = 0 OR p.user_id = ?)
+		WHERE (? = 0 OR p.id < ?) AND (? = 0 OR p.user_id = ?) AND (? = 0 OR p.id = ?)
 		ORDER BY p.id DESC
-		LIMIT ?`, before, before, owner, owner, postsPerPage+1)
+		LIMIT ?`, before, before, owner, owner, only, only, postsPerPage+1)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Couldn't load the posts.", http.StatusInternalServerError)
@@ -3435,6 +3530,7 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			p.Author.Avatar = avatars[author]
 			p.Author.Initial = initialOf(p.Author.Name)
 			p.Author.Admin = authority == "admin"
+			p.Author.Color = adminNameColor(p.Author.Name, authority)
 			if json.Unmarshal([]byte(pictures), &p.Pictures) != nil || p.Pictures == nil {
 				p.Pictures = []string{}
 			}
@@ -3599,6 +3695,7 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 		m.Initial = initialOf(m.Name)
 		m.Avatar = existingPicture(avatar)
 		m.Admin = authority == "admin"
+		m.Color = adminNameColor(m.Name, authority)
 		list = append(list, m)
 	}
 	rows.Close()
@@ -3615,7 +3712,77 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 
 // person is how an account is shown next to posts, comments and friends.
 func person(name, avatar, authority string) postAuthor {
-	return postAuthor{Name: name, Initial: initialOf(name), Avatar: existingPicture(avatar), Admin: authority == "admin"}
+	return postAuthor{Name: name, Initial: initialOf(name), Avatar: existingPicture(avatar), Admin: authority == "admin", Color: adminNameColor(name, authority)}
+}
+
+// profileAppearance reads (GET) or saves (POST JSON) the account's site color
+// and Profile card transparency. Fields left out of a POST stay as they are;
+// an empty color goes back to the default violet.
+func profileAppearance(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		http.Error(w, "Log in first.", http.StatusUnauthorized)
+		return
+	}
+	uid := session.UserId
+	if r.Method == http.MethodPost {
+		var in struct {
+			SiteColor   *string `json:"siteColor"`
+			WidgetClear *int    `json:"widgetClear"`
+			NameColor   *string `json:"nameColor"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in); err != nil {
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+		if in.SiteColor != nil {
+			color := strings.ToLower(strings.TrimSpace(*in.SiteColor))
+			if color != "" && !hexColor.MatchString(color) {
+				http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
+				return
+			}
+			if _, err := db.Exec("UPDATE users SET siteColor = ? WHERE id = ?", color, uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the color.", http.StatusInternalServerError)
+				return
+			}
+		}
+		if in.NameColor != nil {
+			color := strings.ToLower(strings.TrimSpace(*in.NameColor))
+			if session.Authority != "admin" {
+				http.Error(w, "Only admins can color their name.", http.StatusForbidden)
+				return
+			}
+			if color != "" && !hexColor.MatchString(color) {
+				http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
+				return
+			}
+			if _, err := db.Exec("UPDATE users SET nameColor = ? WHERE id = ?", color, uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the name color.", http.StatusInternalServerError)
+				return
+			}
+			loadNameColors()
+		}
+		if in.WidgetClear != nil {
+			clear := min(max(*in.WidgetClear, 0), 100)
+			if _, err := db.Exec("UPDATE users SET widgetClear = ? WHERE id = ?", clear, uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the transparency.", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed.", http.StatusMethodNotAllowed)
+		return
+	}
+	var out struct {
+		SiteColor   string `json:"siteColor"`
+		WidgetClear int    `json:"widgetClear"`
+		NameColor   string `json:"nameColor"`
+	}
+	db.QueryRow("SELECT siteColor, widgetClear, nameColor FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor)
+	writeJSON(w, out)
 }
 
 // profileLayout splits the stored card order ("intake,totals,b12") into keys.
@@ -4063,6 +4230,486 @@ func forumComments(w http.ResponseWriter, r *http.Request) {
 		default:
 			http.Error(w, "Unknown action.", http.StatusBadRequest)
 		}
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- Files access for members (picked on the admin page) ----
+
+// filesGrant is what an account may do in Files. Admins can do everything;
+// a member listed in file_access can open the folders picked for them (and
+// everything inside), and with CanEdit upload, rename and delete in there.
+type filesGrant struct {
+	All     bool     `json:"all"`
+	Folders []string `json:"folders"`
+	CanEdit bool     `json:"canEdit"`
+}
+
+// filesGrantFor answers the account's grant, and false when it has no access at all.
+func filesGrantFor(s cookiesStruct) (filesGrant, bool) {
+	if s.Authority == "admin" {
+		return filesGrant{All: true, CanEdit: true}, true
+	}
+	if s.UserId == 0 {
+		return filesGrant{}, false
+	}
+	var all, edit int
+	var folders string
+	if err := db.QueryRow("SELECT all_folders, folders, can_edit FROM file_access WHERE user_id = ?", s.UserId).Scan(&all, &folders, &edit); err != nil {
+		return filesGrant{}, false
+	}
+	g := filesGrant{All: all == 1, CanEdit: edit == 1}
+	json.Unmarshal([]byte(folders), &g.Folders)
+	return g, true
+}
+
+func filesGrantOf(r *http.Request) filesGrant {
+	session, _ := sessionFromRequest(r)
+	g, _ := filesGrantFor(session)
+	return g
+}
+
+// uploadRel is a path inside UploadedFiles as "a/b" ("" for the folder itself).
+func uploadRel(p string) string {
+	rel, err := filepath.Rel(UploadedFilesDirName, p)
+	if err != nil || rel == "." {
+		return ""
+	}
+	return filepath.ToSlash(rel)
+}
+
+func joinRel(dir, name string) string {
+	if dir == "" {
+		return name
+	}
+	return dir + "/" + name
+}
+
+// allows: rel is one of the granted folders or inside one.
+func (g filesGrant) allows(rel string) bool {
+	if g.All {
+		return true
+	}
+	for _, f := range g.Folders {
+		if rel == f || strings.HasPrefix(rel, f+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// canSee: rel can be listed, either because it is allowed or because a
+// granted folder is somewhere below it (so the member can walk down to it).
+func (g filesGrant) canSee(rel string) bool {
+	if g.allows(rel) {
+		return true
+	}
+	for _, f := range g.Folders {
+		if rel == "" || strings.HasPrefix(f, rel+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// canChangeIn: new files and folders may go into the folder rel.
+func (g filesGrant) canChangeIn(rel string) bool {
+	return g.CanEdit && g.allows(rel)
+}
+
+// canChange: the item rel may be renamed or deleted (never a granted folder itself).
+func (g filesGrant) canChange(rel string) bool {
+	if !g.CanEdit || rel == "" {
+		return false
+	}
+	if g.All {
+		return true
+	}
+	for _, f := range g.Folders {
+		if strings.HasPrefix(rel, f+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// visible drops the items the member may not see. dir is the listed folder,
+// or "" when the items carry their own full /Files/ links (search results).
+func (g filesGrant) visible(items []FileFolderInfo, dir string) []FileFolderInfo {
+	if g.All {
+		return items
+	}
+	out := []FileFolderInfo{}
+	for _, it := range items {
+		rel := joinRel(dir, it.Name)
+		if dir == "" {
+			if p, ok := uploadPathFromURL(it.Path); ok {
+				rel = uploadRel(p)
+			}
+		}
+		if it.IsDir && g.canSee(rel) || !it.IsDir && g.allows(rel) {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+// requireFilesLogin lets in admins and the members an admin gave Files access.
+func requireFilesLogin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		d, ok := sessionFromRequest(r)
+		if !ok {
+			notSignedIn(w, r)
+			return
+		}
+		if r.Method == http.MethodGet {
+			setRoleHint(w, r, d, true)
+		}
+		if _, ok := filesGrantFor(d); !ok {
+			fmt.Printf("[%s] DENY IP=%s USER=%s PATH=%s REASON=no_files_access\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), d.OriginalUsername, r.URL.Path)
+			if r.Method == http.MethodGet {
+				http.Redirect(w, r, "/Main?need=files", http.StatusSeeOther)
+			} else {
+				http.Error(w, "You don't have access to Files.", http.StatusForbidden)
+			}
+			return
+		}
+		next(w, r)
+	}
+}
+
+// uploadFolders lists the folders in UploadedFiles (three levels deep, at most 400).
+func uploadFolders() []string {
+	out := []string{}
+	var walk func(dir, rel string, depth int)
+	walk = func(dir, rel string, depth int) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			if !e.IsDir() || len(out) >= 400 {
+				continue
+			}
+			r := joinRel(rel, e.Name())
+			out = append(out, r)
+			if depth < 3 {
+				walk(filepath.Join(dir, e.Name()), r, depth+1)
+			}
+		}
+	}
+	walk(UploadedFilesDirName, "", 1)
+	sort.Strings(out)
+	return out
+}
+
+// adminFilesAccess: GET lists the accounts with their Files access and the
+// folders to pick from; POST {user, access} sets one account's access
+// (access null takes it away).
+func adminFilesAccess(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		type row struct {
+			ID     int         `json:"id"`
+			Name   string      `json:"name"`
+			Admin  bool        `json:"admin"`
+			Access *filesGrant `json:"access"`
+		}
+		rows, err := db.Query("SELECT id, originalUsername, authority FROM users ORDER BY lower(originalUsername) LIMIT 1000")
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load the accounts.", http.StatusInternalServerError)
+			return
+		}
+		var list []row
+		for rows.Next() {
+			var x row
+			var authority string
+			if rows.Scan(&x.ID, &x.Name, &authority) == nil {
+				x.Admin = authority == "admin"
+				list = append(list, x)
+			}
+		}
+		rows.Close()
+		for i := range list {
+			if g, ok := filesGrantFor(cookiesStruct{UserId: list[i].ID, Authority: map[bool]string{true: "admin", false: "user"}[list[i].Admin]}); ok {
+				if g.Folders == nil {
+					g.Folders = []string{}
+				}
+				list[i].Access = &g
+			}
+		}
+		writeJSON(w, map[string]any{"users": list, "folders": uploadFolders()})
+
+	case http.MethodPost:
+		var in struct {
+			User   int         `json:"user"`
+			Access *filesGrant `json:"access"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&in); err != nil {
+			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+			return
+		}
+		var authority string
+		if err := db.QueryRow("SELECT authority FROM users WHERE id = ?", in.User).Scan(&authority); err != nil {
+			http.Error(w, "That account doesn't exist.", http.StatusNotFound)
+			return
+		}
+		if authority == "admin" {
+			http.Error(w, "Admins can always open every folder.", http.StatusBadRequest)
+			return
+		}
+		if in.Access == nil {
+			db.Exec("DELETE FROM file_access WHERE user_id = ?", in.User)
+			writeJSON(w, map[string]any{"user": in.User, "access": nil})
+			return
+		}
+		// Only real folders inside UploadedFiles, written as "a/b", each once.
+		folders := []string{}
+		seen := map[string]bool{}
+		for _, f := range in.Access.Folders {
+			p, ok := insideUploads(strings.Split(strings.Trim(filepath.ToSlash(f), "/"), "/")...)
+			rel := uploadRel(p)
+			if !ok || rel == "" || seen[rel] {
+				continue
+			}
+			if info, err := os.Stat(p); err != nil || !info.IsDir() {
+				continue
+			}
+			seen[rel] = true
+			folders = append(folders, rel)
+			if len(folders) >= 100 {
+				break
+			}
+		}
+		g := filesGrant{All: in.Access.All, Folders: folders, CanEdit: in.Access.CanEdit}
+		if g.All {
+			g.Folders = []string{}
+		}
+		list, _ := json.Marshal(g.Folders)
+		all, edit := 0, 0
+		if g.All {
+			all = 1
+		}
+		if g.CanEdit {
+			edit = 1
+		}
+		if _, err := db.Exec(`INSERT INTO file_access (user_id, all_folders, folders, can_edit) VALUES (?, ?, ?, ?)
+			ON CONFLICT(user_id) DO UPDATE SET all_folders = excluded.all_folders, folders = excluded.folders, can_edit = excluded.can_edit`, in.User, all, string(list), edit); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save the access.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"user": in.User, "access": g})
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- Admin name colors ----
+
+var nameColorsMu sync.RWMutex
+var nameColors = map[string]string{} // lower-case name -> color, admins only
+
+func loadNameColors() {
+	m := map[string]string{}
+	if rows, err := db.Query("SELECT originalUsername, nameColor FROM users WHERE authority = 'admin' AND nameColor != ''"); err == nil {
+		for rows.Next() {
+			var name, color string
+			if rows.Scan(&name, &color) == nil && hexColor.MatchString(color) {
+				m[strings.ToLower(name)] = color
+			}
+		}
+		rows.Close()
+	}
+	nameColorsMu.Lock()
+	nameColors = m
+	nameColorsMu.Unlock()
+}
+
+// adminNameColor is the color an admin picked for their name ("" for everyone else).
+func adminNameColor(name, authority string) string {
+	if authority != "admin" {
+		return ""
+	}
+	nameColorsMu.RLock()
+	defer nameColorsMu.RUnlock()
+	return nameColors[strings.ToLower(name)]
+}
+
+// ---- Main page pictures (admins can swap them) ----
+
+var sitePictureSlots = map[string]string{
+	"member1": "/hookey.jpg",
+	"member2": "/tepz.jpg",
+}
+
+var sitePicturesDir = filepath.Join(ProfilePicturesDirName, "site")
+
+// sitePictureLink is the link Main uses for a slot: the uploaded picture
+// (with a version so browsers fetch a new one) or the original file.
+func sitePictureLink(slot string) string {
+	var path string
+	if db.QueryRow("SELECT path FROM site_pictures WHERE slot = ?", slot).Scan(&path) == nil {
+		if info, err := os.Stat(filepath.Join(sitePicturesDir, filepath.Base(path))); err == nil && !info.IsDir() {
+			return "/sitepic/" + slot + "?v=" + strconv.FormatInt(info.ModTime().UnixMilli(), 36)
+		}
+	}
+	return sitePictureSlots[slot]
+}
+
+// sitePicture serves an uploaded Main picture to everyone (Main is public).
+func sitePicture(w http.ResponseWriter, r *http.Request) {
+	slot := strings.TrimPrefix(r.URL.Path, "/sitepic/")
+	fallback, known := sitePictureSlots[slot]
+	if !known {
+		http.NotFound(w, r)
+		return
+	}
+	var path string
+	if db.QueryRow("SELECT path FROM site_pictures WHERE slot = ?", slot).Scan(&path) != nil {
+		http.Redirect(w, r, fallback, http.StatusFound)
+		return
+	}
+	p := filepath.Join(sitePicturesDir, filepath.Base(path))
+	switch strings.ToLower(filepath.Ext(p)) {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeFile(w, r, p)
+}
+
+// sitePictureUpload: multipart POST slot=<slot> with an "image", or remove=1
+// to go back to the original picture. Admins only. Answers {"url": "..."}.
+func sitePictureUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPictureBytes+(64<<10))
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		http.Error(w, fmt.Sprintf("That picture is too big. Pick one under %d MB.", maxPictureMB), http.StatusRequestEntityTooLarge)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	slot := r.FormValue("slot")
+	if _, known := sitePictureSlots[slot]; !known {
+		http.Error(w, "Unknown picture.", http.StatusBadRequest)
+		return
+	}
+	var old string
+	db.QueryRow("SELECT path FROM site_pictures WHERE slot = ?", slot).Scan(&old)
+
+	if r.FormValue("remove") == "1" {
+		db.Exec("DELETE FROM site_pictures WHERE slot = ?", slot)
+		if old != "" {
+			os.Remove(filepath.Join(sitePicturesDir, filepath.Base(old)))
+		}
+		writeJSON(w, map[string]string{"url": sitePictureLink(slot)})
+		return
+	}
+	file, _, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "Pick a picture first.", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	name, status, msg := saveImageIn(file, sitePicturesDir, slot)
+	if status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
+	if _, err := db.Exec("INSERT INTO site_pictures (slot, path) VALUES (?, ?) ON CONFLICT(slot) DO UPDATE SET path = excluded.path", slot, name); err != nil {
+		fmt.Println(err)
+		os.Remove(filepath.Join(sitePicturesDir, name))
+		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
+		return
+	}
+	if old != "" && old != name {
+		os.Remove(filepath.Join(sitePicturesDir, filepath.Base(old)))
+	}
+	writeJSON(w, map[string]string{"url": sitePictureLink(slot)})
+}
+
+// ---- Letter icon: comments on your Forum posts ----
+
+// notifications: GET answers {unread, items} with the newest 30 comments
+// other people left on the account's posts (unread = newer than the last
+// time the letter was opened); POST {action:"seen"} marks them all read.
+func notifications(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	var seen int64
+	db.QueryRow("SELECT notesSeenAt FROM users WHERE id = ?", me).Scan(&seen)
+
+	switch r.Method {
+	case http.MethodGet:
+		type note struct {
+			ID       int64      `json:"id"`
+			Post     int64      `json:"post"`
+			PostText string     `json:"postText"`
+			From     postAuthor `json:"from"`
+			Body     string     `json:"body"`
+			At       int64      `json:"at"`
+			Unread   bool       `json:"unread"`
+		}
+		out := struct {
+			Unread int    `json:"unread"`
+			Items  []note `json:"items"`
+		}{Items: []note{}}
+		db.QueryRow(`SELECT COUNT(*) FROM forum_comments c JOIN forum_posts p ON p.id = c.post_id
+			WHERE p.user_id = ? AND c.user_id != ? AND c.created_at > ?`, me, me, seen).Scan(&out.Unread)
+		if r.URL.Query().Get("count") == "1" {
+			writeJSON(w, out)
+			return
+		}
+		rows, err := db.Query(`
+		SELECT c.id, c.post_id, p.body, c.body, c.created_at, u.originalUsername, u.pathToProfilePic, u.authority
+		FROM forum_comments c
+		JOIN forum_posts p ON p.id = c.post_id
+		JOIN users u ON u.id = c.user_id
+		WHERE p.user_id = ? AND c.user_id != ?
+		ORDER BY c.id DESC
+		LIMIT 30`, me, me)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load your messages.", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var n note
+			var name, avatar, authority string
+			if rows.Scan(&n.ID, &n.Post, &n.PostText, &n.Body, &n.At, &name, &avatar, &authority) != nil {
+				continue
+			}
+			if runes := []rune(n.PostText); len(runes) > 80 {
+				n.PostText = string(runes[:80]) + "…"
+			}
+			n.From = person(name, avatar, authority)
+			n.Unread = n.At > seen
+			out.Items = append(out.Items, n)
+		}
+		writeJSON(w, out)
+
+	case http.MethodPost:
+		var in struct {
+			Action string `json:"action"`
+		}
+		json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&in)
+		if in.Action != "seen" {
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+			return
+		}
+		db.Exec("UPDATE users SET notesSeenAt = ? WHERE id = ?", time.Now().UnixMilli(), me)
+		writeJSON(w, map[string]int{"unread": 0})
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
