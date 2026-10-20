@@ -27,6 +27,7 @@
       color: var(--oled-text);
     }
     .gp *, .gp *::before, .gp *::after { box-sizing: border-box; }
+    @media (max-width: 767px) { .gp { padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); } }
 
     /* Hero: name + live clock. It sticks under the nav while the panel
        scrolls up over it; the scroll script shrinks the clock as it goes. */
