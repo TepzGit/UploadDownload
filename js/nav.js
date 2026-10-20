@@ -327,12 +327,13 @@
   }
 
   // Phones: the main pages sit in a tab bar along the bottom of the screen,
-  // like an iPhone app. Pages that aren't tabs (Files, Admin) stay in the
-  // top menu, which only shows when one of them is there for this account.
+  // like an iPhone app, and the top bar keeps only the logo (oled.css).
+  // Files is a tab only for accounts that can open it.
   const TABS = [
     { href: "/", label: "Graph", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
     { href: "/journal", label: "Journal", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
     { href: "/Forum", label: "Forum", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
+    { href: "/Files/", label: "Files", files: true, icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
     { href: "/Replications", label: "Replications", icon: '<rect x="7" y="2" width="14" height="16" rx="2.5"/><path d="M5 6v12.5A3.5 3.5 0 0 0 8.5 22H17a2 2 0 0 1-2 0H8.5A1.5 1.5 0 0 1 7 20.5V6.3A2 2 0 0 0 5 6z"/><path d="M3 6.8V19a4 4 0 0 0 4 4h9.5c.4 0 .8-.1 1.1-.3H7a2.6 2.6 0 0 1-2.6-2.6V5.6A2 2 0 0 0 3 6.8z" opacity=".55"/>' },
     { href: "/Profile", label: "Profile", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
   ];
@@ -342,7 +343,11 @@
     const bar = document.createElement("nav");
     bar.className = "xn-tabs";
     bar.setAttribute("aria-label", "Main");
-    TABS.forEach((tab) => {
+    const rootClass = document.documentElement.classList;
+    const canFiles = rootClass.contains("xn-admin") || rootClass.contains("xn-files");
+    const tabs = TABS.filter((tab) => !tab.files || canFiles);
+    bar.classList.toggle("has-6", tabs.length > 5);
+    tabs.forEach((tab) => {
       const link = Array.from(links).find((a) => (a.getAttribute("href") || "") === tab.href);
       const a = document.createElement("a");
       a.className = "xn-tab";
@@ -364,14 +369,6 @@
     });
     document.body.append(bar);
     document.documentElement.classList.add("xn-has-tabs");
-
-    const root = document.documentElement.classList;
-    const extra = Array.from(links).some((a) => {
-      if (a.classList.contains("xn-in-tabs")) return false;
-      if ((a.getAttribute("href") || "").startsWith("/Files")) return root.contains("xn-admin") || root.contains("xn-files");
-      return true;
-    });
-    nav.classList.toggle("xn-no-extra", !extra);
   }
 
   // Page-leave fade for browsers without cross-document view transitions.

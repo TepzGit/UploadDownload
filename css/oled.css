@@ -633,9 +633,31 @@ input[type="search"].xn-input::-webkit-search-cancel-button { filter: invert(0.6
   .xn-tab[aria-current="page"] { color: var(--oled-accent); }
   .xn-tab:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -4px; border-radius: 10px; }
 
-  /* The top menu keeps only pages that aren't tabs, and hides when there are none. */
-  .xn-js .xn-links a.xn-in-tabs { display: none; }
-  .xn-js .xn.xn-no-extra .xn-toggle { display: none; }
+  /* With the tab bar, the top bar is just the logo on a slim see-through strip
+     that scrolls away with the page. Admins get a small Admin link beside it. */
+  html.xn-has-tabs { --oled-nav-h: 0px; }
+  html.xn-has-tabs .xn {
+    position: relative;
+    min-height: calc(46px + env(safe-area-inset-top));
+    padding-bottom: 0;
+    background: transparent;
+    border-bottom: 0;
+  }
+  html.xn-has-tabs .xn-brand { padding: 4px 0 0; }
+  html.xn-has-tabs .xn-brand .xn-logo { height: 28px; }
+  html.xn-has-tabs .xn-toggle { display: none; }
+  html.xn-has-tabs .xn-links { position: static; visibility: visible; opacity: 1; transform: none; flex-direction: row; padding: 0; background: none; border: 0; }
+  html.xn-has-tabs .xn-links a { display: none; }
+  html.xn-has-tabs .xn-links a.xn-admin { display: flex; align-self: center; height: 32px; min-height: 0; padding: 0 10px; font-size: 13px; border: 1px solid rgba(255, 139, 139, 0.35); border-radius: 16px; }
+  .xn-tabs.has-6 .xn-tab .xn-tab-label { font-size: min(9.5px, 2.45vw); letter-spacing: -0.05em; }
+
+  /* Cards reach close to the screen edges on phones. */
+  .xn-page {
+    padding-left: max(6px, env(safe-area-inset-left));
+    padding-right: max(6px, env(safe-area-inset-right));
+    padding-top: 10px;
+  }
+  .xn-card { padding: 14px; }
 
   /* Bottom popups clear the tab bar. */
   html.xn-has-tabs .xn-toast { bottom: calc(var(--xn-tabs-h) + 14px + env(safe-area-inset-bottom)); }
