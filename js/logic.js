@@ -16,6 +16,7 @@ const state = {
   addedDoses: [],
   baseDurations: { onset: 0, comeup: 0, peak: 0, offset: 0 },
   currentRoa: null,
+  roas: [], // the substance's routes that have timings, e.g. oral, insufflated
   substanceColors: {},
   customColors: {}, // lowercased name -> color the account picked on Profile
 };
@@ -32,6 +33,8 @@ export function getState() {
     units: state.units,
     addedDoses: state.addedDoses,
     baseDurations: state.baseDurations,
+    currentRoa: state.currentRoa,
+    roas: state.roas,
   };
 }
 
@@ -90,18 +93,32 @@ export async function fetchSubstanceData(name) {
 
   const result = await fetchGraphQL(query, { name });
   const substance = result?.data?.substances?.[0];
-  const roa =
-    substance?.roas?.find((item) => item.duration && item.dose?.common?.min) ||
-    substance?.roas?.[0];
+  // Every route with timings can be drawn. A route without its own common
+  // dose borrows one from a route that has it, so the curve still has a scale.
+  const withDose = substance?.roas?.find((item) => item.duration && item.dose?.common?.min);
+  const roas = (substance?.roas || []).filter((item) => item.duration && (item.dose?.common?.min || withDose));
 
-  if (!substance || !roa?.duration || !roa?.dose?.common?.min) {
+  if (!substance || !withDose || !roas.length) {
     throw new Error("No usable dose and duration data was found for this substance.");
   }
 
   state.currentSubstance = substance;
+  state.roas = roas;
+  return selectRoa(withDose.name);
+}
+
+/**
+ * Picks the route of administration (oral, insufflated, ...) for the
+ * substance loaded now. Each route has its own timings and common dose.
+ */
+export function selectRoa(name) {
+  const substance = state.currentSubstance;
+  const roa = state.roas.find((item) => item.name === name) || state.roas[0];
+  const fallback = state.roas.find((item) => item.dose?.common?.min);
+  const dose = roa.dose?.common?.min ? roa.dose : fallback.dose;
   state.currentRoa = roa;
-  state.currentCommonDose = Number(roa.dose.common.min);
-  state.units = roa.dose.units || "";
+  state.currentCommonDose = Number(dose.common.min);
+  state.units = dose.units || "";
   state.baseDurations = {
     onset: averageHours(roa.duration.onset),
     comeup: averageHours(roa.duration.comeup),
@@ -112,6 +129,7 @@ export async function fetchSubstanceData(name) {
   return {
     substance,
     roa,
+    roas: state.roas,
     commonDose: state.currentCommonDose,
     units: state.units,
     durations: state.baseDurations,
@@ -250,6 +268,7 @@ export function addDoseToState({ amount, time, formulation }) {
     unit: state.units,
     formulation: formulation.label,
     releaseHours: formulation.releaseHours,
+    route: state.currentRoa?.name || "",
     substance: state.currentSubstance.name,
     color: colorForSubstance(state.currentSubstance.name),
     profile,
@@ -289,6 +308,7 @@ export function snapshotDoses() {
     unit: dose.unit || "",
     formulation: dose.formulation || "",
     releaseHours: dose.releaseHours || 0,
+    route: dose.route || "",
     time: dose.time,
     profile: { base: { ...dose.profile.base }, commonDose: dose.profile.commonDose },
   }));
@@ -313,6 +333,7 @@ function savedDose(raw) {
     unit: String(raw.unit || "").slice(0, 12),
     formulation: String(raw.formulation || "").slice(0, 40),
     releaseHours,
+    route: String(raw.route || "").slice(0, 30),
     time: raw.time,
     profile: { base, commonDose },
   };

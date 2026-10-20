@@ -2521,7 +2521,7 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 				Name:   g.Substance,
 				Amount: g.Amount,
 				Unit:   g.Unit,
-				Method: g.Formulation,
+				Method: strings.Trim(strings.Join([]string{g.Route, g.Formulation}, ", "), ", "),
 				At:     time.Date(day.Year(), day.Month(), day.Day(), h, m, 0, 0, loc),
 			})
 		}
@@ -2927,6 +2927,7 @@ type experienceDose struct {
 	Unit         string  `json:"unit"`
 	Formulation  string  `json:"formulation"`
 	ReleaseHours float64 `json:"releaseHours"`
+	Route        string  `json:"route"` // route of administration: oral, insufflated, ...
 	Time         string  `json:"time"`
 	Profile      struct {
 		Base struct {
@@ -2966,6 +2967,7 @@ func cleanExperienceDoses(in []experienceDose) ([]experienceDose, bool) {
 		d.Substance = cleanText(d.Substance, 80)
 		d.Unit = cleanText(d.Unit, 12)
 		d.Formulation = cleanText(d.Formulation, 40)
+		d.Route = cleanText(d.Route, 30)
 		b := d.Profile.Base
 		if d.Substance == "" || !clockTime.MatchString(d.Time) ||
 			!inRange(d.Amount, 0.000001, 1e6) || !inRange(d.ReleaseHours, 0, 48) ||
