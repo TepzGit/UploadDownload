@@ -13,6 +13,8 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
+  <link rel="stylesheet" href="/classicons.css" />
+  <script src="/classicons.js"></script>
   <script src="/likes.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -40,7 +42,7 @@
       <span class="di-thumb" id="diThumb" hidden></span>
       <div class="di-titles">
         <p class="xn-eyebrow" id="diClass">Drug info</p>
-        <h1 class="xn-h1 DrugInfoName">Loading…</h1>
+        <div class="di-name-row"><i id="diIcon" class="sc-icon di-icon" aria-hidden="true" hidden></i><h1 class="xn-h1 DrugInfoName">Loading…</h1></div>
       </div>
     </div>
     <p class="di-summary" id="diSummary" hidden></p>
@@ -51,6 +53,9 @@
     </div>
   </section>
 
+  <div class="di-info" id="diInfo" hidden></div>
+
+  <h2 class="xn-label di-section" id="diRoutesTitle" hidden>Dosing by route</h2>
   <div class="DrugInfoIntakeMethods" aria-live="polite"></div>
   <p class="di-note">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
 </main>
@@ -59,7 +64,29 @@
   const DOSE_LEVELS = [["threshold", "Threshold"], ["light", "Light"], ["common", "Common"], ["strong", "Strong"], ["heavy", "Heavy"]];
   const DURATION_PARTS = [["onset", "Onset"], ["comeup", "Come up"], ["peak", "Peak"], ["offset", "Offset"], ["afterglow", "After effects"], ["duration", "Duration"], ["total", "Total"]];
 
+  // Everything beyond dosing. Asked for separately so that, if PsychonautWiki
+  // ever rejects one of these fields, the page still loads with dosing only.
+  const DETAILS = `
+        commonNames
+        systematicName
+        addictionPotential
+        toxicity
+        crossTolerances
+        tolerance { full half zero }
+        effects { name url }
+        dangerousInteractions { name }
+        unsafeInteractions { name }
+        uncertainInteractions { name }`;
+
   async function getDrugInfo(drugName) {
+    try {
+      const info = await askWiki(drugName, DETAILS);
+      if (!info.errors) return info;
+    } catch (_) {}
+    return askWiki(drugName, "");
+  }
+
+  async function askWiki(drugName, DETAIL_FIELDS) {
     const url = "https://api.psychonautwiki.org";
 
     const query = `
@@ -69,7 +96,7 @@
         summary
         class { chemical psychoactive }
         images { thumb }
-
+${DETAIL_FIELDS}
         roas {
           name
 
@@ -157,6 +184,102 @@
     return out;
   }
 
+  function card(title) {
+    const box = el("section", "xn-card di-info-card");
+    box.append(el("h2", "xn-h2 di-info-title", title));
+    return box;
+  }
+
+  function chips(names, className, link) {
+    const wrap = el("div", "di-chips");
+    names.forEach((item) => {
+      const name = typeof item === "string" ? item : item?.name;
+      if (!name) return;
+      const url = link && item?.url;
+      const chip = el(url ? "a" : "span", "di-chip " + (className || ""), name);
+      if (url) {
+        chip.href = url;
+        chip.target = "_blank";
+        chip.rel = "noopener noreferrer";
+      }
+      wrap.append(chip);
+    });
+    return wrap;
+  }
+
+  const cap = (text) => String(text).charAt(0).toUpperCase() + String(text).slice(1);
+
+  function renderDetails(s) {
+    const box = document.getElementById("diInfo");
+    box.innerHTML = "";
+
+    // At a glance
+    const facts = [];
+    const names = [].concat(s.commonNames || []).filter((n) => n && n.toLowerCase() !== s.name.toLowerCase());
+    if (names.length) facts.push(["Also known as", names.join(", ")]);
+    if (s.systematicName) facts.push(["Systematic name", s.systematicName]);
+    if (s.class?.psychoactive?.length) facts.push(["Psychoactive class", s.class.psychoactive.join(", ")]);
+    if (s.class?.chemical?.length) facts.push(["Chemical class", s.class.chemical.join(", ")]);
+    if (s.addictionPotential) facts.push(["Addiction potential", cap(s.addictionPotential)]);
+    [].concat(s.toxicity || []).filter(Boolean).forEach((t, i) => facts.push([i ? "" : "Toxicity", cap(t)]));
+    if (facts.length) {
+      const c = card("At a glance");
+      const list = el("dl", "di-facts");
+      facts.forEach(([label, value]) => {
+        const row = el("div", "di-fact");
+        row.append(el("dt", "", label), el("dd", "", value));
+        list.append(row);
+      });
+      c.append(list);
+      box.append(c);
+    }
+
+    // Tolerance
+    const tol = s.tolerance || {};
+    const tolRows = [["Full tolerance", tol.full], ["Half tolerance", tol.half], ["Back to baseline", tol.zero]].filter(([, v]) => v);
+    const cross = [].concat(s.crossTolerances || []).filter(Boolean);
+    if (tolRows.length || cross.length) {
+      const c = card("Tolerance");
+      if (tolRows.length) {
+        const list = el("dl", "di-list");
+        rows(list, tolRows.map(([k, v]) => [k, cap(v)]));
+        c.append(list);
+      }
+      if (cross.length) {
+        c.append(el("h3", "xn-label di-sub", "Cross-tolerance with"));
+        c.append(chips(cross.map(cap)));
+      }
+      box.append(c);
+    }
+
+    // Interactions, worst first
+    const groups = [
+      ["Dangerous", s.dangerousInteractions, "is-danger", "Don't combine."],
+      ["Unsafe", s.unsafeInteractions, "is-unsafe", "Avoid, or take extra care."],
+      ["Caution", s.uncertainInteractions, "is-caution", "Effects may be unpredictable."],
+    ].filter(([, list]) => list && list.length);
+    if (groups.length) {
+      const c = card("Interactions");
+      groups.forEach(([title, list, cls, hint]) => {
+        const head = el("h3", "xn-label di-sub di-int-head " + cls, title);
+        head.append(el("span", "di-int-hint", hint));
+        c.append(head, chips(list, cls));
+      });
+      box.append(c);
+    }
+
+    // Effects
+    const effects = [].concat(s.effects || []).filter((e) => e?.name);
+    if (effects.length) {
+      const c = card("Effects");
+      c.append(el("p", "di-card-note", `${effects.length} listed on PsychonautWiki. Tap one to read about it.`));
+      c.append(chips(effects, "di-effect", true));
+      box.append(c);
+    }
+
+    box.hidden = !box.children.length;
+  }
+
   function showMessage(text) {
     const box = document.querySelector(".DrugInfoIntakeMethods");
     box.innerHTML = "";
@@ -167,6 +290,12 @@
     const name = substance.name;
     document.title = name + " · Geek⁴u";
     document.querySelector(".DrugInfoName").textContent = name;
+    const iconKey = window.xnClass?.keyFor(substance) || "";
+    const icon = document.getElementById("diIcon");
+    icon.dataset.class = iconKey;
+    icon.title = window.xnClass?.LABELS[iconKey] || "";
+    icon.hidden = !iconKey;
+    renderDetails(substance);
 
     const classes = [].concat(substance.class?.chemical || [], substance.class?.psychoactive || []);
     if (classes.length) document.getElementById("diClass").textContent = classes.join(" · ");
@@ -200,6 +329,7 @@
     const DrugInfoIntakeMethods = document.querySelector(".DrugInfoIntakeMethods");
     DrugInfoIntakeMethods.innerHTML = "";
     const roas = substance.roas || [];
+    document.getElementById("diRoutesTitle").hidden = !roas.length;
     if (!roas.length) return showMessage("PsychonautWiki has no dose or duration data for this substance.");
 
     roas.forEach((roa) => {

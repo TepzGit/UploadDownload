@@ -30,6 +30,7 @@
     .jr-classes{ display:flex; gap:6px; margin-top:16px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
     .jr-classes[hidden]{ display:none; }
     .jr-chip{ flex:none; display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 12px; border:1px solid var(--line); border-radius:18px; background:transparent; color:var(--muted); font:inherit; font-size:12px; cursor:pointer; white-space:nowrap; transition:color .15s ease, border-color .15s ease, background-color .15s ease; -webkit-tap-highlight-color:transparent; }
+    .jr-chip .sc-icon{ width:14px; height:14px; margin:0; }
     .jr-chip small{ font-size:10px; opacity:.75; font-variant-numeric:tabular-nums; }
     .jr-chip[aria-pressed="true"]{ border-color:var(--oled-accent); background:var(--oled-accent-soft); color:var(--text); }
     @media (hover:hover){ .jr-chip:hover{ color:var(--text); border-color:var(--oled-line-strong); } }
@@ -47,6 +48,8 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
+  <link rel="stylesheet" href="/classicons.css" />
+  <script src="/classicons.js"></script>
   <script src="/likes.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -186,6 +189,8 @@
                     b.className = "jr-chip";
                     b.dataset.class = key;
                     b.setAttribute("aria-pressed", String(key === currentClass));
+                    const iconKey = window.xnClass.keyForClass(key);
+                    if (iconKey) b.append(window.xnClass.icon(iconKey, "jr-chip-icon"));
                     b.append(label);
                     if (count != null) {
                         const small = document.createElement("small");
@@ -238,7 +243,7 @@
                         more = offset + PAGE < matches.length;
                         const pages = Math.max(1, Math.ceil(matches.length / PAGE));
                         const chip = document.querySelector(`.jr-chip[data-class="${CSS.escape(currentClass)}"]`);
-                        const what = currentClass && chip ? chip.firstChild.textContent : "";
+                        const what = currentClass && chip ? [...chip.childNodes].find((n) => n.nodeType === 3)?.textContent || "" : "";
                         document.getElementById("classCount").textContent = (currentClass || query)
                             ? `${matches.length} ${matches.length === 1 ? "substance" : "substances"}${what ? " in " + what : ""}${query ? ` matching “${query}”` : ""} · page ${Math.floor(offset / PAGE) + 1} of ${pages}`
                             : "";
@@ -269,7 +274,7 @@
                             <span class="drug-thumb"></span>
                             <span class="drug-text"><span class="drugname"></span><span class="drugclass"></span></span>
                         `;
-                        drugDiv.querySelector(".drugname").textContent = DrugName;
+                        drugDiv.querySelector(".drugname").append(window.xnClass.icon(window.xnClass.keyFor(substance)), DrugName);
                         drugDiv.querySelector(".drugclass").textContent = [Psycho, DrugClass].filter(Boolean).join(" · ") || "Substance";
                         const thumb = drugDiv.querySelector(".drug-thumb");
                         if (imgUrl) {

@@ -1296,15 +1296,7 @@ async function handleSearch() {
 }
 
 // Drug class icons: a small mark next to the substance name.
-const CLASS_LABELS = {
-  depressant: "Depressant",
-  stimulant: "Stimulant",
-  psychedelic: "Psychedelic",
-  dissociative: "Dissociative",
-  cannabinoid: "Cannabinoid",
-  antipsychotic: "Antipsychotic",
-  zdrug: "Z-drug",
-};
+const CLASS_LABELS = window.xnClass?.LABELS || {};
 
 function setClassIcon(icon, name, known) {
   icon.dataset.for = name;

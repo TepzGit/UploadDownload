@@ -84,3 +84,51 @@
   .di-thumb { width: 56px; height: 56px; }
   .di-links .xn-btn { flex: 1; }
 }
+
+/* Class icon beside the name */
+.di-name-row { display: flex; align-items: center; gap: 10px; }
+.di-icon { width: 26px; height: 26px; margin: 0; }
+
+/* Details above the dosing cards */
+.di-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.di-info[hidden] { display: none; }
+.xn-h2.di-info-title { margin: 0 0 12px; }
+.xn-label.di-section { margin: 8px 0 -6px; text-transform: uppercase; letter-spacing: 0.18em; font-size: 10px; }
+.di-section[hidden] { display: none; }
+.di-card-note { margin: 0 0 10px; font-size: 11px; color: var(--oled-muted); }
+
+.di-facts { display: flex; flex-direction: column; margin: 0; }
+.di-fact { display: grid; grid-template-columns: minmax(0, 9.5em) minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--oled-line); font-size: 13px; }
+.di-fact:last-child { border-bottom: 0; }
+.di-fact dt { color: var(--oled-muted); }
+.di-fact dd { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+
+.di-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.di-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--oled-line-strong);
+  border-radius: 14px;
+  font-size: 12px;
+  color: var(--oled-text);
+  text-decoration: none;
+}
+a.di-chip:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+@media (hover: hover) { a.di-chip:hover { border-color: var(--oled-accent); } }
+.di-effect { border-color: rgba(var(--xn-accent-rgb), 0.35); background: var(--oled-accent-soft); }
+.di-chip.is-danger { border-color: rgba(248, 113, 113, 0.5); color: #fca5a5; }
+.di-chip.is-unsafe { border-color: rgba(251, 146, 60, 0.5); color: #fdba74; }
+.di-chip.is-caution { border-color: rgba(250, 204, 21, 0.45); color: #fde68a; }
+.xn-label.di-int-head { display: flex; align-items: baseline; gap: 8px; }
+.di-int-head.is-danger { color: #f87171; }
+.di-int-head.is-unsafe { color: #fb923c; }
+.di-int-head.is-caution { color: #facc15; }
+.di-int-hint { text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--oled-muted); }
+.di-info-card .xn-label.di-sub:first-of-type { margin-top: 4px; }
