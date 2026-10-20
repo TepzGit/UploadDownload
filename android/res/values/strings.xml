@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Geek⁴u</string>
+    <string name="sc_graph">Graph</string>
+    <string name="sc_journal">Journal</string>
+    <string name="sc_forum">Forum</string>
+    <string name="sc_server">Change server</string>
+    <string name="sc_server_long">Change server address</string>
+</resources>

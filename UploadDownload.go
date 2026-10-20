@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"io"
 	"math"
@@ -315,6 +318,7 @@ func main() {
 	http.HandleFunc("/rename", requireFilesLogin(Rename))
 	http.HandleFunc("/getItems", requireFilesLogin(getItems))
 	http.HandleFunc("/admin/files-access", requireAdminLogin(adminFilesAccess))
+	http.HandleFunc("/admin/stats", requireAdminLogin(adminStats))
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
 	http.HandleFunc("/sitepic/", sitePicture)
 	http.HandleFunc("/notifications", requireLogin(notifications))
@@ -333,6 +337,11 @@ func main() {
 	http.HandleFunc("/friends", requireLogin(friends))
 	http.HandleFunc("/experiences/people", requireLogin(experiencePeople))
 	http.HandleFunc("/likes", requireLogin(likes))
+	http.HandleFunc("/Replications", requireLogin(Replications))
+	http.HandleFunc("/replications/list", requireLogin(replicationsList))
+	http.HandleFunc("/replications/files/", requireLogin(replicationsFile))
+	http.HandleFunc("/replications/thumbs/", requireLogin(replicationsFile))
+	http.HandleFunc("/replications/backup", requireAdminLogin(replicationsBackup))
 	// The Graph page is open to everyone, so this answers [] instead of redirecting when signed out.
 	http.HandleFunc("/graphColors", graphColors)
 	http.HandleFunc("/experiences", experiences)
@@ -426,10 +435,21 @@ func main() {
 	// widgetClear is how see-through its Profile cards are, 0 to 100 percent.
 	// nameColor: an admin's name color everywhere it shows; notesSeenAt: when the
 	// letter icon (comments on your posts) was last opened, in ms.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0"} {
+	// siteBg is the account's background on every page ('' = the drifting colors,
+	// a preset name, or 'custom' for siteBgImage, darkened by siteBgDim percent).
+	// createdAt and lastSeen (ms) feed the Admin page's account list.
+	// graphsMade and postsMade count every Graph session and Forum post ever made
+	// (for the geek rank), so deleting or the session limit doesn't lower it.
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
+	}
+	db.Exec(`UPDATE users SET
+		graphsMade = MAX(graphsMade, (SELECT COUNT(*) FROM graph_experiences g WHERE g.user_id = users.id)),
+		postsMade = MAX(postsMade, (SELECT COUNT(*) FROM forum_posts p WHERE p.user_id = users.id))`)
+	if _, err := db.Exec(statsSchema); err != nil {
+		panic("cannot create the view counters: " + err.Error())
 	}
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
@@ -445,9 +465,10 @@ func main() {
 	loadNameColors()
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
 
-	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", nil)
+	handler := countViews(http.DefaultServeMux)
+	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", handler)
 	if err != nil {
-		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port), nil)
+		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port), handler)
 	}
 }
 
@@ -512,8 +533,10 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		Layout        string
 		SiteColor     string
 		WidgetClear   int
+		ClearAlpha    clearAlpha
 		NameColor     string
 		IsAdmin       bool
+		Rank          geekRank
 		Liked         []likedSubstance
 		RecentIntakes []dose
 		Totals        map[string]Totals
@@ -535,7 +558,9 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 
 	var avatar, banner, background, layout string
 	db.QueryRow("SELECT pathToProfilePic, pathToBanner, pathToBackground, profileLayout, siteColor, widgetClear, nameColor FROM users WHERE id = ?", userId).Scan(&avatar, &banner, &background, &layout, &d.SiteColor, &d.WidgetClear, &d.NameColor)
+	d.ClearAlpha = makeClearAlpha(d.WidgetClear)
 	d.IsAdmin = session.Authority == "admin"
+	d.Rank = rankOf(d.Username)
 	if !d.IsAdmin {
 		d.NameColor = ""
 	}
@@ -1334,7 +1359,7 @@ func createUser(username, password, authority string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.Exec("insert into users (username, originalUsername, password_hash, pathToProfilePic, authority) values (?, ?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), "/profiles/Default/default.png", strings.ToLower(authority))
+	res, err := db.Exec("insert into users (username, originalUsername, password_hash, pathToProfilePic, authority, createdAt) values (?, ?, ?, ?, ?, ?)", strings.ToLower(username), username, string(HashedPass), "/profiles/Default/default.png", strings.ToLower(authority), time.Now().UnixMilli())
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
 			return 0, errUserExists
@@ -2755,6 +2780,8 @@ func profilePicture(w http.ResponseWriter, r *http.Request) {
 		column = "pathToBanner"
 	case "background":
 		column = "pathToBackground"
+	case "sitebg":
+		column = "siteBgImage"
 	default:
 		http.Error(w, "Unknown picture.", http.StatusBadRequest)
 		return
@@ -3047,6 +3074,10 @@ func experiences(w http.ResponseWriter, r *http.Request) {
 			// New, or deleted on another device meanwhile: store it as a new one.
 			res, err := db.Exec("INSERT INTO graph_experiences (user_id, started_at, updated_at, doses) VALUES (?, ?, ?, ?)",
 				session.UserId, started, now, string(body))
+			if err == nil {
+				db.Exec("UPDATE users SET graphsMade = graphsMade + 1 WHERE id = ?", session.UserId)
+			}
+			staleRanks()
 			if err != nil {
 				fmt.Println(err)
 				http.Error(w, "Couldn't save that session.", http.StatusInternalServerError)
@@ -3397,8 +3428,10 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		Banner     string
 		Background string
 		Clear      int
+		ClearAlpha clearAlpha
 		NameColor  string
 		Admin      bool
+		Rank       geekRank
 		IsSelf     bool
 		Posts      int
 		Friend     string
@@ -3408,6 +3441,7 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 	var id int
 	var avatar, banner, background, authority string
 	err := db.QueryRow("SELECT id, originalUsername, pathToProfilePic, pathToBanner, pathToBackground, widgetClear, authority FROM users WHERE username = ?", strings.ToLower(name)).Scan(&id, &d.Name, &avatar, &banner, &background, &d.Clear, &authority)
+	d.ClearAlpha = makeClearAlpha(d.Clear)
 	if err == nil {
 		d.Found = true
 		d.Initial = initialOf(d.Name)
@@ -3416,6 +3450,7 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		d.Background = existingPicture(background)
 		d.Admin = authority == "admin"
 		d.NameColor = adminNameColor(d.Name, authority)
+		d.Rank = rankOf(d.Name)
 		d.IsSelf = id == session.UserId
 		d.Friend = friendState(session.UserId, id)
 		db.QueryRow("SELECT COUNT(*) FROM forum_posts WHERE user_id = ?", id).Scan(&d.Posts)
@@ -3466,6 +3501,8 @@ type postAuthor struct {
 	Avatar  string `json:"avatar"`
 	Admin   bool   `json:"admin"`
 	Color   string `json:"color,omitempty"` // an admin's name color
+	Rank    int    `json:"rank,omitempty"`  // geek rank tier, 1 to 5
+	Level   int    `json:"level,omitempty"` // times the account reached Geek⁴
 }
 
 type forumPost struct {
@@ -3531,6 +3568,7 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			p.Author.Initial = initialOf(p.Author.Name)
 			p.Author.Admin = authority == "admin"
 			p.Author.Color = adminNameColor(p.Author.Name, authority)
+			p.Author.Rank, p.Author.Level = rankOf(p.Author.Name).Tier, rankOf(p.Author.Name).Level
 			if json.Unmarshal([]byte(pictures), &p.Pictures) != nil || p.Pictures == nil {
 				p.Pictures = []string{}
 			}
@@ -3596,6 +3634,10 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			raw, _ := json.Marshal(saved)
 			now := time.Now().UnixMilli()
 			res, err := db.Exec("INSERT INTO forum_posts (user_id, body, pictures, created_at) VALUES (?, ?, ?, ?)", uid, body, string(raw), now)
+			if err == nil {
+				db.Exec("UPDATE users SET postsMade = postsMade + 1 WHERE id = ?", uid)
+			}
+			staleRanks()
 			if err != nil {
 				fmt.Println(err)
 				fail(http.StatusInternalServerError, "Couldn't save your post.")
@@ -3606,7 +3648,7 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			db.QueryRow("SELECT pathToProfilePic FROM users WHERE id = ?", uid).Scan(&avatar)
 			writeJSON(w, forumPost{
 				ID:        id,
-				Author:    postAuthor{Name: session.OriginalUsername, Initial: initialOf(session.OriginalUsername), Avatar: existingPicture(avatar), Admin: isAdmin},
+				Author:    postAuthor{Name: session.OriginalUsername, Initial: initialOf(session.OriginalUsername), Avatar: existingPicture(avatar), Admin: isAdmin, Color: adminNameColor(session.OriginalUsername, session.Authority), Rank: rankOf(session.OriginalUsername).Tier, Level: rankOf(session.OriginalUsername).Level},
 				Body:      body,
 				Pictures:  saved,
 				CreatedAt: now,
@@ -3696,6 +3738,7 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 		m.Avatar = existingPicture(avatar)
 		m.Admin = authority == "admin"
 		m.Color = adminNameColor(m.Name, authority)
+		m.Rank, m.Level = rankOf(m.Name).Tier, rankOf(m.Name).Level
 		list = append(list, m)
 	}
 	rows.Close()
@@ -3712,7 +3755,7 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 
 // person is how an account is shown next to posts, comments and friends.
 func person(name, avatar, authority string) postAuthor {
-	return postAuthor{Name: name, Initial: initialOf(name), Avatar: existingPicture(avatar), Admin: authority == "admin", Color: adminNameColor(name, authority)}
+	return postAuthor{Name: name, Initial: initialOf(name), Avatar: existingPicture(avatar), Admin: authority == "admin", Color: adminNameColor(name, authority), Rank: rankOf(name).Tier, Level: rankOf(name).Level}
 }
 
 // profileAppearance reads (GET) or saves (POST JSON) the account's site color
@@ -3730,6 +3773,8 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 			SiteColor   *string `json:"siteColor"`
 			WidgetClear *int    `json:"widgetClear"`
 			NameColor   *string `json:"nameColor"`
+			SiteBg      *string `json:"siteBg"`
+			SiteBgDim   *int    `json:"siteBgDim"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in); err != nil {
 			http.Error(w, "Bad request.", http.StatusBadRequest)
@@ -3764,6 +3809,25 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 			}
 			loadNameColors()
 		}
+		if in.SiteBg != nil {
+			scene := strings.TrimSpace(*in.SiteBg)
+			if !siteScenes[scene] {
+				http.Error(w, "Unknown background.", http.StatusBadRequest)
+				return
+			}
+			if _, err := db.Exec("UPDATE users SET siteBg = ? WHERE id = ?", scene, uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the background.", http.StatusInternalServerError)
+				return
+			}
+		}
+		if in.SiteBgDim != nil {
+			if _, err := db.Exec("UPDATE users SET siteBgDim = ? WHERE id = ?", min(max(*in.SiteBgDim, 0), 90), uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the background.", http.StatusInternalServerError)
+				return
+			}
+		}
 		if in.WidgetClear != nil {
 			clear := min(max(*in.WidgetClear, 0), 100)
 			if _, err := db.Exec("UPDATE users SET widgetClear = ? WHERE id = ?", clear, uid); err != nil {
@@ -3780,8 +3844,12 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 		SiteColor   string `json:"siteColor"`
 		WidgetClear int    `json:"widgetClear"`
 		NameColor   string `json:"nameColor"`
+		SiteBg      string `json:"siteBg"`
+		SiteBgImage string `json:"siteBgImage"`
+		SiteBgDim   int    `json:"siteBgDim"`
 	}
-	db.QueryRow("SELECT siteColor, widgetClear, nameColor FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor)
+	db.QueryRow("SELECT siteColor, widgetClear, nameColor, siteBg, siteBgImage, siteBgDim FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor, &out.SiteBg, &out.SiteBgImage, &out.SiteBgDim)
+	out.SiteBgImage = existingPicture(out.SiteBgImage)
 	writeJSON(w, out)
 }
 
@@ -4714,4 +4782,1363 @@ func notifications(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// ---- Site backgrounds ----
+
+// siteScenes are the backgrounds an account can pick for every page.
+var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars": true, "grid": true, "pills": true, "waves": true, "custom": true}
+
+// ---- Geek rank ----
+
+// geekRank: every Graph session and every Forum post an account ever made is a point.
+// The five tiers make a round of rankRound points. Reaching Geek⁴ earns a level,
+// and when the round is full the tiers start over from Fresh Geek, so the level
+// keeps counting up (Geek⁴ once = level 1, twice = level 2, ...). Every round
+// needs rankHarder (10%) more points than the one before, tiers included.
+type geekRank struct {
+	Tier      int    `json:"tier"`
+	Name      string `json:"name"`
+	Level     int    `json:"level"`     // times Geek⁴ was reached
+	Round     int    `json:"round"`     // which round the account is in, from 1
+	RoundSize int    `json:"roundSize"` // points this round takes
+	Score     int    `json:"score"`
+	Graphs    int    `json:"graphs"`
+	Posts     int    `json:"posts"`
+	Next      string `json:"next"`     // what comes next: a tier name or "a new round"
+	ToNext    int    `json:"toNext"`   // points still needed for it
+	Progress  int    `json:"progress"` // percent of the way from this tier to the next
+}
+
+const rankRound = 150
+const rankHarder = 1.10
+
+// rankScale is how much bigger round r (0 = the first) is than the first.
+func rankScale(r int) float64 { return math.Pow(rankHarder, float64(r)) }
+
+func scaled(points int, r int) int { return int(math.Round(float64(points) * rankScale(r))) }
+
+var geekTiers = []struct {
+	Name string
+	From int
+}{{"Fresh Geek", 0}, {"Geek", 5}, {"Big Geek", 20}, {"Mega Geek", 50}, {"Geek⁴", 120}}
+
+func makeRank(graphs, posts int) geekRank {
+	g := geekRank{Graphs: graphs, Posts: posts, Score: graphs + posts}
+	rounds, in := 0, g.Score
+	for in >= scaled(rankRound, rounds) {
+		in -= scaled(rankRound, rounds)
+		rounds++
+	}
+	g.Level = rounds
+	g.Round = rounds + 1
+	g.RoundSize = scaled(rankRound, rounds)
+	for i, t := range geekTiers {
+		if in >= scaled(t.From, rounds) {
+			g.Tier, g.Name = i+1, t.Name
+		}
+	}
+	if g.Tier == len(geekTiers) {
+		g.Level++
+	}
+	from := scaled(geekTiers[g.Tier-1].From, rounds)
+	to := g.RoundSize
+	g.Next = "a new round"
+	if g.Tier < len(geekTiers) {
+		to = scaled(geekTiers[g.Tier].From, rounds)
+		g.Next = geekTiers[g.Tier].Name
+	}
+	g.ToNext = to - in
+	g.Progress = (in - from) * 100 / (to - from)
+	return g
+}
+
+var ranksMu sync.Mutex
+var ranks = map[string]geekRank{} // lower-case name -> rank
+var ranksAt time.Time
+
+func staleRanks() {
+	ranksMu.Lock()
+	ranksAt = time.Time{}
+	ranksMu.Unlock()
+}
+
+// allRanks recounts everyone at most every 30 seconds (or right after a new post or session).
+func allRanks() map[string]geekRank {
+	ranksMu.Lock()
+	defer ranksMu.Unlock()
+	if time.Since(ranksAt) < 30*time.Second {
+		return ranks
+	}
+	m := map[string]geekRank{}
+	rows, err := db.Query("SELECT username, graphsMade, postsMade FROM users")
+	if err != nil {
+		fmt.Println(err)
+		return ranks
+	}
+	for rows.Next() {
+		var name string
+		var graphs, posts int
+		if rows.Scan(&name, &graphs, &posts) == nil {
+			m[strings.ToLower(name)] = makeRank(graphs, posts)
+		}
+	}
+	rows.Close()
+	ranks, ranksAt = m, time.Now()
+	return ranks
+}
+
+func rankOf(name string) geekRank {
+	if g, ok := allRanks()[strings.ToLower(name)]; ok {
+		return g
+	}
+	return makeRank(0, 0)
+}
+
+// ---- Page views ----
+
+var statsSchema = `
+CREATE TABLE IF NOT EXISTS page_views (
+	day TEXT NOT NULL,
+	page TEXT NOT NULL,
+	views INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY(day, page)
+);
+CREATE TABLE IF NOT EXISTS page_visitors (
+	day TEXT NOT NULL,
+	visitor TEXT NOT NULL,
+	PRIMARY KEY(day, visitor)
+);
+`
+
+// viewedPage names the page a browser opened, or "" for scripts, files and pictures.
+func viewedPage(r *http.Request) string {
+	if r.Method != http.MethodGet {
+		return ""
+	}
+	if dest := r.Header.Get("Sec-Fetch-Dest"); dest != "" && dest != "document" {
+		return ""
+	}
+	p := r.URL.Path
+	switch {
+	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Replications":
+		return p
+	case strings.HasPrefix(p, "/u/"):
+		return "/u/"
+	case strings.HasPrefix(p, "/Files/") && strings.HasSuffix(p, "/"):
+		return "/Files/"
+	}
+	return ""
+}
+
+// countViews adds one view per page opened, and remembers each visitor once a day:
+// an account by its id, everyone else by a hash of their address and browser.
+func countViews(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if page := viewedPage(r); page != "" {
+			day := time.Now().Format("2006-01-02")
+			visitor := ""
+			if s, ok := sessionFromRequest(r); ok && s.UserId != 0 {
+				visitor = "u" + strconv.Itoa(s.UserId)
+				db.Exec("UPDATE users SET lastSeen = ? WHERE id = ?", time.Now().UnixMilli(), s.UserId)
+			} else {
+				sum := sha256.Sum256([]byte(clientIP(r) + "|" + r.UserAgent()))
+				visitor = "a" + hex.EncodeToString(sum[:8])
+			}
+			db.Exec(`INSERT INTO page_views (day, page, views) VALUES (?, ?, 1)
+				ON CONFLICT(day, page) DO UPDATE SET views = views + 1`, day, page)
+			db.Exec("INSERT OR IGNORE INTO page_visitors (day, visitor) VALUES (?, ?)", day, visitor)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// adminStats: views per day (last 30 days), the most opened pages, site totals
+// and every account with its numbers and geek rank.
+func adminStats(w http.ResponseWriter, r *http.Request) {
+	type dayRow struct {
+		Day      string `json:"day"`
+		Views    int    `json:"views"`
+		Visitors int    `json:"visitors"`
+	}
+	now := time.Now()
+	days := make([]dayRow, 30)
+	index := map[string]int{}
+	for i := range days {
+		d := now.AddDate(0, 0, i-29).Format("2006-01-02")
+		days[i].Day = d
+		index[d] = i
+	}
+	first := days[0].Day
+	if rows, err := db.Query("SELECT day, SUM(views) FROM page_views WHERE day >= ? GROUP BY day", first); err == nil {
+		for rows.Next() {
+			var d string
+			var n int
+			if rows.Scan(&d, &n) == nil {
+				if i, ok := index[d]; ok {
+					days[i].Views = n
+				}
+			}
+		}
+		rows.Close()
+	}
+	if rows, err := db.Query("SELECT day, COUNT(*) FROM page_visitors WHERE day >= ? GROUP BY day", first); err == nil {
+		for rows.Next() {
+			var d string
+			var n int
+			if rows.Scan(&d, &n) == nil {
+				if i, ok := index[d]; ok {
+					days[i].Visitors = n
+				}
+			}
+		}
+		rows.Close()
+	}
+	type pageRow struct {
+		Page  string `json:"page"`
+		Views int    `json:"views"`
+	}
+	pages := []pageRow{}
+	if rows, err := db.Query("SELECT page, SUM(views) AS n FROM page_views WHERE day >= ? GROUP BY page ORDER BY n DESC", first); err == nil {
+		for rows.Next() {
+			var p pageRow
+			if rows.Scan(&p.Page, &p.Views) == nil {
+				pages = append(pages, p)
+			}
+		}
+		rows.Close()
+	}
+	type userRow struct {
+		ID       int      `json:"id"`
+		Name     string   `json:"name"`
+		Admin    bool     `json:"admin"`
+		Avatar   string   `json:"avatar"`
+		Joined   int64    `json:"joined"`
+		LastSeen int64    `json:"lastSeen"`
+		Graphs   int      `json:"graphs"`
+		Posts    int      `json:"posts"`
+		Comments int      `json:"comments"`
+		Doses    int      `json:"doses"`
+		Likes    int      `json:"likes"`
+		Friends  int      `json:"friends"`
+		Rank     geekRank `json:"rank"`
+	}
+	users := []userRow{}
+	rows, err := db.Query(`SELECT u.id, u.originalUsername, u.authority, u.pathToProfilePic, u.createdAt, u.lastSeen,
+		u.graphsMade, u.postsMade,
+		(SELECT COUNT(*) FROM forum_comments c WHERE c.user_id = u.id),
+		(SELECT COUNT(*) FROM doses d WHERE d.user_id = u.id),
+		(SELECT COUNT(*) FROM liked_substances l WHERE l.user_id = u.id),
+		(SELECT COUNT(*) FROM friendships f WHERE f.status = 'accepted' AND (f.requester_id = u.id OR f.addressee_id = u.id)),
+		(SELECT MAX(created_at) FROM sessions s WHERE s.user_id = u.id)
+		FROM users u ORDER BY lower(u.originalUsername) LIMIT 2000`)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load the accounts.", http.StatusInternalServerError)
+		return
+	}
+	for rows.Next() {
+		var u userRow
+		var authority, avatar string
+		var login sql.NullString
+		if err := rows.Scan(&u.ID, &u.Name, &authority, &avatar, &u.Joined, &u.LastSeen, &u.Graphs, &u.Posts, &u.Comments, &u.Doses, &u.Likes, &u.Friends, &login); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		u.Admin = authority == "admin"
+		u.Avatar = existingPicture(avatar)
+		if u.LastSeen == 0 && login.Valid {
+			// Accounts from before lastSeen existed: their latest sign in.
+			for _, layout := range []string{"2006-01-02 15:04:05.999999999-07:00", "2006-01-02 15:04:05-07:00", time.RFC3339Nano, "2006-01-02 15:04:05"} {
+				if t, err := time.Parse(layout, login.String); err == nil {
+					u.LastSeen = t.UnixMilli()
+					break
+				}
+			}
+		}
+		u.Rank = makeRank(u.Graphs, u.Posts)
+		users = append(users, u)
+	}
+	rows.Close()
+	var totals struct {
+		Accounts int `json:"accounts"`
+		Graphs   int `json:"graphs"`
+		Posts    int `json:"posts"`
+		Comments int `json:"comments"`
+	}
+	totals.Accounts = len(users)
+	for _, u := range users {
+		totals.Graphs += u.Graphs
+		totals.Posts += u.Posts
+		totals.Comments += u.Comments
+	}
+	tiers := []map[string]any{}
+	for i, t := range geekTiers {
+		tiers = append(tiers, map[string]any{"tier": i + 1, "name": t.Name, "from": t.From})
+	}
+	writeJSON(w, map[string]any{"days": days, "pages": pages, "users": users, "totals": totals, "tiers": tiers, "round": rankRound})
+}
+
+// clearAlpha: the card opacities for a widget transparency, worked out here so
+// the page doesn't need calc() inside rgba(), which some phone browsers skip.
+type clearAlpha struct{ Card, Inner string }
+
+func makeClearAlpha(clear int) clearAlpha {
+	c := float64(min(max(clear, 0), 100)) / 100
+	return clearAlpha{Card: strconv.FormatFloat(1-c, 'f', 2, 64), Inner: strconv.FormatFloat(1-c*0.85, 'f', 3, 64)}
+}
+
+// ---------------- Replications: a backup of PsychonautWiki's effect pictures ----------------
+
+// An admin presses "Back up" on /Replications and this server (it's the one with internet)
+// walks the wiki's effect pages through the MediaWiki API, then downloads every replication
+// picture plus a small preview into replications/ (gitignored), with index.json keeping the
+// effect, caption and artist credit of each. Pressing it again only fetches what's new, and
+// pictures that later vanish from the wiki stay here. PW_API changes the API address (tests).
+
+const replicationsDir = "replications"
+const replAgent = "Geek4uBackup/1.0 (personal backup of effect replications)"
+const replThumbWidth = 480
+const replMaxBytes = 250 << 20
+
+type replication struct {
+	Name     string   `json:"name"`            // the wiki's file name, without "File:"
+	File     string   `json:"file"`            // in replications/files/
+	Thumb    string   `json:"thumb,omitempty"` // in replications/thumbs/ ('' = the file is small enough)
+	Width    int      `json:"width"`
+	Height   int      `json:"height"`
+	Bytes    int64    `json:"bytes"`
+	Mime     string   `json:"mime"`
+	Effects  []string `json:"effects"`
+	Kinds    []string `json:"kinds,omitempty"` // e.g. Visual, from the effect pages' categories
+	Caption  string   `json:"caption,omitempty"`
+	About    string   `json:"about,omitempty"` // the file page's own description
+	Artist   string   `json:"artist,omitempty"`
+	License  string   `json:"license,omitempty"`
+	Source   string   `json:"source"` // the file's page on the wiki
+	Uploaded string   `json:"uploaded,omitempty"`
+}
+
+type replIndex struct {
+	Updated int64         `json:"updated"`
+	Items   []replication `json:"items"`
+	Removed []string      `json:"removed,omitempty"` // removed by an admin, so updates skip them
+}
+
+type replStatus struct {
+	Running  bool   `json:"running"`
+	Phase    string `json:"phase"`
+	Done     int    `json:"done"`
+	Total    int    `json:"total"`
+	New      int    `json:"new"`
+	Failed   int    `json:"failed"`
+	Bytes    int64  `json:"bytes"`
+	Started  int64  `json:"started,omitempty"`
+	Finished int64  `json:"finished,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
+var (
+	replMu    sync.Mutex // guards replState and replStop
+	replState replStatus
+	replStop  bool
+
+	replIdxMu   sync.Mutex // guards replIdx
+	replIdx     *replIndex
+	errReplStop = errors.New("stopped")
+)
+
+var replAPIClient = &http.Client{Timeout: 90 * time.Second}
+
+// Pictures can be big, so there's no overall time limit, only for the wiki to start answering.
+var replFileClient = &http.Client{Transport: &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	ResponseHeaderTimeout: 60 * time.Second,
+	IdleConnTimeout:       90 * time.Second,
+}}
+
+func replAPI() string {
+	if v := os.Getenv("PW_API"); v != "" {
+		return v
+	}
+	return "https://psychonautwiki.org/w/api.php"
+}
+
+func replSetState(change func(s *replStatus)) {
+	replMu.Lock()
+	change(&replState)
+	replMu.Unlock()
+}
+
+func replStopped() bool {
+	replMu.Lock()
+	defer replMu.Unlock()
+	return replStop
+}
+
+// replLoaded returns the index, reading index.json the first time. Call with replIdxMu held.
+func replLoaded() *replIndex {
+	if replIdx == nil {
+		replIdx = &replIndex{}
+		if b, err := os.ReadFile(filepath.Join(replicationsDir, "index.json")); err == nil {
+			json.Unmarshal(b, replIdx)
+		}
+	}
+	return replIdx
+}
+
+// replSave writes index.json through a temporary file so a crash can't leave half of it. Call with replIdxMu held.
+func replSave() error {
+	idx := replLoaded()
+	idx.Updated = time.Now().UnixMilli()
+	b, err := json.MarshalIndent(idx, "", " ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(replicationsDir, 0755); err != nil {
+		return err
+	}
+	tmp := filepath.Join(replicationsDir, "index.json.tmp")
+	if err := os.WriteFile(tmp, b, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(replicationsDir, "index.json"))
+}
+
+// ---- MediaWiki API ----
+
+type wikiPage struct {
+	Title    string `json:"title"`
+	Ns       int    `json:"ns"`
+	Missing  any    `json:"missing,omitempty"`
+	Revision []struct {
+		Content string `json:"content"`
+		Star    string `json:"*"`
+		Slots   struct {
+			Main struct {
+				Content string `json:"content"`
+				Star    string `json:"*"`
+			} `json:"main"`
+		} `json:"slots"`
+	} `json:"revisions"`
+	Images []struct {
+		Title string `json:"title"`
+	} `json:"images"`
+	Links []struct {
+		Title string `json:"title"`
+	} `json:"links"`
+	ImageInfo []struct {
+		URL         string `json:"url"`
+		ThumbURL    string `json:"thumburl"`
+		Size        int64  `json:"size"`
+		Width       int    `json:"width"`
+		Height      int    `json:"height"`
+		Mime        string `json:"mime"`
+		DescURL     string `json:"descriptionurl"`
+		Timestamp   string `json:"timestamp"`
+		User        string `json:"user"`
+		ExtMetadata map[string]struct {
+			Value any `json:"value"`
+		} `json:"extmetadata"`
+	} `json:"imageinfo"`
+}
+
+func (p wikiPage) text() string {
+	for _, r := range p.Revision {
+		for _, s := range []string{r.Slots.Main.Content, r.Slots.Main.Star, r.Content, r.Star} {
+			if s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+type wikiAnswer struct {
+	Continue map[string]any `json:"continue"`
+	Error    *struct {
+		Code string `json:"code"`
+		Info string `json:"info"`
+	} `json:"error"`
+	Query struct {
+		Normalized []struct {
+			From string `json:"from"`
+			To   string `json:"to"`
+		} `json:"normalized"`
+		Redirects []struct {
+			From string `json:"from"`
+			To   string `json:"to"`
+		} `json:"redirects"`
+		Pages           json.RawMessage `json:"pages"`
+		CategoryMembers []struct {
+			Title string `json:"title"`
+			Ns    int    `json:"ns"`
+		} `json:"categorymembers"`
+	} `json:"query"`
+}
+
+// pages reads query.pages, which is a list in formatversion 2 and an object in older wikis.
+func (a wikiAnswer) pages() []wikiPage {
+	var list []wikiPage
+	if json.Unmarshal(a.Query.Pages, &list) == nil {
+		return list
+	}
+	var byID map[string]wikiPage
+	json.Unmarshal(a.Query.Pages, &byID)
+	for _, p := range byID {
+		list = append(list, p)
+	}
+	return list
+}
+
+// replAsk makes one API call, waiting and retrying when the wiki is busy, then pauses a moment to stay polite.
+func replAsk(params url.Values) (wikiAnswer, error) {
+	params.Set("action", "query")
+	params.Set("format", "json")
+	params.Set("formatversion", "2")
+	params.Set("maxlag", "5")
+	var answer wikiAnswer
+	var last error
+	for try := 0; try < 5; try++ {
+		if try > 0 {
+			time.Sleep(time.Duration(2<<try) * time.Second)
+		}
+		if replStopped() {
+			return answer, errReplStop
+		}
+		req, _ := http.NewRequest(http.MethodGet, replAPI()+"?"+params.Encode(), nil)
+		req.Header.Set("User-Agent", replAgent)
+		res, err := replAPIClient.Do(req)
+		if err != nil {
+			var ue *url.Error
+			if errors.As(err, &ue) {
+				err = ue.Err
+			}
+			last = fmt.Errorf("couldn't reach PsychonautWiki (%v)", err)
+			if try >= 2 {
+				break // no internet or the address is wrong; retrying longer won't help
+			}
+			continue
+		}
+		body, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
+		res.Body.Close()
+		if err != nil {
+			last = err
+			continue
+		}
+		if res.StatusCode != http.StatusOK {
+			last = fmt.Errorf("the wiki answered %s", res.Status)
+			if res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= 500 {
+				continue
+			}
+			return answer, last
+		}
+		answer = wikiAnswer{}
+		if err := json.Unmarshal(body, &answer); err != nil {
+			last = fmt.Errorf("the wiki sent something that isn't JSON")
+			continue
+		}
+		if answer.Error != nil {
+			last = fmt.Errorf("the wiki said: %s", answer.Error.Info)
+			if answer.Error.Code == "maxlag" {
+				continue
+			}
+			return answer, last
+		}
+		time.Sleep(300 * time.Millisecond)
+		return answer, nil
+	}
+	return answer, last
+}
+
+// replEach follows the API's "continue" until every part of the answer has arrived.
+func replEach(params url.Values, each func(wikiAnswer)) error {
+	base := url.Values{}
+	for k, v := range params {
+		base[k] = v
+	}
+	cont := map[string]any{}
+	for {
+		q := url.Values{}
+		for k, v := range base {
+			q[k] = v
+		}
+		for k, v := range cont {
+			q.Set(k, fmt.Sprint(v))
+		}
+		answer, err := replAsk(q)
+		if err != nil {
+			return err
+		}
+		each(answer)
+		if len(answer.Continue) == 0 {
+			return nil
+		}
+		cont = answer.Continue
+	}
+}
+
+// ---- reading the wiki text ----
+
+func replFileKey(title string) string {
+	t := strings.TrimSpace(strings.ReplaceAll(title, "_", " "))
+	if i := strings.Index(t, ":"); i >= 0 {
+		switch strings.ToLower(strings.TrimSpace(t[:i])) {
+		case "file", "image":
+			t = strings.TrimSpace(t[i+1:])
+		}
+	}
+	t = strings.Join(strings.Fields(t), " ")
+	if t == "" {
+		return ""
+	}
+	r, n := utf8.DecodeRuneInString(t)
+	return string(unicode.ToUpper(r)) + t[n:]
+}
+
+var (
+	reWikiTemplate = regexp.MustCompile(`\{\{[^{}]*\}\}`)
+	reWikiRef      = regexp.MustCompile(`(?is)<ref[^>]*/>|<ref[^>]*>.*?</ref>`)
+	reWikiLink     = regexp.MustCompile(`\[\[(?:[^\]|]*\|)?([^\]|]*)\]\]`)
+	reWikiExtLink  = regexp.MustCompile(`\[(?:https?:)?//[^\s\]]+\s+([^\]]*)\]`)
+	reTags         = regexp.MustCompile(`<[^>]*>`)
+	reGallery      = regexp.MustCompile(`(?is)<gallery[^>]*>(.*?)</gallery>`)
+	reSpace        = regexp.MustCompile(`\s+`)
+	reUnderscores  = regexp.MustCompile(`_+`)
+)
+
+// replPlain turns a bit of wiki text or HTML into plain text.
+func replPlain(s string, limit int) string {
+	// Simple templates like {{Sub|DMT}} keep their last part; bigger ones go.
+	for i := 0; i < 3; i++ {
+		s = reWikiTemplate.ReplaceAllStringFunc(s, func(t string) string {
+			parts := strings.Split(strings.Trim(t, "{}"), "|")
+			last := strings.TrimSpace(parts[len(parts)-1])
+			if len(parts) < 2 || len(parts) > 3 || strings.Contains(last, "=") || utf8.RuneCountInString(last) > 40 {
+				return ""
+			}
+			return last
+		})
+	}
+	s = reWikiRef.ReplaceAllString(s, "")
+	s = reWikiLink.ReplaceAllString(s, "$1")
+	s = reWikiExtLink.ReplaceAllString(s, "$1")
+	s = reTags.ReplaceAllString(s, " ")
+	s = strings.NewReplacer("'''", "", "''", "", "&nbsp;", " ").Replace(s)
+	s = html.UnescapeString(s)
+	s = strings.TrimSpace(reSpace.ReplaceAllString(s, " "))
+	s = strings.Trim(s, "|")
+	if limit > 0 && utf8.RuneCountInString(s) > limit {
+		s = string([]rune(s)[:limit]) + "…"
+	}
+	return s
+}
+
+// splitWikiArgs splits "a|[[b|c]]|d" on the bars that aren't inside a link or template.
+func splitWikiArgs(s string) []string {
+	var out []string
+	depth, start := 0, 0
+	for i := 0; i < len(s); i++ {
+		switch {
+		case strings.HasPrefix(s[i:], "[[") || strings.HasPrefix(s[i:], "{{"):
+			depth++
+			i++
+		case (strings.HasPrefix(s[i:], "]]") || strings.HasPrefix(s[i:], "}}")) && depth > 0:
+			depth--
+			i++
+		case s[i] == '|' && depth == 0:
+			out = append(out, s[start:i])
+			start = i + 1
+		}
+	}
+	return append(out, s[start:])
+}
+
+// pictureCaption picks the caption out of a picture's options, skipping things like "thumb" or "300px".
+func pictureCaption(args []string) string {
+	caption := ""
+	for _, a := range args {
+		t := strings.TrimSpace(a)
+		l := strings.ToLower(t)
+		if t == "" || strings.HasSuffix(l, "px") || strings.Contains(l, "=") && !strings.Contains(l, "[[") && len(strings.SplitN(l, "=", 2)[0]) < 12 {
+			continue
+		}
+		switch l {
+		case "thumb", "thumbnail", "frame", "framed", "frameless", "border", "left", "right", "center", "centre", "none", "upright", "baseline", "middle", "top", "bottom":
+			continue
+		}
+		caption = t
+	}
+	return replPlain(caption, 400)
+}
+
+type wikiPicture struct {
+	Caption string
+	Gallery bool
+}
+
+// picturesInText finds the pictures a page shows: <gallery> lines and [[File:...]] links.
+func picturesInText(text string) map[string]wikiPicture {
+	found := map[string]wikiPicture{}
+	add := func(name, caption string, gallery bool) {
+		key := replFileKey(name)
+		if key == "" || strings.ContainsAny(key, "{}[]<>") {
+			return
+		}
+		old, seen := found[key]
+		if !seen || (gallery && !old.Gallery) || old.Caption == "" {
+			found[key] = wikiPicture{caption, gallery || old.Gallery}
+		}
+	}
+	for _, m := range reGallery.FindAllStringSubmatch(text, -1) {
+		for _, line := range strings.Split(m[1], "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := splitWikiArgs(line)
+			add(parts[0], pictureCaption(parts[1:]), true)
+		}
+	}
+	text = reGallery.ReplaceAllString(text, "")
+	for i := 0; ; {
+		j := strings.Index(text[i:], "[[")
+		if j < 0 {
+			break
+		}
+		start := i + j + 2
+		depth, end := 1, -1
+		for k := start; k < len(text)-1; k++ {
+			if text[k] == '[' && text[k+1] == '[' {
+				depth++
+				k++
+			} else if text[k] == ']' && text[k+1] == ']' {
+				depth--
+				k++
+				if depth == 0 {
+					end = k - 1
+					break
+				}
+			}
+		}
+		if end < 0 {
+			break
+		}
+		inner := text[start:end]
+		i = end + 2
+		parts := splitWikiArgs(inner)
+		head := strings.ToLower(strings.TrimSpace(parts[0]))
+		if strings.HasPrefix(head, "file:") || strings.HasPrefix(head, "image:") {
+			add(parts[0], pictureCaption(parts[1:]), false)
+		}
+	}
+	return found
+}
+
+// ---- the backup run ----
+
+type replFound struct {
+	effects        map[string]bool
+	caption        string
+	galleryCaption bool // the caption came from a gallery, so a later one doesn't replace it
+	gallery        bool
+	inCat          bool
+}
+
+func startReplicationsBackup() bool {
+	replMu.Lock()
+	defer replMu.Unlock()
+	if replState.Running {
+		return false
+	}
+	replStop = false
+	replState = replStatus{Running: true, Phase: "Finding the effect pages", Started: time.Now().UnixMilli()}
+	go func() {
+		err := backupReplications()
+		replMu.Lock()
+		replState.Running = false
+		replState.Finished = time.Now().UnixMilli()
+		switch {
+		case err == errReplStop:
+			replState.Phase = "Stopped"
+		case err != nil:
+			replState.Phase = "Didn't finish"
+			replState.Error = err.Error()
+		default:
+			replState.Phase = "Done"
+		}
+		replMu.Unlock()
+		if err != nil {
+			fmt.Println("Replications backup:", err)
+		}
+	}()
+	return true
+}
+
+func backupReplications() error {
+	for _, dir := range []string{"files", "thumbs"} {
+		if err := os.MkdirAll(filepath.Join(replicationsDir, dir), 0755); err != nil {
+			return err
+		}
+	}
+
+	// 1. Effect pages: everything under the effect and replication categories (two levels down).
+	pages := map[string]map[string]bool{} // page -> the categories it was listed in
+	found := map[string]*replFound{}
+	seeds := []string{"Category:Effect", "Category:Effects", "Category:Replication", "Category:Replications"}
+	seed := map[string]bool{}
+	for _, s := range seeds {
+		seed[s] = true
+	}
+	type catAt struct {
+		title string
+		depth int
+	}
+	queue := []catAt{}
+	for _, s := range seeds {
+		queue = append(queue, catAt{s, 0})
+	}
+	seenCat := map[string]bool{}
+	for len(queue) > 0 && len(seenCat) < 120 {
+		c := queue[0]
+		queue = queue[1:]
+		if seenCat[c.title] {
+			continue
+		}
+		seenCat[c.title] = true
+		err := replEach(url.Values{"list": {"categorymembers"}, "cmtitle": {c.title}, "cmtype": {"page|subcat|file"}, "cmlimit": {"max"}}, func(a wikiAnswer) {
+			for _, m := range a.Query.CategoryMembers {
+				switch m.Ns {
+				case 0:
+					if pages[m.Title] == nil {
+						pages[m.Title] = map[string]bool{}
+					}
+					if !seed[c.title] {
+						pages[m.Title][strings.TrimPrefix(c.title, "Category:")] = true
+					}
+				case 14:
+					if c.depth < 2 {
+						queue = append(queue, catAt{m.Title, c.depth + 1})
+					}
+				case 6:
+					key := replFileKey(m.Title)
+					if found[key] == nil {
+						found[key] = &replFound{effects: map[string]bool{}}
+					}
+					found[key].inCat = true
+				}
+			}
+		})
+		if err == errReplStop {
+			return err
+		}
+		if err != nil && len(seenCat) == 1 {
+			return err // the very first question failed, so the wiki can't be reached
+		}
+		if err != nil && c.depth == 0 {
+			fmt.Println("Replications:", c.title, err)
+		}
+		replSetState(func(s *replStatus) { s.Phase = fmt.Sprintf("Finding the effect pages (%d so far)", len(pages)) })
+	}
+	// Few pages in categories (the wiki may be set up differently): use the effect index's links too.
+	if len(pages) < 40 {
+		replEach(url.Values{"prop": {"links"}, "titles": {"Subjective effect index|Effect index"}, "redirects": {"1"}, "plnamespace": {"0"}, "pllimit": {"max"}}, func(a wikiAnswer) {
+			for _, p := range a.pages() {
+				for _, l := range p.Links {
+					if pages[l.Title] == nil {
+						pages[l.Title] = map[string]bool{}
+					}
+				}
+			}
+		})
+	}
+	if replStopped() {
+		return errReplStop
+	}
+	if len(pages) == 0 && len(found) == 0 {
+		return errors.New("couldn't find any effect pages on the wiki")
+	}
+
+	// 2. Read each page: the pictures in its galleries and text, and every picture it shows.
+	titles := make([]string, 0, len(pages))
+	for t := range pages {
+		titles = append(titles, t)
+	}
+	sort.Strings(titles)
+	usedOn := map[string]int{} // how many pages show a picture; logos and icons are on lots of them
+	kindsOf := map[string]map[string]bool{}
+	for i := 0; i < len(titles); i += 20 {
+		batch := titles[i:min(i+20, len(titles))]
+		replSetState(func(s *replStatus) {
+			s.Phase = fmt.Sprintf("Reading effect pages (%d of %d)", i, len(titles))
+		})
+		seenHere := map[string]map[string]bool{}
+		err := replEach(url.Values{"prop": {"revisions|images"}, "titles": {strings.Join(batch, "|")}, "rvprop": {"content"}, "rvslots": {"main"}, "imlimit": {"max"}}, func(a wikiAnswer) {
+			for _, p := range a.pages() {
+				if p.Missing != nil && p.Missing != false {
+					continue
+				}
+				if seenHere[p.Title] == nil {
+					seenHere[p.Title] = map[string]bool{}
+				}
+				for name, pic := range picturesInText(p.text()) {
+					f := found[name]
+					if f == nil {
+						f = &replFound{effects: map[string]bool{}}
+						found[name] = f
+					}
+					f.effects[p.Title] = true
+					f.gallery = f.gallery || pic.Gallery
+					if pic.Caption != "" && (f.caption == "" || pic.Gallery && !f.galleryCaption) {
+						f.caption = pic.Caption
+						f.galleryCaption = pic.Gallery
+					}
+					seenHere[p.Title][name] = true
+				}
+				for _, im := range p.Images {
+					name := replFileKey(im.Title)
+					if found[name] == nil {
+						found[name] = &replFound{effects: map[string]bool{}}
+					}
+					found[name].effects[p.Title] = true
+					seenHere[p.Title][name] = true
+				}
+			}
+		})
+		if err != nil {
+			return err
+		}
+		for page, names := range seenHere {
+			for name := range names {
+				usedOn[name]++
+				if len(pages[page]) > 0 {
+					if kindsOf[name] == nil {
+						kindsOf[name] = map[string]bool{}
+					}
+					for k := range pages[page] {
+						kindsOf[name][k] = true
+					}
+				}
+			}
+		}
+	}
+
+	// Keep pictures from galleries and the replication categories, plus pictures shown on just a few pages.
+	keep := []string{}
+	for name, f := range found {
+		if f.gallery || f.inCat || usedOn[name] <= 3 {
+			keep = append(keep, name)
+		}
+	}
+	sort.Strings(keep)
+
+	// 3. Look up each picture: its address, size, artist and license.
+	type infoRow struct {
+		replication
+		url, thumb string
+	}
+	infos := map[string]infoRow{}
+	for i := 0; i < len(keep); i += 50 {
+		batch := keep[i:min(i+50, len(keep))]
+		replSetState(func(s *replStatus) { s.Phase = fmt.Sprintf("Looking up pictures (%d of %d)", i, len(keep)) })
+		names := make([]string, len(batch))
+		for j, n := range batch {
+			names[j] = "File:" + n
+		}
+		err := replEach(url.Values{"prop": {"imageinfo"}, "titles": {strings.Join(names, "|")}, "iiprop": {"url|size|mime|extmetadata|timestamp|user"}, "iiurlwidth": {strconv.Itoa(replThumbWidth)}, "iiextmetadatafilter": {"ImageDescription|Artist|LicenseShortName|Credit"}}, func(a wikiAnswer) {
+			for _, p := range a.pages() {
+				if len(p.ImageInfo) == 0 {
+					continue
+				}
+				ii := p.ImageInfo[0]
+				meta := func(k string) string {
+					if v, ok := ii.ExtMetadata[k]; ok {
+						return fmt.Sprint(v.Value)
+					}
+					return ""
+				}
+				row := infoRow{url: ii.URL, thumb: ii.ThumbURL}
+				row.Name = replFileKey(p.Title)
+				row.Width, row.Height, row.Bytes, row.Mime = ii.Width, ii.Height, ii.Size, ii.Mime
+				row.Source = ii.DescURL
+				row.Uploaded = ii.Timestamp
+				row.About = replPlain(meta("ImageDescription"), 600)
+				row.Artist = replPlain(meta("Artist"), 120)
+				if row.Artist == "" {
+					row.Artist = ii.User
+				}
+				row.License = replPlain(meta("LicenseShortName"), 60)
+				infos[row.Name] = row
+			}
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// 4. Download what's new.
+	replIdxMu.Lock()
+	idx := replLoaded()
+	have := map[string]replication{}
+	for _, it := range idx.Items {
+		have[it.Name] = it
+	}
+	removed := map[string]bool{}
+	for _, n := range idx.Removed {
+		removed[n] = true
+	}
+	replIdxMu.Unlock()
+
+	todo := []infoRow{}
+	for _, name := range keep {
+		row, ok := infos[name]
+		if !ok || removed[name] || row.url == "" {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		if !replExtOK(ext) || !strings.HasPrefix(row.Mime, "image/") && !strings.HasPrefix(row.Mime, "video/") {
+			continue
+		}
+		f := found[name]
+		big := min(row.Width, row.Height) >= 150
+		if !(f.gallery || f.inCat) && !big {
+			continue // small pictures outside galleries are icons
+		}
+		row.Effects = sortedKeys(f.effects)
+		row.Kinds = sortedKeys(kindsOf[name])
+		row.Caption = f.caption
+		todo = append(todo, row)
+	}
+	replSetState(func(s *replStatus) {
+		s.Phase = "Downloading pictures"
+		s.Total = len(todo)
+	})
+
+	base, _ := url.Parse(replAPI())
+	sinceSave := 0
+	for _, row := range todo {
+		if replStopped() {
+			break
+		}
+		it := row.replication
+		old, had := have[it.Name]
+		it.File = replSafeName(it.Name)
+		filePath := filepath.Join(replicationsDir, "files", it.File)
+		fresh := false
+		// Download it when it's new, its file is gone, or the wiki has a newer upload of it.
+		if st, err := os.Stat(filePath); err == nil && had && st.Size() > 0 && (it.Uploaded == "" || old.Uploaded == "" || it.Uploaded == old.Uploaded) {
+			it.Bytes = st.Size()
+		} else {
+			if it.Bytes > replMaxBytes {
+				replSetState(func(s *replStatus) { s.Done++; s.Failed++ })
+				continue
+			}
+			n, err := replDownload(replResolve(base, row.url), filePath)
+			if err == errReplStop {
+				break
+			}
+			if err != nil {
+				fmt.Println("Replications:", it.Name, err)
+				replSetState(func(s *replStatus) { s.Done++; s.Failed++ })
+				continue
+			}
+			it.Bytes = n
+			fresh = true
+			replSetState(func(s *replStatus) { s.Bytes += n; s.New++ })
+		}
+		// A preview for the grid, when the picture is bigger than one.
+		it.Thumb = old.Thumb
+		if row.thumb != "" && row.thumb != row.url && it.Width > replThumbWidth {
+			thumbName := strings.TrimSuffix(it.File, filepath.Ext(it.File)) + replThumbExt(row.thumb)
+			thumbPath := filepath.Join(replicationsDir, "thumbs", thumbName)
+			if _, err := os.Stat(thumbPath); err != nil || fresh {
+				if n, err := replDownload(replResolve(base, row.thumb), thumbPath); err == nil {
+					it.Thumb = thumbName
+					replSetState(func(s *replStatus) { s.Bytes += n })
+				}
+			} else {
+				it.Thumb = thumbName
+			}
+		}
+		replIdxMu.Lock()
+		idx := replLoaded()
+		placed := false
+		for i := range idx.Items {
+			if idx.Items[i].Name == it.Name {
+				idx.Items[i] = it
+				placed = true
+				break
+			}
+		}
+		if !placed {
+			idx.Items = append(idx.Items, it)
+		}
+		sinceSave++
+		if sinceSave >= 20 {
+			replSave()
+			sinceSave = 0
+		}
+		replIdxMu.Unlock()
+		replSetState(func(s *replStatus) { s.Done++ })
+	}
+	replIdxMu.Lock()
+	err := replSave()
+	replIdxMu.Unlock()
+	if replStopped() {
+		return errReplStop
+	}
+	return err
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func replExtOK(ext string) bool {
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".webm", ".mp4":
+		return true
+	}
+	return false
+}
+
+func replThumbExt(link string) string {
+	if u, err := url.Parse(link); err == nil {
+		if ext := strings.ToLower(filepath.Ext(u.Path)); replExtOK(ext) {
+			return ext
+		}
+	}
+	return ".jpg"
+}
+
+func replResolve(base *url.URL, link string) string {
+	u, err := url.Parse(link)
+	if err != nil || base == nil {
+		return link
+	}
+	return base.ResolveReference(u).String()
+}
+
+// replSafeName makes a file name that's fine on Windows: plain letters, plus a short hash so
+// two names that differ only in case or symbols don't land on the same file.
+func replSafeName(name string) string {
+	ext := strings.ToLower(filepath.Ext(name))
+	var b strings.Builder
+	for _, r := range strings.TrimSuffix(name, filepath.Ext(name)) {
+		switch {
+		case r < 128 && (unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-'):
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+		if b.Len() >= 100 {
+			break
+		}
+	}
+	s := strings.Trim(reUnderscores.ReplaceAllString(b.String(), "_"), "_")
+	if s == "" {
+		s = "picture"
+	}
+	sum := sha256.Sum256([]byte(name))
+	return s + "-" + hex.EncodeToString(sum[:3]) + ext
+}
+
+// replDownload saves a link to a file, through a .part file so a broken download never looks finished.
+func replDownload(link, dest string) (int64, error) {
+	var last error
+	for try := 0; try < 3; try++ {
+		if replStopped() {
+			return 0, errReplStop
+		}
+		if try > 0 {
+			time.Sleep(time.Duration(3*try) * time.Second)
+		}
+		req, err := http.NewRequest(http.MethodGet, link, nil)
+		if err != nil {
+			return 0, err
+		}
+		req.Header.Set("User-Agent", replAgent)
+		res, err := replFileClient.Do(req)
+		if err != nil {
+			last = err
+			continue
+		}
+		if res.StatusCode != http.StatusOK {
+			res.Body.Close()
+			last = fmt.Errorf("the wiki answered %s", res.Status)
+			if res.StatusCode == http.StatusNotFound {
+				return 0, last
+			}
+			continue
+		}
+		part := dest + ".part"
+		out, err := os.Create(part)
+		if err != nil {
+			res.Body.Close()
+			return 0, err
+		}
+		n, err := io.Copy(out, io.LimitReader(res.Body, replMaxBytes+1))
+		res.Body.Close()
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err == nil && n > replMaxBytes {
+			err = errors.New("too big")
+		}
+		if err != nil {
+			os.Remove(part)
+			last = err
+			continue
+		}
+		if err := os.Rename(part, dest); err != nil {
+			os.Remove(part)
+			return 0, err
+		}
+		time.Sleep(150 * time.Millisecond)
+		return n, nil
+	}
+	return 0, last
+}
+
+// ---- pages and endpoints ----
+
+func Replications(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	t, err := template.ParseFiles("html/replications.html")
+	if err != nil {
+		http.Error(w, "Couldnt load page", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	if err := t.Execute(w, struct{ Admin bool }{session.Authority == "admin"}); err != nil {
+		fmt.Println(err)
+	}
+}
+
+// replicationsList: GET every backed-up picture (gzipped, it can be a long list); admins also get the backup's progress.
+func replicationsList(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	out := struct {
+		Updated int64         `json:"updated"`
+		Items   []replication `json:"items"`
+		Bytes   int64         `json:"bytes"`
+		Admin   bool          `json:"admin"`
+		Status  *replStatus   `json:"status,omitempty"`
+	}{Admin: session.Authority == "admin"}
+	replIdxMu.Lock()
+	idx := replLoaded()
+	out.Updated = idx.Updated
+	out.Items = append([]replication{}, idx.Items...)
+	replIdxMu.Unlock()
+	for _, it := range out.Items {
+		out.Bytes += it.Bytes
+	}
+	if out.Admin {
+		replMu.Lock()
+		st := replState
+		replMu.Unlock()
+		out.Status = &st
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Vary", "Accept-Encoding")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		json.NewEncoder(gz).Encode(out)
+		return
+	}
+	json.NewEncoder(w).Encode(out)
+}
+
+// replicationsFile serves /replications/files/<name> and /replications/thumbs/<name>.
+func replicationsFile(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/replications/")
+	dir, name, ok := strings.Cut(rest, "/")
+	if !ok || (dir != "files" && dir != "thumbs") || name == "" || name != filepath.Base(name) || strings.HasPrefix(name, ".") || !replExtOK(strings.ToLower(filepath.Ext(name))) {
+		http.NotFound(w, r)
+		return
+	}
+	p := filepath.Join(replicationsDir, dir, name)
+	if info, err := os.Stat(p); err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=604800")
+	http.ServeFile(w, r, p)
+}
+
+// replicationsBackup (admins): GET the progress; POST {action: "start" | "stop" | "remove", name}.
+func replicationsBackup(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var in struct {
+			Action string `json:"action"`
+			Name   string `json:"name"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in) != nil {
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+		switch in.Action {
+		case "start":
+			startReplicationsBackup()
+		case "stop":
+			replMu.Lock()
+			if replState.Running {
+				replStop = true
+				replState.Phase = "Stopping…"
+			}
+			replMu.Unlock()
+		case "remove":
+			replIdxMu.Lock()
+			idx := replLoaded()
+			kept := idx.Items[:0]
+			var gone *replication
+			for i := range idx.Items {
+				if idx.Items[i].Name == in.Name && gone == nil {
+					it := idx.Items[i]
+					gone = &it
+					continue
+				}
+				kept = append(kept, idx.Items[i])
+			}
+			idx.Items = kept
+			if gone != nil {
+				idx.Removed = append(idx.Removed, gone.Name)
+				os.Remove(filepath.Join(replicationsDir, "files", filepath.Base(gone.File)))
+				if gone.Thumb != "" {
+					os.Remove(filepath.Join(replicationsDir, "thumbs", filepath.Base(gone.Thumb)))
+				}
+			}
+			err := replSave()
+			replIdxMu.Unlock()
+			if gone == nil {
+				http.Error(w, "That picture isn't in the backup.", http.StatusNotFound)
+				return
+			}
+			if err != nil {
+				http.Error(w, "Couldn't save the list.", http.StatusInternalServerError)
+				return
+			}
+		default:
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+	} else if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	replMu.Lock()
+	st := replState
+	replMu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	json.NewEncoder(w).Encode(st)
 }

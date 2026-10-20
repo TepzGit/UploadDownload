@@ -64,7 +64,7 @@
   padding: 0;
   overflow: hidden;
   border: 4px solid var(--oled-surface);
-  border-radius: 50%;
+  border-radius: 6px;
   background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), 0.3), #0d0a16);
   box-shadow: 0 0 0 1px rgba(var(--xn-accent-rgb), 0.45), 0 0 28px rgba(var(--xn-accent-rgb), 0.22);
   color: var(--oled-text);
@@ -810,12 +810,15 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-move-pos { flex: 1; color: var(--oled-muted); font-size: 12px; text-align: center; }
 @media (hover: hover) { .pf-move button:not(:disabled):hover { border-color: var(--oled-accent); } }
 
-/* Widget transparency: --pf-clear (0-100, set on <main>) thins the card
-   surfaces on Profile and the public page; menus and popups stay solid. */
+/* Widget transparency: the server writes the card opacities (--pf-a, --pf-a2)
+   on <main> and the slider updates them, so no calc() inside rgba() is needed
+   (some phone browsers dropped that and showed solid cards). Profile and the
+   public page only; menus and popups stay solid. */
 .pf {
-  --pf-clear: 0;
-  --oled-surface: rgba(10, 10, 12, calc(1 - var(--pf-clear) / 100));
-  --oled-surface-2: rgba(18, 18, 22, calc(1 - var(--pf-clear) / 100 * 0.85));
+  --pf-a: 1;
+  --pf-a2: 1;
+  --oled-surface: rgba(10, 10, 12, var(--pf-a));
+  --oled-surface-2: rgba(18, 18, 22, var(--pf-a2));
 }
 .pf .pf-add-menu,
 .pf .xn-menu,
@@ -870,3 +873,82 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-swatch-custom svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 .pf-swatch-none { --sw: transparent; background: linear-gradient(135deg, transparent 46%, #f87171 46%, #f87171 54%, transparent 54%), var(--oled-text); }
 .pf-admin-tag { margin-left: 6px; padding: 1px 5px; border: 1px solid rgba(var(--xn-accent-rgb), 0.5); border-radius: 2px; color: var(--oled-accent); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Site background picker (Appearance). Thumbnails are small still versions of each scene. */
+.pf-scenes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 420px) { .pf-scenes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pf-scenes.is-busy-soft { opacity: 0.6; pointer-events: none; }
+.pf-scene {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 4px 6px;
+  border: 1px solid var(--oled-line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--oled-muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.pf-scene[aria-checked="true"] { border-color: var(--oled-accent); color: var(--oled-text); box-shadow: 0 0 0 1px var(--oled-accent); }
+@media (hover: hover) { .pf-scene:hover { color: var(--oled-text); border-color: var(--oled-line-strong); } }
+.pf-scene:active { transform: scale(0.97); }
+.pf-scene:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pf-scene-thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #000 center / cover no-repeat;
+}
+.pf-scene-thumb[data-thumb="drift"] { background: radial-gradient(circle at 25% 25%, rgba(var(--xn-accent-rgb), 0.6), transparent 45%), radial-gradient(circle at 80% 80%, rgba(76, 81, 255, 0.55), transparent 45%), radial-gradient(circle at 85% 30%, rgba(232, 92, 230, 0.4), transparent 40%), #000; }
+.pf-scene-thumb[data-thumb="aurora"] { background: linear-gradient(170deg, transparent 10%, rgba(var(--xn-accent-rgb), 0.6) 28%, rgba(56, 214, 196, 0.45) 42%, transparent 62%), #000; }
+.pf-scene-thumb[data-thumb="stars"] { background: radial-gradient(1px 1px at 12% 20%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 42% 60%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 70% 30%, rgba(var(--xn-accent-rgb), 1) 50%, transparent 51%), radial-gradient(1px 1px at 85% 75%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 25% 85%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 58% 12%, #fff 50%, transparent 51%), radial-gradient(ellipse at 50% 130%, rgba(var(--xn-accent-rgb), 0.35), transparent 60%), #000; }
+.pf-scene-thumb[data-thumb="grid"] { background: radial-gradient(circle at 50% 40%, rgba(var(--xn-accent-rgb), 0.6), transparent 30%), #000; }
+.pf-scene-thumb[data-thumb="grid"]::after {
+  content: "";
+  position: absolute;
+  left: -50%; right: -50%; bottom: 0; height: 50%;
+  background-image: linear-gradient(rgba(var(--xn-accent-rgb), 0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--xn-accent-rgb), 0.8) 1px, transparent 1px);
+  background-size: 10px 8px;
+  transform: perspective(40px) rotateX(40deg);
+  transform-origin: 50% 100%;
+}
+.pf-scene-thumb[data-thumb="pills"]::before,
+.pf-scene-thumb[data-thumb="pills"]::after {
+  content: "";
+  position: absolute;
+  width: 8px; height: 20px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, rgba(var(--xn-accent-rgb), 0.9) 0 50%, rgba(255, 255, 255, 0.85) 50% 100%);
+}
+.pf-scene-thumb[data-thumb="pills"]::before { left: 26%; top: 22%; transform: rotate(-30deg); }
+.pf-scene-thumb[data-thumb="pills"]::after { left: 62%; top: 46%; transform: rotate(40deg) scale(0.8); opacity: 0.7; }
+.pf-scene-thumb[data-thumb="waves"] { background: radial-gradient(ellipse at 50% 120%, rgba(var(--xn-accent-rgb), 0.55) 30%, transparent 31%), radial-gradient(ellipse at 20% 130%, rgba(var(--xn-accent-rgb), 0.35) 40%, transparent 41%), radial-gradient(ellipse at 85% 125%, rgba(var(--xn-accent-rgb), 0.3) 40%, transparent 41%), #000; }
+.pf-scene-thumb[data-thumb="none"] { background: #000; box-shadow: inset 0 0 0 1px var(--oled-line); }
+.pf-scene-thumb[data-thumb="custom"] { background-color: var(--oled-surface-2); color: var(--oled-muted); }
+.pf-scene-thumb[data-thumb="custom"] svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.pf-scene-thumb[data-thumb="custom"].has-image svg { display: none; }
+.pf-scene-own { margin-top: 10px; }
+.pf-scene-own .xn-label { margin-top: 10px; }
+
+/* Geek rank under the name */
+.pf-rank { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
+.pf-rank .xn-rank { font-size: 12px; padding: 3px 10px 3px 8px; }
+.pf-rank-meter { position: relative; width: 120px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--oled-surface-2); box-shadow: inset 0 0 0 1px var(--oled-line); }
+.pf-rank-meter i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--oled-accent); }
+@media (prefers-reduced-motion: no-preference) { .pf-rank-meter i { animation: pf-meter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.2s; transform-origin: left; } }
+@keyframes pf-meter { from { transform: scaleX(0); } }
+.pf-rank-note { font-size: 11px; color: var(--oled-muted); }
+.pf-rank-how { margin: 6px 0 0; max-width: 46ch; }
+.pf-rank-btn { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color 0.15s ease; }
+.pf-rank-btn:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+@media (hover: hover) { .pf-rank-btn:hover { background: color-mix(in srgb, var(--rank) 22%, transparent); } }
+.pf-head-row > .profile-avatar { align-self: flex-start; }

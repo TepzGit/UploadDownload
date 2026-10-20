@@ -34,6 +34,11 @@ export function paintName(el, who) {
   return el;
 }
 
+/** The small geek rank pips beside a name. */
+export function rankBadge(who) {
+  return who && who.rank && window.xnRank ? window.xnRank.badge(who.rank, true, who.level) : null;
+}
+
 export function profileLink(name) {
   return "/u/" + encodeURIComponent(name);
 }
@@ -127,7 +132,10 @@ function commentItem(comment, onRemoved) {
   when.dateTime = new Date(comment.createdAt).toISOString();
   when.title = new Date(comment.createdAt).toLocaleString();
   when.textContent = postTime(comment.createdAt);
-  head.append(name, when);
+  head.append(name);
+  const commentRank = rankBadge(comment.author);
+  if (commentRank) head.append(commentRank);
+  head.append(when);
   if (comment.canDelete) {
     head.append(deleteButton("fm-delete fm-delete-sm", "Delete", "Delete?", async () => {
       await send("/forum/comments", { action: "delete", id: comment.id });
@@ -280,6 +288,8 @@ export function postCard(post, { onRemoved } = {}) {
     badge.textContent = "Admin";
     head.append(badge);
   }
+  const postRank = rankBadge(post.author);
+  if (postRank) head.append(postRank);
   const when = document.createElement("time");
   when.className = "fm-time";
   when.dateTime = new Date(post.createdAt).toISOString();
