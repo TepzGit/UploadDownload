@@ -55,6 +55,68 @@
     use(hex) { applySiteColor(hex); storeSiteColor(hex); },
     preview: (hex) => { const rgb = hexToRgb(hex); return rgb ? "rgb(" + readable(rgb).join(", ") + ")" : ""; },
   };
+  // Site background: "" = the drifting colors, a preset, or "custom" (own picture).
+  const SCENE_KEY = "xn_site_bg";
+  const SCENES = ["none", "aurora", "stars", "grid", "pills", "waves", "custom"];
+  let scene = { scene: "", image: "", dim: 40 };
+  try { if (signedIn) scene = Object.assign(scene, JSON.parse(localStorage.getItem(SCENE_KEY) || "{}")); } catch (_) {}
+  if (!signedIn) { try { localStorage.removeItem(SCENE_KEY); } catch (_) {} }
+
+  function sceneLayer(name) {
+    const layer = document.createElement("div");
+    layer.className = "xn-scene";
+    layer.setAttribute("aria-hidden", "true");
+    layer.dataset.scene = name;
+    if (name === "pills") {
+      // Spread the capsules over the width with their own size, speed and start.
+      let seed = 7;
+      const rand = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+      for (let i = 0; i < 16; i++) {
+        const pill = document.createElement("span");
+        const size = 0.6 + rand() * 0.9;
+        const time = 16 + rand() * 22;
+        pill.style.cssText = "--x:" + (i * 6.25 + rand() * 5).toFixed(1) + "%;--s:" + size.toFixed(2) + ";--d:" + time.toFixed(1) + "s;--w:-" + (rand() * time).toFixed(1) + "s;--r:" + Math.round(rand() * 360) + "deg;--o:" + (0.18 + size * 0.22).toFixed(2) + ";--sway:" + Math.round(rand() * 120 - 60) + "px";
+        layer.append(pill);
+      }
+    } else if (name === "grid") {
+      layer.innerHTML = '<span class="s1"></span><span class="s2"><i></i></span>';
+    } else if (name !== "none" && name !== "custom") {
+      layer.innerHTML = '<span class="s1"></span><span class="s2"></span><span class="s3"></span>';
+    }
+    return layer;
+  }
+  function applyScene(next) {
+    scene = Object.assign({ scene: "", image: "", dim: 40 }, next);
+    let name = SCENES.includes(scene.scene) ? scene.scene : "";
+    if (name === "custom" && !scene.image) name = "";
+    const root = document.documentElement;
+    if (name) root.dataset.scene = name;
+    else delete root.dataset.scene;
+    root.style.setProperty("--xn-scene-dim", String(Math.min(90, Math.max(0, Number(scene.dim) || 0)) / 100));
+    if (name === "custom") root.style.setProperty("--xn-scene-img", 'url("' + scene.image.replace(/["\\]/g, "") + '")');
+    else root.style.removeProperty("--xn-scene-img");
+    placeScene(name);
+  }
+  // The layer goes right after the drifting colors so it stacks the same way on every page.
+  function placeScene(name) {
+    if (!document.body) return;
+    const old = document.querySelector(".xn-scene");
+    if (old && old.dataset.scene === name) return;
+    if (old) old.remove();
+    const fluid = document.querySelector(".xn-fluid");
+    if (!name || !fluid) return;
+    fluid.after(sceneLayer(name));
+  }
+  applyScene(scene);
+  window.xnScene = {
+    get: () => Object.assign({}, scene),
+    apply: applyScene,
+    use(next) {
+      applyScene(next);
+      try { localStorage.setItem(SCENE_KEY, JSON.stringify(scene)); } catch (_) {}
+    },
+  };
+
   if (signedIn) {
     fetch("/profile/appearance", { headers: { Accept: "application/json" } })
       .then((res) => (res.ok ? res.json() : null))
@@ -62,6 +124,8 @@
         if (!data) return;
         const color = data.siteColor || "";
         if (color !== cached) window.xnSiteColor.use(color);
+        const next = { scene: data.siteBg || "", image: data.siteBgImage || "", dim: data.siteBgDim == null ? 40 : data.siteBgDim };
+        if (JSON.stringify(next) !== JSON.stringify(scene)) window.xnScene.use(next);
       })
       .catch(() => {});
   }
@@ -85,6 +149,33 @@
     });
   }
   window.xnPaintNames = paintNames;
+
+  // Geek rank: 5 tiers, one point per Graph session and per Forum post.
+  // The names match geekTiers in UploadDownload.go.
+  const RANKS = ["Fresh Geek", "Geek", "Big Geek", "Mega Geek", "Geek⁴"];
+  window.xnRank = {
+    NAMES: RANKS,
+    badge(tier, compact, level) {
+      tier = Math.min(5, Math.max(1, Number(tier) || 1));
+      const el = document.createElement("span");
+      el.className = "xn-rank" + (compact ? " is-compact" : "");
+      el.dataset.tier = String(tier);
+      level = Math.max(0, Number(level) || 0);
+      el.title = "Geek rank " + tier + " of 5: " + RANKS[tier - 1] + (level ? ", level " + level : "");
+      el.innerHTML = '<span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name"></span>';
+      const name = el.querySelector(".xn-rank-name");
+      name.textContent = compact ? "Rank: " + RANKS[tier - 1] + (level ? ", level " + level : "") : RANKS[tier - 1];
+      if (compact) name.className = "xn-rank-name xn-sr";
+      if (level) {
+        const lv = document.createElement("span");
+        lv.className = "xn-level";
+        lv.setAttribute("aria-hidden", compact ? "true" : "false");
+        lv.textContent = compact ? String(level) : "Lv " + level;
+        el.append(lv);
+      }
+      return el;
+    },
+  };
 
   // The letter next to the logo: comments other people left on your
   // Forum posts. It shows only while some are unread.
@@ -201,6 +292,7 @@
     const links = nav.querySelectorAll(".xn-links a");
     initMail(nav);
     paintNames();
+    placeScene(document.documentElement.dataset.scene || "");
 
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
     links.forEach((link) => {
@@ -209,6 +301,7 @@
       if (match) link.setAttribute("aria-current", "page");
     });
 
+    initTabs(nav, links);
     if (!toggle) return;
 
     function setOpen(open) {
@@ -231,6 +324,54 @@
     window.addEventListener("resize", () => {
       if (window.innerWidth >= 768) setOpen(false);
     });
+  }
+
+  // Phones: the main pages sit in a tab bar along the bottom of the screen,
+  // like an iPhone app. Pages that aren't tabs (Files, Admin) stay in the
+  // top menu, which only shows when one of them is there for this account.
+  const TABS = [
+    { href: "/", label: "Graph", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { href: "/journal", label: "Journal", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
+    { href: "/Forum", label: "Forum", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
+    { href: "/Replications", label: "Replications", icon: '<rect x="7" y="2" width="14" height="16" rx="2.5"/><path d="M5 6v12.5A3.5 3.5 0 0 0 8.5 22H17a2 2 0 0 1-2 0H8.5A1.5 1.5 0 0 1 7 20.5V6.3A2 2 0 0 0 5 6z"/><path d="M3 6.8V19a4 4 0 0 0 4 4h9.5c.4 0 .8-.1 1.1-.3H7a2.6 2.6 0 0 1-2.6-2.6V5.6A2 2 0 0 0 3 6.8z" opacity=".55"/>' },
+    { href: "/Profile", label: "Profile", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
+  ];
+
+  function initTabs(nav, links) {
+    if (!links.length || document.querySelector(".xn-tabs")) return;
+    const bar = document.createElement("nav");
+    bar.className = "xn-tabs";
+    bar.setAttribute("aria-label", "Main");
+    TABS.forEach((tab) => {
+      const link = Array.from(links).find((a) => (a.getAttribute("href") || "") === tab.href);
+      const a = document.createElement("a");
+      a.className = "xn-tab";
+      a.href = tab.href;
+      if (link) {
+        link.classList.add("xn-in-tabs");
+        if (link.getAttribute("aria-current")) a.setAttribute("aria-current", "page");
+      }
+      a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + tab.icon + '</svg><span class="xn-tab-label">' + tab.label + "</span>";
+      bar.append(a);
+    });
+    // Tapping the tab you're on scrolls back to the top, like iOS.
+    bar.addEventListener("click", (event) => {
+      const a = event.target.closest("a[aria-current]");
+      if (!a || window.location.hash) return;
+      event.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.dispatchEvent(new CustomEvent("xn:tab-reselect", { detail: a.getAttribute("href") }));
+    });
+    document.body.append(bar);
+    document.documentElement.classList.add("xn-has-tabs");
+
+    const root = document.documentElement.classList;
+    const extra = Array.from(links).some((a) => {
+      if (a.classList.contains("xn-in-tabs")) return false;
+      if ((a.getAttribute("href") || "").startsWith("/Files")) return root.contains("xn-admin") || root.contains("xn-files");
+      return true;
+    });
+    nav.classList.toggle("xn-no-extra", !extra);
   }
 
   // Page-leave fade for browsers without cross-document view transitions.

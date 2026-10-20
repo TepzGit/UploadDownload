@@ -268,3 +268,6 @@
 
 /* A post opened from the letter icon lights up for a moment. */
 .fm-post.is-focus { border-color: var(--oled-accent); box-shadow: 0 0 0 1px var(--oled-accent), 0 0 40px -12px rgba(var(--xn-accent-rgb), 0.8); transition: border-color 0.3s ease, box-shadow 0.6s ease; }
+.fm-member-top { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.fm-member-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-post-head .xn-rank, .fm-comment-head .xn-rank { flex: none; }

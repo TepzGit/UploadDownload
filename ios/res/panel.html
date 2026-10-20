@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Geek⁴u</title>
+<!-- The app's own screens (connect to your server, can't reach it), styled like the site. -->
+<style>
+  @font-face { font-family: "Roboto Mono"; src: url("RobotoMono-Regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "Roboto Mono"; src: url("RobotoMono-SemiBold.ttf"); font-weight: 600; }
+  :root { --bg: #000; --text: #f5f3fa; --muted: #9c96aa; --hint: #6b6678; --line: #23202b; --surface-2: #121216; --violet: #a67cff; --ink: #160f24; --bad: #fca5a5; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: "Roboto Mono", ui-monospace, monospace; -webkit-text-size-adjust: 100%; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 32px 24px calc(32px + env(safe-area-inset-bottom)); }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  main[hidden] { display: none; }
+  .logo { width: 170px; height: auto; display: block; }
+  h1 { font-size: 18px; font-weight: 600; margin: 28px 0 0; }
+  p { margin: 6px 0 0; font-size: 12px; line-height: 1.35; color: var(--muted); }
+  label { align-self: stretch; text-align: left; margin-top: 22px; font-size: 11px; color: var(--muted); }
+  input { align-self: stretch; margin-top: 6px; height: 48px; padding: 0 12px; font: 16px "Roboto Mono", ui-monospace, monospace; color: var(--text); background: #000; border: 1px solid var(--line); border-radius: 2px; outline: none; -webkit-appearance: none; }
+  input::placeholder { color: var(--hint); }
+  input:focus { border-color: var(--violet); }
+  .error { align-self: stretch; text-align: left; margin-top: 10px; font-size: 12px; line-height: 1.35; color: var(--bad); }
+  button { align-self: stretch; height: 48px; margin-top: 10px; font: 600 14px "Roboto Mono", ui-monospace, monospace; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 2px; cursor: pointer; }
+  button.primary { margin-top: 16px; color: var(--ink); background: var(--violet); border-color: var(--violet); }
+  button:active { filter: brightness(1.15); }
+  button:disabled { opacity: .6; }
+  #errorView .message { font-size: 13px; margin-top: 8px; }
+  #errorView .server { font-size: 11px; color: var(--hint); margin-top: 10px; word-break: break-all; }
+  #errorView button.primary { margin-top: 22px; }
+</style>
+</head>
+<body>
+<main id="setupView" hidden>
+  <img class="logo" src="logo.svg" alt="Geek⁴u">
+  <h1>Connect to your server</h1>
+  <p>Type the address you open Geek⁴u at in your browser. You only do this once.</p>
+  <label for="address">Server address</label>
+  <input id="address" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go"
+         placeholder="example.com or 192.168.1.20:42067">
+  <div class="error" id="setupError" hidden></div>
+  <button class="primary" id="connect">Connect</button>
+  <button id="anyway" hidden>Use it anyway</button>
+  <button id="cancel" hidden>Cancel</button>
+</main>
+
+<main id="errorView" hidden>
+  <img class="logo" src="logo.svg" alt="Geek⁴u" style="width:150px">
+  <h1>Can't reach Geek⁴u</h1>
+  <p class="message" id="errorMessage"></p>
+  <p class="server" id="errorServer"></p>
+  <button class="primary" id="retry">Try again</button>
+  <button id="change">Change server</button>
+  <button id="close" hidden>Go back</button>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const send = (msg) => window.webkit.messageHandlers.geek4u.postMessage(msg);
+
+  // "example.com" -> try https then http; "192.168.1.20:42067" -> http then https; full links are used as typed.
+  function candidates(typed) {
+    const t = (typed || "").trim();
+    if (!t || /\s/.test(t)) return [];
+    const lower = t.toLowerCase();
+    if (lower.startsWith("http://") || lower.startsWith("https://")) {
+      try {
+        const u = new URL(t);
+        return u.hostname ? [u.protocol + "//" + u.host] : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    const host = t.split("/")[0];
+    if (!host || host.startsWith(":") || host.endsWith(":")) return [];
+    const local = /^[0-9.]+(:\d+)?$/.test(host) || host.startsWith("localhost") || host.includes(":") || host.startsWith("[");
+    return local ? ["http://" + host, "https://" + host] : ["https://" + host, "http://" + host];
+  }
+
+  // Any answer at all means a server is there.
+  async function reachable(origin) {
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 7000);
+    try {
+      await fetch(origin + "/Main", { mode: "no-cors", cache: "no-store", credentials: "omit", signal: stop.signal });
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function setupError(text) {
+    $("setupError").textContent = text;
+    $("setupError").hidden = !text;
+  }
+
+  async function connect() {
+    const tries = candidates($("address").value);
+    if (!tries.length) {
+      setupError("Type your server's address first, like example.com or 192.168.1.20:42067.");
+      return;
+    }
+    $("address").blur();
+    setupError("");
+    $("anyway").hidden = true;
+    $("connect").disabled = true;
+    $("connect").textContent = "Checking…";
+    let found = null;
+    for (const origin of tries) {
+      if (await reachable(origin)) { found = origin; break; }
+    }
+    $("connect").disabled = false;
+    $("connect").textContent = "Connect";
+    if (found) {
+      send({ type: "connect", origin: found });
+    } else {
+      setupError("Couldn't reach " + tries[0].replace(/^https?:\/\//, "") + ". Check the address, and that your server is running.");
+      $("anyway").hidden = false;
+    }
+  }
+
+  $("connect").addEventListener("click", connect);
+  $("address").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); connect(); } });
+  $("anyway").addEventListener("click", () => {
+    const tries = candidates($("address").value);
+    if (tries.length) send({ type: "connect", origin: tries[0] });
+  });
+  $("cancel").addEventListener("click", () => send({ type: "cancel" }));
+  $("retry").addEventListener("click", () => send({ type: "retry" }));
+  $("change").addEventListener("click", () => send({ type: "change" }));
+  $("close").addEventListener("click", () => send({ type: "close" }));
+
+  // Called by the app: show({mode: "setup", prefill, canCancel}) or show({mode: "error", message, server, canClose}).
+  window.show = function (s) {
+    $("setupView").hidden = s.mode !== "setup";
+    $("errorView").hidden = s.mode !== "error";
+    if (s.mode === "setup") {
+      $("address").value = s.prefill || "";
+      $("cancel").hidden = !s.canCancel;
+      $("anyway").hidden = true;
+      setupError("");
+      $("connect").disabled = false;
+      $("connect").textContent = "Connect";
+      if (!s.prefill) setTimeout(() => $("address").focus(), 300);
+    } else {
+      $("errorMessage").textContent = s.message || "";
+      $("errorServer").textContent = s.server || "";
+      $("close").hidden = !s.canClose;
+    }
+  };
+</script>
+</body>
+</html>

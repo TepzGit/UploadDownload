@@ -1,0 +1,223 @@
+/* Replications: the backed-up PsychonautWiki effect pictures (html/replications.html). */
+
+.rp-intro { margin-bottom: 18px; }
+.rp-meta { margin: 8px 0 0; font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+.rp-meta:empty { display: none; }
+
+/* Admins: the backup card */
+.rp-admin { margin-bottom: 18px; }
+.rp-admin-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.rp-admin-text { flex: 1 1 260px; min-width: 0; }
+.rp-admin-note { margin: 6px 0 0; font-size: 12px; line-height: 1.6; color: var(--oled-muted); }
+.rp-admin-actions { display: flex; gap: 8px; }
+.rp-progress { margin-top: 14px; }
+.rp-bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--oled-line);
+}
+.rp-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  border-radius: inherit;
+  background: var(--oled-accent);
+  transition: width 0.4s ease;
+}
+.rp-bar.is-busy span { width: 30%; animation: rp-busy 1.3s ease-in-out infinite; }
+@keyframes rp-busy { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.rp-phase { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--oled-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rp-phase.is-bad { color: #fca5a5; }
+
+/* Search, effect picker and kind chips */
+.rp-tools { display: grid; gap: 8px; }
+@media (min-width: 560px) { .rp-tools { grid-template-columns: minmax(0, 1fr) minmax(0, 240px); } }
+.rp-effect { text-overflow: ellipsis; }
+.rp-chips {
+  display: flex;
+  gap: 8px;
+  margin: 10px -16px 0;
+  padding: 2px 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.rp-chips::-webkit-scrollbar { display: none; }
+@media (min-width: 720px) { .rp-chips { flex-wrap: wrap; margin: 10px 0 0; padding: 2px 0 4px; overflow: visible; } }
+.rp-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--oled-line);
+  border-radius: 18px;
+  background: transparent;
+  color: var(--oled-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.rp-chip small { font-size: 10px; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.rp-chip[aria-pressed="true"] { border-color: var(--oled-accent); background: var(--oled-accent-soft); color: var(--oled-text); }
+@media (hover: hover) { .rp-chip:hover { color: var(--oled-text); border-color: var(--oled-line-strong); } }
+.rp-chip:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+
+.rp-count { margin: 12px 0 0; font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+
+/* The grid */
+.rp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 380px) { .rp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+@media (min-width: 900px) { .rp-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; } }
+.rp-grid > li { min-width: 0; }
+.rp-tile {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--oled-line);
+  border-radius: 2px;
+  background: var(--oled-surface);
+  color: var(--oled-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+@media (hover: hover) { .rp-tile:hover { border-color: rgba(var(--xn-accent-rgb), 0.55); } }
+.rp-tile:active { transform: scale(0.985); }
+.rp-tile:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.rp-tile-pic {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #050507;
+}
+.rp-tile-pic img, .rp-tile-pic video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rp-tile-pic.is-broken::after {
+  content: "Missing";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--oled-muted);
+}
+.rp-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--oled-text);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.rp-tile-cap { display: grid; gap: 2px; padding: 8px 10px 10px; min-width: 0; }
+.rp-tile-cap b, .rp-tile-cap small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-tile-cap b { font-size: 12px; font-weight: 600; }
+.rp-tile-cap small { font-size: 11px; color: var(--oled-muted); }
+
+.rp-more { display: flex; margin: 18px auto 0; }
+.rp-empty { margin: 18px 0 0; font-size: 13px; line-height: 1.6; color: var(--oled-muted); }
+
+/* The viewer */
+.rp-view {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  border: 0;
+  background: #000;
+  color: var(--oled-text);
+  font-family: var(--oled-font);
+}
+.rp-view *, .rp-view *::before, .rp-view *::after { box-sizing: border-box; }
+.rp-view[open] { display: flex; align-items: center; justify-content: center; }
+.rp-view::backdrop { background: transparent; }
+.rp-view-case {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(1100px, 100%);
+  height: 100%;
+  min-height: 0;
+}
+.rp-view-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 120px;
+  touch-action: pan-y pinch-zoom;
+}
+.rp-view-media img, .rp-view-media video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #050507;
+}
+/* The words scroll on their own; the buttons under them always stay on screen. */
+.rp-view-side { flex: 0 1 auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; max-height: 48%; }
+.rp-view-info { display: grid; gap: 8px; align-content: start; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.rp-view-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rp-view-title { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35; }
+.rp-view-count { flex: none; font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+.rp-view-caption, .rp-view-about { margin: 0; font-size: 12px; line-height: 1.6; color: var(--oled-text); overflow-wrap: anywhere; }
+.rp-view-about { color: var(--oled-muted); }
+.rp-view-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.rp-view-facts dt { color: var(--oled-muted); }
+.rp-view-facts dd { margin: 0; overflow-wrap: anywhere; }
+.rp-view-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.rp-view-links, .rp-view-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.rp-view-nav { margin-left: auto; }
+.rp-view-nav .xn-btn { min-width: 44px; }
+@media (max-width: 520px) {
+  .rp-view-links .xn-btn { padding: 0 10px; font-size: 12px; }
+}
+@media (min-width: 900px) and (min-height: 560px) {
+  .rp-view-case { flex-direction: row; align-items: stretch; height: min(760px, 100%); gap: 20px; }
+  .rp-view-media { flex: 1 1 0; min-width: 0; }
+  .rp-view-side { flex: 0 0 320px; max-height: none; }
+  .rp-view-bar { flex-direction: column; align-items: stretch; margin-top: auto; }
+  .rp-view-nav { margin-left: 0; }
+  .rp-view-links .xn-btn, .rp-view-nav [data-close] { flex: 1 1 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-bar span, .rp-tile { transition: none; }
+  .rp-bar.is-busy span { animation: none; width: 100%; opacity: 0.5; }
+}

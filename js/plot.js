@@ -32,7 +32,7 @@ export function loadPlotly() {
  * `timeline` is exactly what logic.computeTimeline() returns:
  * { x, y, hoverTimes, tickValues, tickText }
  */
-export async function renderPlot(timeline, containerId = "myPlot", { live = false } = {}) {
+export async function renderPlot(timeline, containerId = "myPlot", { live = false, starts = [] } = {}) {
   const Plotly = await loadPlotly();
   const container = document.getElementById(containerId);
   const narrow = (container?.clientWidth || window.innerWidth) < 560;
@@ -42,13 +42,15 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
   // isn't room for all of them.
   const tickValues = timeline.tickValues;
   const plotWidth = Math.max(200, (container?.clientWidth || window.innerWidth) - (narrow ? 44 : 70));
-  const maxLabels = Math.max(2, Math.floor(plotWidth / (narrow ? 38 : 46)));
+  const maxLabels = Math.max(2, Math.floor(plotWidth / (narrow ? 27 : 36)));
   const labelEvery = Math.max(1, Math.ceil(tickValues.length / maxLabels));
   const tickText = timeline.tickText.map((text, index) => {
     if (index % labelEvery !== 0) return "";
-    const [time, day] = text.split(" ");
-    return day && time === "00:00" ? `${time}<br>${day}` : time;
+    // Just the hour, like a clock face: 12 13 14 ... 00
+    const [time] = text.split(" ");
+    return time.slice(0, 2);
   });
+  const last = timeline.x[timeline.x.length - 1];
 
   const traces = timeline.series.map((series) => ({
     x: timeline.x,
@@ -58,32 +60,53 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     type: "scatter",
     hovertext: timeline.hoverTimes,
     hovertemplate: `${series.name}<br>Time: %{hovertext}<br>Relative intensity: %{y:.0f}%<extra></extra>`,
-    line: { color: series.color, width: 3, shape: "spline", smoothing: 0.65 },
+    line: { color: series.color, width: narrow ? 3.5 : 4, shape: "spline", smoothing: 0.35 },
     fill: "tozeroy",
-    fillcolor: hexToRgba(series.color, timeline.series.length > 1 ? 0.12 : 0.18),
+    fillcolor: hexToRgba(series.color, timeline.series.length > 1 ? 0.16 : 0.3),
   }));
   const multi = traces.length > 1;
+  // A dot on the baseline at each dose: { x: hour on the timeline, color }.
+  starts.forEach((start) => {
+    traces.push({
+      x: [start.x],
+      y: [0],
+      mode: "markers",
+      type: "scatter",
+      marker: { color: start.color, size: narrow ? 13 : 14 },
+      cliponaxis: false,
+      hoverinfo: "skip",
+      showlegend: false,
+    });
+  });
+  // Hour labels along the top as well as the bottom.
+  traces.push({ x: [timeline.x[0], last], y: [0, 0], xaxis: "x2", mode: "lines", line: { width: 0 }, hoverinfo: "skip", showlegend: false });
+  const hourAxis = {
+    tickmode: "array",
+    tickvals: tickValues,
+    ticktext: tickText,
+    ticks: "",
+    showgrid: false,
+    zeroline: false,
+    showline: false,
+    fixedrange: true,
+    range: [timeline.x[0], last],
+    tickfont: { color: "#f5f3fa", size: narrow ? 12 : 13 },
+  };
 
   const layout = {
-    margin: narrow ? { t: 8, r: 10, b: 44, l: 34 } : { t: 16, r: 18, b: 52, l: 52 },
+    margin: narrow ? { t: 30, r: 12, b: 30, l: 12 } : { t: 34, r: 18, b: 34, l: 18 },
     autosize: true,
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
     font: { family: "Roboto Mono, monospace", size: narrow ? 10 : 12, color: "#9c96aa" },
     dragmode: false,
     hoverlabel: { bgcolor: "#000000", bordercolor: "#2f2a3a", font: { color: "#f5f3fa" } },
-    xaxis: {
-      tickmode: "array",
-      tickvals: tickValues,
-      ticktext: tickText,
-      gridcolor: "rgba(255,255,255,0.07)",
-      zeroline: false,
-      fixedrange: true,
-    },
+    xaxis: { ...hourAxis, showgrid: true, gridcolor: "rgba(255,255,255,0.05)" },
+    xaxis2: { ...hourAxis, overlaying: "x", side: "top", anchor: "y" },
     yaxis: {
-      title: narrow ? undefined : { text: "Relative intensity", font: { size: 11 } },
       rangemode: "tozero",
-      gridcolor: "rgba(255,255,255,0.07)",
+      showticklabels: false,
+      showgrid: false,
       zeroline: false,
       fixedrange: true,
     },
@@ -91,7 +114,10 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: "#f5f3fa" }, bgcolor: "rgba(0,0,0,0)" },
     hovermode: multi ? "x unified" : "closest",
   };
-  if (multi) layout.margin.t = narrow ? 36 : 40;
+  if (multi) {
+    layout.margin.t = narrow ? 58 : 62;
+    layout.legend.y = narrow ? 1.12 : 1.06;
+  }
   if (live) addNowLine(layout, timeline, narrow);
 
   await Plotly.react(containerId, traces, layout, { displayModeBar: false, responsive: true, scrollZoom: false });

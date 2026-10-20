@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: jump straight to a page, or change the server address. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="graph" android:enabled="true" android:icon="@drawable/ic_sc_graph"
+        android:shortcutShortLabel="@string/sc_graph">
+        <intent android:action="com.geek4u.app.OPEN" android:targetPackage="com.geek4u.app"
+            android:targetClass="com.geek4u.app.MainActivity">
+            <extra android:name="path" android:value="/" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="journal" android:enabled="true" android:icon="@drawable/ic_sc_journal"
+        android:shortcutShortLabel="@string/sc_journal">
+        <intent android:action="com.geek4u.app.OPEN" android:targetPackage="com.geek4u.app"
+            android:targetClass="com.geek4u.app.MainActivity">
+            <extra android:name="path" android:value="/journal" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="forum" android:enabled="true" android:icon="@drawable/ic_sc_forum"
+        android:shortcutShortLabel="@string/sc_forum">
+        <intent android:action="com.geek4u.app.OPEN" android:targetPackage="com.geek4u.app"
+            android:targetClass="com.geek4u.app.MainActivity">
+            <extra android:name="path" android:value="/Forum" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="server" android:enabled="true" android:icon="@drawable/ic_sc_server"
+        android:shortcutShortLabel="@string/sc_server" android:shortcutLongLabel="@string/sc_server_long">
+        <intent android:action="com.geek4u.app.CHANGE_SERVER" android:targetPackage="com.geek4u.app"
+            android:targetClass="com.geek4u.app.MainActivity" />
+    </shortcut>
+</shortcuts>

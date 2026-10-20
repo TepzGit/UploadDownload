@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Admin · Geek⁴u</title>
+  <link rel="stylesheet" href="/AdminPanel.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u"><svg class="xn-logo" viewBox="0 -100 300 106" width="74" height="26" aria-hidden="true" focusable="false"><path fill="currentColor" d="M55.11 -8.52 55.04 -36.13H30.1V-26.43H42.43L42.38 -12.9Q41.72 -12.06 40.54 -11.4Q39.36 -10.75 37.88 -10.28Q36.4 -9.81 34.74 -9.57Q33.08 -9.34 31.42 -9.35Q28.66 -9.4 26.48 -10.27Q24.31 -11.13 22.68 -12.76Q21.53 -13.88 20.65 -15.34Q19.76 -16.8 19.12 -18.49Q18.2 -20.99 17.71 -24.1Q17.22 -27.21 17.21 -30.82V-40.29Q17.21 -43.27 17.57 -45.95Q17.93 -48.63 18.63 -50.9Q19.49 -53.67 20.81 -55.81Q22.12 -57.95 23.83 -59.34Q25.22 -60.46 26.9 -61.08Q28.58 -61.69 30.49 -61.69Q33.47 -61.69 35.65 -60.88Q37.82 -60.06 39.29 -58.47Q40.63 -57 41.43 -54.87Q42.22 -52.74 42.6 -50.05H55.05Q54.53 -55.15 52.76 -59.23Q51 -63.32 47.91 -66.2Q44.82 -69.03 40.41 -70.55Q36 -72.07 30.21 -72.07Q26.18 -72.07 22.64 -70.94Q19.11 -69.82 16.16 -67.69Q13.55 -65.74 11.44 -63.08Q9.33 -60.43 7.77 -57.16Q6.13 -53.59 5.26 -49.31Q4.39 -45.03 4.38 -40.19V-30.82Q4.39 -25.77 5.3 -21.36Q6.21 -16.95 8 -13.34Q9.58 -10 11.87 -7.35Q14.17 -4.7 17.02 -2.84Q19.91 -1 23.4 -0.02Q26.9 0.97 30.91 0.98Q35.37 0.99 39.28 0.12Q43.2 -0.75 46.42 -2.26Q49.31 -3.54 51.52 -5.19Q53.72 -6.83 55.11 -8.52Z M89.38 0.98Q97.05 0.98 102.59 -2.03Q108.13 -5.03 110.73 -8.77L104.21 -15.45Q101.83 -12.39 98.07 -10.78Q94.31 -9.17 90.13 -9.17Q87.13 -9.17 84.6 -10.16Q82.08 -11.14 80.16 -12.91Q78.29 -14.62 77.19 -16.76Q76.09 -18.9 75.48 -22.21V-22.4H111.72V-27.8Q111.72 -33.55 110.15 -38.35Q108.59 -43.14 105.56 -46.58Q102.5 -50.01 98.07 -51.91Q93.65 -53.81 87.93 -53.81Q82.62 -53.81 78.01 -51.84Q73.4 -49.87 69.99 -46.28Q66.57 -42.69 64.64 -37.68Q62.7 -32.66 62.7 -26.53V-24.56Q62.7 -19.2 64.62 -14.53Q66.53 -9.86 70.04 -6.44Q73.56 -2.99 78.47 -1Q83.39 0.98 89.38 0.98ZM87.86 -43.57Q90.63 -43.57 92.72 -42.67Q94.81 -41.76 96.24 -40.25Q97.67 -38.7 98.48 -36.61Q99.29 -34.52 99.29 -32.31V-31.37H75.73Q76.23 -34.18 77.29 -36.43Q78.34 -38.68 79.91 -40.28Q81.44 -41.88 83.45 -42.72Q85.47 -43.57 87.86 -43.57Z M146.38 0.98Q154.05 0.98 159.59 -2.03Q165.13 -5.03 167.73 -8.77L161.21 -15.45Q158.83 -12.39 155.07 -10.78Q151.31 -9.17 147.13 -9.17Q144.13 -9.17 141.6 -10.16Q139.08 -11.14 137.16 -12.91Q135.29 -14.62 134.19 -16.76Q133.09 -18.9 132.48 -22.21V-22.4H168.72V-27.8Q168.72 -33.55 167.15 -38.35Q165.59 -43.14 162.56 -46.58Q159.5 -50.01 155.07 -51.91Q150.65 -53.81 144.93 -53.81Q139.62 -53.81 135.01 -51.84Q130.4 -49.87 126.99 -46.28Q123.57 -42.69 121.64 -37.68Q119.7 -32.66 119.7 -26.53V-24.56Q119.7 -19.2 121.62 -14.53Q123.53 -9.86 127.04 -6.44Q130.56 -2.99 135.47 -1Q140.39 0.98 146.38 0.98ZM144.86 -43.57Q147.63 -43.57 149.72 -42.67Q151.81 -41.76 153.24 -40.25Q154.67 -38.7 155.48 -36.61Q156.29 -34.52 156.29 -32.31V-31.37H132.73Q133.23 -34.18 134.29 -36.43Q135.34 -38.68 136.91 -40.28Q138.44 -41.88 140.45 -42.72Q142.47 -43.57 144.86 -43.57Z M197.25 -22.42 213.16 0H228.72L205.61 -30.81L225.84 -52.83H210.64L195.47 -36.53L190.99 -31.49V-75H178.36V0H190.99V-16.56Z M277.77 0H289.21V-52.83H276.54V-15.6Q275.89 -14.24 274.96 -13.12Q274.04 -12.01 272.84 -11.22Q271.43 -10.29 269.56 -9.8Q267.69 -9.3 265.35 -9.3Q262.92 -9.3 261.19 -9.91Q259.47 -10.52 258.37 -11.95Q257.27 -13.34 256.76 -15.67Q256.25 -18.01 256.25 -21.45V-52.83H243.63V-21.55Q243.63 -15.57 244.96 -11.3Q246.3 -7.04 248.73 -4.31Q251.16 -1.53 254.57 -0.26Q257.97 1.02 262.09 1.02Q266.72 1.02 270.54 -1.22Q274.36 -3.45 277.04 -7.39Z"/><g transform="translate(254 -62) scale(1.1) translate(-254 62)"><path fill="var(--logo-pill,#a67cff)" d="M239,-92h15v30h-15a15,15 0 0 1 0,-30z"/><path fill="currentColor" d="M254,-92h15a15,15 0 0 1 0,30h-15z"/><path fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2.6" stroke-linecap="round" d="M230,-81Q232.5,-87.8 241,-88.4H250"/><path fill="#0b0a10" d="M247.97 -74.84V-85.56H244.66L237.49 -74.24L237.62 -72.2H244.71V-68.5H247.97V-72.2H249.95V-74.84ZM240.69 -74.84 244.39 -80.62 244.71 -81.18V-74.84Z"/></g></svg></a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page ad">
+  <section class="xn-card ad-card">
+    <p class="xn-eyebrow">Admin</p>
+    <h1 class="xn-h1">Admin panel</h1>
+    <p class="xn-sub">Site visits, every account and its numbers, who can sign in and who can open Files.</p>
+    <div class="AdminPanelOptions">
+      <a class="AdminPanelOption" href="/admin/createUser">
+        <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/></svg></span>
+        <span class="ad-text"><strong>Create user</strong><span>Add an account and choose its role.</span></span>
+        <svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </a>
+    </div>
+  </section>
+
+  <section class="xn-card ad-card ad-wide" aria-labelledby="stTitle">
+    <p class="xn-eyebrow">Stats</p>
+    <h2 class="xn-h1 ad-h2" id="stTitle">Site views</h2>
+    <div class="st-tiles" id="stTiles"></div>
+    <div class="st-chart-head">
+      <span class="xn-label">Page views per day, last 30 days</span>
+      <span class="st-legend"><i class="st-key st-key-views"></i>Views <i class="st-key st-key-visitors"></i>Visitors</span>
+    </div>
+    <div class="st-chart" id="stChart" aria-live="polite"><p class="fa-empty">Loading…</p></div>
+    <details class="st-table-wrap">
+      <summary>Show as a table</summary>
+      <div class="st-scroll"><table class="st-table" id="stDays"></table></div>
+    </details>
+    <div class="st-split">
+      <div>
+        <span class="xn-label">Most opened pages, last 30 days</span>
+        <ul class="st-pages" id="stPages"></ul>
+      </div>
+      <div>
+        <span class="xn-label">Accounts per geek rank</span>
+        <ul class="st-pages st-tiers" id="stTiers"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="xn-card ad-card ad-wide" aria-labelledby="acTitle">
+    <p class="xn-eyebrow">Accounts</p>
+    <h2 class="xn-h1 ad-h2" id="acTitle">All accounts</h2>
+    <p class="xn-sub" id="acSub">Tap a column to sort.</p>
+    <label class="ad-find">
+      <span class="xn-sr">Find an account</span>
+      <input class="xn-input" id="acFind" type="search" placeholder="Find an account…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </label>
+    <div class="st-scroll ac-scroll"><table class="st-table ac-table" id="acTable"></table></div>
+  </section>
+
+  <section class="xn-card ad-card" aria-labelledby="faTitle">
+    <p class="xn-eyebrow">Files</p>
+    <h2 class="xn-h1 ad-h2" id="faTitle">Files access</h2>
+    <p class="xn-sub">Pick who can open Files and which folders they see. Admins can always open everything. Changes save by themselves.</p>
+    <label class="ad-find">
+      <span class="xn-sr">Find an account</span>
+      <input class="xn-input" id="faFind" type="search" placeholder="Find an account…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </label>
+    <div class="fa-list" id="faList" aria-live="polite"><p class="fa-empty">Loading accounts…</p></div>
+  </section>
+</main>
+<script>
+  // Stats: views per day, top pages, accounts with their numbers.
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    const num = (n) => Number(n || 0).toLocaleString();
+    const PAGE_NAMES = { "/": "Graph", "/Main": "Main", "/journal": "Journal", "/journal/Drug": "Drug info", "/Profile": "Profile", "/Forum": "Forum", "/admin": "Admin", "/Uploader": "Upload", "/u/": "Public profiles", "/Files/": "Files" };
+    const dayLabel = (d, opts) => new Date(d + "T12:00:00").toLocaleDateString(undefined, opts || { month: "short", day: "numeric" });
+    function ago(ms) {
+      if (!ms) return "—";
+      const s = (Date.now() - ms) / 1000;
+      if (s < 120) return "just now";
+      if (s < 3600) return Math.floor(s / 60) + " min ago";
+      if (s < 86400) return Math.floor(s / 3600) + " h ago";
+      if (s < 86400 * 30) return Math.floor(s / 86400) + " d ago";
+      return new Date(ms).toLocaleDateString();
+    }
+
+    function tiles(data) {
+      const days = data.days;
+      const today = days[days.length - 1];
+      const week = days.slice(-7).reduce((a, d) => a + d.views, 0);
+      const month = days.reduce((a, d) => a + d.views, 0);
+      const list = [
+        ["Views today", today.views, today.visitors + (today.visitors === 1 ? " visitor" : " visitors")],
+        ["Last 7 days", week, "views"],
+        ["Last 30 days", month, "views"],
+        ["Accounts", data.totals.accounts, data.totals.graphs + " graphs · " + data.totals.posts + " posts"],
+      ];
+      $("stTiles").innerHTML = list.map(([label, value, sub]) =>
+        '<div class="st-tile"><span class="st-tile-label">' + esc(label) + '</span><strong class="st-tile-value">' + num(value) + '</strong><span class="st-tile-sub">' + esc(sub) + "</span></div>").join("");
+    }
+
+    // Bars for views, a line for visitors, one shared count axis.
+    function chart(days) {
+      const box = $("stChart");
+      const W = 720, H = 220, L = 34, R = 8, T = 12, B = 26;
+      const max = Math.max(4, ...days.map((d) => Math.max(d.views, d.visitors)));
+      const step = Math.pow(10, Math.floor(Math.log10(max)));
+      const nice = [1, 2, 2.5, 5, 10].map((m) => m * step).find((v) => v * 4 >= max) || step * 10;
+      const top = nice * 4;
+      const iw = W - L - R, ih = H - T - B;
+      const bw = iw / days.length;
+      const y = (v) => T + ih - (v / top) * ih;
+      let svg = '<svg viewBox="0 0 ' + W + " " + H + '" class="st-svg" role="img" aria-label="Page views per day for the last 30 days">';
+      for (let i = 0; i <= 4; i++) {
+        const v = nice * i;
+        svg += '<line class="st-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>';
+        svg += '<text class="st-axis" x="' + (L - 6) + '" y="' + (y(v) + 3.5) + '" text-anchor="end">' + num(v) + "</text>";
+      }
+      days.forEach((d, i) => {
+        const x = L + i * bw;
+        const h = Math.max(d.views ? 2 : 0, (d.views / top) * ih);
+        svg += '<rect class="st-bar" x="' + (x + 2) + '" y="' + (T + ih - h) + '" width="' + Math.max(2, bw - 4) + '" height="' + h + '" rx="2"/>';
+        if (i % 5 === 4 || i === days.length - 1) svg += '<text class="st-axis" x="' + (x + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(dayLabel(d.day)) + "</text>";
+      });
+      const pts = days.map((d, i) => (L + i * bw + bw / 2).toFixed(1) + "," + y(d.visitors).toFixed(1)).join(" ");
+      svg += '<polyline class="st-line" points="' + pts + '"/>';
+      svg += '<line class="st-cross" id="stCross" y1="' + T + '" y2="' + (T + ih) + '" x1="0" x2="0" visibility="hidden"/>';
+      svg += '<circle class="st-dot" id="stDot" r="4" cx="0" cy="0" visibility="hidden"/>';
+      svg += '<rect class="st-hit" x="' + L + '" y="' + T + '" width="' + iw + '" height="' + ih + '"/></svg>';
+      box.innerHTML = svg + '<div class="st-tip" id="stTip" hidden></div>';
+      const el = box.querySelector("svg");
+      const tip = $("stTip"), cross = $("stCross"), dot = $("stDot");
+      const bars = [...box.querySelectorAll(".st-bar")];
+      function show(clientX) {
+        const r = el.getBoundingClientRect();
+        const sx = ((clientX - r.left) / r.width) * W;
+        const i = Math.min(days.length - 1, Math.max(0, Math.floor((sx - L) / bw)));
+        const d = days[i];
+        const cx = L + i * bw + bw / 2;
+        cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+        dot.setAttribute("cx", cx); dot.setAttribute("cy", y(d.visitors)); dot.setAttribute("visibility", "visible");
+        bars.forEach((b, j) => b.classList.toggle("is-on", j === i));
+        tip.hidden = false;
+        tip.innerHTML = "<strong>" + esc(dayLabel(d.day, { weekday: "short", month: "short", day: "numeric" })) + "</strong><span><i class=\"st-key st-key-views\"></i>" + num(d.views) + " views</span><span><i class=\"st-key st-key-visitors\"></i>" + num(d.visitors) + " visitors</span>";
+        const px = (cx / W) * r.width;
+        tip.style.left = Math.min(r.width - tip.offsetWidth, Math.max(0, px - tip.offsetWidth / 2)) + "px";
+      }
+      function hide() {
+        tip.hidden = true;
+        cross.setAttribute("visibility", "hidden");
+        dot.setAttribute("visibility", "hidden");
+        bars.forEach((b) => b.classList.remove("is-on"));
+      }
+      el.addEventListener("pointermove", (e) => show(e.clientX));
+      el.addEventListener("pointerdown", (e) => show(e.clientX));
+      el.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
+
+      $("stDays").innerHTML = "<thead><tr><th>Day</th><th>Views</th><th>Visitors</th></tr></thead><tbody>" +
+        days.slice().reverse().map((d) => "<tr><td>" + esc(dayLabel(d.day, { weekday: "short", month: "short", day: "numeric" })) + "</td><td>" + num(d.views) + "</td><td>" + num(d.visitors) + "</td></tr>").join("") + "</tbody>";
+    }
+
+    function bars(listEl, rows) {
+      const max = Math.max(1, ...rows.map((r) => r.value));
+      listEl.innerHTML = rows.length ? rows.map((r) =>
+        '<li><span class="st-page-name">' + r.label + '</span><span class="st-page-bar"><i style="width:' + Math.max(2, (r.value / max) * 100).toFixed(1) + '%"></i></span><span class="st-page-n">' + num(r.value) + "</span></li>").join("")
+        : '<li class="st-none">No views yet.</li>';
+    }
+
+    let users = [];
+    let sortKey = "rank", sortDir = -1;
+    const COLS = [
+      ["name", "Account"], ["rank", "Rank"], ["graphs", "Graphs"], ["posts", "Posts"], ["comments", "Comments"],
+      ["doses", "Doses"], ["likes", "Likes"], ["friends", "Friends"], ["joined", "Joined"], ["lastSeen", "Last seen"],
+    ];
+    const val = (u, key) => key === "rank" ? u.rank.score : key === "name" ? u.name.toLowerCase() : u[key] || 0;
+    function table() {
+      const q = $("acFind").value.trim().toLowerCase();
+      const list = users.filter((u) => !q || u.name.toLowerCase().includes(q)).sort((a, b) => {
+        const va = val(a, sortKey), vb = val(b, sortKey);
+        return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir || a.name.localeCompare(b.name);
+      });
+      const head = "<thead><tr>" + COLS.map(([k, label]) =>
+        '<th scope="col" aria-sort="' + (k === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none") + '"><button type="button" data-sort="' + k + '">' + label + (k === sortKey ? (sortDir > 0 ? " ↑" : " ↓") : "") + "</button></th>").join("") + "</tr></thead>";
+      const body = list.map((u) => {
+        const face = u.avatar ? '<img src="' + esc(u.avatar) + '" alt="" loading="lazy">' : esc(u.name.charAt(0).toUpperCase());
+        const name = '<a class="ac-who" href="/u/' + encodeURIComponent(u.name) + '"><span class="ac-face">' + face + "</span><span>" + esc(u.name) + (u.admin ? ' <small class="ac-admin">Admin</small>' : "") + "</span></a>";
+        const rank = '<span class="xn-rank" data-tier="' + u.rank.tier + '" title="' + u.rank.score + ' points"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">' + esc(u.rank.name) + "</span></span>";
+        return "<tr><th scope=\"row\">" + name + "</th><td>" + rank + "</td><td>" + num(u.graphs) + "</td><td>" + num(u.posts) + "</td><td>" + num(u.comments) + "</td><td>" + num(u.doses) + "</td><td>" + num(u.likes) + "</td><td>" + num(u.friends) + "</td><td>" + (u.joined ? esc(new Date(u.joined).toLocaleDateString()) : "—") + "</td><td>" + esc(ago(u.lastSeen)) + "</td></tr>";
+      }).join("");
+      $("acTable").innerHTML = head + "<tbody>" + (body || '<tr><td colspan="10" class="st-none">No accounts match.</td></tr>') + "</tbody>";
+      $("acSub").textContent = users.length + (users.length === 1 ? " account" : " accounts") + ". Tap a column to sort.";
+    }
+    $("acTable").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sort]");
+      if (!b) return;
+      const k = b.dataset.sort;
+      if (k === sortKey) sortDir = -sortDir;
+      else { sortKey = k; sortDir = k === "name" ? 1 : -1; }
+      table();
+      $("acTable").querySelector('[data-sort="' + k + '"]').focus();
+    });
+    $("acFind").addEventListener("input", table);
+
+    fetch("/admin/stats", { headers: { Accept: "application/json" } })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
+      .then((data) => {
+        tiles(data);
+        chart(data.days);
+        bars($("stPages"), data.pages.slice(0, 8).map((p) => ({ label: esc(PAGE_NAMES[p.page] || p.page), value: p.views })));
+        const counts = data.tiers.map((t) => ({ t, n: data.users.filter((u) => u.rank.tier === t.tier).length }));
+        bars($("stTiers"), counts.map(({ t, n }) => ({ label: '<span class="xn-rank" data-tier="' + t.tier + '"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">' + esc(t.name) + "</span></span>", value: n })));
+        users = data.users;
+        table();
+      })
+      .catch(() => { $("stChart").innerHTML = '<p class="fa-empty">Couldn\'t load the stats. Try again.</p>'; });
+  })();
+
+  // Files access: one row per account. Opening a row shows its settings.
+  (function () {
+    const list = document.getElementById("faList");
+    const find = document.getElementById("faFind");
+    const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+    let folders = [];
+
+    function summary(user) {
+      if (user.admin) return "Admin · every folder";
+      const a = user.access;
+      if (!a) return "No access";
+      const where = a.all ? "Every folder" : a.folders.length === 1 ? "1 folder" : a.folders.length + " folders";
+      return where + (a.canEdit ? " · can change files" : " · view and download");
+    }
+
+    function row(user) {
+      const item = document.createElement("details");
+      item.className = "fa-user";
+      item.dataset.name = user.name.toLowerCase();
+      item.innerHTML =
+        '<summary><span class="fa-face" aria-hidden="true"></span><span class="fa-who"><strong></strong><span class="fa-state"></span></span>' +
+        '<svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></summary>';
+      item.querySelector(".fa-face").textContent = user.name.charAt(0).toUpperCase();
+      item.querySelector("strong").textContent = user.name;
+      const state = item.querySelector(".fa-state");
+      const paintState = () => {
+        state.textContent = summary(user);
+        item.classList.toggle("has-access", !!user.access || user.admin);
+      };
+      paintState();
+      if (user.admin) {
+        item.classList.add("is-admin");
+        const body = document.createElement("p");
+        body.className = "fa-note";
+        body.textContent = "Admins can always open, upload to and change every folder.";
+        item.append(body);
+        return item;
+      }
+
+      const id = "fa" + user.id;
+      const body = document.createElement("div");
+      body.className = "fa-body";
+      body.innerHTML =
+        '<label class="fa-toggle"><input type="checkbox" data-on><span>Can open Files</span></label>' +
+        '<fieldset class="fa-more"><legend class="xn-sr">Which folders</legend>' +
+        '<label class="fa-radio"><input type="radio" name="' + id + 'where" value="all"><span>Every folder</span></label>' +
+        '<label class="fa-radio"><input type="radio" name="' + id + 'where" value="some"><span>Only these folders</span></label>' +
+        '<div class="fa-folders"></div>' +
+        '<label class="fa-toggle"><input type="checkbox" data-edit><span>Can upload, rename and delete<small>Otherwise they can only look and download.</small></span></label>' +
+        "</fieldset>";
+      item.append(body);
+      const on = body.querySelector("[data-on]");
+      const more = body.querySelector(".fa-more");
+      const radios = [...body.querySelectorAll('input[type="radio"]')];
+      const edit = body.querySelector("[data-edit]");
+      const box = body.querySelector(".fa-folders");
+
+      if (!folders.length) {
+        box.innerHTML = '<p class="fa-note">There are no folders in Files yet. Make one on the Files page first.</p>';
+      }
+      const checks = folders.map((path) => {
+        const parts = path.split("/");
+        const label = document.createElement("label");
+        label.className = "fa-folder";
+        label.style.setProperty("--depth", parts.length - 1);
+        label.innerHTML = '<input type="checkbox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span></span>';
+        label.querySelector("span").textContent = parts[parts.length - 1];
+        label.title = path;
+        const input = label.querySelector("input");
+        input.value = path;
+        box.append(label);
+        return input;
+      });
+
+      // A checked folder includes everything inside it.
+      function paintFolders() {
+        const chosen = checks.filter((c) => c.checked && !c.disabled).map((c) => c.value);
+        checks.forEach((c) => {
+          const covered = chosen.some((p) => c.value.startsWith(p + "/"));
+          c.disabled = covered;
+          if (covered) c.checked = true;
+          c.parentElement.classList.toggle("is-covered", covered);
+        });
+      }
+      function show() {
+        const a = user.access;
+        on.checked = !!a;
+        more.disabled = !a;
+        more.hidden = !a;
+        radios[0].checked = !a || a.all;
+        radios[1].checked = !!a && !a.all;
+        box.hidden = !a || a.all;
+        edit.checked = !!a && a.canEdit;
+        checks.forEach((c) => { c.disabled = false; c.checked = !!a && !a.all && a.folders.includes(c.value); });
+        paintFolders();
+        paintState();
+      }
+
+      function read() {
+        if (!on.checked) return null;
+        const all = radios[0].checked;
+        return {
+          all,
+          folders: all ? [] : checks.filter((c) => c.checked && !c.disabled).map((c) => c.value),
+          canEdit: edit.checked,
+        };
+      }
+      let timer = 0;
+      async function save() {
+        const access = read();
+        try {
+          const res = await fetch("/admin/files-access", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: user.id, access }),
+          });
+          if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save. Try again.");
+          const data = await res.json();
+          user.access = data.access || null;
+          if (user.access && !user.access.folders) user.access.folders = [];
+          paintState();
+          toast(user.name + ": " + summary(user) + ".");
+        } catch (error) {
+          toast(error.message, true);
+          show();
+        }
+      }
+      function changed() {
+        more.disabled = !on.checked;
+        more.hidden = !on.checked;
+        box.hidden = !on.checked || radios[0].checked;
+        paintFolders();
+        user.access = read();
+        paintState();
+        clearTimeout(timer);
+        timer = setTimeout(save, 450);
+      }
+      body.addEventListener("change", changed);
+      show();
+      return item;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch("/admin/files-access", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't load the accounts.");
+        const data = await res.json();
+        folders = (data.folders || []).slice().sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+        const users = data.users || [];
+        list.innerHTML = "";
+        users.forEach((u) => list.append(row(u)));
+        if (!users.length) list.innerHTML = '<p class="fa-empty">No accounts yet.</p>';
+      } catch (error) {
+        list.innerHTML = '<p class="fa-empty"></p>';
+        list.firstChild.textContent = error.message;
+      }
+    }
+    find.addEventListener("input", () => {
+      const q = find.value.trim().toLowerCase();
+      list.querySelectorAll(".fa-user").forEach((item) => { item.hidden = !!q && !item.dataset.name.includes(q); });
+    });
+    load();
+  })();
+</script>
+</body>
+</html>

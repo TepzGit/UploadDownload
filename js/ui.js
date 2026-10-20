@@ -57,6 +57,7 @@ function init() {
   initTracker();
   renderRecent();
   renderTracker();
+  initPhone();
   initExperiences();
   loadCustomColors();
 }
@@ -936,7 +937,9 @@ function showOpenedSession() {
   renderRecent();
   paintAddButton();
   renderTracker();
-  if (window.matchMedia("(max-width: 1279px)").matches) {
+  if (isPhone()) {
+    showGraphView(activeExp?.startedAt);
+  } else if (window.matchMedia("(max-width: 1279px)").matches) {
     document.getElementById("chartCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
@@ -1077,6 +1080,7 @@ function experienceSpark(preview, colors) {
 }
 
 function renderExperiences() {
+  renderPhoneList();
   const wrap = document.getElementById("experiences");
   if (!wrap) return;
   const list = wrap.querySelector("[data-exp-list]");
@@ -1429,8 +1433,13 @@ function handleAddDose() {
     refreshChart();
     experienceChanged();
     showToast(`${dose.formulation} dose added.`);
-    // On phones the chart sits below the form, so bring it into view.
-    if (window.matchMedia("(max-width: 1279px)").matches) {
+    if (isPhone()) {
+      // The form was a sheet over the graph: close it so the new curve shows.
+      closeSheet();
+      updateGraphTitle();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (window.matchMedia("(max-width: 1279px)").matches) {
+      // On tablets the chart sits below the form, so bring it into view.
       document.getElementById("chartCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   } catch (error) {
@@ -1438,7 +1447,7 @@ function handleAddDose() {
   }
 }
 
-function handleReset() {
+function handleReset(event, { quiet = false } = {}) {
   flushExperience(); // the timeline stays under Experiences
   activeExp = null;
   logic.resetState();
@@ -1450,7 +1459,7 @@ function handleReset() {
   paintAddButton();
   renderTracker();
   renderExperiences();
-  showToast("Timeline reset.");
+  if (!quiet) showToast("Timeline reset.");
 }
 
 function renderDoseList() {
@@ -1553,7 +1562,8 @@ function refreshChart() {
   // The white "now" line only belongs on a session that is still going
   // (a new one, or one started in the last day and a half), not an old one.
   const live = !activeExp?.startedAt || Date.now() - activeExp.startedAt < 36 * 3600000;
-  plot.renderPlot(timeline, "myPlot", { live });
+  const starts = logic.getState().addedDoses.map((dose) => ({ x: dose.x[0], color: dose.color }));
+  plot.renderPlot(timeline, "myPlot", { live, starts });
 }
 
 // Moves the "now" line along once a minute while the page is open.
@@ -1629,4 +1639,270 @@ function showToast(message, isError = false) {
   els.toast.classList.add("visible");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => els.toast.classList.remove("visible"), 2800);
+}
+
+// ------------------------------------------------------------
+// Phones: list of experiences -> graph view -> add-dose sheet
+// ------------------------------------------------------------
+// Under 768px the page works like an app screen: a list of experiences
+// with a + button, and tapping one (or +) opens its graph. The add-dose
+// form becomes a sheet that slides up from the + button. The sections are
+// the same elements as on desktop; a few are moved while on a phone.
+
+const phoneQuery = window.matchMedia("(max-width: 767px)");
+const isPhone = () => phoneQuery.matches;
+const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+const LIST_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>';
+const PEOPLE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3.1 4.7"/></svg>';
+let phoneMoves = [];
+let listEditing = false;
+
+function initPhone() {
+  if (!document.getElementById("gpList")) return;
+  document.getElementById("gpFab").addEventListener("click", () => {
+    if (document.documentElement.classList.contains("gp-graph")) openSheet();
+    else newExperience();
+  });
+  document.getElementById("gpBack").addEventListener("click", () => {
+    if (history.state?.gp === "graph") history.back();
+    else showListView();
+  });
+  document.getElementById("gpScrim").addEventListener("click", closeSheet);
+  document.getElementById("gpSheetClose").addEventListener("click", closeSheet);
+  document.getElementById("gpEditList").addEventListener("click", () => {
+    listEditing = !listEditing;
+    renderPhoneList();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.documentElement.classList.contains("gp-sheet")) closeSheet();
+  });
+  window.addEventListener("popstate", () => {
+    if (history.state?.gp === "graph") document.documentElement.classList.add("gp-graph");
+    else showListView({ fromHistory: true });
+  });
+  // The Graph tab again, while in a graph: back to the list.
+  document.addEventListener("xn:tab-reselect", (event) => {
+    if (event.detail === "/" && document.documentElement.classList.contains("gp-graph")) document.getElementById("gpBack").click();
+  });
+  // A reload lands on the list, not on a half-restored graph.
+  if (location.hash === "#graph") history.replaceState(null, "", location.pathname + location.search);
+  phoneQuery.addEventListener("change", applyPhoneLayout);
+  applyPhoneLayout();
+}
+
+/** Moves the dose list, recent doses and tracker into their phone places, or back. */
+function applyPhoneLayout() {
+  const root = document.documentElement.classList;
+  const phone = isPhone();
+  root.toggle("gp-phone", phone);
+  if (phone && !phoneMoves.length) {
+    const chartCard = document.getElementById("chartCard");
+    const controls = document.getElementById("controlsCard");
+    const move = (node, place) => {
+      if (!node) return;
+      phoneMoves.push({ node, parent: node.parentNode, next: node.nextSibling });
+      place(node);
+    };
+    move(document.getElementById("doseBlock"), (n) => { n.classList.add("gp-doses"); chartCard.appendChild(n); });
+    move(document.getElementById("trackerOpen"), (n) => chartCard.after(n));
+    move(document.getElementById("recentDoses"), (n) => controls.querySelector(".flex.items-center.justify-between").after(n));
+  } else if (!phone && phoneMoves.length) {
+    phoneMoves.reverse().forEach(({ node, parent, next }) => {
+      node.classList.remove("gp-doses");
+      parent.insertBefore(node, next);
+    });
+    phoneMoves = [];
+    root.remove("gp-graph", "gp-sheet", "gp-editing");
+  }
+  plot.resizePlot("myPlot");
+}
+
+// "27 May 2026", day first like the journal, in the browser's language.
+function longDate(t, month = "long") {
+  const d = new Date(t);
+  return `${d.getDate()} ${d.toLocaleDateString([], { month })} ${d.getFullYear()}`;
+}
+
+function updateGraphTitle() {
+  const { addedDoses } = logic.getState();
+  const started = activeExp?.startedAt;
+  const title = document.getElementById("gpBarTitle");
+  const day = document.getElementById("gpDay");
+  const when = started || Date.now();
+  title.textContent = started || addedDoses.length ? longDate(when) : "New experience";
+  day.textContent = `${new Date(when).toLocaleDateString([], { weekday: "short" })}, ${longDate(when, "short")}`;
+  if (activeExp?.viewOnly) day.textContent += ` · ${activeExp.owner}'s session`;
+}
+
+function showGraphView() {
+  const root = document.documentElement.classList;
+  if (!root.contains("gp-graph")) {
+    root.add("gp-graph");
+    history.pushState({ gp: "graph" }, "", "#graph");
+  }
+  updateGraphTitle();
+  window.scrollTo(0, 0);
+  // Plotly measured the chart while it was hidden.
+  requestAnimationFrame(() => plot.resizePlot("myPlot"));
+}
+
+function showListView({ fromHistory = false } = {}) {
+  const root = document.documentElement.classList;
+  closeSheet();
+  root.remove("gp-graph");
+  if (!fromHistory && history.state?.gp) history.replaceState(null, "", location.pathname + location.search);
+  flushExperience();
+  renderPhoneList();
+  window.scrollTo(0, 0);
+}
+
+function newExperience() {
+  if (logic.getState().addedDoses.length || activeExp) handleReset(null, { quiet: true });
+  showGraphView();
+  openSheet();
+}
+
+function openSheet() {
+  document.documentElement.classList.add("gp-sheet");
+  const sheet = document.getElementById("controlsCard");
+  sheet.scrollTop = 0;
+  // Straight to typing a substance when none is picked yet.
+  if (els.dosePanel.hidden) els.input.focus({ preventScroll: true });
+}
+
+function closeSheet() {
+  document.documentElement.classList.remove("gp-sheet");
+  els.suggestions.hidden = true;
+  if (document.activeElement && document.getElementById("controlsCard").contains(document.activeElement)) document.activeElement.blur();
+}
+
+/** The phone list: one row per experience, like a journal. */
+function renderPhoneList() {
+  const wrap = document.getElementById("gpList");
+  if (!wrap) return;
+  const rows = wrap.querySelector("[data-gp-rows]");
+  const note = wrap.querySelector("[data-gp-note]");
+  const editBtn = document.getElementById("gpEditList");
+  rows.replaceChildren();
+
+  // Same sign-in / device notes as the desktop box.
+  const deskNote = document.querySelector("#experiences [data-exp-note]");
+  note.hidden = true;
+  if (expMode === "off" && expUnreachable) {
+    note.hidden = false;
+    note.textContent = "Couldn't reach your saved experiences. Reload the page to try again.";
+  } else if (expMode === "off") {
+    note.hidden = false;
+    note.innerHTML = 'Your experiences aren\'t being saved. <a href="/Main?next=/">Log in</a> to keep them on your account' +
+      (readCookie(CONSENT_COOKIE) === null ? ", or accept the cookie popup to keep them on this device." : ".");
+  } else if (expMode === "local") {
+    note.hidden = false;
+    note.innerHTML = expUnreachable
+      ? "Couldn't reach your saved experiences, so new ones stay on this device for now."
+      : 'Saved on this device only. <a href="/Main?next=/">Log in</a> to keep them on your account.';
+  }
+  void deskNote;
+
+  if (!experiences.length) listEditing = false;
+  editBtn.hidden = !experiences.length;
+  editBtn.textContent = listEditing ? "Done" : "Edit";
+  document.documentElement.classList.toggle("gp-editing", listEditing);
+
+  if (!experiences.length && !sharedExperiences.length) {
+    const empty = el("div", "gp-empty");
+    if (expMode === "loading") empty.textContent = "Loading your experiences…";
+    else empty.innerHTML = "<strong>No experiences yet</strong>Tap + to add a dose and draw your first graph.";
+    rows.appendChild(empty);
+    return;
+  }
+
+  experiences.forEach((entry, index) => rows.appendChild(phoneRow(entry, index, false)));
+  if (!sharedExperiences.length) return;
+  rows.appendChild(el("p", "gp-section", "Shared with you"));
+  sharedExperiences.forEach((entry, index) => rows.appendChild(phoneRow(entry, index, true)));
+}
+
+function phoneRow(entry, index, shared) {
+  const preview = logic.previewTimeline(entry.doses);
+  const names = preview ? preview.names : [...new Set(entry.doses.map((d) => d.substance || d.name).filter(Boolean))];
+  const colors = preview ? logic.previewColors(preview.names) : [];
+  const times = entry.doses.map((d) => d.time).filter(Boolean).sort();
+  const first = times[0] || "";
+  const last = times[times.length - 1] || "";
+  const date = longDate(entry.startedAt);
+  const dayWord = expDayLabel(entry.startedAt);
+  const weekday = new Date(entry.startedAt).toLocaleDateString([], { weekday: "short" });
+  const span = last && last !== first ? `${first}–${last}` : first;
+
+  const row = el("div", "gp-row");
+  row.setAttribute("role", "listitem");
+  row.style.animationDelay = `${Math.min(index, 12) * 30}ms`;
+  const stops = colors.length ? colors : ["var(--violet)"];
+  row.style.setProperty("--bar", stops.length > 1 ? `linear-gradient(${stops.join(", ")})` : stops[0]);
+
+  const open = el("button", "gp-open");
+  open.type = "button";
+  const bar = el("span", "gp-bar-c");
+  const text = el("span", "gp-text");
+  text.append(el("strong", "", date));
+  const owner = entry.owner?.name || "A friend";
+  text.append(el("span", "gp-subs", shared ? `${owner}'s session · ${names.join(", ")}` : names.join(", ") || "No substance"));
+  const when = /day$/.test(dayWord) ? dayWord : weekday;
+  text.append(el("span", "gp-when", [when, span].filter(Boolean).join(" · ")));
+  if (entry.people?.length) text.append(el("span", "gp-with", shared ? peopleText(entry.people).replace(/^With/, "Also with") : peopleText(entry.people)));
+  const side = el("span", "gp-side");
+  side.innerHTML = CHEVRON;
+  if (entry.doses.length > 1) {
+    const count = el("span", "gp-count");
+    count.innerHTML = LIST_ICON;
+    count.append(String(entry.doses.length));
+    side.append(count);
+  }
+  open.append(bar, text, side);
+  open.setAttribute("aria-label", `Open ${shared ? owner + "'s " : ""}session from ${date}${span ? ", " + span : ""}: ${names.join(", ")}, ${entry.doses.length} dose${entry.doses.length === 1 ? "" : "s"}`);
+  open.addEventListener("click", () => {
+    if (listEditing) return;
+    if (shared) openSharedExperience(entry.id);
+    else openExperience(entry.id);
+  });
+  row.append(open);
+  if (shared) return row;
+
+  const tools = el("span", "gp-tools");
+  if (expMode === "account") {
+    const ppl = el("button", "gp-ppl");
+    ppl.type = "button";
+    ppl.innerHTML = PEOPLE_ICON;
+    ppl.setAttribute("aria-label", `Who was with you, session from ${date}`);
+    if (entry.people?.length) ppl.classList.add("has-people");
+    ppl.addEventListener("click", () => editPeople(entry));
+    tools.append(ppl);
+  }
+  const del = el("button", "gp-del", "Delete");
+  del.type = "button";
+  del.setAttribute("aria-label", `Delete the session from ${date}`);
+  let armed = null;
+  del.addEventListener("click", () => {
+    if (!armed) {
+      // First tap asks, second tap deletes.
+      del.classList.add("is-confirm");
+      del.textContent = "Sure?";
+      armed = setTimeout(() => {
+        armed = null;
+        del.classList.remove("is-confirm");
+        del.textContent = "Delete";
+      }, 4000);
+      return;
+    }
+    clearTimeout(armed);
+    queueExperience(async () => {
+      await dropExperience(entry.id);
+      if (activeExp?.id === entry.id) activeExp = null;
+      renderExperiences();
+      showToast("Session deleted.");
+    });
+  });
+  tools.append(del);
+  row.append(tools);
+  return row;
 }

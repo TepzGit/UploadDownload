@@ -126,8 +126,9 @@ body * {
   letter-spacing: -0.01em;
 }
 
-/* The logo is an inline SVG (letters drawn as paths, so no font is needed). */
-.xn-brand .xn-logo { display: block; width: auto; height: 26px; }
+/* The logo is an inline SVG (letters drawn as paths, so no font is needed): the "Now line" dose curve over geek⁴u. */
+.xn-brand .xn-logo { display: block; width: auto; height: 30px; overflow: visible; }
+@media (min-width: 720px) { .xn-brand .xn-logo { height: 36px; } }
 
 /* Older pages may still have the text version. The "4" in Geek⁴u: a real <sup> so it stays in Roboto Mono (the
    self-hosted font has no ⁴ glyph). */
@@ -577,6 +578,69 @@ input[type="search"].xn-input::-webkit-search-cancel-button { filter: invert(0.6
 .xn-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 .xn-toast.is-error { border-color: #f8717155; color: #fca5a5; }
 
+/* ------------------------------------------------------------
+   Phone tab bar (nav.js builds it from the nav links)
+   ------------------------------------------------------------ */
+:root { --xn-tabs-h: 0px; }
+.xn-tabs { display: none; }
+
+@media (max-width: 767px) {
+  html.xn-has-tabs { --xn-tabs-h: 56px; }
+  html.xn-has-tabs body { padding-bottom: calc(var(--xn-tabs-h) + env(safe-area-inset-bottom)); }
+
+  .xn-tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: stretch;
+    height: calc(var(--xn-tabs-h) + env(safe-area-inset-bottom));
+    padding: 4px max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+    background: rgba(14, 14, 17, 0.84);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    backdrop-filter: saturate(180%) blur(22px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    view-transition-name: xn-tabs;
+  }
+  .xn-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: #8c8994;
+    text-decoration: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    transition: color 0.15s ease;
+  }
+  .xn-tab svg { width: 26px; height: 26px; fill: currentColor; transition: transform 0.15s ease; }
+  .xn-tab:active svg { transform: scale(0.88); }
+  .xn-tabs .xn-tab .xn-tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: min(10.5px, 2.75vw);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  .xn-tab[aria-current="page"] { color: var(--oled-accent); }
+  .xn-tab:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -4px; border-radius: 10px; }
+
+  /* The top menu keeps only pages that aren't tabs, and hides when there are none. */
+  .xn-js .xn-links a.xn-in-tabs { display: none; }
+  .xn-js .xn.xn-no-extra .xn-toggle { display: none; }
+
+  /* Bottom popups clear the tab bar. */
+  html.xn-has-tabs .xn-toast { bottom: calc(var(--xn-tabs-h) + 14px + env(safe-area-inset-bottom)); }
+}
+
 /* Page scroll stays put behind an open modal. */
 html.xn-modal-open,
 html.xn-modal-open body { overflow: hidden; }
@@ -729,3 +793,187 @@ html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: 
 .xn-inbox-line time { margin-left: auto; font-size: 11px; }
 .xn-inbox-body { color: var(--oled-text); overflow-wrap: anywhere; white-space: pre-line; }
 .xn-inbox-post { color: var(--oled-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ------------------------------------------------------------
+   Site backgrounds (Profile > Appearance > Background). nav.js puts
+   data-scene on <html> and a .xn-scene layer next to .xn-fluid.
+   No data-scene = the drifting colors above.
+   ------------------------------------------------------------ */
+html[data-scene] .xn-fluid,
+html[data-scene] .xn-hatch,
+html[data-scene] .crosshatch { display: none; }
+.xn-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #000;
+  contain: strict;
+}
+.xn-bg > .xn-scene { z-index: -1; }
+.xn-scene span { position: absolute; display: block; will-change: transform; }
+
+/* Aurora: soft bands of light swaying across the top. */
+.xn-scene[data-scene="aurora"] span {
+  left: -30vw;
+  width: 160vw;
+  height: 46vh;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.9;
+}
+.xn-scene[data-scene="aurora"] .s1 { top: -14vh; background: linear-gradient(90deg, transparent 8%, rgba(var(--xn-accent-rgb), 0.5) 35%, rgba(56, 214, 196, 0.35) 60%, transparent 90%); animation: xn-aurora-1 19s ease-in-out infinite alternate; }
+.xn-scene[data-scene="aurora"] .s2 { top: 8vh; background: linear-gradient(90deg, transparent 10%, rgba(56, 214, 196, 0.28) 40%, rgba(232, 92, 230, 0.3) 70%, transparent 92%); animation: xn-aurora-2 27s ease-in-out infinite alternate; }
+.xn-scene[data-scene="aurora"] .s3 { top: 30vh; height: 34vh; background: linear-gradient(90deg, transparent 15%, rgba(76, 81, 255, 0.26) 45%, rgba(var(--xn-accent-rgb), 0.22) 75%, transparent 95%); animation: xn-aurora-3 35s ease-in-out infinite alternate; }
+.xn-scene[data-scene="aurora"]::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, #000 92%); }
+@keyframes xn-aurora-1 { from { transform: translateX(-12vw) skewY(-4deg) scaleY(0.8); } to { transform: translateX(14vw) skewY(5deg) scaleY(1.2); } }
+@keyframes xn-aurora-2 { from { transform: translateX(10vw) skewY(6deg) scaleY(1.1); } to { transform: translateX(-16vw) skewY(-3deg) scaleY(0.75); } }
+@keyframes xn-aurora-3 { from { transform: translateX(-8vw) skewY(-2deg); } to { transform: translateX(12vw) skewY(4deg) scaleY(1.3); } }
+
+/* Stars: three layers drifting up at different speeds, the near one twinkling. */
+.xn-scene[data-scene="stars"] span { left: 0; top: 0; width: 100%; height: calc(100% + 600px); }
+.xn-scene[data-scene="stars"] .s1 {
+  background-image: radial-gradient(1px 1px at 20px 30px, #fff 50%, transparent 51%), radial-gradient(1px 1px at 80px 110px, rgba(255, 255, 255, 0.7) 50%, transparent 51%), radial-gradient(1px 1px at 140px 60px, rgba(255, 255, 255, 0.8) 50%, transparent 51%);
+  background-size: 150px 150px;
+  opacity: 0.6;
+  animation: xn-stars 120s linear infinite;
+}
+.xn-scene[data-scene="stars"] .s2 {
+  background-image: radial-gradient(1.5px 1.5px at 50px 80px, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 210px 170px, rgba(var(--xn-accent-rgb), 1) 50%, transparent 51%);
+  background-size: 300px 300px;
+  opacity: 0.75;
+  animation: xn-stars 80s linear infinite;
+}
+.xn-scene[data-scene="stars"] .s3 {
+  background-image: radial-gradient(2px 2px at 100px 150px, #fff 50%, transparent 51%), radial-gradient(2.5px 2.5px at 420px 520px, rgba(var(--xn-accent-rgb), 1) 50%, transparent 51%);
+  background-size: 600px 600px;
+  animation: xn-stars 50s linear infinite, xn-twinkle 4s ease-in-out infinite alternate;
+}
+.xn-scene[data-scene="stars"]::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 120%, rgba(var(--xn-accent-rgb), 0.22), transparent 60%); }
+@keyframes xn-stars { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -600px, 0); } }
+@keyframes xn-twinkle { from { opacity: 1; } to { opacity: 0.35; } }
+
+/* Grid: a neon floor rolling toward you under a glowing horizon. */
+.xn-scene[data-scene="grid"] .s1 {
+  left: 50%; top: 18vh;
+  width: 60vmax; height: 60vmax;
+  margin-left: -30vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--xn-accent-rgb), 0.38) 0%, rgba(232, 92, 230, 0.12) 40%, transparent 68%);
+  animation: xn-pulse 9s ease-in-out infinite alternate;
+}
+.xn-scene[data-scene="grid"] .s2 {
+  left: -50%; right: -50%; bottom: 0;
+  height: 55vh;
+  perspective: 320px;
+  overflow: hidden;
+  will-change: auto;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 40%);
+  mask-image: linear-gradient(180deg, transparent, #000 40%);
+}
+.xn-scene[data-scene="grid"] .s2 i {
+  position: absolute;
+  left: 0; right: 0; top: -100%;
+  height: 300%;
+  background-image:
+    linear-gradient(rgba(var(--xn-accent-rgb), 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--xn-accent-rgb), 0.55) 1px, transparent 1px);
+  background-size: 60px 60px;
+  transform-origin: 50% 100%;
+  transform: rotateX(72deg) translate3d(0, 0, 0);
+  animation: xn-floor 2.4s linear infinite;
+}
+@keyframes xn-floor { from { transform: rotateX(72deg) translate3d(0, 0, 0); } to { transform: rotateX(72deg) translate3d(0, 60px, 0); } }
+@keyframes xn-pulse { from { transform: scale(0.92); opacity: 0.75; } to { transform: scale(1.08); opacity: 1; } }
+
+/* Pills: capsules floating up and turning slowly (nav.js spreads them out). */
+.xn-scene[data-scene="pills"] span {
+  bottom: -80px;
+  left: var(--x);
+  width: calc(16px * var(--s));
+  height: calc(40px * var(--s));
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(var(--xn-accent-rgb), 0.8) 0 50%, rgba(255, 255, 255, 0.75) 50% 100%);
+  opacity: var(--o);
+  animation: xn-rise var(--d) linear infinite;
+  animation-delay: var(--w);
+}
+.xn-scene[data-scene="pills"]::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, rgba(var(--xn-accent-rgb), 0.12), transparent 70%); }
+@keyframes xn-rise { from { transform: translate3d(0, 0, 0) rotate(var(--r)); } to { transform: translate3d(var(--sway), calc(-100vh - 160px), 0) rotate(calc(var(--r) + 300deg)); } }
+
+/* Waves: layered swells rolling along the bottom. */
+.xn-scene[data-scene="waves"] span {
+  left: 0; bottom: 0;
+  width: 200%;
+  height: 40vh;
+  background: rgba(var(--xn-accent-rgb), var(--o));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200' preserveAspectRatio='none'%3E%3Cpath d='M0 100 C150 40 300 40 450 100 S750 160 900 100 S1050 40 1200 100 V200 H0Z'/%3E%3C/svg%3E") 0 0 / 50% 100% repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 200' preserveAspectRatio='none'%3E%3Cpath d='M0 100 C150 40 300 40 450 100 S750 160 900 100 S1050 40 1200 100 V200 H0Z'/%3E%3C/svg%3E") 0 0 / 50% 100% repeat-x;
+  animation: xn-wave var(--d) linear infinite;
+}
+.xn-scene[data-scene="waves"] .s1 { --o: 0.08; --d: 26s; height: 52vh; }
+.xn-scene[data-scene="waves"] .s2 { --o: 0.12; --d: 18s; height: 40vh; animation-direction: reverse; }
+.xn-scene[data-scene="waves"] .s3 { --o: 0.18; --d: 12s; height: 26vh; }
+.xn-scene[data-scene="waves"]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 60vh; background: radial-gradient(ellipse at 50% 0%, rgba(76, 81, 255, 0.18), transparent 70%); }
+@keyframes xn-wave { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+
+/* Your own picture, darkened so text stays readable. */
+.xn-scene[data-scene="custom"] {
+  background: #000 var(--xn-scene-img, none) center / cover no-repeat;
+}
+.xn-scene[data-scene="custom"]::after { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, var(--xn-scene-dim, 0.4)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .xn-scene span, .xn-scene span i { animation: none !important; }
+}
+
+/* Geek rank badge (nav.js xnRank.badge, Profile, public profile, Forum).
+   Five pips fill up with the tier; the color climbs too. */
+.xn-rank {
+  --rank: #9c96aa;
+  position: relative; /* keeps the hidden label inside scrolling lists */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--rank) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rank) 12%, transparent);
+  color: var(--rank);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.xn-rank[data-tier="2"] { --rank: #2dd4bf; }
+.xn-rank[data-tier="3"] { --rank: #60a5fa; }
+.xn-rank[data-tier="4"] { --rank: rgb(var(--xn-accent-rgb)); }
+.xn-rank[data-tier="5"] { --rank: #fbbf24; box-shadow: 0 0 14px rgba(251, 191, 36, 0.35); }
+.xn-rank-pips { display: inline-flex; gap: 2px; }
+.xn-rank-pips i { width: 4px; height: 9px; border-radius: 2px; background: currentColor; opacity: 0.22; }
+.xn-rank[data-tier="1"] .xn-rank-pips i:nth-child(-n+1),
+.xn-rank[data-tier="2"] .xn-rank-pips i:nth-child(-n+2),
+.xn-rank[data-tier="3"] .xn-rank-pips i:nth-child(-n+3),
+.xn-rank[data-tier="4"] .xn-rank-pips i:nth-child(-n+4),
+.xn-rank[data-tier="5"] .xn-rank-pips i { opacity: 1; }
+.xn-rank.is-compact { gap: 0; padding: 3px 5px; }
+.xn-rank.is-compact .xn-rank-pips i { width: 3px; height: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .xn-rank[data-tier="5"] { animation: xn-rank-glow 2.6s ease-in-out infinite alternate; }
+}
+@keyframes xn-rank-glow { from { box-shadow: 0 0 6px rgba(251, 191, 36, 0.2); } to { box-shadow: 0 0 16px rgba(251, 191, 36, 0.5); } }
+/* Level: how many times the account reached Geek⁴. */
+.xn-level {
+  margin-left: 2px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--rank);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.xn-rank.is-compact .xn-level { margin-left: 4px; padding: 0 4px; font-size: 9px; line-height: 13px; }
