@@ -301,6 +301,11 @@
   .release-details > summary::-webkit-details-marker{ display:none; }
   .release-details[open] .release-chevron{ transform:rotate(180deg); }
   .release-chevron{ transition:transform .15s ease; }
+  .roa-picker{ display:flex; flex-wrap:wrap; gap:.4rem; }
+  .roa-chip{ min-height:36px; padding:0 .85rem; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); color:var(--muted); font-size:12px; transition:color .15s ease, border-color .15s ease, background-color .15s ease; }
+  .roa-chip[aria-checked="true"]{ border-color:var(--violet); background:rgba(var(--xn-accent-rgb), .16); color:var(--text); }
+  .roa-chip:focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
+  @media (hover:hover){ .roa-chip:hover{ color:var(--text); } }
 
   /* ---------------- Phones (under 768px): an app-style Graph page ----------------
      List of experiences -> tap one (or +) -> its graph, with + opening the
@@ -514,6 +519,10 @@
       <p id="status" class="font-mono text-[11px] text-[var(--muted)] mb-3">Search for a substance to begin.</p>
 
       <section id="dosePanel" class="flex flex-col gap-3" hidden>
+        <div id="roaField" hidden>
+          <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Route of administration</span>
+          <div id="roaPicker" class="roa-picker" role="radiogroup" aria-label="Route of administration"></div>
+        </div>
         <div class="grid grid-cols-2 gap-2">
           <label class="block">
             <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Dose <span id="doseUnit"></span></span>

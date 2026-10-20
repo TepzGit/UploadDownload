@@ -163,7 +163,7 @@ function getRecent() {
 
 function rememberDose(entry) {
   if (!hasConsent()) return;
-  const key = (d) => `${d.substance}|${d.amount}|${d.formulation}`;
+  const key = recentKey;
   const old = getRecent();
   const before = old.find((d) => key(d) === key(entry));
   const fresh = { ...entry, at: Date.now(), n: before ? before.n + 1 : 1 };
@@ -171,7 +171,9 @@ function rememberDose(entry) {
   writeCookie(RECENT_COOKIE, JSON.stringify(list));
 }
 
-const recentKey = (d) => `${d.substance}|${d.amount}|${d.formulation}`;
+function recentKey(d) {
+  return `${d.substance}|${d.amount}|${d.formulation}${d.route ? "|" + d.route : ""}`;
+}
 
 const stillMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -272,7 +274,7 @@ function renderRecent() {
     meta.className = "recent-meta";
     const amount = document.createElement("b");
     amount.textContent = `${d.amount} ${d.unit || ""}`.trim();
-    meta.append(amount, ` · ${releaseLabel(d)}`);
+    meta.append(amount, ` · ${d.route ? d.route + " · " : ""}${releaseLabel(d)}`);
     const when = document.createElement("span");
     when.className = "recent-when";
     const ago = agoLabel(d.at);
@@ -618,6 +620,9 @@ async function useRecent(d) {
   els.input.value = d.substance;
   await handleSearch();
   if (els.dosePanel.hidden) return;
+  if (d.route && d.route !== logic.getState().currentRoa?.name && logic.getState().roas?.some((r) => r.name === d.route)) {
+    showRoute(logic.selectRoa(d.route));
+  }
   els.doseInput.value = d.amount;
   const box = els.formulationInputs.find((c) => c.value === d.formulation);
   if (box) {
@@ -1269,14 +1274,11 @@ async function handleSearch() {
   els.status.textContent = "Loading substance data…";
 
   try {
-    const { substance, roa, commonDose, units } = await logic.fetchSubstanceData(substanceName);
+    const info = await logic.fetchSubstanceData(substanceName);
 
-    els.doseInput.value = commonDose;
-    els.doseUnit.textContent = units;
     els.doseStartHour.value = logic.currentTimeValue();
     els.dosePanel.hidden = false;
-    els.status.textContent = `${substance.name} loaded · common dose ${commonDose} ${units}`;
-    renderSubstanceInfo(substance, roa);
+    showRoute(info);
     paintAddButton();
   } catch (error) {
     els.dosePanel.hidden = true;
@@ -1286,6 +1288,34 @@ async function handleSearch() {
   } finally {
     setLoading(false);
   }
+}
+
+// Route of administration: one chip per route PsychonautWiki has timings for.
+// Picking one swaps in that route's durations and common dose.
+const routeName = (name) => (name ? name.charAt(0).toUpperCase() + name.slice(1) : "");
+
+function showRoute({ substance, roa, roas, commonDose, units }) {
+  els.doseInput.value = commonDose;
+  els.doseUnit.textContent = units;
+  els.status.textContent = `${substance.name} loaded · ${roa.name ? roa.name + " · " : ""}common dose ${commonDose} ${units}`;
+  renderSubstanceInfo(substance, roa);
+  const field = document.getElementById("roaField");
+  const picker = document.getElementById("roaPicker");
+  if (!field || !picker) return;
+  field.hidden = !roas.length;
+  picker.replaceChildren();
+  roas.forEach((item) => {
+    const chip = el("button", "roa-chip", routeName(item.name));
+    chip.type = "button";
+    chip.setAttribute("role", "radio");
+    chip.setAttribute("aria-checked", String(item.name === roa.name));
+    chip.addEventListener("click", () => {
+      if (item.name === logic.getState().currentRoa?.name) return;
+      showRoute(logic.selectRoa(item.name));
+      picker.querySelector('[aria-checked="true"]')?.focus();
+    });
+    picker.appendChild(chip);
+  });
 }
 
 /** The add button takes the color this substance has (or will get) on the graph. */
@@ -1425,7 +1455,7 @@ function handleAddDose() {
       formulation: selectedFormulation(),
     });
     const f = selectedFormulation();
-    rememberDose({ substance: dose.substance, amount: dose.amount, unit: dose.unit, formulation: f.key, label: f.label, releaseHours: f.releaseHours });
+    rememberDose({ substance: dose.substance, amount: dose.amount, unit: dose.unit, route: dose.route, formulation: f.key, label: f.label, releaseHours: f.releaseHours });
     logDose(dose);
     renderRecent();
     renderTracker();
@@ -1490,7 +1520,7 @@ function renderDoseList() {
     const name = document.createElement("strong");
     name.textContent = dose.substance;
     const meta = document.createElement("span");
-    meta.textContent = `${dose.amount} ${dose.unit} · ${dose.formulation}`;
+    meta.textContent = [`${dose.amount} ${dose.unit}`, dose.route, dose.formulation].filter(Boolean).join(" · ");
     details.append(name, meta);
 
     const edit = document.createElement("button");
@@ -1604,7 +1634,7 @@ async function handleSave() {
         Time: takenAt.toISOString(),
         DoseAmount: String(dose.amount),
         Unit: dose.unit,
-        Method: dose.formulation,
+        Method: [dose.route, dose.formulation].filter(Boolean).join(", "),
       };
     }),
   }));
