@@ -56,10 +56,79 @@ function fetchGraphQL(query, variables = {}) {
 /** Typeahead suggestions. Old name: searchSuggestions() (network part only). */
 export async function searchSuggestions(name) {
   const query = `query Suggestions($name: String!) {
-        substances(query: $name) { name }
+        substances(query: $name) { name class { psychoactive chemical } }
     }`;
   const result = await fetchGraphQL(query, { name });
-  return result?.data?.substances || [];
+  const substances = result?.data?.substances || [];
+  substances.forEach((s) => rememberClass(s));
+  return substances;
+}
+
+// ------------------------------------------------------------
+// Drug class icons (depressant, stimulant, ...). The class comes from
+// PsychonautWiki and is kept in localStorage so lists don't refetch it.
+// ------------------------------------------------------------
+
+const CLASS_KEY = "gp-classes";
+const Z_DRUGS = ["zolpidem", "zopiclone", "eszopiclone", "zaleplon"];
+// First match wins, so the narrow classes come before depressant/stimulant.
+const CLASS_RULES = [
+  ["zdrug", /hypnotic|imidazopyridine|cyclopyrrolone|pyrazolopyrimidine/],
+  ["antipsychotic", /antipsychotic/],
+  ["cannabinoid", /cannabinoid/],
+  ["dissociative", /dissociative/],
+  ["psychedelic", /psychedelic|hallucinogen/],
+  ["depressant", /depressant|opioid|sedative|anxiolytic|benzodiazepine|gabapentinoid|barbiturate/],
+  ["stimulant", /stimulant|entactogen|nootropic/],
+];
+let classCache = null;
+const classRequests = new Map();
+
+function readClassCache() {
+  if (classCache) return classCache;
+  try { classCache = JSON.parse(localStorage.getItem(CLASS_KEY)) || {}; } catch { classCache = {}; }
+  return classCache;
+}
+
+/** Turns a PsychonautWiki substance into one icon key, or "" when none fits. */
+export function classKeyFor(substance) {
+  const name = String(substance?.name || "").toLowerCase();
+  if (Z_DRUGS.includes(name)) return "zdrug";
+  if (name === "cannabis" || name === "thc") return "cannabinoid";
+  const text = [...(substance?.class?.psychoactive || []), ...(substance?.class?.chemical || [])].join(" ").toLowerCase();
+  const rule = CLASS_RULES.find(([, re]) => re.test(text));
+  return rule ? rule[0] : "";
+}
+
+function rememberClass(substance, name = substance?.name) {
+  if (!name) return;
+  const cache = readClassCache();
+  cache[name.toLowerCase()] = classKeyFor(substance);
+  try { localStorage.setItem(CLASS_KEY, JSON.stringify(cache)); } catch {}
+}
+
+/** The icon key for a substance name; looks it up once when it isn't cached. */
+export function classKeyOf(name) {
+  const key = String(name || "").toLowerCase();
+  const cache = readClassCache();
+  if (key in cache) return Promise.resolve(cache[key]);
+  if (!classRequests.has(key)) {
+    const query = `query Class($name: String!) {
+        substances(query: $name) { name class { psychoactive chemical } }
+    }`;
+    classRequests.set(key, fetchGraphQL(query, { name }).then((result) => {
+      const hit = (result?.data?.substances || []).find((s) => s.name.toLowerCase() === key) || result?.data?.substances?.[0];
+      if (!hit) return "";
+      rememberClass(hit, key);
+      return classKeyFor(hit);
+    }).catch(() => ""));
+  }
+  return classRequests.get(key);
+}
+
+/** The cached icon key, without a network call. */
+export function cachedClassKey(name) {
+  return readClassCache()[String(name || "").toLowerCase()] || "";
 }
 
 /**
@@ -71,6 +140,7 @@ export async function fetchSubstanceData(name) {
   const query = `query Substance($name: String!) {
         substances(query: $name) {
             name
+            class { psychoactive chemical }
             images { thumb }
             summary
             addictionPotential
@@ -104,6 +174,7 @@ export async function fetchSubstanceData(name) {
 
   state.currentSubstance = substance;
   state.roas = roas;
+  rememberClass(substance);
   return selectRoa(withDose.name);
 }
 
