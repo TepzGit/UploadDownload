@@ -40,6 +40,8 @@ function init() {
     substanceInfo: document.getElementById("substanceInfo"),
     substanceImage: document.getElementById("substanceImage"),
     substanceName: document.getElementById("substanceName"),
+    substanceClass: document.getElementById("substanceClass"),
+    inputClass: document.getElementById("inputClass"),
     substanceSummary: document.getElementById("substanceSummary"),
     addictionPotential: document.getElementById("addictionPotential"),
     substanceTimes: document.getElementById("substanceTimes"),
@@ -154,6 +156,7 @@ function getRecent() {
       unit: typeof d.unit === "string" ? d.unit.slice(0, 12) : "",
       formulation: known.has(d.formulation) ? d.formulation : "immediate",
       label: typeof d.label === "string" ? d.label.slice(0, 40) : "",
+      route: typeof d.route === "string" ? d.route.slice(0, 30) : "",
       releaseHours: Number.isFinite(Number(d.releaseHours)) ? Number(d.releaseHours) : 0,
       at: Number.isFinite(Number(d.at)) && Number(d.at) > 0 ? Number(d.at) : 0, // last used (ms)
       n: Number.isInteger(Number(d.n)) && Number(d.n) > 0 ? Math.min(Number(d.n), 999) : 1, // times used
@@ -266,6 +269,7 @@ function renderRecent() {
     tile.className = "recent-tile";
     tile.setAttribute("aria-hidden", "true");
     tile.textContent = d.substance.slice(0, 1).toUpperCase();
+    tileIcon(tile, d.substance);
     const text = document.createElement("span");
     text.className = "recent-text";
     const name = document.createElement("strong");
@@ -644,6 +648,7 @@ function bindEvents() {
   els.input.addEventListener("input", () => {
     clearTimeout(suggestionTimer);
     const value = els.input.value.trim();
+    syncInputClass();
     if (value.length < 2) {
       els.suggestions.hidden = true;
       return;
@@ -1253,7 +1258,7 @@ function showSuggestions(substances) {
     option.type = "button";
     option.className = "suggestion";
     option.setAttribute("role", "option");
-    option.textContent = substance.name;
+    option.append(classIcon(substance.name), substance.name);
     option.addEventListener("click", () => {
       els.input.value = substance.name;
       els.suggestions.hidden = true;
@@ -1288,6 +1293,60 @@ async function handleSearch() {
   } finally {
     setLoading(false);
   }
+}
+
+// Drug class icons: a small mark next to the substance name.
+const CLASS_LABELS = {
+  depressant: "Depressant",
+  stimulant: "Stimulant",
+  psychedelic: "Psychedelic",
+  dissociative: "Dissociative",
+  cannabinoid: "Cannabinoid",
+  antipsychotic: "Antipsychotic",
+  zdrug: "Z-drug",
+};
+
+function setClassIcon(icon, name, known) {
+  icon.dataset.for = name;
+  const apply = (key) => {
+    if (icon.dataset.for !== name) return;
+    icon.dataset.class = key || "";
+    icon.hidden = !key;
+    icon.title = CLASS_LABELS[key] || "";
+    icon.dispatchEvent(new Event("sc-icon"));
+  };
+  const key = known ?? logic.cachedClassKey(name);
+  apply(key);
+  if (known === undefined && !key) logic.classKeyOf(name).then(apply);
+}
+
+function classIcon(name) {
+  const icon = document.createElement("i");
+  icon.className = "sc-icon";
+  icon.setAttribute("aria-hidden", "true");
+  setClassIcon(icon, name);
+  return icon;
+}
+
+/** Recent dose tiles show the class icon in place of the first letter. */
+function tileIcon(tile, name) {
+  const icon = classIcon(name);
+  const show = () => {
+    if (icon.hidden) return;
+    tile.textContent = "";
+    tile.append(icon);
+  };
+  icon.addEventListener("sc-icon", show);
+  show();
+}
+
+/** The search field shows the icon while it holds the loaded substance. */
+function syncInputClass() {
+  const loaded = logic.getState().currentSubstance?.name || "";
+  const same = loaded && els.input.value.trim().toLowerCase() === loaded.toLowerCase();
+  if (same) setClassIcon(els.inputClass, loaded);
+  else els.inputClass.hidden = true;
+  els.input.classList.toggle("has-class", same && !els.inputClass.hidden);
 }
 
 // Route of administration: one chip per route PsychonautWiki has timings for.
@@ -1387,6 +1446,8 @@ function renderSubstanceInfo(substance, roa) {
   }
 
   els.substanceName.textContent = substance.name;
+  setClassIcon(els.substanceClass, substance.name, logic.classKeyFor(substance));
+  syncInputClass();
   els.substanceSummary.textContent = substance.summary || "No summary available.";
   els.addictionPotential.textContent = substance.addictionPotential || "Unknown";
   setPills("caution", substance.uncertainInteractions);
@@ -1481,6 +1542,7 @@ function handleReset(event, { quiet = false } = {}) {
   flushExperience(); // the timeline stays under Experiences
   activeExp = null;
   logic.resetState();
+  syncInputClass();
   renderDoseList();
   plot.clearPlot("myPlot");
   els.chartEmpty.hidden = false;
@@ -1518,7 +1580,7 @@ function renderDoseList() {
 
     const details = document.createElement("div");
     const name = document.createElement("strong");
-    name.textContent = dose.substance;
+    name.append(classIcon(dose.substance), dose.substance);
     const meta = document.createElement("span");
     meta.textContent = [`${dose.amount} ${dose.unit}`, dose.route, dose.formulation].filter(Boolean).join(" · ");
     details.append(name, meta);
@@ -1735,7 +1797,7 @@ function applyPhoneLayout() {
     };
     move(document.getElementById("doseBlock"), (n) => { n.classList.add("gp-doses"); chartCard.appendChild(n); });
     move(document.getElementById("trackerOpen"), (n) => chartCard.after(n));
-    move(document.getElementById("recentDoses"), (n) => controls.querySelector(".flex.items-center.justify-between").after(n));
+    move(document.getElementById("recentDoses"), (n) => document.getElementById("dosePanel").after(n));
   } else if (!phone && phoneMoves.length) {
     phoneMoves.reverse().forEach(({ node, parent, next }) => {
       node.classList.remove("gp-doses");
