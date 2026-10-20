@@ -69,35 +69,19 @@ export async function searchSuggestions(name) {
 // PsychonautWiki and is kept in localStorage so lists don't refetch it.
 // ------------------------------------------------------------
 
-const CLASS_KEY = "gp-classes";
-const Z_DRUGS = ["zolpidem", "zopiclone", "eszopiclone", "zaleplon"];
-// First match wins, so the narrow classes come before depressant/stimulant.
-const CLASS_RULES = [
-  ["zdrug", /hypnotic|imidazopyridine|cyclopyrrolone|pyrazolopyrimidine/],
-  ["antipsychotic", /antipsychotic/],
-  ["cannabinoid", /cannabinoid/],
-  ["dissociative", /dissociative/],
-  ["psychedelic", /psychedelic|hallucinogen/],
-  ["depressant", /depressant|opioid|sedative|anxiolytic|benzodiazepine|gabapentinoid|barbiturate/],
-  ["stimulant", /stimulant|entactogen|nootropic/],
-];
+const CLASS_KEY = "gp-classes-2"; // -2: opioid and empathogen icons were added
 let classCache = null;
 const classRequests = new Map();
 
 function readClassCache() {
   if (classCache) return classCache;
-  try { classCache = JSON.parse(localStorage.getItem(CLASS_KEY)) || {}; } catch { classCache = {}; }
+  try { classCache = JSON.parse(localStorage.getItem(CLASS_KEY)) || {}; localStorage.removeItem("gp-classes"); } catch { classCache = {}; }
   return classCache;
 }
 
-/** Turns a PsychonautWiki substance into one icon key, or "" when none fits. */
+/** Turns a PsychonautWiki substance into one icon key (js/classicons.js), or "". */
 export function classKeyFor(substance) {
-  const name = String(substance?.name || "").toLowerCase();
-  if (Z_DRUGS.includes(name)) return "zdrug";
-  if (name === "cannabis" || name === "thc") return "cannabinoid";
-  const text = [...(substance?.class?.psychoactive || []), ...(substance?.class?.chemical || [])].join(" ").toLowerCase();
-  const rule = CLASS_RULES.find(([, re]) => re.test(text));
-  return rule ? rule[0] : "";
+  return window.xnClass ? window.xnClass.keyFor(substance) : "";
 }
 
 function rememberClass(substance, name = substance?.name) {
