@@ -5,8 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Journal · Geek⁴u</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <link href="/vendor/daisyui-4.12.10.css" rel="stylesheet" type="text/css" />
   <style>
     :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:var(--oled-accent); }
     body{ color:var(--text); }
@@ -53,6 +52,7 @@
   <script src="/likes.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="stylesheet" href="/vendor/tailwind.css">
 </head>
 <body class="min-h-screen xn-bg">
   <header class="xn">
@@ -63,7 +63,7 @@
     <a href="/">Graph</a>
     <a href="/Files/">Files</a>
     <a href="/Forum">Forum</a>
-    <a href="/Replications">Replications</a>
+    <a href="/Utility">Utility</a>
     <a href="/Profile">Profile</a>
   </nav>
 </header>
@@ -140,11 +140,37 @@
             // The class filter needs the whole catalog, so it's fetched once
             // (a few big pages) and kept for this browser tab.
             const CATALOG_KEY = "xn_pw_catalog_v1";
+            // Offline (the phone app), the list comes from the substances the
+            // Graph saved on the phone (offline.js).
+            const offlineStore = import("/offline.js").catch(() => null);
+            // Custom substances (added by an admin in the Substances Importer) join the list, marked Custom.
+            const customLoad = import("/logic.js").then((m) => m.customSubstances()).catch(() => []);
+            async function withCustom(all) {
+                const custom = await customLoad;
+                const taken = new Set(custom.map((c) => c.name.toLowerCase()));
+                return [...custom, ...all.filter((s) => !taken.has(String(s.name || "").toLowerCase()))]
+                    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+            }
+            async function savedCatalog() {
+                const store = await offlineStore;
+                const all = store ? await store.allSubstances() : [];
+                if (!all.length) throw new Error("nothing saved on this phone");
+                return all.sort((a, b) => a.name.localeCompare(b.name));
+            }
             async function loadCatalog() {
                 try {
                     const saved = JSON.parse(sessionStorage.getItem(CATALOG_KEY) || "null");
                     if (saved && saved.length) return saved;
                 } catch (_) {}
+                if (!navigator.onLine) return savedCatalog();
+                try {
+                    return await downloadCatalog();
+                } catch (error) {
+                    if (!(error instanceof TypeError)) throw error;
+                    return savedCatalog();
+                }
+            }
+            async function downloadCatalog() {
                 const all = [];
                 for (let offset = 0; offset < 4000; offset += 250) {
                     const result = await fetchGraphQL(`{
@@ -247,6 +273,8 @@
                         document.getElementById("classCount").textContent = (currentClass || query)
                             ? `${matches.length} ${matches.length === 1 ? "substance" : "substances"}${what ? " in " + what : ""}${query ? ` matching “${query}”` : ""} · page ${Math.floor(offset / PAGE) + 1} of ${pages}`
                             : "";
+                    } else if (!navigator.onLine) {
+                        throw new TypeError("offline"); // the saved list shows once loadCatalog has it
                     } else {
                         const result = await getSubstances(offset, query);
                         substances = result?.data?.substances || [];
@@ -276,6 +304,12 @@
                         `;
                         drugDiv.querySelector(".drugname").append(window.xnClass.icon(window.xnClass.keyFor(substance)), DrugName);
                         drugDiv.querySelector(".drugclass").textContent = [Psycho, DrugClass].filter(Boolean).join(" · ") || "Substance";
+                        if (substance.custom) {
+                            const tag = document.createElement("span");
+                            tag.className = "drug-custom";
+                            tag.textContent = "Custom";
+                            drugDiv.querySelector(".drugname").append(tag);
+                        }
                         const thumb = drugDiv.querySelector(".drug-thumb");
                         if (imgUrl) {
                             const img = document.createElement("img");
@@ -308,6 +342,10 @@
                 } catch (error) {
                     console.error("Error fetching substances:", error);
                     if (seq !== displaySeq) return;
+                    if (!navigator.onLine) {
+                        drugsDiv.innerHTML = `<p class="jr-status">You're offline. Loading the substances saved on this phone…</p>`;
+                        return;
+                    }
                     drugsDiv.innerHTML = `<p class="jr-status">Couldn't reach PsychonautWiki. Check your connection and try again.</p>`;
                 }
             }
@@ -324,11 +362,18 @@
 
             document.addEventListener("DOMContentLoaded", () => {
                 displaySubstances(0);
-                loadCatalog().then((all) => {
+                loadCatalog().catch(async (error) => {
+                    // No PsychonautWiki list, but the custom ones can still show.
+                    if (!(await customLoad).length) throw error;
+                    return [];
+                }).then(withCustom).then((all) => {
                     catalog = all;
                     buildChips();
                     displaySubstances(currentSearchQuery ? 0 : currentOffset, currentSearchQuery);
-                }).catch((error) => console.warn("Class filter unavailable:", error));
+                }).catch((error) => {
+                    console.warn("Class filter unavailable:", error);
+                    if (!navigator.onLine) document.querySelector(".Drugs").innerHTML = `<p class="jr-status">You're offline, and no substances are saved on this phone yet. Open the Graph once with internet to save them.</p>`;
+                });
 
                 const inputField = document.getElementById("input");
                 let searchTimeout;

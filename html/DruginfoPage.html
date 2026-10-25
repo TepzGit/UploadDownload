@@ -28,7 +28,7 @@
     <a href="/">Graph</a>
     <a href="/Files/">Files</a>
     <a href="/Forum">Forum</a>
-    <a href="/Replications">Replications</a>
+    <a href="/Utility">Utility</a>
     <a href="/Profile">Profile</a>
   </nav>
 </header>
@@ -57,7 +57,7 @@
 
   <h2 class="xn-label di-section" id="diRoutesTitle" hidden>Dosing by route</h2>
   <div class="DrugInfoIntakeMethods" aria-live="polite"></div>
-  <p class="di-note">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
+  <p class="di-note" id="diNote">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
 </main>
 
 <script>
@@ -78,12 +78,41 @@
         unsafeInteractions { name }
         uncertainInteractions { name }`;
 
+  // Offline (the phone app), the page shows the copy kept on the phone (offline.js).
+  const offlineStore = import("/offline.js").catch(() => null);
+
+  async function savedInfo(drugName) {
+    const store = await offlineStore;
+    const saved = store ? await store.getSubstance(drugName) : null;
+    if (!saved) throw new Error("offline and not saved");
+    return { data: { substances: [saved] }, offline: true };
+  }
+
+  // Substances an admin added in the Substances Importer come from our server.
+  const customLookup = (name) => import("/logic.js").then((m) => m.customByName(name)).catch(() => null);
+
   async function getDrugInfo(drugName) {
+    const custom = await customLookup(drugName);
+    if (custom) return { data: { substances: [custom] } };
+    if (!navigator.onLine) return savedInfo(drugName);
+    let info = null;
     try {
-      const info = await askWiki(drugName, DETAILS);
-      if (!info.errors) return info;
-    } catch (_) {}
-    return askWiki(drugName, "");
+      info = await askWiki(drugName, DETAILS);
+      if (info.errors) info = null;
+    } catch (error) {
+      if (error instanceof TypeError) return savedInfo(drugName);
+    }
+    if (!info) {
+      try {
+        info = await askWiki(drugName, "");
+      } catch (error) {
+        if (error instanceof TypeError) return savedInfo(drugName);
+        throw error;
+      }
+    }
+    const found = info?.data?.substances?.[0];
+    if (found) offlineStore.then((store) => store && store.putSubstances([found]));
+    return info;
   }
 
   async function askWiki(drugName, DETAIL_FIELDS) {
@@ -234,6 +263,19 @@ ${DETAIL_FIELDS}
       box.append(c);
     }
 
+    // Custom entries: half-life, risks, notes and the full timeline
+    if (s.custom) {
+      const c = card("Safety");
+      const half = s.halfLife ? range(s.halfLife.min, s.halfLife.max) : "";
+      const list = el("dl", "di-list");
+      rows(list, [["Half-life", half ? half + " hours" : "Not given"]]);
+      c.append(list);
+      if (s.risks) c.append(el("h3", "xn-label di-sub", "Risks"), el("p", "di-card-note di-pre", s.risks));
+      if (s.notes) c.append(el("h3", "xn-label di-sub", "Notes"), el("p", "di-card-note di-pre", s.notes));
+      c.append(el("p", "di-card-note di-custom-note", "Added by an admin on this site, not from PsychonautWiki."));
+      box.append(c);
+    }
+
     // Tolerance
     const tol = s.tolerance || {};
     const tolRows = [["Full tolerance", tol.full], ["Half tolerance", tol.half], ["Back to baseline", tol.zero]].filter(([, v]) => v);
@@ -318,6 +360,8 @@ ${DETAIL_FIELDS}
     }
 
     document.getElementById("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(name.replace(/\s+/g, "_"));
+    document.getElementById("diWiki").hidden = !!substance.custom;
+    if (substance.custom) document.getElementById("diNote").textContent = "Dose and duration data were added by an admin on this site and are a rough guide, not advice.";
     document.getElementById("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"));
     document.getElementById("diLinks").hidden = false;
 
@@ -337,11 +381,20 @@ ${DETAIL_FIELDS}
       const head = el("div", "di-roa-head");
       head.append(el("h2", "xn-h2 di-roa-name", roa.name || "Unknown route"));
       const bio = roa.bioavailability ? range(roa.bioavailability.min, roa.bioavailability.max) : "";
-      head.append(el("span", "di-bio", "Bioavailability: " + (bio ? bio + "%" : "N/A")));
+      if (!substance.custom || bio) head.append(el("span", "di-bio", "Bioavailability: " + (bio ? bio + "%" : "N/A")));
       card.append(head);
 
       const doses = doseEntries(roa.dose);
       const durations = durationEntries(roa.duration);
+      // Custom entries can have a come-down and a second peak (Substances Importer).
+      const ext = roa.extended || {};
+      const pct = (v) => Math.round(Number(v) * 100) + "%";
+      const at = () => { const i = durations.findIndex(([label]) => label === "Offset"); return i < 0 ? durations.length : i; };
+      if (ext.comedown > 0) durations.splice(at(), 0, ["Come down", `${ext.comedown} hours, to ${pct(ext.comedownLevel ?? 0.35)} of the peak`]);
+      if (ext.peak2?.duration > 0) {
+        const p2 = ext.peak2;
+        durations.splice(durations.findIndex(([label]) => label === "Peak") + 1, 0, ["Second peak", `${p2.duration} hours at ${pct(p2.level ?? 1)}, ${p2.gap || 0} hours after the first (dips to ${pct(p2.dip ?? 0.5)})`]);
+      }
       if (doses.length) {
         card.append(el("h3", "xn-label di-sub", "Dose"));
         const list = el("dl", "di-list di-doses");
@@ -374,7 +427,9 @@ ${DETAIL_FIELDS}
     }).catch((error) => {
       console.error(error);
       document.querySelector(".DrugInfoName").textContent = drugName;
-      showMessage("Couldn't reach PsychonautWiki. Check your connection and try again.");
+      showMessage(!/offline and not saved/.test(error && error.message)
+        ? "Couldn't reach PsychonautWiki. Check your connection and try again."
+        : "You're offline, and this substance isn't saved on this phone yet. Open the Graph once with internet to save every substance.");
     });
   }
 </script>

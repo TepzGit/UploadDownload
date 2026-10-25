@@ -11,6 +11,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.webkit.JavascriptInterface;
+import org.json.JSONObject;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -18,6 +20,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.net.http.SslError;
@@ -46,6 +49,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -72,7 +76,7 @@ import java.util.Locale;
  */
 public class MainActivity extends Activity {
     /** Put the site's address here (like "https://example.com") to skip the setup screen. */
-    static final String DEFAULT_SERVER = "";
+    static final String DEFAULT_SERVER = "http://87.61.252.240:42067";
 
     static final String ACTION_OPEN = "com.geek4u.app.OPEN";
     static final String ACTION_CHANGE_SERVER = "com.geek4u.app.CHANGE_SERVER";
@@ -105,11 +109,26 @@ public class MainActivity extends Activity {
     WebChromeClient.CustomViewCallback fullscreenCallback;
     /** The page that failed to load, while the "Can't reach" screen is up. */
     String failedUrl;
+    /** Saved pages and files for offline use (OfflineCache). */
+    OfflineCache cache;
+    volatile String userAgent;
+    volatile String serverHost;
+    ConnectivityManager.NetworkCallback netWatch;
+    /** Copies the Files folders picked on the Profile into Download/Geek4u (SyncEngine). */
+    SyncEngine sync;
+    boolean syncAfterPermission;
 
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         prefs = getSharedPreferences("geek4u", MODE_PRIVATE);
+        cache = new OfflineCache(new File(getCacheDir(), "offline"));
+        sync = new SyncEngine(this, new SyncEngine.Listener() {
+            public void onStatus(JSONObject status) {
+                pushSyncStatus(status);
+            }
+        });
+        watchNetwork();
         mono = font("fonts/RobotoMono-Regular.ttf", Typeface.MONOSPACE);
         monoBold = font("fonts/RobotoMono-SemiBold.ttf", Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
         root = new FrameLayout(this);
@@ -171,12 +190,15 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(true);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         s.setUserAgentString(s.getUserAgentString() + " Geek4uApp/" + version() + " (Android)");
+        userAgent = s.getUserAgentString();
+        web.setNetworkAvailable(online());
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(web, false);
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
         web.setDownloadListener(new Downloads());
+        web.addJavascriptInterface(new Bridge(), "Geek4uApp");
         registerForContextMenu(web);
         root.addView(web, 0, new FrameLayout.LayoutParams(MATCH, MATCH));
 
@@ -190,6 +212,16 @@ public class MainActivity extends Activity {
 
     void openSite(String url) {
         createWeb();
+        serverHost = Uri.parse(server).getHost();
+        // Opened without internet: go to a page the phone has saved.
+        if (!online() && !cache.has(url)) {
+            for (String page : OfflineCache.OFFLINE_PAGES) {
+                if (cache.has(server + page)) {
+                    url = server + page;
+                    break;
+                }
+            }
+        }
         if (splash == null && web.getUrl() == null) showSplash();
         web.loadUrl(url);
     }
@@ -263,6 +295,14 @@ public class MainActivity extends Activity {
     }
 
     class Client extends WebViewClient {
+        // Runs off the main thread for every request: pages, scripts, pictures, JSON.
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            String host = serverHost;
+            if (cache == null || host == null || !cache.handles(request, host)) return null;
+            return cache.load(request, userAgent, online());
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             // Leave frames inside a page alone, only whole-page moves can go to another app.
@@ -574,6 +614,10 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
         if (request != REQ_STORAGE) return;
+        if (syncAfterPermission) {
+            syncAfterPermission = false;
+            startSync(false);
+        }
         String[] d = pendingDownload;
         pendingDownload = null;
         if (d == null) return;
@@ -632,10 +676,88 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (web != null) web.onResume();
+        // Keeps synced folders fresh; the first sync starts from the Profile's Phone sync.
+        if (sync.lastSync() > 0 && online() && System.currentTimeMillis() - sync.lastSync() > 15 * 60 * 1000L) startSync(false);
+    }
+
+    // ---------------------------------------------------------------- phone sync
+
+    /** What the page's Phone sync popup calls (window.Geek4uApp). */
+    class Bridge {
+        @JavascriptInterface
+        public void syncNow() {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    startSync(true);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void syncStatus() {
+            pushSyncStatus(sync.status());
+        }
+    }
+
+    void startSync(boolean ask) {
+        if (server.isEmpty()) return;
+        boolean canWrite = Build.VERSION.SDK_INT >= 29
+                || checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        if (!canWrite && ask) {
+            syncAfterPermission = true;
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQ_STORAGE);
+            return;
+        }
+        sync.start(server, userAgent, canWrite);
+    }
+
+    void pushSyncStatus(final JSONObject status) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                if (web != null) web.evaluateJavascript("window.xnSyncStatus&&window.xnSyncStatus(" + status + ")", null);
+            }
+        });
+    }
+
+    /** Tells the page when the phone goes on or offline, so it can upload saved changes. */
+    void watchNetwork() {
+        if (Build.VERSION.SDK_INT < 24) return;
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            netWatch = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    tellWeb(true);
+                }
+
+                @Override
+                public void onLost(Network network) {
+                    tellWeb(online());
+                }
+            };
+            cm.registerDefaultNetworkCallback(netWatch);
+        } catch (Exception e) {
+            netWatch = null;
+        }
+    }
+
+    void tellWeb(final boolean available) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                if (web != null) web.setNetworkAvailable(available);
+            }
+        });
     }
 
     @Override
     protected void onDestroy() {
+        if (netWatch != null) {
+            try {
+                ((ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE)).unregisterNetworkCallback(netWatch);
+            } catch (Exception e) {
+                // already gone
+            }
+        }
         if (web != null) {
             root.removeView(web);
             web.destroy();
@@ -874,11 +996,35 @@ public class MainActivity extends Activity {
         col.setPadding(dp(24), dp(32), dp(24), dp(32));
         col.setGravity(Gravity.CENTER_HORIZONTAL);
         col.addView(logo(150), new LinearLayout.LayoutParams(WRAP, WRAP));
-        col.addView(text("Can't reach Geek⁴u", 18, TEXT, true), lp(MATCH, WRAP, 28));
+        boolean offline = !online();
+        String savedPage = null;
+        if (offline) {
+            message = "This page needs internet. The Graph, Journal, your Profile and Utility work offline.";
+            for (String page : OfflineCache.OFFLINE_PAGES) {
+                if (cache.has(server + page) && !page.equals("/Main")) {
+                    savedPage = server + page;
+                    break;
+                }
+            }
+        }
+        col.addView(text(offline ? "You need internet" : "Can't reach Geek⁴u", 18, TEXT, true), lp(MATCH, WRAP, 28));
         col.addView(text(message, 13, MUTED, false), lp(MATCH, WRAP, 8));
         col.addView(text(server, 11, HINT, false), lp(MATCH, WRAP, 10));
-        Button retry = button("Try again", true);
-        col.addView(retry, lp(MATCH, dp(48), 22));
+        if (savedPage != null) {
+            final String target = savedPage;
+            Button graph = button(target.endsWith("/Profile") ? "Open your Profile" : target.endsWith("/Utility") ? "Open Utility" : target.contains("/journal") ? "Open the Journal" : "Open the Graph", true);
+            col.addView(graph, lp(MATCH, dp(48), 22));
+            graph.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    failedUrl = null;
+                    removeOverlay();
+                    createWeb();
+                    web.loadUrl(target);
+                }
+            });
+        }
+        Button retry = button("Try again", savedPage == null);
+        col.addView(retry, lp(MATCH, dp(48), savedPage == null ? 22 : 10));
         Button change = button("Change server", false);
         col.addView(change, lp(MATCH, dp(48), 10));
         retry.setOnClickListener(new View.OnClickListener() {

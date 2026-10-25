@@ -25,7 +25,7 @@
     <a href="/">Graph</a>
     <a href="/Files/">Files</a>
     <a href="/Forum">Forum</a>
-    <a href="/Replications">Replications</a>
+    <a href="/Utility">Utility</a>
     <a href="/Profile">Profile</a>
   </nav>
 </header>
@@ -41,6 +41,11 @@
       <a class="AdminPanelOption" href="/admin/createUser">
         <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/></svg></span>
         <span class="ad-text"><strong>Create user</strong><span>Add an account and choose its role.</span></span>
+        <svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </a>
+      <a class="AdminPanelOption" href="/admin/substances">
+        <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8.5 2h7M7 15h10"/></svg></span>
+        <span class="ad-text"><strong>Substances Importer</strong><span>Add medications and substances PsychonautWiki doesn't have.</span></span>
         <svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
       </a>
     </div>
@@ -99,7 +104,7 @@
     const $ = (id) => document.getElementById(id);
     const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     const num = (n) => Number(n || 0).toLocaleString();
-    const PAGE_NAMES = { "/": "Graph", "/Main": "Main", "/journal": "Journal", "/journal/Drug": "Drug info", "/Profile": "Profile", "/Forum": "Forum", "/admin": "Admin", "/Uploader": "Upload", "/u/": "Public profiles", "/Files/": "Files", "/Replications": "Replications" };
+    const PAGE_NAMES = { "/": "Graph", "/Main": "Main", "/journal": "Journal", "/journal/Drug": "Drug info", "/Profile": "Profile", "/Forum": "Forum", "/admin": "Admin", "/Uploader": "Upload", "/Utility": "Utility", "/u/": "Public profiles", "/Files/": "Files", "/Replications": "Replications", "/admin/substances": "Substances Importer" };
     const dayLabel = (d, opts) => new Date(d + "T12:00:00").toLocaleDateString(undefined, opts || { month: "short", day: "numeric" });
     function ago(ms) {
       if (!ms) return "—";

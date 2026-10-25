@@ -132,3 +132,5 @@ a.di-chip:focus-visible { outline: 2px solid var(--oled-accent); outline-offset:
 .di-int-head.is-caution { color: #facc15; }
 .di-int-hint { text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--oled-muted); }
 .di-info-card .xn-label.di-sub:first-of-type { margin-top: 4px; }
+.di-pre { white-space: pre-line; color: var(--oled-text); font-size: 12px; line-height: 1.6; }
+.di-custom-note { margin-top: 12px; }

@@ -16,7 +16,7 @@ LLVM=$(ls -d /usr/lib/llvm-*/bin 2>/dev/null | sort -V | tail -1)
 LD64=$(command -v ld64.lld || echo "$LLVM/ld64.lld")
 RCODESIGN=$(command -v rcodesign || true)
 LINK=(-arch arm64 -platform_version ios 15.0 15.6 -syslibroot "$SDK" -L"$SDK/usr/lib" -F"$SDK/System/Library/Frameworks"
-      -lSystem -lobjc -framework Foundation -framework CoreGraphics -framework UIKit -framework WebKit -dead_strip -adhoc_codesign)
+      -lSystem -lobjc -framework Foundation -framework CoreGraphics -framework UIKit -framework WebKit -framework AVFAudio -dead_strip -adhoc_codesign)
 
 if [ ! -f "$SDK/System/Library/Frameworks/WebKit.framework/Headers/WebKit.h" ]; then
   echo "Fetching iOS SDK headers..."
@@ -28,6 +28,17 @@ if [ ! -f "$SDK/System/Library/Frameworks/WebKit.framework/Headers/WebKit.h" ]; 
     System/Library/Frameworks/Foundation.framework/Foundation.tbd System/Library/Frameworks/CoreFoundation.framework/CoreFoundation.tbd \
     System/Library/Frameworks/CoreGraphics.framework/CoreGraphics.tbd
 fi
+if [ ! -f "$SDK/System/Library/Frameworks/AVFAudio.framework/AVFAudio.tbd" ]; then
+  echo "Fetching the audio session headers (background music)..."
+  python3 tools/fetch_sdk.py "$SDK" System/Library/Frameworks/AVFAudio.framework/Headers/AVAudioSession.h \
+    System/Library/Frameworks/AVFAudio.framework/AVFAudio.tbd
+fi
+if [ ! -f "$SDK/usr/include/arpa/inet.h" ]; then
+  echo "Fetching the C headers the offline proxy uses..."
+  python3 tools/fetch_sdk.py "$SDK" $(for h in arpa/inet.h dirent.h errno.h fcntl.h netdb.h netinet/in.h netinet/tcp.h \
+    poll.h pthread.h signal.h stdint.h stdio.h stdlib.h string.h strings.h sys/socket.h sys/stat.h sys/time.h time.h unistd.h; do
+    echo usr/include/$h; done)
+fi
 
 rm -rf build
 APP=build/Payload/Geek4u.app
@@ -36,9 +47,10 @@ mkdir -p "$APP"
 echo "Code..."
 clang -target arm64-apple-ios15.0 -isysroot "$SDK" -fobjc-arc -O2 -Wall -Wextra -Wno-unused-parameter \
   -Wunguarded-availability -c src/main.m -o build/main.o
+clang -target arm64-apple-ios15.0 -isysroot "$SDK" -O2 -Wall -Wextra -c src/gkproxy.c -o build/gkproxy.o
 # The first link fetches any framework stubs UIKit pulls in that aren't here yet.
-python3 tools/fetch_reexports.py "$SDK" "$LD64" "${LINK[@]}" -o "$APP/Geek4u" build/main.o > build/link.log
-"$LD64" "${LINK[@]}" -o "$APP/Geek4u" build/main.o
+python3 tools/fetch_reexports.py "$SDK" "$LD64" "${LINK[@]}" -o "$APP/Geek4u" build/main.o build/gkproxy.o > build/link.log
+"$LD64" "${LINK[@]}" -o "$APP/Geek4u" build/main.o build/gkproxy.o
 
 echo "Bundle..."
 python3 tools/make_plist.py "$APP/Info.plist" "$VERSION" "$BUILD"

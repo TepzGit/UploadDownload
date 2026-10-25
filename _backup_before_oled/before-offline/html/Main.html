@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Home · Geek⁴u</title>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  {{if .IsAdmin}}<script src="/media.js"></script>{{end}}
+  <style>
+    .gp {
+      --gp-card: #0a0a0c;
+      --gp-tile: #111115;
+      --gp-line: #23202b;
+      --gp-line-hi: #3a3150;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: clamp(20px, 4vw, 40px) max(16px, env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      color: var(--oled-text);
+    }
+    .gp *, .gp *::before, .gp *::after { box-sizing: border-box; }
+    @media (max-width: 767px) { .gp { padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); } }
+
+    /* Hero: name + live clock. It sticks under the nav while the panel
+       scrolls up over it; the scroll script shrinks the clock as it goes. */
+    .gp-hero {
+      position: sticky;
+      top: calc(var(--oled-nav-h) + env(safe-area-inset-top));
+      z-index: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(80vh - var(--oled-nav-h));
+      min-height: calc(80svh - var(--oled-nav-h));
+      text-align: center;
+    }
+    .gp-hero-inner { transform-origin: 50% 50%; will-change: transform; }
+    .gp-hint {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      width: 28px;
+      height: 28px;
+      margin-left: -14px;
+      color: var(--oled-muted);
+      animation: gp-bob 2.4s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes gp-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
+    .gp-title {
+      margin: 0;
+      font-size: clamp(1rem, 2.4vw, 1.25rem);
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--oled-accent);
+    }
+    /* The logo above the clock (same drawing as the nav logo). */
+    .gp-title .gp-logo { display: block; width: auto; height: clamp(68px, 14vw, 128px); margin: 0 auto 8px; color: var(--oled-text); }
+    .gp-clock {
+      margin: 6px 0 0;
+      font-size: clamp(3.4rem, 16vw, 9.5rem);
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .gp-clock .gp-sec { color: var(--oled-muted); }
+    .gp-date { margin: 10px 0 0; font-size: 0.95rem; color: var(--oled-muted); }
+
+    .gp-panel {
+      position: relative;
+      z-index: 1;
+      will-change: opacity, transform;
+      box-shadow: 0 -30px 80px -40px rgba(var(--xn-accent-rgb), var(--gp-glow, 0));
+      margin-top: clamp(24px, 4vw, 40px);
+      padding: clamp(18px, 4.5vw, 48px);
+      border: 1px solid var(--gp-line);
+      border-radius: 20px;
+      background: var(--gp-card);
+    }
+
+    .gp-kicker {
+      margin: 0 0 18px;
+      font-size: 0.75rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--oled-muted);
+      text-align: center;
+    }
+
+    /* Team */
+    .gp-team {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 284px));
+      justify-content: center;
+      gap: clamp(16px, 8vw, 120px);
+    }
+    .gp-member {
+      margin: 0;
+      padding: 14px 14px 18px;
+      border: 1px solid var(--gp-line);
+      border-radius: 14px;
+      background: var(--gp-tile);
+      text-align: center;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    @media (hover: hover) {
+      .gp-member:hover { transform: translateY(-3px); border-color: var(--gp-line-hi); }
+    }
+    .gp-photo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #000;
+    }
+    .gp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gp-photo { position: relative; }
+    .gp-pic-tools { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+    .gp-pic-tools button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 36px; padding: 0 10px; border: 1px solid rgba(255,255,255,0.18); border-radius: 18px;
+      background: rgba(0,0,0,0.72); color: #fff; font: inherit; font-size: 12px; cursor: pointer;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .gp-pic-tools button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .gp-pic-tools button:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+    @media (hover: hover) { .gp-pic-tools button:hover { border-color: var(--oled-accent); } }
+    .gp-photo.is-busy img { opacity: 0.4; }
+    .gp-photo > span { font-size: 5rem; font-weight: 600; color: var(--oled-accent); }
+    .gp-member figcaption { margin-top: 14px; }
+    .gp-name { display: block; font-size: 1.1rem; font-weight: 600; }
+    .gp-role {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px;
+      border: 1px solid var(--gp-line-hi);
+      border-radius: 999px;
+      background: var(--oled-accent-soft);
+      font-size: 0.78rem;
+      color: #cdb8ff;
+    }
+
+    /* Sign in + weather */
+    .gp-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+      gap: 16px;
+      margin-top: clamp(28px, 5vw, 56px);
+    }
+    .gp-tile {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 26px 22px;
+      border: 1px solid var(--gp-line);
+      border-radius: 16px;
+      background: var(--gp-tile);
+      text-align: center;
+    }
+    .gp-label { font-size: 0.75rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--oled-muted); }
+    .gp-place { margin-top: 8px; font-size: 1.35rem; font-weight: 600; }
+    .gp-temp { margin: 18px 0 12px; font-size: clamp(3rem, 8vw, 4.25rem); font-weight: 300; line-height: 1; }
+    .gp-cond { font-size: 1rem; color: #d4d0de; }
+    .gp-wind { margin-top: 6px; font-size: 0.85rem; color: var(--oled-muted); }
+
+    .gp-login { display: grid; gap: 10px; width: 100%; max-width: 360px; margin: 16px auto 0; text-align: left; }
+    .gp-login input {
+      width: 100%;
+      height: 48px;
+      padding: 0 14px;
+      border: 1px solid var(--gp-line);
+      border-radius: 10px;
+      background: #000;
+      color: var(--oled-text);
+      font: inherit;
+    }
+    .gp-login input:focus { outline: 2px solid var(--oled-accent); outline-offset: 1px; border-color: transparent; }
+    .gp-login button {
+      height: 48px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--oled-accent);
+      color: #160f24;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+    .gp-login button:hover { filter: brightness(1.1); }
+    .gp-login button:disabled { opacity: 0.6; cursor: wait; }
+    .gp-error { min-height: 1.2em; font-size: 0.85rem; color: #ff8b8b; text-align: center; }
+    .gp-error.is-ok { color: #bbf7d0; }
+
+    /* Log in / Sign up switch and the signed-in tile */
+    .gp-tabs {
+      display: flex;
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+      padding: 3px;
+      border: 1px solid var(--gp-line);
+      border-radius: 12px;
+      background: #000;
+    }
+    .gp-tabs button {
+      flex: 1;
+      height: 38px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--oled-muted);
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .gp-tabs button[aria-selected="true"] { background: var(--gp-tile); color: var(--oled-text); box-shadow: inset 0 0 0 1px var(--gp-line-hi); }
+    .gp-tabs button:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+    .gp-hint-text { margin: 0; font-size: 0.75rem; line-height: 1.5; color: var(--oled-muted); }
+    .gp-note { margin: 0 auto 12px; max-width: 360px; font-size: 0.85rem; color: #cdb8ff; }
+    .gp-who { margin-top: 10px; font-size: 1.6rem; font-weight: 600; overflow-wrap: anywhere; }
+    .gp-role-line { margin-top: 6px; font-size: 0.85rem; color: var(--oled-muted); }
+    .gp-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+    .gp-actions form { display: contents; }
+    .gp-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+      height: 44px;
+      padding: 0 18px;
+      border: 1px solid var(--gp-line);
+      border-radius: 10px;
+      background: #000;
+      color: var(--oled-text);
+      font: inherit;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s ease, filter 0.15s ease;
+    }
+    .gp-btn-primary { border-color: transparent; background: var(--oled-accent); color: #160f24; }
+    @media (hover: hover) {
+      .gp-btn:hover { border-color: var(--gp-line-hi); }
+      .gp-btn-primary:hover { filter: brightness(1.1); border-color: transparent; }
+    }
+
+    @media (max-width: 560px) {
+      .gp-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .gp-member { padding: 10px 10px 14px; }
+      .gp-name { font-size: 0.95rem; }
+      .gp-role { font-size: 0.7rem; padding: 2px 8px; }
+    }
+
+    .gp { position: relative; z-index: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gp-member, .gp-member:hover { transition: none; transform: none; }
+      .gp-hint { animation: none; }
+    }
+  </style>
+  <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+</head>
+<body>
+  <header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u"><svg class="xn-logo" viewBox="-6 -166 358 191" width="56.2" height="30" aria-hidden="true" focusable="false"><defs><linearGradient id="xnNowGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity=".5"/><stop offset="1" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity="0"/></linearGradient></defs><path fill="url(#xnNowGlow)" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92Z"/><path fill="none" style="stroke:var(--logo-pill,#a67cff)" stroke-width="5" stroke-linecap="round" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92"/><path stroke="#fff" stroke-width="3" d="M196,-162V-92"/><circle cx="196" cy="-150" r="7" fill="#fff"/><path fill="currentColor" d="M5.79 -26.82V-25.79Q5.79 -20.05 7.28 -15.14Q8.76 -10.24 11.54 -6.66Q14.3 -3.09 18.22 -1.05Q22.15 0.98 27.06 0.98Q29.63 0.98 31.87 0.42Q34.11 -0.13 35.97 -1.14Q37.21 -1.83 38.3 -2.73Q39.39 -3.63 40.38 -4.72V-1.38Q40.38 1.46 39.57 3.71Q38.77 5.96 37.27 7.49Q35.65 9.14 33.27 9.99Q30.9 10.84 27.87 10.84Q26.02 10.84 24.27 10.48Q22.52 10.11 20.87 9.36Q19.18 8.6 17.62 7.41Q16.05 6.21 14.66 4.59L8.86 12.25Q10.58 14.53 13 16.15Q15.42 17.77 18.12 18.8Q20.8 19.83 23.52 20.32Q26.23 20.8 28.55 20.8Q33.99 20.8 38.5 19.32Q43.01 17.83 46.26 14.96Q49.46 12.09 51.25 7.92Q53.04 3.75 53.04 -1.59V-52.83H41.55L41.04 -47.65Q40.07 -48.86 38.92 -49.86Q37.78 -50.85 36.45 -51.58Q34.57 -52.69 32.26 -53.25Q29.95 -53.81 27.16 -53.81Q22.19 -53.81 18.24 -51.85Q14.3 -49.88 11.53 -46.32Q8.75 -42.75 7.27 -37.78Q5.79 -32.8 5.79 -26.82ZM18.45 -25.79V-26.82Q18.45 -30.25 19.16 -33.28Q19.87 -36.31 21.36 -38.61Q22.8 -40.86 25.03 -42.17Q27.25 -43.48 30.33 -43.48Q32.04 -43.48 33.49 -43.13Q34.94 -42.78 36.14 -42.15Q37.5 -41.44 38.56 -40.34Q39.61 -39.24 40.38 -37.81V-15.06Q39.65 -13.74 38.67 -12.67Q37.69 -11.6 36.42 -10.84Q35.18 -10.13 33.65 -9.74Q32.11 -9.35 30.23 -9.35Q27.17 -9.35 24.94 -10.64Q22.72 -11.93 21.28 -14.18Q19.83 -16.39 19.14 -19.37Q18.45 -22.36 18.45 -25.79Z M90.38 0.98Q98.05 0.98 103.59 -2.03Q109.13 -5.03 111.73 -8.77L105.21 -15.45Q102.83 -12.39 99.07 -10.78Q95.31 -9.17 91.13 -9.17Q88.13 -9.17 85.6 -10.16Q83.08 -11.14 81.16 -12.91Q79.29 -14.62 78.19 -16.76Q77.09 -18.9 76.48 -22.21V-22.4H112.72V-27.8Q112.72 -33.55 111.15 -38.35Q109.59 -43.14 106.56 -46.58Q103.5 -50.01 99.07 -51.91Q94.65 -53.81 88.93 -53.81Q83.62 -53.81 79.01 -51.84Q74.4 -49.87 70.99 -46.28Q67.57 -42.69 65.64 -37.68Q63.7 -32.66 63.7 -26.53V-24.56Q63.7 -19.2 65.62 -14.53Q67.53 -9.86 71.04 -6.44Q74.56 -2.99 79.47 -1Q84.39 0.98 90.38 0.98ZM88.86 -43.57Q91.63 -43.57 93.72 -42.67Q95.81 -41.76 97.24 -40.25Q98.67 -38.7 99.48 -36.61Q100.29 -34.52 100.29 -32.31V-31.37H76.73Q77.23 -34.18 78.29 -36.43Q79.34 -38.68 80.91 -40.28Q82.44 -41.88 84.45 -42.72Q86.47 -43.57 88.86 -43.57Z M148.38 0.98Q156.05 0.98 161.59 -2.03Q167.13 -5.03 169.73 -8.77L163.21 -15.45Q160.83 -12.39 157.07 -10.78Q153.31 -9.17 149.13 -9.17Q146.13 -9.17 143.6 -10.16Q141.08 -11.14 139.16 -12.91Q137.29 -14.62 136.19 -16.76Q135.09 -18.9 134.48 -22.21V-22.4H170.72V-27.8Q170.72 -33.55 169.15 -38.35Q167.59 -43.14 164.56 -46.58Q161.5 -50.01 157.07 -51.91Q152.65 -53.81 146.93 -53.81Q141.62 -53.81 137.01 -51.84Q132.4 -49.87 128.99 -46.28Q125.57 -42.69 123.64 -37.68Q121.7 -32.66 121.7 -26.53V-24.56Q121.7 -19.2 123.62 -14.53Q125.53 -9.86 129.04 -6.44Q132.56 -2.99 137.47 -1Q142.39 0.98 148.38 0.98ZM146.86 -43.57Q149.63 -43.57 151.72 -42.67Q153.81 -41.76 155.24 -40.25Q156.67 -38.7 157.48 -36.61Q158.29 -34.52 158.29 -32.31V-31.37H134.73Q135.23 -34.18 136.29 -36.43Q137.34 -38.68 138.91 -40.28Q140.44 -41.88 142.45 -42.72Q144.47 -43.57 146.86 -43.57Z M200.25 -22.42 216.16 0H231.72L208.61 -30.81L228.84 -52.83H213.64L198.47 -36.53L193.99 -31.49V-75H181.36V0H193.99V-16.56Z M303.77 0H315.21V-52.83H302.54V-15.6Q301.89 -14.24 300.96 -13.12Q300.04 -12.01 298.84 -11.22Q297.43 -10.29 295.56 -9.8Q293.69 -9.3 291.35 -9.3Q288.92 -9.3 287.19 -9.91Q285.47 -10.52 284.37 -11.95Q283.27 -13.34 282.76 -15.67Q282.25 -18.01 282.25 -21.45V-52.83H269.63V-21.55Q269.63 -15.57 270.96 -11.3Q272.3 -7.04 274.73 -4.31Q277.16 -1.53 280.57 -0.26Q283.97 1.02 288.09 1.02Q292.72 1.02 296.54 -1.22Q300.36 -3.45 303.04 -7.39Z"/><path style="fill:var(--logo-pill,#a67cff)" d="M256.2 -65.74V-88.97H249.04L233.5 -64.44L233.78 -60.02H249.14V-52H256.2V-60.02H260.49V-65.74ZM240.43 -65.74 248.45 -78.25 249.14 -79.47V-65.74Z"/></svg></a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Replications">Replications</a>
+    <a href="/Profile">Profile</a>
+    {{if eq .SessionInfo.Authority "admin"}}<a class="xn-admin" href="/admin">Admin</a>{{end}}
+  </nav>
+</header>
+
+  <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+  <main class="gp">
+    <section class="gp-hero" id="gpHero">
+      <div class="gp-hero-inner" id="gpHeroInner">
+        <h1 class="gp-title" aria-label="Geek⁴u"><svg class="gp-logo" viewBox="-6 -166 358 191" aria-hidden="true" focusable="false"><defs><linearGradient id="xnNowGlowHero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity=".5"/><stop offset="1" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity="0"/></linearGradient></defs><path fill="url(#xnNowGlowHero)" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92Z"/><path fill="none" style="stroke:var(--logo-pill,#a67cff)" stroke-width="5" stroke-linecap="round" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92"/><path stroke="#fff" stroke-width="3" d="M196,-162V-92"/><circle cx="196" cy="-150" r="7" fill="#fff"/><path fill="currentColor" d="M5.79 -26.82V-25.79Q5.79 -20.05 7.28 -15.14Q8.76 -10.24 11.54 -6.66Q14.3 -3.09 18.22 -1.05Q22.15 0.98 27.06 0.98Q29.63 0.98 31.87 0.42Q34.11 -0.13 35.97 -1.14Q37.21 -1.83 38.3 -2.73Q39.39 -3.63 40.38 -4.72V-1.38Q40.38 1.46 39.57 3.71Q38.77 5.96 37.27 7.49Q35.65 9.14 33.27 9.99Q30.9 10.84 27.87 10.84Q26.02 10.84 24.27 10.48Q22.52 10.11 20.87 9.36Q19.18 8.6 17.62 7.41Q16.05 6.21 14.66 4.59L8.86 12.25Q10.58 14.53 13 16.15Q15.42 17.77 18.12 18.8Q20.8 19.83 23.52 20.32Q26.23 20.8 28.55 20.8Q33.99 20.8 38.5 19.32Q43.01 17.83 46.26 14.96Q49.46 12.09 51.25 7.92Q53.04 3.75 53.04 -1.59V-52.83H41.55L41.04 -47.65Q40.07 -48.86 38.92 -49.86Q37.78 -50.85 36.45 -51.58Q34.57 -52.69 32.26 -53.25Q29.95 -53.81 27.16 -53.81Q22.19 -53.81 18.24 -51.85Q14.3 -49.88 11.53 -46.32Q8.75 -42.75 7.27 -37.78Q5.79 -32.8 5.79 -26.82ZM18.45 -25.79V-26.82Q18.45 -30.25 19.16 -33.28Q19.87 -36.31 21.36 -38.61Q22.8 -40.86 25.03 -42.17Q27.25 -43.48 30.33 -43.48Q32.04 -43.48 33.49 -43.13Q34.94 -42.78 36.14 -42.15Q37.5 -41.44 38.56 -40.34Q39.61 -39.24 40.38 -37.81V-15.06Q39.65 -13.74 38.67 -12.67Q37.69 -11.6 36.42 -10.84Q35.18 -10.13 33.65 -9.74Q32.11 -9.35 30.23 -9.35Q27.17 -9.35 24.94 -10.64Q22.72 -11.93 21.28 -14.18Q19.83 -16.39 19.14 -19.37Q18.45 -22.36 18.45 -25.79Z M90.38 0.98Q98.05 0.98 103.59 -2.03Q109.13 -5.03 111.73 -8.77L105.21 -15.45Q102.83 -12.39 99.07 -10.78Q95.31 -9.17 91.13 -9.17Q88.13 -9.17 85.6 -10.16Q83.08 -11.14 81.16 -12.91Q79.29 -14.62 78.19 -16.76Q77.09 -18.9 76.48 -22.21V-22.4H112.72V-27.8Q112.72 -33.55 111.15 -38.35Q109.59 -43.14 106.56 -46.58Q103.5 -50.01 99.07 -51.91Q94.65 -53.81 88.93 -53.81Q83.62 -53.81 79.01 -51.84Q74.4 -49.87 70.99 -46.28Q67.57 -42.69 65.64 -37.68Q63.7 -32.66 63.7 -26.53V-24.56Q63.7 -19.2 65.62 -14.53Q67.53 -9.86 71.04 -6.44Q74.56 -2.99 79.47 -1Q84.39 0.98 90.38 0.98ZM88.86 -43.57Q91.63 -43.57 93.72 -42.67Q95.81 -41.76 97.24 -40.25Q98.67 -38.7 99.48 -36.61Q100.29 -34.52 100.29 -32.31V-31.37H76.73Q77.23 -34.18 78.29 -36.43Q79.34 -38.68 80.91 -40.28Q82.44 -41.88 84.45 -42.72Q86.47 -43.57 88.86 -43.57Z M148.38 0.98Q156.05 0.98 161.59 -2.03Q167.13 -5.03 169.73 -8.77L163.21 -15.45Q160.83 -12.39 157.07 -10.78Q153.31 -9.17 149.13 -9.17Q146.13 -9.17 143.6 -10.16Q141.08 -11.14 139.16 -12.91Q137.29 -14.62 136.19 -16.76Q135.09 -18.9 134.48 -22.21V-22.4H170.72V-27.8Q170.72 -33.55 169.15 -38.35Q167.59 -43.14 164.56 -46.58Q161.5 -50.01 157.07 -51.91Q152.65 -53.81 146.93 -53.81Q141.62 -53.81 137.01 -51.84Q132.4 -49.87 128.99 -46.28Q125.57 -42.69 123.64 -37.68Q121.7 -32.66 121.7 -26.53V-24.56Q121.7 -19.2 123.62 -14.53Q125.53 -9.86 129.04 -6.44Q132.56 -2.99 137.47 -1Q142.39 0.98 148.38 0.98ZM146.86 -43.57Q149.63 -43.57 151.72 -42.67Q153.81 -41.76 155.24 -40.25Q156.67 -38.7 157.48 -36.61Q158.29 -34.52 158.29 -32.31V-31.37H134.73Q135.23 -34.18 136.29 -36.43Q137.34 -38.68 138.91 -40.28Q140.44 -41.88 142.45 -42.72Q144.47 -43.57 146.86 -43.57Z M200.25 -22.42 216.16 0H231.72L208.61 -30.81L228.84 -52.83H213.64L198.47 -36.53L193.99 -31.49V-75H181.36V0H193.99V-16.56Z M303.77 0H315.21V-52.83H302.54V-15.6Q301.89 -14.24 300.96 -13.12Q300.04 -12.01 298.84 -11.22Q297.43 -10.29 295.56 -9.8Q293.69 -9.3 291.35 -9.3Q288.92 -9.3 287.19 -9.91Q285.47 -10.52 284.37 -11.95Q283.27 -13.34 282.76 -15.67Q282.25 -18.01 282.25 -21.45V-52.83H269.63V-21.55Q269.63 -15.57 270.96 -11.3Q272.3 -7.04 274.73 -4.31Q277.16 -1.53 280.57 -0.26Q283.97 1.02 288.09 1.02Q292.72 1.02 296.54 -1.22Q300.36 -3.45 303.04 -7.39Z"/><path style="fill:var(--logo-pill,#a67cff)" d="M256.2 -65.74V-88.97H249.04L233.5 -64.44L233.78 -60.02H249.14V-52H256.2V-60.02H260.49V-65.74ZM240.43 -65.74 248.45 -78.25 249.14 -79.47V-65.74Z"/></svg></h1>
+        <p class="gp-clock" aria-label="Current time"><span id="timeDisplay">--:--</span><span class="gp-sec" id="secDisplay">:--</span></p>
+        <p class="gp-date" id="dateDisplay">&nbsp;</p>
+      </div>
+      <svg class="gp-hint" id="gpHint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </section>
+
+    <section class="gp-panel" id="gpPanel">
+      
+      <div class="gp-team">
+        <figure class="gp-member">
+          <div class="gp-photo" data-slot="member1"><img src="{{index .Pictures "member1"}}" alt="Hookey" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
+          <figcaption><span class="gp-name">Hookey</span><span class="gp-role">Frontend</span></figcaption>
+        </figure>
+        <figure class="gp-member">
+          <div class="gp-photo" data-slot="member2"><img src="{{index .Pictures "member2"}}" alt="Tepz" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))"></div>
+          <figcaption><span class="gp-name">Tepz</span><span class="gp-role">Backend</span></figcaption>
+        </figure>
+      </div>
+
+      <div class="gp-row">
+        {{if not .Login}}
+        <div class="gp-tile" id="gpAuth">
+          <p class="gp-note" id="gpNextNote" hidden>Log in or sign up to open that page.</p>
+          <div class="gp-tabs" role="tablist" aria-label="Account">
+            <button type="button" role="tab" id="tabLogin" aria-selected="true" aria-controls="passwordEntry">Log in</button>
+            <button type="button" role="tab" id="tabSignup" aria-selected="false" aria-controls="signupForm" tabindex="-1">Sign up</button>
+          </div>
+
+          <form class="gp-login" id="passwordEntry" role="tabpanel" aria-labelledby="tabLogin">
+            <input id="usernameInput" type="text" placeholder="Username" aria-label="Username" autocomplete="username" autocapitalize="off" spellcheck="false" />
+            <input id="passwordInput" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password" />
+            <button type="submit" id="loginButton">Log in</button>
+            <div class="gp-error" id="passwordError" role="alert"></div>
+          </form>
+
+          <form class="gp-login" id="signupForm" role="tabpanel" aria-labelledby="tabSignup" hidden>
+            <input id="signupUser" type="text" placeholder="Username" aria-label="Username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="24" />
+            <input id="signupPass" type="password" placeholder="Password (8+ characters)" aria-label="Password" autocomplete="new-password" maxlength="72" />
+            <input id="signupPass2" type="password" placeholder="Repeat password" aria-label="Repeat password" autocomplete="new-password" maxlength="72" />
+            <p class="gp-hint-text">3 to 24 letters, numbers, dots, dashes or underscores.</p>
+            <button type="submit" id="signupButton">Create account</button>
+            <div class="gp-error" id="signupError" role="alert"></div>
+          </form>
+        </div>
+        {{else}}
+        <div class="gp-tile">
+          <p class="gp-note" id="gpNeedAdmin" hidden>That page is only open to admin accounts.</p>
+          <div class="gp-label">Signed in as</div>
+          <div class="gp-who">{{.SessionInfo.OriginalUsername}}</div>
+          <div class="gp-role-line">{{if eq .SessionInfo.Authority "admin"}}Admin account{{else}}Member{{end}}</div>
+          <div class="gp-actions">
+            <a class="gp-btn gp-btn-primary" href="/Profile">Profile</a>
+            <form method="post" action="/logout"><button type="submit" class="gp-btn">Sign out</button></form>
+          </div>
+        </div>
+        {{end}}
+
+        <div class="gp-tile">
+          
+          <div class="gp-place" id="weatherLocation">Copenhagen, DK</div>
+          <div class="gp-temp" id="weatherTemp">--°</div>
+          <div class="gp-cond" id="weatherCondition">Loading weather…</div>
+          <div class="gp-wind" id="weatherWind">Wind: -- m/s</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  {{if .IsAdmin}}
+  <script>
+    // Admins: change or reset the team pictures on this page.
+    (function () {
+      const CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+      const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+      document.querySelectorAll(".gp-photo[data-slot]").forEach((photo) => {
+        const slot = photo.dataset.slot;
+        const who = photo.closest("figure").querySelector(".gp-name").textContent.trim();
+        const tools = document.createElement("div");
+        tools.className = "gp-pic-tools";
+        tools.innerHTML = '<button type="button" data-change>' + CAMERA + '<span>Change</span></button>' +
+          '<button type="button" data-reset>Reset</button>' +
+          '<input type="file" accept="image/*" hidden>';
+        const input = tools.querySelector("input");
+        tools.querySelector("[data-change]").setAttribute("aria-label", "Change " + who + "'s picture");
+        tools.querySelector("[data-reset]").setAttribute("aria-label", "Reset " + who + "'s picture to the original");
+        photo.append(tools);
+
+        function show(url) {
+          let img = photo.querySelector("img");
+          if (!img) {
+            img = document.createElement("img");
+            img.alt = who;
+            photo.querySelector(":scope > span")?.remove();
+            photo.prepend(img);
+          }
+          img.src = url;
+        }
+        async function send(form, done) {
+          photo.classList.add("is-busy");
+          try {
+            const res = await fetch("/site/picture", { method: "POST", body: form });
+            if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save the picture. Try again.");
+            const data = await res.json();
+            show(data.url);
+            toast(done);
+          } catch (error) {
+            toast(error.message, true);
+          } finally {
+            photo.classList.remove("is-busy");
+          }
+        }
+        tools.querySelector("[data-change]").addEventListener("click", () => input.click());
+        input.addEventListener("change", async () => {
+          const file = input.files[0];
+          input.value = "";
+          if (!file) return;
+          const picture = window.xnShrinkPicture ? await window.xnShrinkPicture(file, [1200, 1200]) : file;
+          const form = new FormData();
+          form.append("slot", slot);
+          form.append("image", picture, picture.name || "picture.jpg");
+          send(form, who + "'s picture changed.");
+        });
+        tools.querySelector("[data-reset]").addEventListener("click", () => {
+          const form = new FormData();
+          form.append("slot", slot);
+          form.append("remove", "1");
+          send(form, who + "'s picture is back to the original.");
+        });
+      });
+    })();
+  </script>
+  {{end}}
+  <script>
+    const timeDisplay = document.getElementById('timeDisplay')
+    const secDisplay = document.getElementById('secDisplay')
+    const dateDisplay = document.getElementById('dateDisplay')
+    const passwordEntry = document.getElementById('passwordEntry')
+    const usernameInput = document.getElementById('usernameInput')
+    const passwordInput = document.getElementById('passwordInput')
+    const loginButton = document.getElementById('loginButton')
+    const passwordError = document.getElementById('passwordError')
+    const weatherLocation = document.getElementById('weatherLocation')
+    const weatherTemp = document.getElementById('weatherTemp')
+    const weatherCondition = document.getElementById('weatherCondition')
+    const weatherWind = document.getElementById('weatherWind')
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2,'0');
+      const minutes = String(now.getMinutes()).padStart(2,'0');
+      const seconds = String(now.getSeconds()).padStart(2,'0');
+      timeDisplay.textContent = `${hours}:${minutes}`;
+      secDisplay.textContent = `:${seconds}`;
+      dateDisplay.textContent = now.toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    }
+
+    // Where to go after signing in: the page that sent us here (?next=), if it's on this site.
+    const nextPath = (() => {
+      const next = new URLSearchParams(window.location.search).get('next') || '';
+      return next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '';
+    })();
+
+    function signedIn() {
+      if (nextPath) window.location.href = nextPath;
+      else window.location.reload();
+    }
+
+    async function submitLogin() {
+      passwordError.textContent = '';
+      const password = passwordInput?.value || '';
+      const username = usernameInput?.value.trim() || '';
+      if (!password || !username) {
+        passwordError.textContent = 'Username or password cannot be empty.';
+        return;
+      }
+      loginButton.disabled = true;
+      try {
+        const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password })});
+        if (!res.ok) {
+          passwordError.textContent = res.status === 401 ? 'Wrong username or password.' : 'Could not log in right now. Try again.';
+        } else {
+          signedIn();
+          return;
+        }
+      } catch (_) {
+        passwordError.textContent = 'Could not reach the server.';
+      }
+      loginButton.disabled = false;
+    }
+
+    const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,24}$/;
+
+    async function submitSignup() {
+      const signupError = document.getElementById('signupError');
+      const signupButton = document.getElementById('signupButton');
+      const username = document.getElementById('signupUser').value.trim();
+      const password = document.getElementById('signupPass').value;
+      const repeat = document.getElementById('signupPass2').value;
+      signupError.textContent = '';
+      if (!USERNAME_RULE.test(username)) {
+        signupError.textContent = 'Usernames are 3 to 24 letters, numbers, dots, dashes or underscores.';
+        return;
+      }
+      if (password.length < 8) {
+        signupError.textContent = 'Passwords need at least 8 characters.';
+        return;
+      }
+      if (password !== repeat) {
+        signupError.textContent = "The passwords don't match.";
+        return;
+      }
+      signupButton.disabled = true;
+      try {
+        const res = await fetch('/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password })});
+        if (res.ok) {
+          signupError.classList.add('is-ok');
+          signupError.textContent = 'Account created. Signing you in…';
+          signedIn();
+          return;
+        }
+        signupError.textContent = (await res.text()).trim() || 'Could not create the account. Try again.';
+      } catch (_) {
+        signupError.textContent = 'Could not reach the server.';
+      }
+      signupButton.disabled = false;
+    }
+
+    if (new URLSearchParams(window.location.search).get('need') === 'admin') {
+      const note = document.getElementById('gpNeedAdmin');
+      if (note) note.hidden = false;
+    }
+
+    (function authTabs() {
+      const tabLogin = document.getElementById('tabLogin');
+      const tabSignup = document.getElementById('tabSignup');
+      const signupForm = document.getElementById('signupForm');
+      if (!tabLogin || !tabSignup || !signupForm) return;
+      const tabs = [tabLogin, tabSignup];
+      const panels = [passwordEntry, signupForm];
+      function select(index, focus) {
+        tabs.forEach((tab, i) => {
+          tab.setAttribute('aria-selected', String(i === index));
+          tab.tabIndex = i === index ? 0 : -1;
+          panels[i].hidden = i !== index;
+        });
+        if (focus) panels[index].querySelector('input').focus();
+      }
+      tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => select(i, true));
+        tab.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const to = (i + 1) % 2;
+            select(to, false);
+            tabs[to].focus();
+          }
+        });
+      });
+      signupForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitSignup();
+      });
+      if (window.location.hash === '#signup') select(1, false);
+
+      // Sent here from a page that needs an account: bring the box into view.
+      if (nextPath) {
+        document.getElementById('gpNextNote').hidden = false;
+        requestAnimationFrame(() => {
+          document.getElementById('gpAuth').scrollIntoView({ block: 'center' });
+          if (!window.matchMedia('(hover: none)').matches) usernameInput?.focus({ preventScroll: true });
+        });
+      }
+    })();
+
+    // WMO weather codes used by open-meteo
+    function describeWeather(code) {
+      if (code === 0) return 'Clear sky';
+      if (code <= 2) return 'Partly cloudy';
+      if (code === 3) return 'Overcast';
+      if (code === 45 || code === 48) return 'Fog';
+      if (code >= 51 && code <= 57) return 'Drizzle';
+      if (code >= 61 && code <= 67) return 'Rain';
+      if (code >= 71 && code <= 77) return 'Snow';
+      if (code >= 80 && code <= 82) return 'Rain showers';
+      if (code === 85 || code === 86) return 'Snow showers';
+      if (code >= 95) return 'Thunderstorm';
+      return 'Cloudy';
+    }
+
+    async function fetchWeather(latitude, longitude) {
+      try {
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=celsius&windspeed_unit=ms`);
+        if (!response.ok) throw new Error('Weather API error');
+        const data = await response.json();
+        const weather = data.current_weather;
+        if (!weather) throw new Error('No weather data');
+        weatherTemp.textContent = `${Math.round(weather.temperature)}°C`;
+        weatherCondition.textContent = describeWeather(weather.weathercode);
+        weatherWind.textContent = `Wind: ${weather.windspeed.toFixed(1)} m/s`;
+      } catch (_) {
+        weatherLocation.textContent = 'Unable to load weather';
+        weatherTemp.textContent = '--°';
+        weatherCondition.textContent = 'Unavailable';
+        weatherWind.textContent = 'Wind: -- m/s';
+      }
+    }
+
+    if (passwordEntry) {
+      passwordEntry.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitLogin();
+      });
+    }
+
+    // Scroll: the clock shrinks and drifts up into the space left above the
+    // panel, while the panel fades up from 40% to full strength.
+    (function heroScroll() {
+      const hero = document.getElementById('gpHero');
+      const inner = document.getElementById('gpHeroInner');
+      const panel = document.getElementById('gpPanel');
+      const hint = document.getElementById('gpHint');
+      if (!hero || !inner || !panel) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let range = 1, ticking = false;
+      const measure = () => { range = Math.max(1, hero.offsetHeight * 0.65); };
+      const paint = () => {
+        ticking = false;
+        const y = Math.max(window.scrollY, 0);
+        const s = Math.min(y, range);
+        const p = s / range;
+        const eased = 1 - Math.pow(1 - p, 2);
+        // Past the range the clock scrolls away with the page, so the panel never covers it.
+        const shift = s / 2 + Math.max(0, y - range);
+        inner.style.transform = `translateY(${-shift}px) scale(${1 - 0.55 * eased})`;
+        panel.style.opacity = String(0.4 + 0.6 * eased);
+        panel.style.transform = `translateY(${(1 - eased) * 28}px)`;
+        panel.style.setProperty('--gp-glow', (0.35 * eased).toFixed(3));
+        if (hint) hint.style.opacity = String(Math.max(0, 1 - p * 4));
+      };
+      const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(paint); } };
+      measure(); paint();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', () => { measure(); onScroll(); });
+    })();
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    fetchWeather(55.6761, 12.5683);
+    setInterval(() => fetchWeather(55.6761, 12.5683), 10 * 60 * 1000);
+  </script>
+</body>
+</html>

@@ -289,6 +289,16 @@
     const nav = document.querySelector(".xn");
     if (!nav) return;
     const toggle = nav.querySelector(".xn-toggle");
+    // Music sits after the Forum on every page (added here, not in each page's HTML).
+    const linkBox = nav.querySelector(".xn-links");
+    if (linkBox && !linkBox.querySelector('a[href="/Music"]')) {
+      const music = document.createElement("a");
+      music.href = "/Music";
+      music.textContent = "Music";
+      const forum = linkBox.querySelector('a[href="/Forum"]');
+      if (forum) forum.after(music);
+      else linkBox.append(music);
+    }
     const links = nav.querySelectorAll(".xn-links a");
     initMail(nav);
     paintNames();
@@ -333,8 +343,9 @@
     { href: "/", label: "Graph", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
     { href: "/journal", label: "Journal", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
     { href: "/Forum", label: "Forum", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
+    { href: "/Music", label: "Music", icon: '<path d="M20 3.2v12.3a3.5 3.5 0 1 1-2-3.2V7.6l-8 2v8.9a3.5 3.5 0 1 1-2-3.2V6.4a1.5 1.5 0 0 1 1.1-1.5l9-2.3A1.5 1.5 0 0 1 20 3.2z"/>' },
     { href: "/Files/", label: "Files", files: true, icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
-    { href: "/Replications", label: "Replications", icon: '<rect x="7" y="2" width="14" height="16" rx="2.5"/><path d="M5 6v12.5A3.5 3.5 0 0 0 8.5 22H17a2 2 0 0 1-2 0H8.5A1.5 1.5 0 0 1 7 20.5V6.3A2 2 0 0 0 5 6z"/><path d="M3 6.8V19a4 4 0 0 0 4 4h9.5c.4 0 .8-.1 1.1-.3H7a2.6 2.6 0 0 1-2.6-2.6V5.6A2 2 0 0 0 3 6.8z" opacity=".55"/>' },
+    { href: "/Utility", label: "Utility", icon: '<path d="M14.7 3.2a5.5 5.5 0 0 0-5.9 7.3L3.3 16a2.3 2.3 0 0 0 3.3 3.3l5.5-5.5a5.5 5.5 0 0 0 7.3-5.9l-3 3a1.6 1.6 0 0 1-2.3 0l-1.1-1.1a1.6 1.6 0 0 1 0-2.3z"/>' },
     { href: "/Profile", label: "Profile", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
   ];
 
@@ -347,6 +358,7 @@
     const canFiles = rootClass.contains("xn-admin") || rootClass.contains("xn-files");
     const tabs = TABS.filter((tab) => !tab.files || canFiles);
     bar.classList.toggle("has-6", tabs.length > 5);
+    bar.classList.toggle("has-7", tabs.length > 6);
     tabs.forEach((tab) => {
       const link = Array.from(links).find((a) => (a.getAttribute("href") || "") === tab.href);
       const a = document.createElement("a");
@@ -481,6 +493,52 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove("is-on"), 3200);
   };
+
+  // Offline, the Graph, Profile and Utility still work (the app keeps them
+  // on the phone), but these pages need the server. Say so instead of
+  // opening a page that can't load.
+  // The phone app keeps the Journal on the phone, so only the website needs internet for it.
+  const IN_APP = /Geek4uApp/.test(navigator.userAgent);
+  const ONLINE_ONLY = [
+    ...(IN_APP ? [] : [[/^\/journal(\/|$)/i, "the Journal"]]),
+    [/^\/(Files\/|Uploader)/i, "Files"],
+    [/^\/(Forum|u\/)/i, "the Forum"],
+    ...(IN_APP ? [] : [[/^\/Music/i, "Music"]]),
+    [/^\/admin/i, "the Admin page"],
+  ];
+  let offlineBox = null;
+  function showNeedsInternet(what) {
+    if (!offlineBox) {
+      offlineBox = document.createElement("div");
+      offlineBox.className = "xn-offline";
+      offlineBox.setAttribute("role", "alertdialog");
+      offlineBox.setAttribute("aria-modal", "true");
+      offlineBox.setAttribute("aria-labelledby", "xnOfflineTitle");
+      offlineBox.innerHTML = '<div class="xn-offline-card"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0M5.2 12.3a10.5 10.5 0 0 1 13.6 0M8.5 15.8a6 6 0 0 1 7 0"/><circle cx="12" cy="19.2" r="1.3"/><path d="M3 3l18 18"/></svg><h2 id="xnOfflineTitle">You need internet</h2><p></p><button type="button" class="xn-btn xn-btn-primary">OK</button></div>';
+      const close = () => offlineBox.classList.remove("is-on");
+      offlineBox.querySelector("button").addEventListener("click", close);
+      offlineBox.addEventListener("click", (event) => { if (event.target === offlineBox) close(); });
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
+      document.body.appendChild(offlineBox);
+    }
+    offlineBox.querySelector("p").textContent = `Connect to Wi-Fi or mobile data to use ${what}. ${IN_APP ? "The Graph, Journal, your Profile and Utility" : "The Graph, your Profile and Utility"} work without internet.`;
+    offlineBox.classList.add("is-on");
+    offlineBox.querySelector("button").focus();
+  }
+  window.xnNeedsInternet = showNeedsInternet;
+  window.addEventListener("click", (event) => {
+    if (navigator.onLine !== false || event.defaultPrevented || event.button) return;
+    const link = event.target.closest && event.target.closest("a[href]");
+    if (!link || link.target === "_blank") return;
+    let url;
+    try { url = new URL(link.href, location.href); } catch { return; }
+    if (url.origin !== location.origin) return;
+    const hit = ONLINE_ONLY.find(([re]) => re.test(url.pathname));
+    if (!hit) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    showNeedsInternet(hit[1]);
+  }, true);
 
   initLeaveFade();
   initSmoothWheel();
