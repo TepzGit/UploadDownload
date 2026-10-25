@@ -29,7 +29,7 @@
     <a href="/">Graph</a>
     <a href="/Files/">Files</a>
     <a href="/Forum">Forum</a>
-    <a href="/Replications">Replications</a>
+    <a href="/Utility">Utility</a>
     <a href="/Profile">Profile</a>
   </nav>
 </header>
@@ -55,21 +55,26 @@
         <span class="avatar-overlay"><svg aria-hidden="true"><use href="#i-camera"/></svg></span>
       </button>
       <div class="pf-who">
-        <p class="xn-eyebrow">Profile</p>
-        <h1 class="xn-h1" id="username" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Username}}</h1>
+        <div class="pf-name-row">
+          <h1 class="xn-h1" id="username" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Username}}</h1>
+          <div class="pf-menu-wrap">
+            <button type="button" class="pf-gear" id="pfGear" aria-label="Settings" title="Settings" aria-haspopup="menu" aria-expanded="false" aria-controls="options"><span aria-hidden="true"></span></button>
+            <div class="pf-menu" id="options" role="menu" aria-label="Settings" hidden>
+              <button type="button" class="pf-menu-item option" id="APB" role="menuitem">Appearance</button>
+              <button type="button" class="pf-menu-item option" id="DTB" role="menuitem">Data</button>
+              <button type="button" class="pf-menu-item option" id="PRB" role="menuitem">Preferences</button>
+              <button type="button" class="pf-menu-item option" id="SYB" role="menuitem">Phone sync</button>
+              <a class="pf-menu-item option" href="/u/{{.Username}}" role="menuitem">Public view</a>
+              <form method="post" action="/logout" class="pf-signout"><button type="submit" class="pf-menu-item pf-menu-out" role="menuitem">Sign out</button></form>
+            </div>
+          </div>
+        </div>
         <div class="pf-rank" data-tier="{{.Rank.Tier}}">
           <button type="button" class="xn-rank pf-rank-btn" data-tier="{{.Rank.Tier}}" aria-expanded="false" aria-controls="rankHow"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}<span class="xn-sr"> (how ranks work)</span></button>
           <span class="pf-rank-meter" role="img" aria-label="{{.Rank.Progress}}% of the way to {{.Rank.Next}}"><i style="width:{{.Rank.Progress}}%"></i></span>
           <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}} · {{.Rank.ToNext}} more to {{.Rank.Next}}{{if eq .Rank.Tier 5}} (level {{.Rank.Level}} reached){{end}}</small>
         </div>
         <p class="pf-note pf-rank-how" id="rankHow" hidden>Every Graph session and Forum post you make is a point. In your first round the ranks are Fresh Geek, Geek (5), Big Geek (20), Mega Geek (50) and Geek⁴ (120). Each time you reach Geek⁴ you earn a level. When a round is full (150 points the first time) the ranks start over from Fresh Geek, and every new round needs 10% more points than the one before. You're in round {{.Rank.Round}}, which takes {{.Rank.RoundSize}} points.</p>
-      </div>
-      <div class="pf-actions" id="options">
-        <button type="button" class="xn-btn option" id="APB">Appearance</button>
-        <button type="button" class="xn-btn option" id="DTB">Data</button>
-        <button type="button" class="xn-btn option" id="PRB">Preferences</button>
-        <a class="xn-btn option" href="/u/{{.Username}}">Public view</a>
-        <form method="post" action="/logout" class="pf-signout"><button type="submit" class="xn-btn">Sign out</button></form>
       </div>
     </div>
     <input type="file" class="pf-file" id="avatarFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
@@ -307,6 +312,27 @@
   </div>
 </div>
 
+<div class="popup" id="SY" role="dialog" aria-modal="true" aria-labelledby="SYtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="SYtitle">Phone sync</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="APcontent">
+      <p class="pf-note sy-intro">The Geek4u app copies the folders you tick into <b>Geek4u</b> in your phone's Files, and keeps them matching the server. Files you remove here are removed from the phone too.</p>
+      <p class="pf-note sy-msg" id="syMsg" aria-live="polite">Loading your folders…</p>
+      <div class="sy-list" id="syList" role="group" aria-label="Folders to sync"></div>
+      <div class="sy-app" id="syApp" hidden>
+        <span class="xn-label">This phone</span>
+        <p class="pf-note" id="syState">Waiting for the app…</p>
+        <div class="sy-bar" id="syBar" hidden><span></span></div>
+        <button type="button" class="xn-btn" id="syNow">Sync now</button>
+      </div>
+    </div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSS">Done</button>
+  </div>
+</div>
+
 <div class="popup" id="DAY" role="dialog" aria-modal="true" aria-labelledby="DAYtitle">
   <div class="popcase">
     <div class="pop-head">
@@ -373,6 +399,49 @@
     if (opener) opener.focus({ preventScroll: true });
   }
 
+  // Settings menu beside the name: the gear opens it, picking an item or
+  // tapping anywhere else closes it.
+  (() => {
+    const gear = document.getElementById("pfGear");
+    const menu = document.getElementById("options");
+    const items = () => [...menu.querySelectorAll(".pf-menu-item")];
+    const setOpen = (open) => {
+      menu.hidden = !open;
+      gear.setAttribute("aria-expanded", String(open));
+      if (!open) return;
+      // Fixed to the screen, so the header card's rounded edge can't cut it off.
+      const g = gear.getBoundingClientRect();
+      const width = menu.offsetWidth;
+      menu.style.top = Math.round(g.bottom + 6) + "px";
+      menu.style.left = Math.round(Math.max(8, Math.min(g.left, window.innerWidth - width - 8))) + "px";
+      items()[0].focus({ preventScroll: true });
+    };
+    gear.addEventListener("click", () => setOpen(menu.hidden));
+    // Capture runs before the item's own handler, so a popup opened by the
+    // item hands focus back to the gear when it closes.
+    menu.addEventListener("click", (event) => {
+      if (!event.target.closest(".pf-menu-item")) return;
+      gear.focus({ preventScroll: true });
+      setOpen(false);
+    }, true);
+    document.addEventListener("click", (event) => {
+      if (!menu.hidden && !event.target.closest(".pf-menu-wrap")) setOpen(false);
+    });
+    window.addEventListener("scroll", () => { if (!menu.hidden) setOpen(false); }, { passive: true });
+    window.addEventListener("resize", () => { if (!menu.hidden) setOpen(false); });
+    menu.addEventListener("keydown", (event) => {
+      const list = items();
+      const at = list.indexOf(document.activeElement);
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        list[(at + (event.key === "ArrowDown" ? 1 : list.length - 1)) % list.length].focus();
+      } else if (event.key === "Escape") {
+        setOpen(false);
+        gear.focus();
+      }
+    });
+  })();
+
   openAP.onclick = () => showPopup(AP);
   openDT.onclick = () => showPopup(DT);
   openPR.onclick = () => { showPopup(PR); window.gcOpen && window.gcOpen(); };
@@ -386,7 +455,118 @@
   const EXP = document.getElementById("EXP");
   document.getElementById("CSExp").onclick = () => hidePopup(EXP);
 
-  [AP, DT, PR, DAY, EXP].forEach((popup) => {
+  // ---------------- Phone sync ----------------
+  // The server keeps which folders this account syncs (/sync/folders). The
+  // Android and iOS apps read that list, copy the files into the phone's Files
+  // app and report progress back through window.xnSyncStatus.
+  const SY = document.getElementById("SY");
+  (function phoneSync() {
+    const list = document.getElementById("syList");
+    const msg = document.getElementById("syMsg");
+    const appBox = document.getElementById("syApp");
+    const stateText = document.getElementById("syState");
+    const bar = document.getElementById("syBar");
+    const nowBtn = document.getElementById("syNow");
+    const android = window.Geek4uApp && typeof window.Geek4uApp.syncNow === "function" ? window.Geek4uApp : null;
+    const ios = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.geek4uSync;
+    const inApp = !!(android || ios);
+    const tell = (what) => {
+      try {
+        if (android) what === "sync" ? android.syncNow() : android.syncStatus();
+        else if (ios) ios.postMessage(what);
+      } catch (_) {}
+    };
+    let saveTimer = 0;
+
+    const fmtSize = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? (n / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1e3)) + " KB";
+    window.xnSyncStatus = (s) => {
+      if (!s) return;
+      appBox.hidden = false;
+      const running = s.state === "running";
+      nowBtn.disabled = running;
+      nowBtn.textContent = running ? "Syncing…" : "Sync now";
+      bar.hidden = !running || !s.total;
+      if (!bar.hidden) bar.firstElementChild.style.width = Math.round(100 * (s.done || 0) / s.total) + "%";
+      const where = s.where ? " They are in " + s.where + "." : "";
+      if (running) stateText.textContent = s.total ? `Copying ${s.done || 0} of ${s.total} files…` : "Checking the server…";
+      else if (s.state === "error") stateText.textContent = (s.error || "Sync stopped.") + (s.last ? " Last full sync " + new Date(s.last).toLocaleString() + "." : "");
+      else if (s.last) stateText.textContent = `${s.files || 0} files (${fmtSize(s.bytes || 0)}) on this phone, synced ${new Date(s.last).toLocaleString()}.` + where;
+      else stateText.textContent = "Not synced yet." + where;
+    };
+
+    const render = (data) => {
+      list.textContent = "";
+      if (!data.access) {
+        msg.textContent = "Phone sync uses Files, and your account has no Files access yet. Ask an admin to give you some folders.";
+        return;
+      }
+      if (!data.available.length) {
+        msg.textContent = "There are no folders in Files yet.";
+        return;
+      }
+      msg.textContent = inApp ? "Tick the folders to keep on this phone." : "Tick the folders to keep on your phone, then open the Geek4u app on it.";
+      const chosen = new Set(data.chosen);
+      data.available.forEach((f) => {
+        const depth = f.split("/").length - 1;
+        const label = document.createElement("label");
+        label.className = "sy-item";
+        label.style.setProperty("--depth", depth);
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = f;
+        box.checked = chosen.has(f) || [...chosen].some((c) => f.startsWith(c + "/"));
+        box.disabled = [...chosen].some((c) => f.startsWith(c + "/"));
+        const name = document.createElement("span");
+        name.textContent = f.split("/").pop();
+        label.append(box, name);
+        list.append(label);
+      });
+    };
+
+    const picked = () => [...list.querySelectorAll("input:checked:not(:disabled)")].map((b) => b.value);
+    list.addEventListener("change", (e) => {
+      const box = e.target;
+      // A ticked folder brings everything inside it, so its subfolders show ticked and locked.
+      list.querySelectorAll("input").forEach((b) => {
+        if (b !== box && b.value.startsWith(box.value + "/")) {
+          b.checked = box.checked;
+          b.disabled = box.checked;
+        }
+      });
+      clearTimeout(saveTimer);
+      msg.textContent = "Saving…";
+      saveTimer = setTimeout(async () => {
+        try {
+          const res = await fetch("/sync/folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folders: picked() }) });
+          if (!res.ok) throw new Error(await res.text());
+          const out = await res.json();
+          msg.textContent = out.chosen.length ? `Saved. ${out.chosen.length} folder${out.chosen.length === 1 ? "" : "s"} will be synced.` : "Saved. Nothing will be synced.";
+          tell("sync");
+        } catch (error) {
+          msg.textContent = error instanceof TypeError ? "You're offline. Connect to the internet to change your sync folders." : "Couldn't save: " + (error.message || "try again.");
+        }
+      }, 500);
+    });
+
+    nowBtn.addEventListener("click", () => tell("sync"));
+
+    window.syOpen = async () => {
+      if (inApp) { appBox.hidden = false; tell("status"); }
+      msg.textContent = "Loading your folders…";
+      try {
+        const res = await fetch("/sync/folders", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("status " + res.status);
+        render(await res.json());
+      } catch (error) {
+        list.textContent = "";
+        msg.textContent = error instanceof TypeError ? "You need internet to change your sync folders. Files already on this phone stay there." : "Couldn't load your folders.";
+      }
+    };
+  })();
+  document.getElementById("SYB").onclick = () => { showPopup(SY); window.syOpen(); };
+  document.getElementById("CSS").onclick = () => hidePopup(SY);
+
+  [AP, DT, PR, SY, DAY, EXP].forEach((popup) => {
     popup.addEventListener("click", (e) => {
       if (e.target === popup || e.target.closest("[data-close]")) hidePopup(popup);
     });

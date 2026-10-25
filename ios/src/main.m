@@ -2,12 +2,24 @@
 // like the site. The app adds what a browser would: uploads (photos, camera, files), downloads you
 // can save to Files, swipe back, pull to refresh, opening other sites in Safari, Home Screen quick
 // actions, and a screen to type the server's address the first time.
+//
+// Offline: an http server is loaded through a small proxy inside the app (gkproxy.c) that keeps a
+// copy of every page and file, so the Graph, Journal, Profile and Utility open without internet.
+// Phone sync: the Files folders picked on the Profile are copied into the app's folder in the
+// Files app ("On My iPhone › Geek⁴u") and kept matching the server.
+// Music: playlists marked "Keep on this iPhone" on the Music page are saved in the app, and the
+// proxy plays them from there (offline too). Audio keeps playing in the background and on the
+// lock screen.
 
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import <AVFAudio/AVAudioSession.h>
+#include "gkproxy.h"
+
+static const int kProxyPort = 42800;
 
 // Put the site's address here (like @"https://example.com") to skip the setup screen.
-static NSString *const kDefaultServer = @"";
+static NSString *const kDefaultServer = @"http://87.61.252.240:42067";
 
 static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0x7c / 255.0 blue:0xff / 255.0 alpha:1]; }
 
@@ -18,6 +30,14 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
 @property (nonatomic, strong) UIImageView *splashView;
 @property (nonatomic, strong) UIRefreshControl *refresher;
 @property (nonatomic, copy) NSString *serverOrigin;
+// What the web view loads: the proxy (http://127.0.0.1:42800) for an http server, else serverOrigin.
+@property (nonatomic, copy) NSString *siteOrigin;
+@property (nonatomic) BOOL proxyRestarted;
+@property (nonatomic) BOOL syncing;
+@property (nonatomic, strong) NSMutableDictionary *syncStatus;
+@property (nonatomic) BOOL musicSyncing;
+@property (nonatomic) BOOL musicAgain; // the playlists changed while saving: go again after
+@property (nonatomic, strong) NSMutableDictionary *musicStatus;
 @property (nonatomic, copy) NSString *failedPageURL;
 @property (nonatomic, copy) NSString *panelMode;
 @property (nonatomic, copy) NSString *pendingPanelScript;
@@ -40,11 +60,21 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
 
     NSString *saved = [[NSUserDefaults standardUserDefaults] stringForKey:@"server"];
     self.serverOrigin = saved.length ? saved : kDefaultServer;
+    [self startProxy];
+    [self loadSyncStatus];
+    [self loadMusicStatus];
+    // Music goes on playing when the app is in the background or the phone is locked.
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cameBack)
+                                                 name:UIApplicationWillEnterForegroundNotification object:nil];
 
     WKWebViewConfiguration *config = [WKWebViewConfiguration new];
     config.allowsInlineMediaPlayback = YES;
     config.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
-    config.applicationNameForUserAgent = @"Mobile/15E148 Geek4uApp/1.0 (iOS)";
+    NSString *version = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"] ?: @"1";
+    config.applicationNameForUserAgent = [NSString stringWithFormat:@"Mobile/15E148 Geek4uApp/%@ (iOS)", version];
+    [config.userContentController addScriptMessageHandler:self name:@"geek4uSync"];
+    [config.userContentController addScriptMessageHandler:self name:@"geek4uMusic"];
     self.siteView = [[WKWebView alloc] initWithFrame:self.view.bounds configuration:config];
     self.siteView.navigationDelegate = self;
     self.siteView.UIDelegate = self;
@@ -82,7 +112,7 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
         [self showSetupWithPrefill:@"" canCancel:NO];
     } else {
         NSString *path = [self shortcutPath:self.pendingShortcut];
-        [self openSite:path ? [self.serverOrigin stringByAppendingString:path] : [self startPageURL]];
+        [self openSite:path ? [self.siteOrigin stringByAppendingString:path] : [self startPageURL]];
         if ([self.pendingShortcut.type isEqualToString:@"com.geek4u.app.server"]) [self showSetupWithPrefill:self.serverOrigin canCancel:YES];
     }
     self.pendingShortcut = nil;
@@ -119,8 +149,43 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
 
 - (NSString *)startPageURL {
     NSString *last = [[NSUserDefaults standardUserDefaults] stringForKey:@"last"];
-    if (last.length && [self isOwnSite:[NSURL URLWithString:last]]) return last;
-    return [self.serverOrigin stringByAppendingString:@"/Main"];
+    NSURL *u = last.length ? [NSURL URLWithString:last] : nil;
+    if (u && [self isOwnSite:u]) {
+        // Saved before the offline proxy (or with another port): same page, through siteOrigin.
+        NSURLComponents *c = [NSURLComponents componentsWithURL:u resolvingAgainstBaseURL:NO];
+        NSString *rest = c.percentEncodedPath.length ? c.percentEncodedPath : @"/";
+        if (c.percentEncodedQuery) rest = [rest stringByAppendingFormat:@"?%@", c.percentEncodedQuery];
+        return [self.siteOrigin stringByAppendingString:rest];
+    }
+    return [self.siteOrigin stringByAppendingString:@"/Main"];
+}
+
+// ---------------------------------------------------------------- the offline proxy
+
+- (void)startProxy {
+    self.siteOrigin = self.serverOrigin;
+    NSURL *u = [NSURL URLWithString:self.serverOrigin ?: @""];
+    if (![u.scheme.lowercaseString isEqualToString:@"http"] || !u.host.length) return; // https: loaded directly
+    NSString *caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *dir = [caches stringByAppendingPathComponent:@"offline"];
+    int port = u.port ? u.port.intValue : 80;
+    if (gk_proxy_start(kProxyPort, u.host.UTF8String, port, dir.fileSystemRepresentation) == 0) {
+        self.siteOrigin = [NSString stringWithFormat:@"http://127.0.0.1:%d", kProxyPort];
+        gk_proxy_set_music_dir([self musicDir].fileSystemRepresentation);
+    }
+}
+
+- (BOOL)usesProxy {
+    return ![self.siteOrigin isEqualToString:self.serverOrigin ?: @""];
+}
+
+// iOS can close a sleeping app's sockets: start the proxy again when the app comes back.
+- (void)cameBack {
+    if ([self usesProxy] && !gk_proxy_alive()) [self startProxy];
+    NSTimeInterval last = [self.syncStatus[@"last"] doubleValue] / 1000;
+    if (last > 0 && [NSDate date].timeIntervalSince1970 - last > 15 * 60) [self startSync];
+    NSTimeInterval musicLast = [self.musicStatus[@"last"] doubleValue] / 1000;
+    if ([self.musicStatus[@"playlists"] count] && [NSDate date].timeIntervalSince1970 - musicLast > 30 * 60) [self startMusicSync];
 }
 
 // Remembers the page you were on, so the app opens there again (pages only, not pictures or files).
@@ -135,8 +200,11 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
     if (!self.serverOrigin.length || !url.host) return NO;
     NSString *scheme = url.scheme.lowercaseString;
     if (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"]) return NO;
-    NSString *host = [NSURL URLWithString:self.serverOrigin].host;
-    return host && [host caseInsensitiveCompare:url.host] == NSOrderedSame;
+    for (NSString *origin in @[self.serverOrigin, self.siteOrigin ?: self.serverOrigin]) {
+        NSString *host = [NSURL URLWithString:origin].host;
+        if (host && [host caseInsensitiveCompare:url.host] == NSOrderedSame) return YES;
+    }
+    return NO;
 }
 
 - (void)openOutside:(NSURL *)url {
@@ -158,9 +226,10 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     [d setObject:origin forKey:@"server"];
     if (changed) [d removeObjectForKey:@"last"];
+    if (changed) [self startProxy];
     [self hidePanel];
     self.failedPageURL = nil;
-    if (changed || !self.siteView.URL) [self openSite:[origin stringByAppendingString:@"/Main"]];
+    if (changed || !self.siteView.URL) [self openSite:[self.siteOrigin stringByAppendingString:@"/Main"]];
 }
 
 - (NSString *)shortcutPath:(UIApplicationShortcutItem *)item {
@@ -184,7 +253,7 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
     if (path) {
         if ([self.panelMode isEqualToString:@"error"]) [self hidePanel];
         self.failedPageURL = nil;
-        [self openSite:[self.serverOrigin stringByAppendingString:path]];
+        [self openSite:[self.siteOrigin stringByAppendingString:path]];
     }
 }
 
@@ -260,6 +329,17 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
 - (void)showLoadError:(NSError *)error {
     NSString *host = [NSURL URLWithString:self.serverOrigin].host ?: self.serverOrigin;
     NSString *message;
+    // Through the proxy, a page that isn't saved on the phone comes back as a dropped connection.
+    BOOL proxyMiss = [self usesProxy] && [error.domain isEqualToString:NSURLErrorDomain]
+        && (error.code == NSURLErrorNetworkConnectionLost || error.code == NSURLErrorBadServerResponse
+            || error.code == NSURLErrorCannotParseResponse || error.code == NSURLErrorZeroByteResource);
+    if (proxyMiss) {
+        [self.refresher endRefreshing];
+        [self showPanel:@{@"mode": @"error",
+                          @"message": @"This page needs internet, or your server is off. The Graph, Journal, your Profile and Utility work offline.",
+                          @"server": self.serverOrigin ?: @"", @"canClose": @(self.siteView.URL != nil)}];
+        return;
+    }
     switch (error.code) {
         case NSURLErrorNotConnectedToInternet:
         case NSURLErrorNetworkConnectionLost:
@@ -292,6 +372,29 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
 }
 
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message {
+    if ([message.name isEqualToString:@"geek4uSync"]) {
+        if ([message.body isEqual:@"sync"]) [self startSync];
+        else [self pushSyncStatus];
+        return;
+    }
+    if ([message.name isEqualToString:@"geek4uMusic"]) {
+        NSDictionary *m = [message.body isKindOfClass:[NSDictionary class]] ? message.body : @{};
+        if ([m[@"action"] isEqual:@"keep"] && [m[@"playlists"] isKindOfClass:[NSArray class]]) {
+            NSMutableArray *ids = [NSMutableArray array];
+            for (id x in m[@"playlists"]) {
+                if ([x isKindOfClass:[NSNumber class]] && [x longLongValue] > 0 && ![ids containsObject:x]) [ids addObject:@([x longLongValue])];
+            }
+            self.musicStatus[@"playlists"] = ids;
+            NSMutableDictionary *index = [self readMusicIndex];
+            index[@"playlists"] = ids;
+            [self writeMusicIndex:index];
+            [self startMusicSync];
+        } else if ([m[@"action"] isEqual:@"sync"]) {
+            [self startMusicSync];
+        }
+        [self pushMusicStatus];
+        return;
+    }
     NSDictionary *m = [message.body isKindOfClass:[NSDictionary class]] ? message.body : nil;
     NSString *type = m[@"type"];
     if ([type isEqualToString:@"connect"]) {
@@ -300,7 +403,7 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
         [self hidePanel];
         if (!self.siteView.URL && self.serverOrigin.length) [self openSite:[self startPageURL]];
     } else if ([type isEqualToString:@"retry"]) {
-        NSString *url = self.failedPageURL ?: [self.serverOrigin stringByAppendingString:@"/Main"];
+        NSString *url = self.failedPageURL ?: [self.siteOrigin stringByAppendingString:@"/Main"];
         self.failedPageURL = nil;
         [self hidePanel];
         [self openSite:url];
@@ -372,6 +475,7 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
         return;
     }
     self.failedPageURL = nil;
+    self.proxyRestarted = NO;
     if ([self.panelMode isEqualToString:@"error"]) [self hidePanel];
     [self hideSplashLogo];
     [self.refresher endRefreshing];
@@ -394,6 +498,14 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
     }
     NSString *failing = error.userInfo[NSURLErrorFailingURLStringErrorKey];
     self.failedPageURL = [failing isKindOfClass:[NSString class]] ? failing : webView.URL.absoluteString;
+    // The proxy was gone (the phone slept): start it again and load the page once more.
+    if ([self usesProxy] && !gk_proxy_alive() && !self.proxyRestarted && self.failedPageURL) {
+        self.proxyRestarted = YES;
+        [self startProxy];
+        [self openSite:self.failedPageURL];
+        return;
+    }
+    self.proxyRestarted = NO;
     [self showLoadError:error];
 }
 
@@ -510,6 +622,475 @@ static UIColor *Violet(void) { return [UIColor colorWithRed:0xa6 / 255.0 green:0
     [self.downloadDestinations removeObjectForKey:[NSValue valueWithNonretainedObject:download]];
     [self.activeDownloads removeObject:download];
     [self showAlertMessage:[@"Couldn't download that. " stringByAppendingString:error.localizedDescription ?: @""] completion:nil];
+}
+
+// ---------------------------------------------------------------- phone sync (the Profile's "Phone sync")
+
+// Synced folders go in Documents, which the Files app shows as On My iPhone › Geek⁴u.
+- (NSString *)syncRoot {
+    return NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+}
+
+- (NSString *)syncIndexPath {
+    NSString *support = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES).firstObject;
+    [[NSFileManager defaultManager] createDirectoryAtPath:support withIntermediateDirectories:YES attributes:nil error:nil];
+    return [support stringByAppendingPathComponent:@"sync-index.json"];
+}
+
+- (NSMutableDictionary *)readSyncIndex {
+    NSData *data = [NSData dataWithContentsOfFile:[self syncIndexPath]];
+    id index = data ? [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil] : nil;
+    if (![index isKindOfClass:[NSMutableDictionary class]]) index = [NSMutableDictionary dictionary];
+    if (![index[@"files"] isKindOfClass:[NSMutableDictionary class]]) index[@"files"] = [NSMutableDictionary dictionary];
+    return index;
+}
+
+- (void)writeSyncIndex:(NSDictionary *)index {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:index options:0 error:nil];
+    [data writeToFile:[self syncIndexPath] atomically:YES];
+}
+
+- (void)loadSyncStatus {
+    NSDictionary *index = [self readSyncIndex];
+    self.syncStatus = [@{@"state": @"idle", @"where": @"Files › On My iPhone › Geek⁴u",
+                         @"last": index[@"last"] ?: @0, @"files": @([index[@"files"] count]),
+                         @"bytes": index[@"bytes"] ?: @0} mutableCopy];
+}
+
+- (void)pushSyncStatus {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSData *json = [NSJSONSerialization dataWithJSONObject:self.syncStatus options:0 error:nil];
+        if (!json) return;
+        NSString *js = [NSString stringWithFormat:@"window.xnSyncStatus&&window.xnSyncStatus(%@)",
+                        [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]];
+        [self.siteView evaluateJavaScript:js completionHandler:nil];
+    });
+}
+
+- (void)setSyncState:(NSString *)state done:(NSInteger)done total:(NSInteger)total error:(NSString *)error {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.syncStatus[@"state"] = state;
+        self.syncStatus[@"done"] = @(done);
+        self.syncStatus[@"total"] = @(total);
+        if (error) self.syncStatus[@"error"] = error;
+        else [self.syncStatus removeObjectForKey:@"error"];
+        [self pushSyncStatus];
+    });
+}
+
+// "a/b/c.jpg" from the server, or nil when it tries to leave the folder.
+static NSString *CleanSyncPath(id p) {
+    if (![p isKindOfClass:[NSString class]]) return nil;
+    NSMutableArray *parts = [NSMutableArray array];
+    for (NSString *part in [[p stringByReplacingOccurrencesOfString:@"\\" withString:@"/"] componentsSeparatedByString:@"/"]) {
+        if (!part.length || [part isEqualToString:@"."]) continue;
+        if ([part isEqualToString:@".."]) return nil;
+        [parts addObject:part];
+    }
+    return parts.count ? [parts componentsJoinedByString:@"/"] : nil;
+}
+
+// The web view's sign-in cookie, as headers for requests to origin (they go through the proxy too).
+- (void)cookieHeadersFor:(NSString *)origin then:(void (^)(NSDictionary *headers))done {
+    NSString *host = [NSURL URLWithString:origin].host;
+    [self.siteView.configuration.websiteDataStore.httpCookieStore getAllCookies:^(NSArray<NSHTTPCookie *> *all) {
+        NSMutableArray *mine = [NSMutableArray array];
+        for (NSHTTPCookie *c in all) {
+            NSString *domain = [c.domain hasPrefix:@"."] ? [c.domain substringFromIndex:1] : c.domain;
+            if ([domain caseInsensitiveCompare:host] == NSOrderedSame) [mine addObject:c];
+        }
+        done([NSHTTPCookie requestHeaderFieldsWithCookies:mine]);
+    }];
+}
+
+- (void)startSync {
+    if (self.syncing || !self.siteOrigin.length) return;
+    self.syncing = YES;
+    [self setSyncState:@"running" done:0 total:0 error:nil];
+    NSString *origin = self.siteOrigin;
+    [self cookieHeadersFor:origin then:^(NSDictionary *headers) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            NSString *problem = [self syncFrom:origin headers:headers];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.syncing = NO;
+                if (problem) [self setSyncState:@"error" done:0 total:0 error:problem];
+            });
+        });
+    }];
+}
+
+// Runs on a background queue. Answers nil when everything is copied, else what went wrong.
+- (NSString *)syncFrom:(NSString *)origin headers:(NSDictionary *)headers {
+    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    cfg.HTTPCookieStorage = nil;
+    cfg.HTTPShouldSetCookies = NO;
+    cfg.timeoutIntervalForRequest = 60;
+    cfg.HTTPAdditionalHeaders = headers;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg];
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    __block NSData *body = nil;
+    __block NSHTTPURLResponse *response = nil;
+    __block NSError *failure = nil;
+    dispatch_semaphore_t wait = dispatch_semaphore_create(0);
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[origin stringByAppendingString:@"/sync/manifest"]]];
+    [[session dataTaskWithRequest:req completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
+        body = d;
+        response = (NSHTTPURLResponse *)r;
+        failure = e;
+        dispatch_semaphore_signal(wait);
+    }] resume];
+    dispatch_semaphore_wait(wait, DISPATCH_TIME_FOREVER);
+    if (failure) {
+        [session invalidateAndCancel];
+        return @"Couldn't reach the server. Sync will try again later.";
+    }
+    NSString *type = [response valueForHTTPHeaderField:@"Content-Type"] ?: @"";
+    if (response.statusCode == 403) {
+        [session invalidateAndCancel];
+        return @"Sync stopped: your account has no Files access.";
+    }
+    if (response.statusCode != 200 || ![type containsString:@"json"]) {
+        [session invalidateAndCancel];
+        return @"Sync stopped: log in again in the app.";
+    }
+    NSDictionary *manifest = [NSJSONSerialization JSONObjectWithData:body options:0 error:nil];
+    NSArray *list = [manifest isKindOfClass:[NSDictionary class]] && [manifest[@"files"] isKindOfClass:[NSArray class]] ? manifest[@"files"] : @[];
+
+    NSMutableDictionary *index = [self readSyncIndex];
+    NSMutableDictionary *have = index[@"files"];
+    NSString *root = [self syncRoot];
+    NSMutableSet *wanted = [NSMutableSet set];
+    NSInteger total = list.count, done = 0, failed = 0, netErrors = 0;
+    long long bytes = 0;
+    NSDate *lastSave = [NSDate date];
+    for (NSDictionary *f in list) {
+        NSString *path = [f isKindOfClass:[NSDictionary class]] ? CleanSyncPath(f[@"path"]) : nil;
+        if (!path) {
+            total--;
+            continue;
+        }
+        [wanted addObject:path];
+        long long size = [f[@"size"] longLongValue], mtime = [f[@"mtime"] longLongValue];
+        NSString *target = [root stringByAppendingPathComponent:path];
+        NSDictionary *old = have[path];
+        BOOL same = [old isKindOfClass:[NSDictionary class]] && [old[@"size"] longLongValue] == size
+            && [old[@"mtime"] longLongValue] == mtime && [fm fileExistsAtPath:target];
+        if (!same) {
+            NSURLComponents *u = [NSURLComponents componentsWithString:[origin stringByAppendingString:@"/sync/file"]];
+            u.queryItems = @[[NSURLQueryItem queryItemWithName:@"path" value:path]];
+            __block NSURL *downloaded = nil;
+            __block NSInteger code = 0;
+            __block NSError *err = nil;
+            NSString *tmp = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
+            [[session downloadTaskWithURL:u.URL completionHandler:^(NSURL *location, NSURLResponse *r, NSError *e) {
+                code = [(NSHTTPURLResponse *)r statusCode];
+                err = e;
+                // The file at location is removed when this returns: move it first.
+                if (location && !e && [fm moveItemAtPath:location.path toPath:tmp error:nil]) downloaded = [NSURL fileURLWithPath:tmp];
+                dispatch_semaphore_signal(wait);
+            }] resume];
+            dispatch_semaphore_wait(wait, DISPATCH_TIME_FOREVER);
+            // The server went away mid-sync: stop, and try again later.
+            netErrors = err ? netErrors + 1 : 0;
+            if (netErrors >= 3) {
+                [fm removeItemAtPath:tmp error:nil];
+                [self writeSyncIndex:index];
+                [session invalidateAndCancel];
+                return @"Couldn't reach the server. Sync will try again later.";
+            }
+            if (downloaded && code == 200) {
+                [fm createDirectoryAtPath:[target stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+                [fm removeItemAtPath:target error:nil];
+                if ([fm moveItemAtPath:tmp toPath:target error:nil]) {
+                    NSURL *t = [NSURL fileURLWithPath:target];
+                    [t setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:nil]; // it's on the server already
+                    have[path] = @{@"size": @(size), @"mtime": @(mtime)};
+                } else {
+                    failed++;
+                }
+            } else {
+                [fm removeItemAtPath:tmp error:nil];
+                failed++;
+            }
+        }
+        if (have[path]) bytes += size;
+        done++;
+        if (-lastSave.timeIntervalSinceNow > 1.5) {
+            [self writeSyncIndex:index];
+            lastSave = [NSDate date];
+            [self setSyncState:@"running" done:done total:total error:nil];
+        }
+    }
+    [session finishTasksAndInvalidate];
+
+    // Gone from the server, or in a folder that was unticked.
+    for (NSString *path in [have allKeys]) {
+        if ([wanted containsObject:path]) continue;
+        NSString *target = [root stringByAppendingPathComponent:path];
+        [fm removeItemAtPath:target error:nil];
+        [have removeObjectForKey:path];
+        // Tidy folders left empty.
+        NSString *dir = [target stringByDeletingLastPathComponent];
+        while (dir.length > root.length && [[fm contentsOfDirectoryAtPath:dir error:nil] count] == 0) {
+            [fm removeItemAtPath:dir error:nil];
+            dir = [dir stringByDeletingLastPathComponent];
+        }
+    }
+
+    double now = floor([NSDate date].timeIntervalSince1970 * 1000);
+    index[@"last"] = @(now);
+    index[@"bytes"] = @(bytes);
+    [self writeSyncIndex:index];
+    NSUInteger count = have.count;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.syncStatus[@"last"] = @(now);
+        self.syncStatus[@"files"] = @(count);
+        self.syncStatus[@"bytes"] = @(bytes);
+    });
+    if (failed) return [NSString stringWithFormat:@"%ld %@ couldn't be copied. Sync will try again.", (long)failed, failed == 1 ? @"file" : @"files"];
+    [self setSyncState:@"idle" done:done total:total error:nil];
+    return nil;
+}
+
+
+// ---------------------------------------------------------------- music kept on the phone (the Music page)
+
+// Saved songs: <id>-<version>.audio with its type in .mime. Not in Documents (the Files app
+// would show them) and not backed up: they're on the server.
+- (NSString *)musicDir {
+    NSString *support = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *dir = [support stringByAppendingPathComponent:@"music"];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:dir]) {
+        [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+        [[NSURL fileURLWithPath:dir] setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:nil];
+    }
+    return dir;
+}
+
+- (NSString *)musicIndexPath {
+    return [[self musicDir] stringByAppendingPathComponent:@"index.json"];
+}
+
+// {playlists: [ids kept], have: {"<id>": "<version>"}, bytes, last}
+- (NSMutableDictionary *)readMusicIndex {
+    NSData *data = [NSData dataWithContentsOfFile:[self musicIndexPath]];
+    id index = data ? [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil] : nil;
+    if (![index isKindOfClass:[NSMutableDictionary class]]) index = [NSMutableDictionary dictionary];
+    if (![index[@"have"] isKindOfClass:[NSMutableDictionary class]]) index[@"have"] = [NSMutableDictionary dictionary];
+    if (![index[@"playlists"] isKindOfClass:[NSArray class]]) index[@"playlists"] = @[];
+    return index;
+}
+
+- (void)writeMusicIndex:(NSDictionary *)index {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:index options:0 error:nil];
+    [data writeToFile:[self musicIndexPath] atomically:YES];
+}
+
+- (void)loadMusicStatus {
+    NSDictionary *index = [self readMusicIndex];
+    self.musicStatus = [@{@"state": @"idle", @"playlists": index[@"playlists"], @"have": [index[@"have"] copy],
+                          @"bytes": index[@"bytes"] ?: @0, @"last": index[@"last"] ?: @0} mutableCopy];
+}
+
+- (void)pushMusicStatus {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSData *json = [NSJSONSerialization dataWithJSONObject:self.musicStatus options:0 error:nil];
+        if (!json) return;
+        NSString *js = [NSString stringWithFormat:@"window.xnMusicStatus&&window.xnMusicStatus(%@)",
+                        [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]];
+        [self.siteView evaluateJavaScript:js completionHandler:nil];
+    });
+}
+
+- (void)setMusicState:(NSString *)state done:(NSInteger)done total:(NSInteger)total error:(NSString *)error index:(NSDictionary *)index {
+    NSDictionary *have = [index[@"have"] copy];
+    id bytes = index[@"bytes"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.musicStatus[@"state"] = state;
+        self.musicStatus[@"done"] = @(done);
+        self.musicStatus[@"total"] = @(total);
+        if (have) self.musicStatus[@"have"] = have;
+        if (bytes) self.musicStatus[@"bytes"] = bytes;
+        if (error) self.musicStatus[@"error"] = error;
+        else [self.musicStatus removeObjectForKey:@"error"];
+        [self pushMusicStatus];
+    });
+}
+
+- (void)startMusicSync {
+    if (!self.siteOrigin.length) return;
+    if (self.musicSyncing) {
+        self.musicAgain = YES;
+        return;
+    }
+    self.musicSyncing = YES;
+    self.musicAgain = NO;
+    [self setMusicState:@"running" done:0 total:0 error:nil index:nil];
+    NSString *origin = self.siteOrigin;
+    // Let a long download finish if the app is put away meanwhile.
+    __block UIBackgroundTaskIdentifier task = [[UIApplication sharedApplication] beginBackgroundTaskWithName:@"music" expirationHandler:^{
+        [[UIApplication sharedApplication] endBackgroundTask:task];
+        task = UIBackgroundTaskInvalid;
+    }];
+    [self cookieHeadersFor:origin then:^(NSDictionary *headers) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            NSString *problem = [self musicSyncFrom:origin headers:headers];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.musicSyncing = NO;
+                if (problem) [self setMusicState:@"error" done:0 total:0 error:problem index:nil];
+                if (task != UIBackgroundTaskInvalid) [[UIApplication sharedApplication] endBackgroundTask:task];
+                if (self.musicAgain) [self startMusicSync];
+            });
+        });
+    }];
+}
+
+static NSString *MusicVersion(id v) {
+    if (![v isKindOfClass:[NSString class]] || ![v length] || [v length] > 60) return nil;
+    NSCharacterSet *bad = [[NSCharacterSet alphanumericCharacterSet] invertedSet];
+    return [v rangeOfCharacterFromSet:bad].location == NSNotFound ? v : nil;
+}
+
+// Runs on a background queue: saves the songs of the kept playlists that aren't here in their
+// current version, and removes the rest. Answers nil when done, else what went wrong.
+- (NSString *)musicSyncFrom:(NSString *)origin headers:(NSDictionary *)headers {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *dir = [self musicDir];
+    NSMutableDictionary *index = [self readMusicIndex];
+    NSMutableDictionary *have = index[@"have"];
+    NSArray *lists = index[@"playlists"];
+    NSArray *songs = @[];
+
+    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    cfg.HTTPCookieStorage = nil;
+    cfg.HTTPShouldSetCookies = NO;
+    cfg.timeoutIntervalForRequest = 60;
+    cfg.timeoutIntervalForResource = 30 * 60;
+    cfg.HTTPAdditionalHeaders = headers;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg];
+    dispatch_semaphore_t wait = dispatch_semaphore_create(0);
+
+    if (lists.count) {
+        NSURLComponents *u = [NSURLComponents componentsWithString:[origin stringByAppendingString:@"/music/offline"]];
+        u.queryItems = @[[NSURLQueryItem queryItemWithName:@"playlists" value:[lists componentsJoinedByString:@","]]];
+        __block NSData *body = nil;
+        __block NSHTTPURLResponse *response = nil;
+        __block NSError *failure = nil;
+        [[session dataTaskWithURL:u.URL completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
+            body = d;
+            response = (NSHTTPURLResponse *)r;
+            failure = e;
+            dispatch_semaphore_signal(wait);
+        }] resume];
+        dispatch_semaphore_wait(wait, DISPATCH_TIME_FOREVER);
+        NSString *type = [response valueForHTTPHeaderField:@"Content-Type"] ?: @"";
+        if (failure) {
+            [session invalidateAndCancel];
+            return @"Couldn't reach the server. Saving songs will try again later.";
+        }
+        if (response.statusCode != 200 || ![type containsString:@"json"]) {
+            [session invalidateAndCancel];
+            return @"Saving songs stopped: log in again in the app.";
+        }
+        NSDictionary *manifest = [NSJSONSerialization JSONObjectWithData:body options:0 error:nil];
+        if ([manifest isKindOfClass:[NSDictionary class]] && [manifest[@"songs"] isKindOfClass:[NSArray class]]) songs = manifest[@"songs"];
+        // Playlists that were deleted or unshared drop out.
+        if ([manifest[@"playlists"] isKindOfClass:[NSArray class]]) {
+            index[@"playlists"] = manifest[@"playlists"];
+            NSArray *still = manifest[@"playlists"];
+            dispatch_async(dispatch_get_main_queue(), ^{ self.musicStatus[@"playlists"] = still; });
+        }
+    }
+
+    NSMutableSet *wanted = [NSMutableSet set];
+    NSInteger total = 0, done = 0, failed = 0, netErrors = 0;
+    for (NSDictionary *song in songs) if ([song isKindOfClass:[NSDictionary class]]) total++;
+    NSDate *lastPush = [NSDate date];
+    for (NSDictionary *song in songs) {
+        if (![song isKindOfClass:[NSDictionary class]]) continue;
+        long long sid = [song[@"id"] longLongValue];
+        NSString *v = MusicVersion(song[@"v"]);
+        if (sid <= 0 || !v) {
+            total--;
+            continue;
+        }
+        NSString *key = [NSString stringWithFormat:@"%lld", sid];
+        NSString *name = [NSString stringWithFormat:@"%lld-%@", sid, v];
+        [wanted addObject:name];
+        NSString *target = [dir stringByAppendingPathComponent:[name stringByAppendingString:@".audio"]];
+        if (!([have[key] isEqual:v] && [fm fileExistsAtPath:target])) {
+            NSURLComponents *u = [NSURLComponents componentsWithString:[origin stringByAppendingFormat:@"/music/stream/%lld", sid]];
+            u.queryItems = @[[NSURLQueryItem queryItemWithName:@"v" value:v]];
+            __block NSString *tmp = nil;
+            __block NSInteger code = 0;
+            __block NSString *mime = nil;
+            __block NSError *err = nil;
+            [[session downloadTaskWithURL:u.URL completionHandler:^(NSURL *location, NSURLResponse *r, NSError *e) {
+                code = [(NSHTTPURLResponse *)r statusCode];
+                mime = r.MIMEType;
+                err = e;
+                NSString *t = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
+                if (location && !e && [fm moveItemAtPath:location.path toPath:t error:nil]) tmp = t;
+                dispatch_semaphore_signal(wait);
+            }] resume];
+            dispatch_semaphore_wait(wait, DISPATCH_TIME_FOREVER);
+            netErrors = err ? netErrors + 1 : 0;
+            if (netErrors >= 3) {
+                if (tmp) [fm removeItemAtPath:tmp error:nil];
+                [self writeMusicIndex:index];
+                [session invalidateAndCancel];
+                return @"Couldn't reach the server. Saving songs will try again later.";
+            }
+            if (tmp && code == 200 && [mime hasPrefix:@"audio/"]) {
+                [fm removeItemAtPath:target error:nil];
+                if ([fm moveItemAtPath:tmp toPath:target error:nil]) {
+                    [mime writeToFile:[dir stringByAppendingPathComponent:[name stringByAppendingString:@".mime"]] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                    have[key] = v;
+                } else {
+                    failed++;
+                }
+            } else {
+                if (tmp) [fm removeItemAtPath:tmp error:nil];
+                failed++;
+            }
+            [self writeMusicIndex:index];
+        }
+        done++;
+        if (-lastPush.timeIntervalSinceNow > 1) {
+            lastPush = [NSDate date];
+            [self setMusicState:@"running" done:done total:total error:nil index:index];
+        }
+    }
+    [session finishTasksAndInvalidate];
+
+    // Songs no longer on a kept playlist, and older versions, go.
+    long long bytes = 0;
+    for (NSString *file in [fm contentsOfDirectoryAtPath:dir error:nil]) {
+        NSString *ext = file.pathExtension;
+        if (![ext isEqualToString:@"audio"] && ![ext isEqualToString:@"mime"]) continue;
+        NSString *name = file.stringByDeletingPathExtension;
+        NSString *path = [dir stringByAppendingPathComponent:file];
+        if (![wanted containsObject:name]) {
+            [fm removeItemAtPath:path error:nil];
+            continue;
+        }
+        if ([ext isEqualToString:@"audio"]) bytes += [[fm attributesOfItemAtPath:path error:nil] fileSize];
+    }
+    for (NSString *key in [have allKeys]) {
+        if (![wanted containsObject:[NSString stringWithFormat:@"%@-%@", key, have[key]]]) [have removeObjectForKey:key];
+    }
+    index[@"bytes"] = @(bytes);
+    index[@"last"] = @(floor([NSDate date].timeIntervalSince1970 * 1000));
+    [self writeMusicIndex:index];
+    id last = index[@"last"];
+    dispatch_async(dispatch_get_main_queue(), ^{ self.musicStatus[@"last"] = last; });
+    if (failed) {
+        [self setMusicState:@"error" done:done total:total error:nil index:index];
+        return [NSString stringWithFormat:@"%ld %@ couldn't be saved. It will try again.", (long)failed, failed == 1 ? @"song" : @"songs"];
+    }
+    [self setMusicState:@"idle" done:done total:total error:nil index:index];
+    return nil;
 }
 
 @end

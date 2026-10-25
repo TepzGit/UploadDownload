@@ -13,3 +13,5 @@ ios/build/
 ios/sdk/
 *.apk
 *.ipa
+MusicCache/
+spotify.json

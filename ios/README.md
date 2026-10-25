@@ -30,6 +30,11 @@ refresh it for you over Wi-Fi). A paid developer account makes that a year.
 - Long-press the app icon for Graph, Journal, Forum and Change server.
 - It reopens the page you were on, and shows a "Can't reach Geek⁴u" screen with Try again when the
   server is down.
+- Music: on the Music page, "Keep on this iPhone" saves a playlist's songs in the app (only new or
+  changed songs are downloaded), and the offline proxy plays them from there, with or without
+  internet. Music keeps playing in the background and on the lock screen (UIBackgroundModes audio,
+  AVAudioSession playback). The page talks to the app through `window.webkit.messageHandlers.geek4uMusic`
+  and the app answers with `window.xnMusicStatus(...)`.
 
 ## Build it
 
@@ -42,7 +47,7 @@ No Mac is needed. On Linux or WSL (Ubuntu or Debian):
 That makes `build/Geek4u.ipa`. The first build fetches the parts of the iOS 15.6 SDK it needs
 (about 11 MB) from github.com/theos/sdks into `sdk/`.
 
-For an update: `VERSION=1.1 BUILD=2 bash build.sh`.
+For an update: `VERSION=1.3 BUILD=4 bash build.sh` (raise both each time).
 
 To skip the address question, put your server in `kDefaultServer` in `src/main.m`, like
 `@"http://example.com:42067"`.

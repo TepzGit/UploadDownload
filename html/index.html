@@ -4,14 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Substance timeline · Geek⁴u</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  // hover: styles only on devices that can hover, so taps on iPhone don't leave buttons stuck "hovered"
-  if (window.tailwind) tailwind.config = { future: { hoverOnlyWhenSupported: true } };
-</script>
-<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="/vendor/daisyui-4.12.10.css" rel="stylesheet" type="text/css" />
+<link href="/vendor/fonts.css" rel="stylesheet">
 <style>
   :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:var(--oled-accent); }
   body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
@@ -22,6 +16,7 @@
   .check-card.selected{ border-color:var(--violet); background:rgba(var(--xn-accent-rgb), .12); }
   .suggestion{ display:block; width:100%; text-align:left; padding:.5rem .75rem; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
   .suggestion:hover{ background:rgba(255,255,255,.08); }
+  .sug-custom{ margin-left:.5rem; padding:0 .35rem; border:1px solid var(--line); border-radius:2px; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
   /* Drug class icons: shared styles in classicons.css */
   .sc-icon-lg{ width:20px; height:20px; margin:0; }
   .recent-tile .sc-icon{ width:18px; height:18px; margin:0; background:var(--c, var(--violet)); }
@@ -75,6 +70,7 @@
   .pill.empty{ color:var(--muted); background:transparent; }
   .dose-list-empty{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding:.5rem 0; }
   .toast{ position:fixed; left:50%; bottom:calc(1.25rem + env(safe-area-inset-bottom)); max-width:calc(100vw - 2rem); text-align:center; transform:translate(-50%,20px); background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:.6rem 1rem; border-radius:.125rem; opacity:0; pointer-events:none; transition:.25s ease; z-index:60; }
+  .toast{ width:max-content; white-space:normal; line-height:1.5; }
   .toast.visible{ opacity:1; transform:translate(-50%,0); }
   .toast.error{ border-color:#f8717155; color:#fca5a5; }
   .chart-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; min-height:var(--chart-h); padding:1.5rem 1rem; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center; }
@@ -438,6 +434,7 @@
   <script>if (window.matchMedia("(max-width: 767px)").matches) document.documentElement.classList.add("gp-phone");</script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="stylesheet" href="/vendor/tailwind.css">
 </head>
 <body class="min-h-screen bg-black text-[#f8f4ff]">
 <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
@@ -450,7 +447,7 @@
     <a href="/">Graph</a>
     <a href="/Files/">Files</a>
     <a href="/Forum">Forum</a>
-    <a href="/Replications">Replications</a>
+    <a href="/Utility">Utility</a>
     <a href="/Profile">Profile</a>
   </nav>
 </header>
@@ -628,6 +625,12 @@
       </section>
       <p id="substanceSummary" class="text-[#fff] text-sm leading-relaxed mb-6 p-3 border border-[var(--line)] bg-[var(--bg)]"></p>
       <p class="text-lg text-[var(--muted)] mb-6 pb-4 border-b-2 border-[var(--line)]">Addiction potential:<br><strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>
+      <div id="customInfo" class="mb-6 pb-4 border-b-2 border-[var(--line)] text-sm" hidden>
+        <p class="text-[var(--muted)] mb-1">Half-life</p><p id="customHalfLife" class="text-[var(--text)] mb-3"></p>
+        <p class="text-[var(--muted)] mb-1">Risks</p><p id="customRisks" class="text-[var(--text)] leading-relaxed mb-3 whitespace-pre-line"></p>
+        <p class="text-[var(--muted)] mb-1">Notes</p><p id="customNotes" class="text-[var(--text)] leading-relaxed whitespace-pre-line"></p>
+        <p class="text-[10px] text-[var(--muted)] mt-3 uppercase tracking-widest">Custom entry, added by an admin</p>
+      </div>
       <div class="space-y-7">
         <div><p class="text-base text-amber-300 mb-2">Caution</p><div data-interaction="caution"></div></div>
         <div><p class="text-base text-orange-400 mb-2">Dangerous</p><div data-interaction="danger"></div></div>

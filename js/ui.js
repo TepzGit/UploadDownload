@@ -8,6 +8,7 @@
 
 import * as logic from "./logic.js";
 import * as plot from "./plot.js";
+import * as offline from "./offline.js";
 
 let suggestionTimer;
 let els = {}; // populated in init()
@@ -62,15 +63,19 @@ function init() {
   initPhone();
   initExperiences();
   loadCustomColors();
+  sendJournalOutbox();
+  // The whole substance catalog, kept on the phone for offline use (weekly).
+  setTimeout(() => {
+    logic.refreshOfflineCatalog();
+    plot.loadPlotly().catch(() => {}); // so the app has the chart library saved before going offline
+  }, 4000);
 }
 
 // Colors the account picked on Profile › Preferences. Signed out, the
 // server answers [] and the default palette is used.
 async function loadCustomColors() {
   try {
-    const res = await fetch("/graphColors", { headers: { Accept: "application/json" } });
-    if (!res.ok || !(res.headers.get("content-type") || "").includes("json")) return;
-    const list = await res.json();
+    const { data: list } = await offline.cachedJson("/graphColors", "xn_graph_colors");
     if (!Array.isArray(list) || !list.length) return;
     logic.setCustomColors(list);
     renderRecent();
@@ -756,21 +761,27 @@ async function initExperiences() {
     if (document.visibilityState === "hidden") flushExperience();
   });
   renderExperiences();
+  let wentOffline = false;
   try {
-    const res = await fetch("/experiences", { headers: { Accept: "application/json" } });
-    if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
-      const data = await res.json();
-      if (data?.signedIn) {
-        expMode = "account";
-        experiences = Array.isArray(data.items) ? data.items : [];
-        sharedExperiences = Array.isArray(data.shared) ? data.shared : [];
-      }
-    } else {
+    // Offline, this is the last list the server sent, kept on the phone.
+    const { data, offline: off } = await offline.cachedJson("/experiences", EXP_CACHE_KEY);
+    wentOffline = off;
+    if (data?.signedIn) {
+      expMode = "account";
+      experiences = applyOutbox(Array.isArray(data.items) ? data.items : []);
+      sharedExperiences = Array.isArray(data.shared) ? data.shared : [];
+    } else if (!data) {
       expUnreachable = true;
     }
   } catch (_) {
-    expUnreachable = true; // offline: fall back to this device
+    expUnreachable = true;
   }
+  window.addEventListener("online", whenBackOnline);
+  // Wi-Fi without internet, or the server was down: "online" never fires, so try again every minute.
+  setInterval(() => {
+    if (!offline.isOffline() && expMode === "account" && expOutbox.length) whenBackOnline();
+  }, 60000);
+  if (expMode === "account" && !wentOffline && expOutbox.length) whenBackOnline();
   if (expMode !== "account") {
     expMode = hasConsent() ? "local" : "off";
     experiences = readLocalExperiences();
@@ -828,18 +839,126 @@ function writeLocalExperiences() {
   }
 }
 
-async function storeExperience(entry) {
-  if (expMode === "account") {
+// ---- Offline saves (signed in) ----
+// A session saved without internet gets a temporary id ("o...") and waits in
+// an outbox on the phone; whenBackOnline() sends the outbox in order.
+
+const EXP_CACHE_KEY = "xn_exp_cache";
+const EXP_OUTBOX_KEY = "xn_exp_outbox";
+const JOURNAL_OUTBOX_KEY = "xn_journal_outbox";
+let expOutbox = offline.readJson(EXP_OUTBOX_KEY, []);
+let offlineToastShown = false;
+const isTempId = (id) => typeof id === "string" && id.startsWith("o");
+const tempIds = new Map(); // temporary id -> the id the server gave it
+
+function applyOutbox(list) {
+  let out = list.slice();
+  expOutbox.forEach((op) => {
+    out = out.filter((e) => e.id !== op.key);
+    if (!op.delete) out.push({ id: op.key, startedAt: op.startedAt, updatedAt: op.at, doses: op.doses, people: [] });
+  });
+  return out.sort((a, b) => b.startedAt - a.startedAt);
+}
+
+function saveOutbox() {
+  offline.saveJson(EXP_OUTBOX_KEY, expOutbox);
+}
+
+function queueOffline(op) {
+  expOutbox = expOutbox.filter((o) => o.key !== op.key);
+  // A session made and deleted while offline never needs to reach the server.
+  if (!(op.delete && isTempId(op.key))) expOutbox.push({ ...op, at: Date.now() });
+  saveOutbox();
+  if (!offlineToastShown) {
+    offlineToastShown = true;
+    showToast("You're offline. Your changes are saved on this phone and upload when you're back online.");
+  }
+}
+
+function saveExperienceCache() {
+  offline.saveJson(EXP_CACHE_KEY, {
+    signedIn: true,
+    items: experiences.filter((e) => !isTempId(e.id) && !expOutbox.some((o) => o.key === e.id)),
+    shared: sharedExperiences,
+  });
+}
+
+/** Sends the outbox. Stops at the first failure and keeps what's left. Runs inside the save queue. */
+async function sendOutbox() {
+  let sent = 0;
+  while (expOutbox.length) {
+    const op = expOutbox[0];
     const res = await fetch("/experiences", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: entry.id || 0, startedAt: entry.startedAt, doses: entry.doses }),
-      keepalive: true,
+      body: JSON.stringify(op.delete ? { id: op.key, delete: true } : { id: isTempId(op.key) ? 0 : op.key, startedAt: op.startedAt, doses: op.doses }),
     });
-    if (res.status === 401) throw new Error("Log in again to keep saving your experiences.");
-    if (!res.ok) throw new Error((await res.text()).trim() || "This session couldn't be saved.");
-    return res.json();
+    if (res.status === 401) throw new Error("Log in again to upload the sessions saved on this phone.");
+    if (!res.ok) throw new Error("A session saved on this phone couldn't be uploaded. It will try again later.");
+    if (!op.delete) {
+      const saved = await res.json();
+      if (isTempId(op.key)) {
+        // Swap the temporary id for the real one everywhere it is used.
+        experiences = experiences.map((e) => (e.id === op.key ? { ...saved, people: e.people || [] } : e));
+        if (activeExp?.id === op.key) activeExp.id = saved.id;
+        tempIds.set(op.key, saved.id);
+        expOutbox.forEach((o) => { if (o.key === op.key) o.key = saved.id; });
+      }
+    }
+    expOutbox.shift();
+    saveOutbox();
+    sent++;
   }
+  saveExperienceCache();
+  return sent;
+}
+
+function whenBackOnline() {
+  offlineToastShown = false;
+  logic.refreshOfflineCatalog();
+  sendJournalOutbox();
+  if (expMode !== "account" || !expOutbox.length) return;
+  queueExperience(async () => {
+    const sent = await sendOutbox();
+    renderExperiences();
+    if (sent) showToast(`Back online. Uploaded ${sent === 1 ? "the session" : sent + " sessions"} saved on this phone.`);
+  });
+}
+
+async function storeExperience(entry) {
+  if (expMode === "account") {
+    if (!offline.isOffline()) {
+      try {
+        if (expOutbox.length) await sendOutbox();
+        if (tempIds.has(entry.id)) entry = { ...entry, id: tempIds.get(entry.id) };
+        return await sendExperience(entry);
+      } catch (error) {
+        if (!offline.isNetworkError(error)) throw error;
+      }
+    }
+    const key = entry.id || `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    queueOffline({ key, startedAt: entry.startedAt, doses: entry.doses });
+    return { id: key, startedAt: entry.startedAt, updatedAt: Date.now(), doses: entry.doses };
+  }
+  return storeLocally(entry);
+}
+
+async function sendExperience(entry) {
+  const res = await fetch("/experiences", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: entry.id || 0, startedAt: entry.startedAt, doses: entry.doses }),
+    keepalive: true,
+  });
+  if (res.status === 401) throw new Error("Log in again to keep saving your experiences.");
+  if (!res.ok) throw new Error((await res.text()).trim() || "This session couldn't be saved.");
+  const saved = await res.json();
+  experiences = [saved, ...experiences.filter((e) => e.id !== saved.id)];
+  saveExperienceCache();
+  return saved;
+}
+
+function storeLocally(entry) {
   const saved = {
     id: entry.id || `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     startedAt: entry.startedAt,
@@ -853,17 +972,28 @@ async function storeExperience(entry) {
 
 async function dropExperience(id) {
   if (expMode === "account") {
-    const res = await fetch("/experiences", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, delete: true }),
-      keepalive: true,
-    });
-    if (res.status === 401) throw new Error("Log in again to change your experiences.");
-    if (!res.ok) throw new Error("That couldn't be deleted. Try again.");
+    let sent = false;
+    if (!offline.isOffline() && !isTempId(id)) {
+      try {
+        if (expOutbox.length) await sendOutbox();
+        const res = await fetch("/experiences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, delete: true }),
+          keepalive: true,
+        });
+        if (res.status === 401) throw new Error("Log in again to change your experiences.");
+        if (!res.ok) throw new Error("That couldn't be deleted. Try again.");
+        sent = true;
+      } catch (error) {
+        if (!offline.isNetworkError(error)) throw error;
+      }
+    }
+    if (!sent) queueOffline({ key: id, delete: true });
   }
   experiences = experiences.filter((e) => e.id !== id);
   if (expMode === "local") writeLocalExperiences();
+  if (expMode === "account") saveExperienceCache();
 }
 
 /** Runs store writes one after another so a new session gets its id before the next save. */
@@ -1259,6 +1389,12 @@ function showSuggestions(substances) {
     option.className = "suggestion";
     option.setAttribute("role", "option");
     option.append(classIcon(substance.name), substance.name);
+    if (substance.custom) {
+      const tag = document.createElement("span");
+      tag.className = "sug-custom";
+      tag.textContent = "Custom";
+      option.append(tag);
+    }
     option.addEventListener("click", () => {
       els.input.value = substance.name;
       els.suggestions.hidden = true;
@@ -1442,12 +1578,32 @@ function renderSubstanceInfo(substance, roa) {
   syncInputClass();
   els.substanceSummary.textContent = substance.summary || "No summary available.";
   els.addictionPotential.textContent = substance.addictionPotential || "Unknown";
+  renderCustomInfo(substance);
   setPills("caution", substance.uncertainInteractions);
   setPills("danger", substance.unsafeInteractions);
   setPills("severe", substance.dangerousInteractions);
   renderDurations(substance, roa);
   els.substanceInfo.hidden = false;
   els.layout?.classList.add("has-info");
+}
+
+/** Half-life, risks and notes, which only custom (admin-added) substances carry. */
+function renderCustomInfo(substance) {
+  const box = document.getElementById("customInfo");
+  if (!box) return;
+  box.hidden = !substance?.custom;
+  if (!substance?.custom) return;
+  const h = substance.halfLife;
+  const half = h ? [h.min, h.max].filter((n) => n != null).filter((n, i, a) => a.indexOf(n) === i).join("–") : "";
+  const fill = (id, text) => {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.hidden = !text;
+    el.previousElementSibling.hidden = !text;
+  };
+  fill("customHalfLife", half ? `${half} hours` : "");
+  fill("customRisks", substance.risks || "");
+  fill("customNotes", substance.notes || "");
 }
 
 function setPills(type, items) {
@@ -1695,22 +1851,53 @@ async function handleSave() {
 
   els.saveButton.disabled = true;
   els.saveButton.textContent = "Saving…";
+  const left = payloads.slice();
   try {
-    for (const data of payloads) {
+    if (offline.isOffline()) throw new TypeError("offline");
+    while (left.length) {
       const response = await fetch("/sub/saveData", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(left[0]),
       });
       if (!response.ok) throw new Error("Save failed");
+      left.shift();
     }
     showToast("Timeline saved to your journal.");
-  } catch (_) {
-    showToast("The timeline could not be saved. Please try again.", true);
+  } catch (error) {
+    if (offline.isNetworkError(error)) {
+      offline.saveJson(JOURNAL_OUTBOX_KEY, [...offline.readJson(JOURNAL_OUTBOX_KEY, []), ...left]);
+      showToast("You're offline. It's saved on this phone and goes to your journal when you're back online.");
+    } else {
+      showToast("The timeline could not be saved. Please try again.", true);
+    }
   } finally {
     els.saveButton.disabled = false;
     els.saveButton.textContent = "Save data";
   }
+}
+
+/** Journal saves made offline go up once the phone is back online. */
+async function sendJournalOutbox() {
+  let left = offline.readJson(JOURNAL_OUTBOX_KEY, []);
+  if (!left.length || offline.isOffline()) return;
+  let sent = 0;
+  try {
+    while (left.length) {
+      const response = await fetch("/sub/saveData", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(left[0]),
+      });
+      if (!response.ok) break;
+      left = left.slice(1);
+      offline.saveJson(JOURNAL_OUTBOX_KEY, left);
+      sent++;
+    }
+  } catch (_) {
+    // still offline; try again on the next "online"
+  }
+  if (sent) showToast("Back online. Your saved timeline went to your journal.");
 }
 
 // ------------------------------------------------------------

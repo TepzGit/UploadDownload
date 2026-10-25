@@ -6,6 +6,9 @@
 // control flow are unchanged, only reorganized and exported.
 // ============================================================
 
+import * as offline from "./offline.js";
+import { effectCurve, effectHours } from "./curve.js";
+
 const API_URL = "https://api.psychonautwiki.org";
 
 const state = {
@@ -53,12 +56,101 @@ function fetchGraphQL(query, variables = {}) {
   });
 }
 
+// ------------------------------------------------------------
+// Custom substances: added by an admin in the Substances Importer
+// (/admin/substances), kept in our own database, apart from the
+// PsychonautWiki data. They are turned into the same shape as a
+// PsychonautWiki substance (with custom: true) so the Graph,
+// Journal and Drug info treat them alike.
+// ------------------------------------------------------------
+
+let customList = null;
+
+/** A custom entry from /substances/custom in PsychonautWiki's shape. */
+export function customToSubstance(c) {
+  const hours = (v) => (Number(v) > 0 ? { min: Number(v), max: Number(v), units: "hours" } : null);
+  const d = c.durations || {};
+  const total = effectHours(d);
+  const range = (r) => (r && (r.min != null || r.max != null) ? { min: r.min ?? r.max, max: r.max ?? r.min } : null);
+  const named = (list) => (list || []).map((name) => ({ name }));
+  return {
+    name: c.name,
+    custom: true,
+    customId: c.id,
+    commonNames: c.aliases || [],
+    class: { psychoactive: c.class ? [c.class] : [], chemical: c.chemicalClass ? [c.chemicalClass] : [] },
+    images: [],
+    summary: c.summary || "",
+    addictionPotential: c.addictionPotential || "",
+    halfLife: c.halfLife || null,
+    risks: c.risks || "",
+    notes: c.notes || "",
+    dangerousInteractions: named(c.interactions?.dangerous),
+    unsafeInteractions: named(c.interactions?.unsafe),
+    uncertainInteractions: named(c.interactions?.uncertain),
+    roas: [{
+      name: c.route || "oral",
+      dose: {
+        units: c.units || "mg",
+        threshold: c.dose?.threshold ?? null,
+        heavy: c.dose?.heavy ?? null,
+        light: range(c.dose?.light),
+        common: range(c.dose?.common),
+        strong: range(c.dose?.strong),
+      },
+      duration: {
+        onset: hours(d.onset), comeup: hours(d.comeup), peak: hours(d.peak), offset: hours(d.offset),
+        total: hours(total),
+      },
+      extended: { comedown: d.comedown, comedownLevel: d.comedownLevel, peak2: d.peak2 },
+    }],
+  };
+}
+
+/** Every custom substance (kept on the phone for offline use). */
+export async function customSubstances() {
+  if (customList) return customList;
+  try {
+    const { data } = await offline.cachedJson("/substances/custom", "xn_custom_substances");
+    customList = Array.isArray(data) ? data.map(customToSubstance) : [];
+    customList.forEach((sub) => rememberClass(sub));
+  } catch {
+    customList = [];
+  }
+  return customList;
+}
+
+function customMatches(text) {
+  const q = String(text || "").trim().toLowerCase();
+  return (customList || []).filter((s) => [s.name, ...s.commonNames].some((n) => String(n).toLowerCase().includes(q)));
+}
+
+/** The custom substance with this name or alias, or null. */
+export async function customByName(name) {
+  const q = String(name || "").trim().toLowerCase();
+  const list = await customSubstances();
+  return list.find((s) => [s.name, ...s.commonNames].some((n) => String(n).toLowerCase() === q)) || null;
+}
+
 /** Typeahead suggestions. Old name: searchSuggestions() (network part only). */
 export async function searchSuggestions(name) {
+  await customSubstances();
+  const custom = customMatches(name);
+  return [...custom, ...(await wikiSuggestions(name)).filter((s) => !custom.some((c) => c.name.toLowerCase() === s.name.toLowerCase()))];
+}
+
+async function wikiSuggestions(name) {
   const query = `query Suggestions($name: String!) {
         substances(query: $name) { name class { psychoactive chemical } }
     }`;
-  const result = await fetchGraphQL(query, { name });
+  let result;
+  try {
+    if (offline.isOffline()) throw new TypeError("offline");
+    result = await fetchGraphQL(query, { name });
+  } catch (error) {
+    if (!offline.isNetworkError(error)) throw error;
+    return offline.searchNames(name); // substances saved on this phone
+  }
   const substances = result?.data?.substances || [];
   substances.forEach((s) => rememberClass(s));
   return substances;
@@ -100,6 +192,9 @@ export function classKeyOf(name) {
     const query = `query Class($name: String!) {
         substances(query: $name) { name class { psychoactive chemical } }
     }`;
+    if (offline.isOffline()) {
+      return offline.getSubstance(name).then((hit) => (hit ? classKeyFor(hit) : ""));
+    }
     classRequests.set(key, fetchGraphQL(query, { name }).then((result) => {
       const hit = (result?.data?.substances || []).find((s) => s.name.toLowerCase() === key) || result?.data?.substances?.[0];
       if (!hit) return "";
@@ -120,10 +215,11 @@ export function cachedClassKey(name) {
  * half of search(). Updates internal state and returns the same
  * shape the UI needs to render the substance panel.
  */
-export async function fetchSubstanceData(name) {
-  const query = `query Substance($name: String!) {
-        substances(query: $name) {
+// Everything the Graph needs about a substance. The weekly catalog download
+// asks for the same fields so any substance can be drawn offline.
+const SUBSTANCE_FIELDS = `
             name
+            commonNames
             class { psychoactive chemical }
             images { thumb }
             summary
@@ -141,12 +237,85 @@ export async function fetchSubstanceData(name) {
                     total { min max units }
                 }
                 dose { units common { min } }
-            }
-        }
+            }`;
+
+// What the Journal's Drug info page shows, kept in the offline catalog too.
+const CATALOG_FIELDS = `
+            name
+            commonNames
+            systematicName
+            class { psychoactive chemical }
+            images { thumb }
+            summary
+            addictionPotential
+            toxicity
+            crossTolerances
+            tolerance { full half zero }
+            effects { name url }
+            uncertainInteractions { name }
+            unsafeInteractions { name }
+            dangerousInteractions { name }
+            roas {
+                name
+                dose { units threshold heavy common { min max } light { min max } strong { min max } }
+                duration {
+                    afterglow { min max units }
+                    comeup { min max units }
+                    duration { min max units }
+                    offset { min max units }
+                    onset { min max units }
+                    peak { min max units }
+                    total { min max units }
+                }
+                bioavailability { min max }
+            }`;
+
+/** Downloads the whole catalog once a week for offline use (see offline.js). */
+export function refreshOfflineCatalog(options) {
+  let fields = CATALOG_FIELDS;
+  return offline.refreshCatalog(async (offset) => {
+    const ask = () => fetchGraphQL(`{ substances(limit: 250 offset: ${offset}) { ${fields} } }`);
+    let result;
+    try {
+      result = await ask();
+    } catch (error) {
+      if (offline.isNetworkError(error) || fields === SUBSTANCE_FIELDS) throw error;
+      result = { errors: [error] };
+    }
+    if (result?.errors && fields !== SUBSTANCE_FIELDS) {
+      // PsychonautWiki turned down a detail field: keep what the Graph needs.
+      fields = SUBSTANCE_FIELDS;
+      result = await ask();
+    }
+    const page = result?.data?.substances;
+    if (Array.isArray(page)) {
+      const cache = readClassCache();
+      page.forEach((s) => { if (s?.name) cache[s.name.toLowerCase()] = classKeyFor(s); });
+      try { localStorage.setItem(CLASS_KEY, JSON.stringify(cache)); } catch {}
+    }
+    return page;
+  }, options);
+}
+
+export async function fetchSubstanceData(name) {
+  const query = `query Substance($name: String!) {
+        substances(query: $name) { ${SUBSTANCE_FIELDS} }
     }`;
 
-  const result = await fetchGraphQL(query, { name });
-  const substance = result?.data?.substances?.[0];
+  // A custom substance (Substances Importer) comes from our server, not PsychonautWiki.
+  let substance = await customByName(name);
+  if (!substance) {
+    try {
+      if (offline.isOffline()) throw new TypeError("offline");
+      const result = await fetchGraphQL(query, { name });
+      substance = result?.data?.substances?.[0];
+      if (substance) offline.putSubstances([substance]);
+    } catch (error) {
+      if (!offline.isNetworkError(error)) throw error;
+      substance = await offline.getSubstance(name);
+      if (!substance) throw new Error("You're offline and this substance isn't saved on this phone yet.");
+    }
+  }
   // Every route with timings can be drawn. A route without its own common
   // dose borrows one from a route that has it, so the curve still has a scale.
   const withDose = substance?.roas?.find((item) => item.duration && item.dose?.common?.min);
@@ -179,6 +348,7 @@ export function selectRoa(name) {
     comeup: averageHours(roa.duration.comeup),
     peak: averageHours(roa.duration.peak),
     offset: averageHours(roa.duration.offset),
+    ...extendedBase(roa.extended), // custom substances only
   };
 
   return {
@@ -223,35 +393,18 @@ export function currentTimeValue() {
 /** profile = the substance's { base, commonDose }; defaults to the one loaded now. */
 export function buildDoseCurve(startHour, doseAmount, releaseHours, profile = currentProfile()) {
   const intensity = doseAmount / profile.commonDose;
+  // Extended release stretches the curve. comedown and a second peak (custom
+  // substances from the admin Substances Importer, see curve.js) stretch too.
   const adjusted = {
+    ...profile.base,
     onset: profile.base.onset + releaseHours * 0.15,
     comeup: profile.base.comeup + releaseHours * 0.25,
     peak: profile.base.peak + releaseHours * 0.45,
     offset: profile.base.offset + releaseHours * 0.15,
   };
-  const total = Object.values(adjusted).reduce((sum, value) => sum + value, 0);
-  const step = Math.max(0.05, total / 650);
-  const x = [startHour];
-  const y = [0];
-  let cursor = startHour;
-
-  appendSegment(adjusted.onset, () => 0);
-  appendSegment(adjusted.comeup, (progress) => progress * 100 * intensity);
-  appendSegment(adjusted.peak, () => 100 * intensity);
-  appendSegment(adjusted.offset, (progress) => (1 - progress) * 100 * intensity);
-
-  function appendSegment(duration, valueAt) {
-    if (duration <= 0) return;
-    const count = Math.max(1, Math.ceil(duration / step));
-    for (let index = 1; index <= count; index += 1) {
-      const progress = index / count;
-      x.push(cursor + duration * progress);
-      y.push(Math.max(0, valueAt(progress)));
-    }
-    cursor += duration;
-  }
-
-  return { x, y };
+  if (adjusted.comedown > 0) adjusted.comedown += releaseHours * 0.1;
+  const step = Math.max(0.05, effectHours(adjusted) / 650);
+  return effectCurve(adjusted, startHour, intensity, step);
 }
 
 export function formatChartTime(value) {
@@ -284,6 +437,22 @@ function interpolateDose(dose, point) {
 
 function currentProfile() {
   return { base: { ...state.baseDurations }, commonDose: state.currentCommonDose };
+}
+
+/** The optional come-down and second-peak parts of a saved profile, checked. */
+function extendedBase(raw) {
+  const out = {};
+  const hours = (v) => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) <= 240 ? Number(v) : 0;
+  const share = (v, d) => Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : d;
+  if (hours(raw?.comedown)) {
+    out.comedown = hours(raw.comedown);
+    out.comedownLevel = share(raw.comedownLevel, 0.35);
+  }
+  const p2 = raw?.peak2;
+  if (p2 && hours(p2.duration)) {
+    out.peak2 = { gap: hours(p2.gap), dip: share(p2.dip, 0.5), duration: hours(p2.duration), level: share(p2.level, 1) };
+  }
+  return out;
 }
 
 // ------------------------------------------------------------
@@ -380,6 +549,7 @@ function savedDose(raw) {
     base[key] = Number(raw.profile?.base?.[key]) || 0;
     if (base[key] < 0 || base[key] > 240) return null;
   }
+  Object.assign(base, extendedBase(raw.profile?.base));
   if (!(amount > 0) || !(commonDose > 0) || releaseHours < 0 || releaseHours > 48) return null;
   if (!/^\d{1,2}:\d{2}$/.test(String(raw.time || ""))) return null;
   return {

@@ -26,8 +26,14 @@ info = {
     "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight"],
     "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown",
                                               "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight"],
-    # The Geek4u server speaks plain http unless it sits behind https.
-    "NSAppTransportSecurity": {"NSAllowsArbitraryLoads": True, "NSAllowsLocalNetworking": True},
+    # The Geek4u server speaks plain http unless it sits behind https. Only NSAllowsArbitraryLoads:
+    # iOS ignores it as soon as NSAllowsLocalNetworking or another ATS key is also present.
+    "NSAppTransportSecurity": {"NSAllowsArbitraryLoads": True},
+    # Phone sync puts the picked Files folders in Documents; these show it in the Files app.
+    "UIFileSharingEnabled": True,
+    # Music keeps playing with the app in the background or the phone locked.
+    "UIBackgroundModes": ["audio"],
+    "LSSupportsOpeningDocumentsInPlace": True,
     "NSLocalNetworkUsageDescription": "Geek⁴u connects to your server when it's on your home network.",
     "NSCameraUsageDescription": "Take a photo or video to upload, like a profile picture.",
     "NSMicrophoneUsageDescription": "Record sound with a video you upload.",

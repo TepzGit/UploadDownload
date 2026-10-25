@@ -17,10 +17,14 @@ export function loadPlotly() {
 
   plotlyLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://cdn.plot.ly/plotly-2.32.0.min.js";
+    script.src = "/vendor/plotly-2.32.0.min.js";
     script.async = true;
     script.onload = () => resolve(window.Plotly);
-    script.onerror = () => reject(new Error("Plotly failed to load."));
+    script.onerror = () => {
+      plotlyLoadPromise = null; // offline: try again next time
+      script.remove();
+      reject(new Error("Plotly failed to load."));
+    };
     document.head.appendChild(script);
   });
 

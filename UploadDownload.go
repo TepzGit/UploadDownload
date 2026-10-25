@@ -3,9 +3,12 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
+	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,11 +16,13 @@ import (
 	"html"
 	"html/template"
 	"io"
+	"io/fs"
 	"math"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -197,6 +202,21 @@ CREATE TABLE IF NOT EXISTS file_access (
 	FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS custom_substances (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	data TEXT NOT NULL,
+	created_by INTEGER NOT NULL,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phone_sync (
+	user_id INTEGER PRIMARY KEY,
+	folders TEXT NOT NULL DEFAULT '[]',
+	FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS site_pictures (
 	slot TEXT PRIMARY KEY,
 	path TEXT NOT NULL
@@ -318,6 +338,24 @@ func main() {
 	http.HandleFunc("/rename", requireFilesLogin(Rename))
 	http.HandleFunc("/getItems", requireFilesLogin(getItems))
 	http.HandleFunc("/admin/files-access", requireAdminLogin(adminFilesAccess))
+	// Substances Importer: admins add their own substances next to PsychonautWiki's.
+	http.HandleFunc("/admin/substances", requireAdminLogin(SubstancesImporter))
+	http.HandleFunc("/admin/substances/api", requireAdminLogin(adminCustomSubstances))
+	// Open like the Graph page, so the Graph can draw custom substances for everyone.
+	http.HandleFunc("/substances/custom", publicCustomSubstances)
+	// Phone sync: the folders a member picked on their Profile are copied into the app's folder on the phone.
+	http.HandleFunc("/sync/folders", requireLogin(syncFolders))
+	http.HandleFunc("/sync/manifest", requireLogin(syncManifest))
+	http.HandleFunc("/sync/file", requireLogin(syncFile))
+	// Music: the audio files in Files, playlists (also imported from Spotify), sharing with friends.
+	http.HandleFunc("/Music", requireLogin(Music))
+	http.HandleFunc("/music/library", requireLogin(musicLibrary))
+	http.HandleFunc("/music/playlists", requireLogin(musicPlaylists))
+	http.HandleFunc("/music/import", requireLogin(musicImport))
+	http.HandleFunc("/music/stream/", requireLogin(musicStream))
+	http.HandleFunc("/music/art/", requireLogin(musicArt))
+	http.HandleFunc("/music/cover/", requireLogin(musicCover))
+	http.HandleFunc("/music/offline", requireLogin(musicOffline))
 	http.HandleFunc("/admin/stats", requireAdminLogin(adminStats))
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
 	http.HandleFunc("/sitepic/", sitePicture)
@@ -337,7 +375,11 @@ func main() {
 	http.HandleFunc("/friends", requireLogin(friends))
 	http.HandleFunc("/experiences/people", requireLogin(experiencePeople))
 	http.HandleFunc("/likes", requireLogin(likes))
-	http.HandleFunc("/Replications", requireLogin(Replications))
+	http.HandleFunc("/Utility", requireLogin(Utility))
+	// Replications was replaced by Utility; old links and bookmarks land there.
+	http.HandleFunc("/Replications", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/Utility", http.StatusMovedPermanently)
+	})
 	http.HandleFunc("/replications/list", requireLogin(replicationsList))
 	http.HandleFunc("/replications/files/", requireLogin(replicationsFile))
 	http.HandleFunc("/replications/thumbs/", requireLogin(replicationsFile))
@@ -450,6 +492,9 @@ func main() {
 		postsMade = MAX(postsMade, (SELECT COUNT(*) FROM forum_posts p WHERE p.user_id = users.id))`)
 	if _, err := db.Exec(statsSchema); err != nil {
 		panic("cannot create the view counters: " + err.Error())
+	}
+	if _, err := db.Exec(musicSchema); err != nil {
+		panic("cannot create the music tables: " + err.Error())
 	}
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
@@ -2935,6 +2980,10 @@ type experienceDose struct {
 			Comeup float64 `json:"comeup"`
 			Peak   float64 `json:"peak"`
 			Offset float64 `json:"offset"`
+			// Only custom substances (Substances Importer) have these.
+			Comedown      float64     `json:"comedown,omitempty"`
+			ComedownLevel float64     `json:"comedownLevel,omitempty"`
+			Peak2         *secondPeak `json:"peak2,omitempty"`
 		} `json:"base"`
 		CommonDose float64 `json:"commonDose"`
 	} `json:"profile"`
@@ -2972,7 +3021,8 @@ func cleanExperienceDoses(in []experienceDose) ([]experienceDose, bool) {
 		if d.Substance == "" || !clockTime.MatchString(d.Time) ||
 			!inRange(d.Amount, 0.000001, 1e6) || !inRange(d.ReleaseHours, 0, 48) ||
 			!inRange(d.Profile.CommonDose, 0.000001, 1e6) ||
-			!inRange(b.Onset, 0, 240) || !inRange(b.Comeup, 0, 240) || !inRange(b.Peak, 0, 240) || !inRange(b.Offset, 0, 240) {
+			!inRange(b.Onset, 0, 240) || !inRange(b.Comeup, 0, 240) || !inRange(b.Peak, 0, 240) || !inRange(b.Offset, 0, 240) ||
+			!inRange(b.Comedown, 0, 240) || !inRange(b.ComedownLevel, 0, 1) || (b.Peak2 != nil && !b.Peak2.valid()) {
 			return nil, false
 		}
 		out = append(out, d)
@@ -4923,7 +4973,7 @@ func viewedPage(r *http.Request) string {
 	}
 	p := r.URL.Path
 	switch {
-	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Replications":
+	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Utility":
 		return p
 	case strings.HasPrefix(p, "/u/"):
 		return "/u/"
@@ -6009,6 +6059,13 @@ func replDownload(link, dest string) (int64, error) {
 
 // ---- pages and endpoints ----
 
+// Utility: small tools (volumetric dosing, unit converter, redose timer) that
+// run in the browser, so they also work in the app without internet.
+func Utility(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, "html/utility.html")
+}
+
 func Replications(w http.ResponseWriter, r *http.Request) {
 	session, _ := sessionFromRequest(r)
 	t, err := template.ParseFiles("html/replications.html")
@@ -6143,4 +6200,1966 @@ func replicationsBackup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(st)
+}
+
+// ---- Phone sync ----
+//
+// A member with Files access picks folders on their Profile; the Android and
+// iOS apps copy those folders into "Geek4u" in the phone's Files and keep them
+// matching the server (new and changed files come down, removed ones go).
+
+const syncMaxFiles = 20000
+
+// syncChosen is the account's picked folders that it may still open.
+func syncChosen(s cookiesStruct, g filesGrant) []string {
+	var raw string
+	db.QueryRow("SELECT folders FROM phone_sync WHERE user_id = ?", s.UserId).Scan(&raw)
+	var picked []string
+	json.Unmarshal([]byte(raw), &picked)
+	out := []string{}
+	for _, f := range picked {
+		if g.allows(f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// syncFolders: GET answers {access, available, chosen}; POST {folders} saves the pick.
+func syncFolders(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	g, ok := filesGrantFor(s)
+	switch r.Method {
+	case http.MethodGet:
+		if !ok {
+			writeJSON(w, map[string]any{"access": false, "available": []string{}, "chosen": []string{}})
+			return
+		}
+		available := []string{}
+		for _, f := range uploadFolders() {
+			if g.allows(f) {
+				available = append(available, f)
+			}
+		}
+		writeJSON(w, map[string]any{"access": true, "available": available, "chosen": syncChosen(s, g)})
+	case http.MethodPost:
+		if !ok {
+			http.Error(w, "You don't have access to Files.", http.StatusForbidden)
+			return
+		}
+		var in struct {
+			Folders []string `json:"folders"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+		keep := []string{}
+		seen := map[string]bool{}
+		for _, f := range in.Folders {
+			f = strings.Trim(filepath.ToSlash(f), "/")
+			p, inside := insideUploads(strings.Split(f, "/")...)
+			if f == "" || !inside || seen[f] || !g.allows(f) {
+				continue
+			}
+			if st, err := os.Stat(p); err != nil || !st.IsDir() {
+				continue
+			}
+			seen[f] = true
+			keep = append(keep, f)
+			if len(keep) >= 100 {
+				break
+			}
+		}
+		b, _ := json.Marshal(keep)
+		if _, err := db.Exec(`INSERT INTO phone_sync (user_id, folders) VALUES (?, ?)
+			ON CONFLICT(user_id) DO UPDATE SET folders = excluded.folders`, s.UserId, string(b)); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save your sync folders.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"chosen": keep})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+type syncEntry struct {
+	Path  string `json:"path"`
+	Size  int64  `json:"size"`
+	MTime int64  `json:"mtime"`
+}
+
+// syncManifest lists every file in the picked folders: {folders, files:[{path,size,mtime}]}.
+func syncManifest(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	g, ok := filesGrantFor(s)
+	if !ok {
+		http.Error(w, "You don't have access to Files.", http.StatusForbidden)
+		return
+	}
+	chosen := syncChosen(s, g)
+	files := []syncEntry{}
+	seen := map[string]bool{}
+	truncated := false
+	for _, f := range chosen {
+		root, inside := insideUploads(strings.Split(f, "/")...)
+		if !inside {
+			continue
+		}
+		filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.Type()&fs.ModeSymlink != 0 {
+				return nil
+			}
+			if strings.HasPrefix(d.Name(), ".") && p != root {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if len(files) >= syncMaxFiles {
+				truncated = true
+				return filepath.SkipAll
+			}
+			rel := uploadRel(p)
+			if seen[rel] {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return nil
+			}
+			seen[rel] = true
+			files = append(files, syncEntry{Path: rel, Size: info.Size(), MTime: info.ModTime().Unix()})
+			return nil
+		})
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"folders": chosen, "files": files, "truncated": truncated})
+}
+
+// syncFile sends one file from a picked folder (?path=a/b/c.jpg).
+func syncFile(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	g, ok := filesGrantFor(s)
+	rel := strings.Trim(filepath.ToSlash(r.URL.Query().Get("path")), "/")
+	if !ok || rel == "" || !g.allows(rel) {
+		http.Error(w, "Not allowed.", http.StatusForbidden)
+		return
+	}
+	picked := false
+	for _, f := range syncChosen(s, g) {
+		if rel == f || strings.HasPrefix(rel, f+"/") {
+			picked = true
+			break
+		}
+	}
+	p, inside := insideUploads(strings.Split(rel, "/")...)
+	st, err := os.Stat(p)
+	if !picked || !inside || err != nil || st.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", "attachment")
+	http.ServeFile(w, r, p)
+}
+
+// ---- Substances Importer (admin) ----
+//
+// Admins add medications and other substances PsychonautWiki doesn't have.
+// They live in custom_substances, apart from anything fetched from
+// PsychonautWiki (which is never stored on the server), and the Graph,
+// Journal and Drug info read them from /substances/custom.
+
+// secondPeak: a biphasic effect. gap hours after the first peak ends (dipping
+// to dip, a share of the first peak), it holds at level for duration hours.
+type secondPeak struct {
+	Gap      float64 `json:"gap"`
+	Dip      float64 `json:"dip"`
+	Duration float64 `json:"duration"`
+	Level    float64 `json:"level"`
+}
+
+func (p *secondPeak) valid() bool {
+	return inRange(p.Gap, 0, 240) && inRange(p.Dip, 0, 1) && inRange(p.Duration, 0.01, 240) && inRange(p.Level, 0.01, 1)
+}
+
+type rangeValue struct {
+	Min *float64 `json:"min,omitempty"`
+	Max *float64 `json:"max,omitempty"`
+}
+
+type customSubstance struct {
+	ID                 int64       `json:"id"`
+	Name               string      `json:"name"`
+	Aliases            []string    `json:"aliases"`
+	Class              string      `json:"class"`
+	ChemicalClass      string      `json:"chemicalClass"`
+	Summary            string      `json:"summary"`
+	HalfLife           *rangeValue `json:"halfLife,omitempty"` // hours
+	AddictionPotential string      `json:"addictionPotential"`
+	Risks              string      `json:"risks"`
+	Notes              string      `json:"notes"`
+	Interactions       struct {
+		Dangerous []string `json:"dangerous"`
+		Unsafe    []string `json:"unsafe"`
+		Uncertain []string `json:"uncertain"`
+	} `json:"interactions"`
+	Route string `json:"route"`
+	Units string `json:"units"`
+	Dose  struct {
+		Threshold *float64    `json:"threshold,omitempty"`
+		Light     *rangeValue `json:"light,omitempty"`
+		Common    *rangeValue `json:"common,omitempty"`
+		Strong    *rangeValue `json:"strong,omitempty"`
+		Heavy     *float64    `json:"heavy,omitempty"`
+	} `json:"dose"`
+	// All in hours, the same shape the Graph draws (js/curve.js).
+	Durations struct {
+		Onset         float64     `json:"onset"`
+		Comeup        float64     `json:"comeup"`
+		Peak          float64     `json:"peak"`
+		Comedown      float64     `json:"comedown"`
+		ComedownLevel float64     `json:"comedownLevel"`
+		Offset        float64     `json:"offset"`
+		Peak2         *secondPeak `json:"peak2,omitempty"`
+	} `json:"durations"`
+	CreatedBy string `json:"createdBy,omitempty"`
+	CreatedAt int64  `json:"createdAt,omitempty"`
+	UpdatedAt int64  `json:"updatedAt,omitempty"`
+}
+
+func cleanList(in []string, maxItems, maxLen int) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, v := range in {
+		v = cleanText(v, maxLen)
+		if v == "" || seen[strings.ToLower(v)] {
+			continue
+		}
+		seen[strings.ToLower(v)] = true
+		out = append(out, v)
+		if len(out) >= maxItems {
+			break
+		}
+	}
+	return out
+}
+
+func okNumber(p *float64, max float64) bool {
+	return p == nil || inRange(*p, 0, max)
+}
+
+func okRange(r *rangeValue, max float64) bool {
+	if r == nil {
+		return true
+	}
+	if !okNumber(r.Min, max) || !okNumber(r.Max, max) {
+		return false
+	}
+	return r.Min == nil || r.Max == nil || *r.Min <= *r.Max
+}
+
+// clean checks an entry from the form; the message says what to fix.
+func (c *customSubstance) clean() string {
+	c.Name = cleanText(c.Name, 80)
+	if c.Name == "" {
+		return "Give the substance a name."
+	}
+	c.Aliases = cleanList(c.Aliases, 20, 80)
+	c.Class = cleanText(c.Class, 60)
+	c.ChemicalClass = cleanText(c.ChemicalClass, 60)
+	c.Summary = cleanMultiline(c.Summary, 4000)
+	c.AddictionPotential = cleanText(c.AddictionPotential, 120)
+	c.Risks = cleanMultiline(c.Risks, 4000)
+	c.Notes = cleanMultiline(c.Notes, 4000)
+	c.Interactions.Dangerous = cleanList(c.Interactions.Dangerous, 60, 80)
+	c.Interactions.Unsafe = cleanList(c.Interactions.Unsafe, 60, 80)
+	c.Interactions.Uncertain = cleanList(c.Interactions.Uncertain, 60, 80)
+	c.Route = strings.ToLower(cleanText(c.Route, 30))
+	if c.Route == "" {
+		c.Route = "oral"
+	}
+	c.Units = cleanText(c.Units, 12)
+	if c.Units == "" {
+		c.Units = "mg"
+	}
+	if !okRange(c.HalfLife, 24*365) {
+		return "The half-life needs numbers from 0 up, with the lowest first."
+	}
+	d := &c.Dose
+	if !okNumber(d.Threshold, 1e6) || !okNumber(d.Heavy, 1e6) || !okRange(d.Light, 1e6) || !okRange(d.Common, 1e6) || !okRange(d.Strong, 1e6) {
+		return "Doses need numbers from 0 up, with the lowest first."
+	}
+	if d.Common == nil || (d.Common.Min == nil && d.Common.Max == nil) {
+		return "Enter a common dose. The Graph scales the curve with it."
+	}
+	if (d.Common.Min != nil && *d.Common.Min <= 0) || (d.Common.Min == nil && *d.Common.Max <= 0) {
+		return "The common dose must be more than 0."
+	}
+	t := &c.Durations
+	for _, v := range []float64{t.Onset, t.Comeup, t.Peak, t.Comedown, t.Offset} {
+		if !inRange(v, 0, 240) {
+			return "Durations must be between 0 and 240 hours."
+		}
+	}
+	if t.Comeup+t.Peak+t.Offset+t.Comedown <= 0 {
+		return "Set at least the come-up, peak or offset, so there is a curve to draw."
+	}
+	if !inRange(t.ComedownLevel, 0, 1) {
+		return "The come-down level must be between 0 and 100%."
+	}
+	if t.Comedown == 0 {
+		t.ComedownLevel = 0
+	} else if t.ComedownLevel == 0 {
+		t.ComedownLevel = 0.35
+	}
+	if t.Peak2 != nil && t.Peak2.Duration == 0 {
+		t.Peak2 = nil // "no second peak"
+	}
+	if t.Peak2 != nil && !t.Peak2.valid() {
+		return "The second peak needs a length, a level between 1 and 100% and a dip between 0 and 100%."
+	}
+	return ""
+}
+
+func loadCustomSubstances() ([]customSubstance, error) {
+	rows, err := db.Query(`SELECT c.id, c.data, c.created_at, c.updated_at, COALESCE(u.originalUsername, '')
+		FROM custom_substances c LEFT JOIN users u ON u.id = c.created_by ORDER BY lower(c.name)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []customSubstance{}
+	for rows.Next() {
+		var c customSubstance
+		var data string
+		var id, created, updated int64
+		var by string
+		if err := rows.Scan(&id, &data, &created, &updated, &by); err != nil {
+			return nil, err
+		}
+		if json.Unmarshal([]byte(data), &c) != nil {
+			continue
+		}
+		c.ID, c.CreatedAt, c.UpdatedAt, c.CreatedBy = id, created, updated, by
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func SubstancesImporter(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, "html/substances.html")
+}
+
+// publicCustomSubstances lists the custom substances for the Graph, Journal and Drug info.
+func publicCustomSubstances(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	list, err := loadCustomSubstances()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load the custom substances.", http.StatusInternalServerError)
+		return
+	}
+	for i := range list {
+		list[i].CreatedBy = "" // who added it is for admins only
+	}
+	writeJSON(w, list)
+}
+
+// adminCustomSubstances: GET lists them; POST {..., id} creates (id 0) or
+// updates one; POST {id, delete: true} removes one.
+func adminCustomSubstances(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		list, err := loadCustomSubstances()
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load the custom substances.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, list)
+	case http.MethodPost:
+		session, _ := sessionFromRequest(r)
+		var in struct {
+			customSubstance
+			Delete bool `json:"delete"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&in); err != nil {
+			http.Error(w, "Couldn't read that substance.", http.StatusBadRequest)
+			return
+		}
+		if in.Delete {
+			if _, err := db.Exec("DELETE FROM custom_substances WHERE id = ?", in.ID); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't delete that.", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
+			return
+		}
+		c := in.customSubstance
+		if msg := c.clean(); msg != "" {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+		id := c.ID
+		c.ID, c.CreatedBy, c.CreatedAt, c.UpdatedAt = 0, "", 0, 0
+		body, _ := json.Marshal(c)
+		now := time.Now().UnixMilli()
+		var err error
+		if id > 0 {
+			var res sql.Result
+			res, err = db.Exec("UPDATE custom_substances SET name = ?, data = ?, updated_at = ? WHERE id = ?", c.Name, string(body), now, id)
+			if err == nil {
+				if n, _ := res.RowsAffected(); n == 0 {
+					http.Error(w, "That substance was deleted meanwhile.", http.StatusNotFound)
+					return
+				}
+			}
+		} else {
+			var res sql.Result
+			res, err = db.Exec("INSERT INTO custom_substances (name, data, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+				c.Name, string(body), session.UserId, now, now)
+			if err == nil {
+				id, _ = res.LastInsertId()
+			}
+		}
+		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "unique") {
+				http.Error(w, "There is already a custom substance called "+c.Name+".", http.StatusConflict)
+				return
+			}
+			fmt.Println(err)
+			http.Error(w, "Couldn't save that substance.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"id": id, "name": c.Name})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- Music ----
+//
+// The music library is the audio files in Files (UploadedFiles) that the
+// account may open, so music is uploaded and organised like any other file
+// and the Files access an admin gives decides whose music is whose. Each file
+// is read once (title, artist, album, length, cover) with ffprobe when it's
+// installed, otherwise from its name ("Artist - Title.mp3") and folders, and
+// kept in music_tracks; only new or changed files are read again.
+//
+// Playlists are made on the Music page or imported from Spotify. Spotify only
+// gives the list (names, artists, albums, covers): each song is then matched
+// to an audio file in the library. Nothing is ever streamed or downloaded from
+// Spotify. Owners can share a playlist with friends, who can play it (also
+// the songs they couldn't open in Files themselves) but not change it.
+//
+// Files iPhones can't play (ogg, opus, wma, ape...) are turned into AAC with
+// ffmpeg the first time they're played and kept in MusicCache. The iOS app
+// keeps playlists on the phone for offline listening (/music/offline).
+
+const musicCacheDir = "MusicCache"
+const maxPlaylists = 200
+const maxPlaylistTracks = 2000
+
+// Played as they are by Safari, the iOS app and Chrome.
+var musicDirect = map[string]string{
+	".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".wav": "audio/wav",
+	".flac": "audio/flac", ".aif": "audio/aiff", ".aiff": "audio/aiff", ".alac": "audio/mp4",
+}
+
+// Turned into AAC (.m4a) with ffmpeg first.
+var musicConvert = map[string]bool{
+	".ogg": true, ".oga": true, ".opus": true, ".wma": true, ".ape": true, ".wv": true,
+	".mka": true, ".webm": true, ".ac3": true, ".dsf": true, ".tta": true,
+}
+
+const musicSchema = `
+CREATE TABLE IF NOT EXISTS music_tracks (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	path TEXT NOT NULL UNIQUE,
+	size INTEGER NOT NULL,
+	mtime INTEGER NOT NULL,
+	title TEXT NOT NULL DEFAULT '',
+	artist TEXT NOT NULL DEFAULT '',
+	album TEXT NOT NULL DEFAULT '',
+	duration REAL NOT NULL DEFAULT 0,
+	has_art INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS music_playlists (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	owner_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	source TEXT NOT NULL DEFAULT 'manual',
+	spotify_id TEXT NOT NULL DEFAULT '',
+	image TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL,
+	FOREIGN KEY(owner_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS music_playlists_by_owner ON music_playlists(owner_id);
+CREATE TABLE IF NOT EXISTS music_playlist_tracks (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	playlist_id INTEGER NOT NULL,
+	position INTEGER NOT NULL,
+	title TEXT NOT NULL,
+	artist TEXT NOT NULL DEFAULT '',
+	album TEXT NOT NULL DEFAULT '',
+	duration_ms INTEGER NOT NULL DEFAULT 0,
+	isrc TEXT NOT NULL DEFAULT '',
+	spotify_id TEXT NOT NULL DEFAULT '',
+	image_url TEXT NOT NULL DEFAULT '',
+	track_id INTEGER,
+	manual INTEGER NOT NULL DEFAULT 0,
+	FOREIGN KEY(playlist_id) REFERENCES music_playlists(id)
+);
+CREATE INDEX IF NOT EXISTS music_playlist_tracks_by_list ON music_playlist_tracks(playlist_id, position);
+CREATE TABLE IF NOT EXISTS music_playlist_shares (
+	playlist_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	added_at INTEGER NOT NULL,
+	PRIMARY KEY(playlist_id, user_id),
+	FOREIGN KEY(playlist_id) REFERENCES music_playlists(id),
+	FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS music_playlist_shares_by_user ON music_playlist_shares(user_id);
+`
+
+type musicTrack struct {
+	ID       int64   `json:"id"`
+	Path     string  `json:"-"`
+	Size     int64   `json:"size"`
+	MTime    int64   `json:"-"`
+	Title    string  `json:"title"`
+	Artist   string  `json:"artist"`
+	Album    string  `json:"album"`
+	Duration float64 `json:"duration"`
+	HasArt   bool    `json:"art"`
+	Version  string  `json:"v"`
+	Playable bool    `json:"playable"`
+	Folder   string  `json:"folder"`
+}
+
+func (t *musicTrack) fill() {
+	t.Version = strconv.FormatInt(t.MTime, 36) + strconv.FormatInt(t.Size, 36)
+	ext := strings.ToLower(filepath.Ext(t.Path))
+	t.Playable = musicDirect[ext] != "" || musicConvert[ext] && ffmpegPath() != ""
+	t.Folder = ""
+	if i := strings.LastIndex(t.Path, "/"); i > 0 {
+		t.Folder = t.Path[:i]
+	}
+}
+
+var musicMu sync.Mutex // guards the scan state below
+var musicScanning bool
+var musicScannedAt time.Time
+
+var ffOnce sync.Once
+var ffmpegBin, ffprobeBin string
+
+// ffmpegPath is ffmpeg's location, "" when it isn't installed (PATH, or next to the server).
+func ffmpegPath() string {
+	ffOnce.Do(func() {
+		find := func(name string) string {
+			if p, err := exec.LookPath(name); err == nil {
+				return p
+			}
+			for _, cand := range []string{name, name + ".exe", filepath.Join("ffmpeg", "bin", name+".exe"), filepath.Join("ffmpeg", "bin", name)} {
+				if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+					abs, _ := filepath.Abs(cand)
+					return abs
+				}
+			}
+			return ""
+		}
+		ffmpegBin, ffprobeBin = find("ffmpeg"), find("ffprobe")
+		if ffmpegBin == "" {
+			fmt.Println("Music: ffmpeg not found, so ogg/opus/wma files won't play and covers come only from cover.jpg files.")
+		}
+	})
+	return ffmpegBin
+}
+
+func isMusicFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	return musicDirect[ext] != "" || musicConvert[ext]
+}
+
+// musicGuess fills in a song's details from its file name and folders:
+// "Artist - Title", "01 - Title" or "01. Artist - Title", with the folder as album.
+func musicGuess(rel string) (title, artist, album string) {
+	parts := strings.Split(rel, "/")
+	base := strings.TrimSuffix(parts[len(parts)-1], filepath.Ext(parts[len(parts)-1]))
+	base = strings.TrimSpace(strings.ReplaceAll(base, "_", " "))
+	base = strings.TrimLeft(regexp.MustCompile(`^\d{1,3}\s*[-.)]?\s+`).ReplaceAllString(base, ""), " ")
+	if i := strings.Index(base, " - "); i > 0 {
+		artist, title = strings.TrimSpace(base[:i]), strings.TrimSpace(base[i+3:])
+	} else {
+		title = base
+	}
+	if len(parts) >= 2 {
+		album = parts[len(parts)-2]
+	}
+	if artist == "" && len(parts) >= 4 { // Artist/Album/song, inside a top folder
+		artist = parts[len(parts)-3]
+	}
+	return
+}
+
+// musicProbe reads a file's tags with ffprobe. ok is false without ffprobe or on a bad file.
+func musicProbe(p string) (title, artist, album string, duration float64, art bool, ok bool) {
+	if ffmpegPath(); ffprobeBin == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, ffprobeBin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", p).Output()
+	if err != nil {
+		return
+	}
+	var info struct {
+		Format struct {
+			Duration string            `json:"duration"`
+			Tags     map[string]string `json:"tags"`
+		} `json:"format"`
+		Streams []struct {
+			CodecType   string            `json:"codec_type"`
+			Disposition map[string]int    `json:"disposition"`
+			Tags        map[string]string `json:"tags"`
+		} `json:"streams"`
+	}
+	if json.Unmarshal(out, &info) != nil {
+		return
+	}
+	tags := map[string]string{}
+	add := func(m map[string]string) {
+		for k, v := range m {
+			k = strings.ToLower(k)
+			if tags[k] == "" {
+				tags[k] = strings.TrimSpace(v)
+			}
+		}
+	}
+	add(info.Format.Tags)
+	for _, s := range info.Streams {
+		if s.CodecType == "audio" {
+			add(s.Tags) // ogg/opus keep their tags on the stream
+		}
+		if s.CodecType == "video" && s.Disposition["attached_pic"] == 1 {
+			art = true
+		}
+	}
+	title, album = tags["title"], tags["album"]
+	artist = tags["artist"]
+	if artist == "" {
+		artist = tags["album_artist"]
+	}
+	duration, _ = strconv.ParseFloat(info.Format.Duration, 64)
+	return cleanText(title, 200), cleanText(artist, 200), cleanText(album, 200), duration, art, true
+}
+
+// musicScan brings music_tracks up to date with the audio files in UploadedFiles.
+func musicScan() {
+	known := map[string]musicTrack{}
+	rows, err := db.Query("SELECT id, path, size, mtime FROM music_tracks")
+	if err == nil {
+		for rows.Next() {
+			var t musicTrack
+			if rows.Scan(&t.ID, &t.Path, &t.Size, &t.MTime) == nil {
+				known[t.Path] = t
+			}
+		}
+		rows.Close()
+	}
+	seen := map[string]bool{}
+	changed := false
+	filepath.WalkDir(UploadedFilesDirName, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") && p != UploadedFilesDirName {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() || !isMusicFile(d.Name()) {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		rel := uploadRel(p)
+		seen[rel] = true
+		old, had := known[rel]
+		if had && old.Size == info.Size() && old.MTime == info.ModTime().Unix() {
+			return nil
+		}
+		title, artist, album, duration, art, ok := musicProbe(p)
+		gt, ga, gal := musicGuess(rel)
+		if !ok || title == "" {
+			title = gt
+		}
+		if artist == "" {
+			artist = ga
+		}
+		if album == "" {
+			album = gal
+		}
+		if _, err := db.Exec(`INSERT INTO music_tracks (path, size, mtime, title, artist, album, duration, has_art) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(path) DO UPDATE SET size = excluded.size, mtime = excluded.mtime, title = excluded.title,
+			artist = excluded.artist, album = excluded.album, duration = excluded.duration, has_art = excluded.has_art`,
+			rel, info.Size(), info.ModTime().Unix(), title, artist, album, duration, boolInt(art)); err != nil {
+			fmt.Println("music scan:", err)
+		}
+		changed = true
+		return nil
+	})
+	for path, t := range known {
+		if !seen[path] {
+			db.Exec("DELETE FROM music_tracks WHERE id = ?", t.ID)
+			db.Exec("UPDATE music_playlist_tracks SET track_id = NULL, manual = 0 WHERE track_id = ?", t.ID)
+			changed = true
+		}
+	}
+	if changed {
+		musicRematchAll()
+	}
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// musicRefresh starts a library scan in the background when the last one is
+// over 30 seconds old (wait: finish it first). It answers whether one is running.
+func musicRefresh(wait bool) bool {
+	musicMu.Lock()
+	if musicScanning || time.Since(musicScannedAt) < 30*time.Second {
+		running := musicScanning
+		musicMu.Unlock()
+		return running
+	}
+	musicScanning = true
+	musicMu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		musicScan()
+		musicMu.Lock()
+		musicScanning, musicScannedAt = false, time.Now()
+		musicMu.Unlock()
+	}()
+	if wait {
+		select {
+		case <-done:
+			return false
+		case <-time.After(8 * time.Second):
+		}
+	}
+	return true
+}
+
+func loadMusicTracks(where string, args ...any) []musicTrack {
+	out := []musicTrack{}
+	rows, err := db.Query("SELECT id, path, size, mtime, title, artist, album, duration, has_art FROM music_tracks "+where, args...)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t musicTrack
+		var art int
+		if rows.Scan(&t.ID, &t.Path, &t.Size, &t.MTime, &t.Title, &t.Artist, &t.Album, &t.Duration, &art) == nil {
+			t.HasArt = art == 1
+			t.fill()
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// musicLibraryFor is every song the account may open in Files.
+func musicLibraryFor(s cookiesStruct) []musicTrack {
+	g, ok := filesGrantFor(s)
+	if !ok {
+		return []musicTrack{}
+	}
+	all := loadMusicTracks("ORDER BY lower(artist), lower(album), lower(title)")
+	if g.All {
+		return all
+	}
+	out := []musicTrack{}
+	for _, t := range all {
+		if g.allows(t.Path) {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// ---- matching Spotify songs to files ----
+
+var musicNoise = regexp.MustCompile(`(?i)\s*[\(\[][^\)\]]*[\)\]]|\s+-\s+.*(remaster|version|edit|mix|live|mono|stereo|deluxe|bonus).*$|\s+(feat\.?|ft\.?|featuring)\s.*$`)
+var musicAccents = strings.NewReplacer("á", "a", "à", "a", "â", "a", "ä", "a", "ã", "a", "å", "a", "æ", "ae", "ç", "c",
+	"é", "e", "è", "e", "ê", "e", "ë", "e", "í", "i", "ì", "i", "î", "i", "ï", "i", "ñ", "n", "ó", "o", "ò", "o",
+	"ô", "o", "ö", "o", "õ", "o", "ø", "o", "ú", "u", "ù", "u", "û", "u", "ü", "u", "ý", "y", "ÿ", "y", "ß", "ss", "&", " and ")
+
+// musicNorm makes names comparable: "Don't Stop (2011 Remaster)" -> "dont stop".
+func musicNorm(s string) string {
+	s = musicAccents.Replace(strings.ToLower(musicNoise.ReplaceAllString(s, "")))
+	var b strings.Builder
+	space := false
+	for _, r := range s {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+			space = false
+		case r == '\'' || r == '’' || r == '.':
+		default:
+			if !space && b.Len() > 0 {
+				b.WriteByte(' ')
+				space = true
+			}
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// firstArtist: "A, B & C" -> "a".
+func firstArtist(s string) string {
+	for _, sep := range []string{",", ";", " & ", " x ", " feat", " ft."} {
+		if i := strings.Index(strings.ToLower(s), sep); i > 0 {
+			s = s[:i]
+		}
+	}
+	return musicNorm(s)
+}
+
+type musicCandidate struct {
+	id                 int64
+	title, artist, all string
+	duration           float64
+}
+
+func musicCandidates(tracks []musicTrack) []musicCandidate {
+	out := make([]musicCandidate, 0, len(tracks))
+	for _, t := range tracks {
+		if !t.Playable {
+			continue
+		}
+		gt, ga, _ := musicGuess(t.Path)
+		out = append(out, musicCandidate{
+			id: t.ID, title: musicNorm(t.Title), artist: musicNorm(t.Artist), duration: t.Duration,
+			all: " " + musicNorm(t.Title+" "+t.Artist+" "+gt+" "+ga+" "+strings.TrimSuffix(filepath.Base(t.Path), filepath.Ext(t.Path))) + " ",
+		})
+	}
+	return out
+}
+
+// musicMatch finds the library file for one song, 0 when none fits well enough.
+func musicMatch(cands []musicCandidate, title, artist string, durationMs int64) int64 {
+	nt, na := musicNorm(title), firstArtist(artist)
+	if nt == "" {
+		return 0
+	}
+	best, bestScore := int64(0), 0
+	for _, c := range cands {
+		score := 0
+		switch {
+		case c.title == nt:
+			score = 4
+		case strings.Contains(c.all, " "+nt+" "):
+			score = 2
+		default:
+			continue
+		}
+		switch {
+		case na == "":
+		case c.artist != "" && (strings.Contains(c.artist, na) || strings.Contains(na, c.artist)):
+			score += 3
+		case strings.Contains(c.all, " "+na+" "):
+			score += 2
+		case c.artist != "":
+			score -= 3 // same title, someone else's song
+		}
+		if durationMs > 0 && c.duration > 0 {
+			diff := math.Abs(c.duration - float64(durationMs)/1000)
+			if diff <= 4 {
+				score++
+			} else if diff > 30 {
+				score--
+			}
+		}
+		if score > bestScore {
+			best, bestScore = c.id, score
+		}
+	}
+	if bestScore >= 4 {
+		return best
+	}
+	return 0
+}
+
+// musicRematch matches a playlist's songs that have no file yet (or lost it),
+// against the owner's library. Songs matched by hand are left alone.
+func musicRematch(playlistID int64) {
+	var owner int
+	if db.QueryRow("SELECT owner_id FROM music_playlists WHERE id = ?", playlistID).Scan(&owner) != nil {
+		return
+	}
+	var authority string
+	db.QueryRow("SELECT authority FROM users WHERE id = ?", owner).Scan(&authority)
+	cands := musicCandidates(musicLibraryFor(cookiesStruct{UserId: owner, Authority: authority}))
+	type row struct {
+		id       int64
+		title    string
+		artist   string
+		duration int64
+	}
+	var todo []row
+	rows, err := db.Query("SELECT id, title, artist, duration_ms FROM music_playlist_tracks WHERE playlist_id = ? AND track_id IS NULL AND manual = 0", playlistID)
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.id, &r.title, &r.artist, &r.duration) == nil {
+			todo = append(todo, r)
+		}
+	}
+	rows.Close()
+	for _, r := range todo {
+		if id := musicMatch(cands, r.title, r.artist, r.duration); id > 0 {
+			db.Exec("UPDATE music_playlist_tracks SET track_id = ? WHERE id = ?", id, r.id)
+		}
+	}
+}
+
+func musicRematchAll() {
+	var ids []int64
+	rows, err := db.Query("SELECT DISTINCT playlist_id FROM music_playlist_tracks WHERE track_id IS NULL AND manual = 0")
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		var id int64
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	for _, id := range ids {
+		musicRematch(id)
+	}
+}
+
+// ---- who may see what ----
+
+// musicPlaylistRole: "owner", "shared" (a friend it was shared with) or "".
+func musicPlaylistRole(id int64, me int) string {
+	var owner int
+	if db.QueryRow("SELECT owner_id FROM music_playlists WHERE id = ?", id).Scan(&owner) != nil {
+		return ""
+	}
+	if owner == me {
+		return "owner"
+	}
+	var n int
+	db.QueryRow("SELECT COUNT(*) FROM music_playlist_shares WHERE playlist_id = ? AND user_id = ?", id, me).Scan(&n)
+	if n > 0 && friendState(me, owner) == "friends" {
+		return "shared"
+	}
+	return ""
+}
+
+// musicCanPlay: the file is in the account's Files access, or on a playlist it owns or was shared.
+func musicCanPlay(s cookiesStruct, t musicTrack) bool {
+	if g, ok := filesGrantFor(s); ok && g.allows(t.Path) {
+		return true
+	}
+	var n int
+	db.QueryRow(`SELECT COUNT(*) FROM music_playlist_tracks pt JOIN music_playlists p ON p.id = pt.playlist_id
+		WHERE pt.track_id = ? AND (p.owner_id = ? OR EXISTS (SELECT 1 FROM music_playlist_shares sh WHERE sh.playlist_id = p.id AND sh.user_id = ?))`,
+		t.ID, s.UserId, s.UserId).Scan(&n)
+	return n > 0
+}
+
+func musicTrackByID(raw string) (musicTrack, bool) {
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return musicTrack{}, false
+	}
+	list := loadMusicTracks("WHERE id = ?", id)
+	if len(list) == 0 {
+		return musicTrack{}, false
+	}
+	return list[0], true
+}
+
+// ---- pages and answers ----
+
+func Music(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, "html/music.html")
+}
+
+// musicLibrary: GET answers {tracks, scanning, ffmpeg, access}. ?wait=1 waits for a scan.
+func musicLibrary(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	_, access := filesGrantFor(s)
+	scanning := false
+	if access {
+		scanning = musicRefresh(r.URL.Query().Get("wait") == "1")
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	writeJSON(w, map[string]any{"tracks": musicLibraryFor(s), "scanning": scanning, "ffmpeg": ffmpegPath() != "", "access": access})
+}
+
+type playlistSummary struct {
+	ID      int64       `json:"id"`
+	Name    string      `json:"name"`
+	Source  string      `json:"source"`
+	Image   string      `json:"image"`
+	Count   int         `json:"count"`
+	Matched int         `json:"matched"`
+	Owner   *postAuthor `json:"owner,omitempty"`
+	Updated int64       `json:"updated"`
+}
+
+type playlistSong struct {
+	ID       int64       `json:"id"`
+	Title    string      `json:"title"`
+	Artist   string      `json:"artist"`
+	Album    string      `json:"album"`
+	Duration int64       `json:"durationMs"`
+	Image    string      `json:"image"`
+	Spotify  string      `json:"spotify"`
+	Manual   bool        `json:"manual"`
+	Track    *musicTrack `json:"track"`
+}
+
+func playlistCover(id int64, image string) string {
+	if image == "" {
+		return ""
+	}
+	return fmt.Sprintf("/music/cover/%d?v=%s", id, image)
+}
+
+func musicPlaylistSummaries(query string, args ...any) []playlistSummary {
+	out := []playlistSummary{}
+	rows, err := db.Query(`SELECT p.id, p.name, p.source, p.image, p.updated_at, u.originalUsername, u.pathToProfilePic, u.authority,
+		(SELECT COUNT(*) FROM music_playlist_tracks t WHERE t.playlist_id = p.id),
+		(SELECT COUNT(*) FROM music_playlist_tracks t WHERE t.playlist_id = p.id AND t.track_id IS NOT NULL)
+		FROM music_playlists p JOIN users u ON u.id = p.owner_id `+query, args...)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p playlistSummary
+		var name, avatar, authority string
+		if rows.Scan(&p.ID, &p.Name, &p.Source, &p.Image, &p.Updated, &name, &avatar, &authority, &p.Count, &p.Matched) == nil {
+			a := person(name, avatar, authority)
+			p.Owner = &a
+			p.Image = playlistCover(p.ID, p.Image)
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func musicPlaylistSongs(id int64) []playlistSong {
+	out := []playlistSong{}
+	tracks := map[int64]musicTrack{}
+	for _, t := range loadMusicTracks("WHERE id IN (SELECT track_id FROM music_playlist_tracks WHERE playlist_id = ?)", id) {
+		tracks[t.ID] = t
+	}
+	rows, err := db.Query(`SELECT id, title, artist, album, duration_ms, image_url, spotify_id, manual, track_id
+		FROM music_playlist_tracks WHERE playlist_id = ? ORDER BY position, id`, id)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s playlistSong
+		var manual int
+		var track sql.NullInt64
+		if rows.Scan(&s.ID, &s.Title, &s.Artist, &s.Album, &s.Duration, &s.Image, &s.Spotify, &manual, &track) != nil {
+			continue
+		}
+		s.Manual = manual == 1
+		if t, ok := tracks[track.Int64]; track.Valid && ok {
+			t := t
+			s.Track = &t
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// musicPlaylists: GET lists {own, shared}; GET ?id= answers one playlist with its songs.
+// POST {action, ...} changes one (see the switch below).
+func musicPlaylists(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	me := s.UserId
+	w.Header().Set("Cache-Control", "no-cache")
+	if r.Method == http.MethodGet {
+		if raw := r.URL.Query().Get("id"); raw != "" {
+			id, _ := strconv.ParseInt(raw, 10, 64)
+			role := musicPlaylistRole(id, me)
+			if role == "" {
+				http.Error(w, "That playlist was deleted, or isn't shared with you.", http.StatusNotFound)
+				return
+			}
+			if role == "owner" {
+				musicRematch(id)
+			}
+			list := musicPlaylistSummaries("WHERE p.id = ?", id)
+			if len(list) == 0 {
+				http.NotFound(w, r)
+				return
+			}
+			var spotify string
+			db.QueryRow("SELECT spotify_id FROM music_playlists WHERE id = ?", id).Scan(&spotify)
+			shares := []postAuthor{}
+			if role == "owner" {
+				shares = orNobody(musicShares(id))
+				if shares == nil {
+					shares = []postAuthor{}
+				}
+			}
+			writeJSON(w, map[string]any{"playlist": list[0], "mine": role == "owner", "spotify": spotify, "shares": shares, "songs": musicPlaylistSongs(id)})
+			return
+		}
+		writeJSON(w, map[string]any{
+			"own":    musicPlaylistSummaries("WHERE p.owner_id = ? ORDER BY p.updated_at DESC", me),
+			"shared": musicSharedWith(me),
+		})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		Action string   `json:"action"`
+		ID     int64    `json:"id"`
+		Name   string   `json:"name"`
+		Tracks []int64  `json:"tracks"` // library songs to add
+		Song   int64    `json:"song"`   // a playlist row
+		Track  int64    `json:"track"`  // a library song (0 = no file)
+		Order  []int64  `json:"order"`  // playlist rows in their new order
+		People []string `json:"people"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+		return
+	}
+	now := time.Now().UnixMilli()
+	if in.Action == "create" {
+		name := cleanText(in.Name, 100)
+		if name == "" {
+			http.Error(w, "Give the playlist a name.", http.StatusBadRequest)
+			return
+		}
+		var n int
+		db.QueryRow("SELECT COUNT(*) FROM music_playlists WHERE owner_id = ?", me).Scan(&n)
+		if n >= maxPlaylists {
+			http.Error(w, fmt.Sprintf("You have %d playlists, the most there can be. Delete one first.", maxPlaylists), http.StatusBadRequest)
+			return
+		}
+		res, err := db.Exec("INSERT INTO music_playlists (owner_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)", me, name, now, now)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't make the playlist. Try again.", http.StatusInternalServerError)
+			return
+		}
+		id, _ := res.LastInsertId()
+		in.ID = id
+		if len(in.Tracks) > 0 {
+			in.Action = "add"
+		} else {
+			writeJSON(w, map[string]any{"id": id})
+			return
+		}
+	}
+	if musicPlaylistRole(in.ID, me) != "owner" {
+		http.Error(w, "That playlist was deleted, or isn't yours to change.", http.StatusNotFound)
+		return
+	}
+	var err error
+	touch := true
+	switch in.Action {
+	case "rename":
+		name := cleanText(in.Name, 100)
+		if name == "" {
+			http.Error(w, "Give the playlist a name.", http.StatusBadRequest)
+			return
+		}
+		_, err = db.Exec("UPDATE music_playlists SET name = ? WHERE id = ?", name, in.ID)
+	case "delete":
+		touch = false
+		for _, q := range []string{"DELETE FROM music_playlist_tracks WHERE playlist_id = ?", "DELETE FROM music_playlist_shares WHERE playlist_id = ?", "DELETE FROM music_playlists WHERE id = ?"} {
+			if _, e := db.Exec(q, in.ID); e != nil {
+				err = e
+			}
+		}
+		os.Remove(filepath.Join(musicCacheDir, "covers", fmt.Sprintf("%d.jpg", in.ID)))
+	case "add":
+		var count, pos int
+		db.QueryRow("SELECT COUNT(*), COALESCE(MAX(position), 0) FROM music_playlist_tracks WHERE playlist_id = ?", in.ID).Scan(&count, &pos)
+		allowed := map[int64]musicTrack{}
+		for _, t := range musicLibraryFor(s) {
+			allowed[t.ID] = t
+		}
+		for _, tid := range in.Tracks {
+			t, ok := allowed[tid]
+			if !ok || count >= maxPlaylistTracks {
+				continue
+			}
+			pos++
+			count++
+			if _, e := db.Exec(`INSERT INTO music_playlist_tracks (playlist_id, position, title, artist, album, duration_ms, track_id, manual)
+				VALUES (?, ?, ?, ?, ?, ?, ?, 1)`, in.ID, pos, t.Title, t.Artist, t.Album, int64(t.Duration*1000), t.ID); e != nil {
+				err = e
+			}
+		}
+	case "remove":
+		_, err = db.Exec("DELETE FROM music_playlist_tracks WHERE id = ? AND playlist_id = ?", in.Song, in.ID)
+	case "move":
+		tx, e := db.Begin()
+		if e == nil {
+			for i, sid := range in.Order {
+				if _, e = tx.Exec("UPDATE music_playlist_tracks SET position = ? WHERE id = ? AND playlist_id = ?", i+1, sid, in.ID); e != nil {
+					break
+				}
+			}
+			if e == nil {
+				e = tx.Commit()
+			} else {
+				tx.Rollback()
+			}
+		}
+		err = e
+	case "match":
+		// Pick the file for a song by hand (track 0: "no file", and stop guessing).
+		if in.Track == 0 {
+			_, err = db.Exec("UPDATE music_playlist_tracks SET track_id = NULL, manual = 1 WHERE id = ? AND playlist_id = ?", in.Song, in.ID)
+			break
+		}
+		ok := false
+		for _, t := range musicLibraryFor(s) {
+			if t.ID == in.Track {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			http.Error(w, "That file isn't in your music.", http.StatusForbidden)
+			return
+		}
+		_, err = db.Exec("UPDATE music_playlist_tracks SET track_id = ?, manual = 1 WHERE id = ? AND playlist_id = ?", in.Track, in.Song, in.ID)
+	case "unmatch":
+		// Let the server guess again.
+		_, err = db.Exec("UPDATE music_playlist_tracks SET track_id = NULL, manual = 0 WHERE id = ? AND playlist_id = ?", in.Song, in.ID)
+		if err == nil {
+			musicRematch(in.ID)
+		}
+	case "share":
+		var ids []int
+		seen := map[int]bool{}
+		for _, name := range in.People {
+			id, ok := userByName(name)
+			if !ok || id == me || seen[id] {
+				continue
+			}
+			if friendState(me, id) != "friends" {
+				http.Error(w, "You can only share with friends, and "+cleanText(name, 40)+" isn't one.", http.StatusForbidden)
+				return
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+		if len(ids) > 50 {
+			http.Error(w, "A playlist can be shared with up to 50 friends.", http.StatusBadRequest)
+			return
+		}
+		tx, e := db.Begin()
+		if e == nil {
+			_, e = tx.Exec("DELETE FROM music_playlist_shares WHERE playlist_id = ?", in.ID)
+			for i, id := range ids {
+				if e != nil {
+					break
+				}
+				_, e = tx.Exec("INSERT INTO music_playlist_shares (playlist_id, user_id, added_at) VALUES (?, ?, ?)", in.ID, id, now+int64(i))
+			}
+			if e == nil {
+				e = tx.Commit()
+			} else {
+				tx.Rollback()
+			}
+		}
+		err = e
+	case "resync":
+		var spotify string
+		db.QueryRow("SELECT spotify_id FROM music_playlists WHERE id = ?", in.ID).Scan(&spotify)
+		if spotify == "" {
+			http.Error(w, "This playlist didn't come from Spotify.", http.StatusBadRequest)
+			return
+		}
+		pl, e := spotifyPlaylist(spotify)
+		if e != nil {
+			http.Error(w, e.Error(), http.StatusBadGateway)
+			return
+		}
+		err = musicStoreImport(in.ID, pl, true)
+	default:
+		http.Error(w, "Unknown action.", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't change the playlist. Try again.", http.StatusInternalServerError)
+		return
+	}
+	if touch {
+		db.Exec("UPDATE music_playlists SET updated_at = ? WHERE id = ?", now, in.ID)
+	}
+	writeJSON(w, map[string]any{"id": in.ID})
+}
+
+func musicShares(id int64) []postAuthor {
+	out := []postAuthor{}
+	rows, err := db.Query(`SELECT u.originalUsername, u.pathToProfilePic, u.authority FROM music_playlist_shares s
+		JOIN users u ON u.id = s.user_id WHERE s.playlist_id = ? ORDER BY s.added_at`, id)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, avatar, authority string
+		if rows.Scan(&name, &avatar, &authority) == nil {
+			out = append(out, person(name, avatar, authority))
+		}
+	}
+	return out
+}
+
+// musicSharedWith: playlists friends shared with me (only while we're still friends).
+func musicSharedWith(me int) []playlistSummary {
+	out := []playlistSummary{}
+	states := friendStates(me)
+	for _, p := range musicPlaylistSummaries("WHERE p.id IN (SELECT playlist_id FROM music_playlist_shares WHERE user_id = ?) ORDER BY p.updated_at DESC", me) {
+		var owner int
+		db.QueryRow("SELECT owner_id FROM music_playlists WHERE id = ?", p.ID).Scan(&owner)
+		if states[owner] == "friends" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// ---- Spotify (playlist details only) ----
+
+type spotifySong struct {
+	Title, Artist, Album, ISRC, ID, Image string
+	DurationMs                            int64
+}
+
+type spotifyList struct {
+	Name, Image string
+	Songs       []spotifySong
+}
+
+var spotifyMu sync.Mutex
+var spotifyToken string
+var spotifyTokenUntil time.Time
+
+// spotifyCredentials come from SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET, or
+// spotify.json ({"clientId": "...", "clientSecret": "..."}) next to the server.
+func spotifyCredentials() (string, string) {
+	id, secret := os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET")
+	if id != "" && secret != "" {
+		return id, secret
+	}
+	var f struct {
+		ClientID     string `json:"clientId"`
+		ClientSecret string `json:"clientSecret"`
+	}
+	if b, err := os.ReadFile("spotify.json"); err == nil && json.Unmarshal(b, &f) == nil {
+		return strings.TrimSpace(f.ClientID), strings.TrimSpace(f.ClientSecret)
+	}
+	return "", ""
+}
+
+var errNoSpotify = errors.New("Spotify import isn't set up on the server yet. An admin needs to add a Spotify app's client ID and secret (spotify.json next to the server). Until then, paste the song list instead.")
+
+func spotifyAuth() (string, error) {
+	spotifyMu.Lock()
+	defer spotifyMu.Unlock()
+	if spotifyToken != "" && time.Now().Before(spotifyTokenUntil) {
+		return spotifyToken, nil
+	}
+	id, secret := spotifyCredentials()
+	if id == "" || secret == "" {
+		return "", errNoSpotify
+	}
+	req, _ := http.NewRequest("POST", "https://accounts.spotify.com/api/token", strings.NewReader("grant_type=client_credentials"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(id+":"+secret)))
+	res, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	if err != nil {
+		return "", errors.New("Couldn't reach Spotify. Try again later.")
+	}
+	defer res.Body.Close()
+	var out struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	if res.StatusCode != 200 || json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&out) != nil || out.AccessToken == "" {
+		return "", errors.New("Spotify didn't accept the server's client ID and secret.")
+	}
+	spotifyToken, spotifyTokenUntil = out.AccessToken, time.Now().Add(time.Duration(out.ExpiresIn-60)*time.Second)
+	return spotifyToken, nil
+}
+
+func spotifyGet(link string, into any) error {
+	token, err := spotifyAuth()
+	if err != nil {
+		return err
+	}
+	req, _ := http.NewRequest("GET", link, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return errors.New("Couldn't reach Spotify. Try again later.")
+	}
+	defer res.Body.Close()
+	switch res.StatusCode {
+	case 200:
+	case 404, 400:
+		return errors.New("Spotify can't find that playlist. It must be public; Spotify's own mixes (like Discover Weekly) can't be read by apps.")
+	case 401:
+		spotifyMu.Lock()
+		spotifyToken = ""
+		spotifyMu.Unlock()
+		return errors.New("Spotify turned the server away. Try again.")
+	case 429:
+		return errors.New("Spotify says too many requests. Try again in a minute.")
+	default:
+		return fmt.Errorf("Spotify answered %d. Try again later.", res.StatusCode)
+	}
+	return json.NewDecoder(io.LimitReader(res.Body, 16<<20)).Decode(into)
+}
+
+var spotifyIDPattern = regexp.MustCompile(`(?:playlist[/:])([A-Za-z0-9]{10,40})`)
+
+// spotifyPlaylistID takes a link, a spotify:playlist: URI or a bare ID.
+func spotifyPlaylistID(s string) string {
+	s = strings.TrimSpace(s)
+	if m := spotifyIDPattern.FindStringSubmatch(s); m != nil {
+		return m[1]
+	}
+	if regexp.MustCompile(`^[A-Za-z0-9]{22}$`).MatchString(s) {
+		return s
+	}
+	return ""
+}
+
+func spotifyPlaylist(id string) (spotifyList, error) {
+	var head struct {
+		Name   string `json:"name"`
+		Images []struct {
+			URL string `json:"url"`
+		} `json:"images"`
+	}
+	base := "https://api.spotify.com/v1/playlists/" + url.PathEscape(id)
+	if err := spotifyGet(base+"?fields=name,images", &head); err != nil {
+		return spotifyList{}, err
+	}
+	out := spotifyList{Name: cleanText(head.Name, 100)}
+	if len(head.Images) > 0 {
+		out.Image = head.Images[0].URL
+	}
+	next := base + "/tracks?limit=100&fields=" + url.QueryEscape("next,items(track(id,name,duration_ms,external_ids(isrc),artists(name),album(name,images)))")
+	for next != "" && len(out.Songs) < maxPlaylistTracks {
+		var page struct {
+			Next  string `json:"next"`
+			Items []struct {
+				Track *struct {
+					ID         string `json:"id"`
+					Name       string `json:"name"`
+					DurationMs int64  `json:"duration_ms"`
+					External   struct {
+						ISRC string `json:"isrc"`
+					} `json:"external_ids"`
+					Artists []struct {
+						Name string `json:"name"`
+					} `json:"artists"`
+					Album struct {
+						Name   string `json:"name"`
+						Images []struct {
+							URL   string `json:"url"`
+							Width int    `json:"width"`
+						} `json:"images"`
+					} `json:"album"`
+				} `json:"track"`
+			} `json:"items"`
+		}
+		if err := spotifyGet(next, &page); err != nil {
+			return spotifyList{}, err
+		}
+		for _, it := range page.Items {
+			t := it.Track
+			if t == nil || t.Name == "" {
+				continue // removed songs and podcast episodes
+			}
+			names := []string{}
+			for _, a := range t.Artists {
+				names = append(names, a.Name)
+			}
+			img := ""
+			for _, im := range t.Album.Images { // the smallest one at least 200px wide
+				if img == "" || im.Width >= 200 {
+					img = im.URL
+				}
+			}
+			out.Songs = append(out.Songs, spotifySong{Title: cleanText(t.Name, 200), Artist: cleanText(strings.Join(names, ", "), 200),
+				Album: cleanText(t.Album.Name, 200), ISRC: t.External.ISRC, ID: t.ID, Image: img, DurationMs: t.DurationMs})
+		}
+		if !strings.HasPrefix(page.Next, "https://api.spotify.com/") {
+			break
+		}
+		next = page.Next
+	}
+	return out, nil
+}
+
+// musicParseText reads a pasted song list: one "Artist - Title" per line, or a
+// CSV with Track Name / Artist Name(s) columns (like Exportify's export).
+func musicParseText(text string) []spotifySong {
+	out := []spotifySong{}
+	text = strings.TrimPrefix(text, "\ufeff")
+	rd := csv.NewReader(strings.NewReader(text))
+	rd.FieldsPerRecord = -1
+	rd.LazyQuotes = true
+	if records, err := rd.ReadAll(); err == nil && len(records) > 1 {
+		col := map[string]int{}
+		for i, h := range records[0] {
+			col[strings.ToLower(strings.TrimSpace(h))] = i
+		}
+		pick := func(rec []string, names ...string) string {
+			for _, n := range names {
+				if i, ok := col[n]; ok && i < len(rec) {
+					return strings.TrimSpace(rec[i])
+				}
+			}
+			return ""
+		}
+		if _, ok := col["track name"]; ok {
+			for _, rec := range records[1:] {
+				title := pick(rec, "track name")
+				if title == "" {
+					continue
+				}
+				ms, _ := strconv.ParseInt(pick(rec, "duration (ms)", "track duration (ms)"), 10, 64)
+				id := pick(rec, "track uri", "spotify id")
+				id = strings.TrimPrefix(id, "spotify:track:")
+				out = append(out, spotifySong{Title: cleanText(title, 200), Artist: cleanText(strings.ReplaceAll(pick(rec, "artist name(s)", "artist name", "artist"), ";", ", "), 200),
+					Album: cleanText(pick(rec, "album name", "album"), 200), ISRC: pick(rec, "isrc"), ID: cleanText(id, 40), DurationMs: ms})
+				if len(out) >= maxPlaylistTracks {
+					break
+				}
+			}
+			return out
+		}
+	}
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(regexp.MustCompile(`^\d{1,4}[.)]\s*`).ReplaceAllString(strings.TrimSpace(line), ""))
+		if line == "" {
+			continue
+		}
+		s := spotifySong{Title: line}
+		for _, sep := range []string{" - ", " – ", " — ", "\t"} {
+			if i := strings.Index(line, sep); i > 0 {
+				s.Artist, s.Title = strings.TrimSpace(line[:i]), strings.TrimSpace(line[i+len(sep):])
+				break
+			}
+		}
+		s.Title, s.Artist = cleanText(s.Title, 200), cleanText(s.Artist, 200)
+		if s.Title != "" {
+			out = append(out, s)
+		}
+		if len(out) >= maxPlaylistTracks {
+			break
+		}
+	}
+	return out
+}
+
+// musicStoreImport writes an imported song list into playlist id. With keep,
+// songs already there (same Spotify ID, or same title and artist) keep a file
+// that was picked by hand; songs no longer on the list go.
+func musicStoreImport(id int64, pl spotifyList, keep bool) error {
+	type old struct {
+		track  sql.NullInt64
+		manual int
+	}
+	prev := map[string]old{}
+	if keep {
+		rows, err := db.Query("SELECT spotify_id, title, artist, track_id, manual FROM music_playlist_tracks WHERE playlist_id = ?", id)
+		if err == nil {
+			for rows.Next() {
+				var sid, title, artist string
+				var o old
+				if rows.Scan(&sid, &title, &artist, &o.track, &o.manual) == nil && o.manual == 1 {
+					prev["s:"+sid] = o
+					prev["n:"+musicNorm(title)+"|"+firstArtist(artist)] = o
+				}
+			}
+			rows.Close()
+		}
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec("DELETE FROM music_playlist_tracks WHERE playlist_id = ?", id); err != nil {
+		tx.Rollback()
+		return err
+	}
+	for i, s := range pl.Songs {
+		var track any
+		manual := 0
+		o, ok := prev["s:"+s.ID]
+		if !ok || s.ID == "" {
+			o, ok = prev["n:"+musicNorm(s.Title)+"|"+firstArtist(s.Artist)]
+		}
+		if ok {
+			manual = 1
+			if o.track.Valid {
+				track = o.track.Int64
+			}
+		}
+		if _, err = tx.Exec(`INSERT INTO music_playlist_tracks (playlist_id, position, title, artist, album, duration_ms, isrc, spotify_id, image_url, track_id, manual)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, i+1, s.Title, s.Artist, s.Album, s.DurationMs, s.ISRC, s.ID, s.Image, track, manual); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	if pl.Image != "" {
+		if saved := musicSaveCover(id, pl.Image); saved != "" {
+			tx.Exec("UPDATE music_playlists SET image = ? WHERE id = ?", saved, id)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	musicRematch(id)
+	return nil
+}
+
+// musicSaveCover keeps a copy of a Spotify cover picture on the server, so it
+// shows offline and the phone never talks to Spotify. Answers a version tag.
+func musicSaveCover(id int64, link string) string {
+	u, err := url.Parse(link)
+	if err != nil || u.Scheme != "https" || !(strings.HasSuffix(u.Host, ".scdn.co") || strings.HasSuffix(u.Host, ".spotifycdn.com")) {
+		return ""
+	}
+	res, err := (&http.Client{Timeout: 20 * time.Second}).Get(link)
+	if err != nil {
+		return ""
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return ""
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 8<<20))
+	if err != nil || !strings.HasPrefix(http.DetectContentType(data), "image/") {
+		return ""
+	}
+	dir := filepath.Join(musicCacheDir, "covers")
+	os.MkdirAll(dir, 0755)
+	if os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.jpg", id)), data, 0644) != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:4])
+}
+
+// musicImport: POST {link} (a Spotify playlist) or {text, name} (a pasted list)
+// makes a playlist and matches its songs to the library. Answers {id, count, matched}.
+func musicImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s, _ := sessionFromRequest(r)
+	var in struct {
+		Link string `json:"link"`
+		Text string `json:"text"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2<<20)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that. A pasted list can be up to 2 MB.", http.StatusBadRequest)
+		return
+	}
+	var n int
+	db.QueryRow("SELECT COUNT(*) FROM music_playlists WHERE owner_id = ?", s.UserId).Scan(&n)
+	if n >= maxPlaylists {
+		http.Error(w, fmt.Sprintf("You have %d playlists, the most there can be. Delete one first.", maxPlaylists), http.StatusBadRequest)
+		return
+	}
+	var pl spotifyList
+	source, spotifyID := "text", ""
+	if strings.TrimSpace(in.Link) != "" {
+		spotifyID = spotifyPlaylistID(in.Link)
+		if spotifyID == "" {
+			http.Error(w, "That isn't a Spotify playlist link. Copy it in Spotify with Share › Copy link to playlist.", http.StatusBadRequest)
+			return
+		}
+		var err error
+		if pl, err = spotifyPlaylist(spotifyID); err != nil {
+			code := http.StatusBadGateway
+			if err == errNoSpotify {
+				code = http.StatusServiceUnavailable
+			}
+			http.Error(w, err.Error(), code)
+			return
+		}
+		source = "spotify"
+	} else {
+		pl.Songs = musicParseText(in.Text)
+		pl.Name = cleanText(in.Name, 100)
+		if len(pl.Songs) == 0 {
+			http.Error(w, "Paste one song per line, like: Artist - Title.", http.StatusBadRequest)
+			return
+		}
+	}
+	if pl.Name == "" {
+		pl.Name = "Imported playlist"
+	}
+	if len(pl.Songs) == 0 {
+		http.Error(w, "That playlist has no songs.", http.StatusBadRequest)
+		return
+	}
+	musicRefresh(true)
+	now := time.Now().UnixMilli()
+	res, err := db.Exec("INSERT INTO music_playlists (owner_id, name, source, spotify_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		s.UserId, pl.Name, source, spotifyID, now, now)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save the playlist. Try again.", http.StatusInternalServerError)
+		return
+	}
+	id, _ := res.LastInsertId()
+	if err := musicStoreImport(id, pl, false); err != nil {
+		fmt.Println(err)
+		db.Exec("DELETE FROM music_playlists WHERE id = ?", id)
+		http.Error(w, "Couldn't save the playlist. Try again.", http.StatusInternalServerError)
+		return
+	}
+	var matched int
+	db.QueryRow("SELECT COUNT(*) FROM music_playlist_tracks WHERE playlist_id = ? AND track_id IS NOT NULL", id).Scan(&matched)
+	writeJSON(w, map[string]any{"id": id, "count": len(pl.Songs), "matched": matched})
+}
+
+// ---- sending audio and pictures ----
+
+var musicConvertMu sync.Mutex
+var musicConverting = map[string]*sync.Mutex{}
+
+// musicFileFor answers the file to send for a song and its type: the file
+// itself, or its AAC copy (made with ffmpeg the first time).
+func musicFileFor(t musicTrack) (string, string, error) {
+	p, inside := insideUploads(strings.Split(t.Path, "/")...)
+	if !inside {
+		return "", "", errors.New("not found")
+	}
+	ext := strings.ToLower(filepath.Ext(t.Path))
+	if mime := musicDirect[ext]; mime != "" {
+		return p, mime, nil
+	}
+	if ffmpegPath() == "" {
+		return "", "", errors.New("This song needs FFmpeg on the server to play.")
+	}
+	dir := filepath.Join(musicCacheDir, "audio")
+	out := filepath.Join(dir, fmt.Sprintf("%d-%s.m4a", t.ID, t.Version))
+	if _, err := os.Stat(out); err == nil {
+		return out, "audio/mp4", nil
+	}
+	musicConvertMu.Lock()
+	m := musicConverting[out]
+	if m == nil {
+		m = &sync.Mutex{}
+		musicConverting[out] = m
+	}
+	musicConvertMu.Unlock()
+	m.Lock()
+	defer m.Unlock()
+	if _, err := os.Stat(out); err == nil {
+		return out, "audio/mp4", nil
+	}
+	os.MkdirAll(dir, 0755)
+	// Older copies of this song (the file changed) go.
+	if old, _ := filepath.Glob(filepath.Join(dir, fmt.Sprintf("%d-*.m4a", t.ID))); len(old) > 0 {
+		for _, f := range old {
+			os.Remove(f)
+		}
+	}
+	tmp := out + ".part.m4a"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, ffmpegBin, "-y", "-v", "error", "-i", p, "-map", "0:a:0", "-vn", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", tmp)
+	if msg, err := cmd.CombinedOutput(); err != nil {
+		os.Remove(tmp)
+		fmt.Println("music convert:", t.Path, err, strings.TrimSpace(string(msg)))
+		return "", "", errors.New("This song couldn't be converted.")
+	}
+	if err := os.Rename(tmp, out); err != nil {
+		return "", "", err
+	}
+	return out, "audio/mp4", nil
+}
+
+// musicStream: GET /music/stream/<id> sends a song (Range works, for seeking).
+func musicStream(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	t, ok := musicTrackByID(strings.TrimPrefix(r.URL.Path, "/music/stream/"))
+	if !ok || !musicCanPlay(s, t) {
+		http.Error(w, "That song is gone, or you can't play it.", http.StatusNotFound)
+		return
+	}
+	p, mime, err := musicFileFor(t)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
+		return
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	st, _ := f.Stat()
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("X-Music-Version", t.Version)
+	// The URL carries ?v=<version>, so a changed file gets a new URL.
+	if r.URL.Query().Get("v") == t.Version {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
+	http.ServeContent(w, r, "", st.ModTime(), f)
+}
+
+var musicCoverNames = []string{"cover.jpg", "folder.jpg", "front.jpg", "cover.png", "folder.png", "album.jpg", "Cover.jpg", "Folder.jpg"}
+
+// musicArt: GET /music/art/<id> sends a song's cover (embedded, or cover.jpg beside it).
+func musicArt(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	t, ok := musicTrackByID(strings.TrimPrefix(r.URL.Path, "/music/art/"))
+	if !ok || !musicCanPlay(s, t) {
+		http.NotFound(w, r)
+		return
+	}
+	p, inside := insideUploads(strings.Split(t.Path, "/")...)
+	if !inside {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	if t.HasArt && ffmpegPath() != "" {
+		dir := filepath.Join(musicCacheDir, "art")
+		out := filepath.Join(dir, fmt.Sprintf("%d-%s.jpg", t.ID, t.Version))
+		if _, err := os.Stat(out); err != nil {
+			os.MkdirAll(dir, 0755)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			tmp := out + ".part.jpg"
+			err := exec.CommandContext(ctx, ffmpegBin, "-y", "-v", "error", "-i", p, "-map", "0:v:0", "-frames:v", "1",
+				"-vf", "scale='min(600,iw)':-2", "-q:v", "3", tmp).Run()
+			cancel()
+			if err == nil {
+				os.Rename(tmp, out)
+			} else {
+				os.Remove(tmp)
+			}
+		}
+		if _, err := os.Stat(out); err == nil {
+			http.ServeFile(w, r, out)
+			return
+		}
+	}
+	dir := filepath.Dir(p)
+	for _, name := range musicCoverNames {
+		if st, err := os.Stat(filepath.Join(dir, name)); err == nil && !st.IsDir() {
+			http.ServeFile(w, r, filepath.Join(dir, name))
+			return
+		}
+	}
+	http.NotFound(w, r)
+}
+
+// musicCover: GET /music/cover/<playlist id> sends an imported playlist's cover.
+func musicCover(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	id, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/music/cover/"), 10, 64)
+	if musicPlaylistRole(id, s.UserId) == "" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	http.ServeFile(w, r, filepath.Join(musicCacheDir, "covers", fmt.Sprintf("%d.jpg", id)))
+}
+
+// musicOffline: GET /music/offline?playlists=1,2 lists the songs the phone
+// should keep for those playlists: {songs:[{id, v, size, title, artist}]}.
+// The phone downloads only the ones it doesn't have in that version.
+func musicOffline(w http.ResponseWriter, r *http.Request) {
+	s, _ := sessionFromRequest(r)
+	type entry struct {
+		ID     int64  `json:"id"`
+		V      string `json:"v"`
+		Size   int64  `json:"size"`
+		Title  string `json:"title"`
+		Artist string `json:"artist"`
+		Art    bool   `json:"art"`
+	}
+	out := []entry{}
+	seen := map[int64]bool{}
+	lists := []int64{}
+	for _, raw := range strings.Split(r.URL.Query().Get("playlists"), ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+		if err != nil || musicPlaylistRole(id, s.UserId) == "" {
+			continue
+		}
+		lists = append(lists, id)
+		for _, song := range musicPlaylistSongs(id) {
+			if song.Track == nil || seen[song.Track.ID] || !song.Track.Playable {
+				continue
+			}
+			seen[song.Track.ID] = true
+			t := song.Track
+			out = append(out, entry{ID: t.ID, V: t.Version, Size: t.Size, Title: t.Title, Artist: t.Artist, Art: t.HasArt})
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"playlists": lists, "songs": out})
 }

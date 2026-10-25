@@ -23,8 +23,13 @@
           const json = (res.headers.get("content-type") || "").includes("json");
           return res.ok && json ? res.json() : [];
         })
-        .then((list) => new Map(list.map((item) => [key(item.name), item])))
-        .catch(() => new Map());
+        .then((list) => {
+          try { localStorage.setItem("xn_likes", JSON.stringify(list)); } catch (_) {}
+          return list;
+        })
+        // Offline: the hearts show the likes from the last time online.
+        .catch(() => { try { return JSON.parse(localStorage.getItem("xn_likes") || "[]"); } catch (_) { return []; } })
+        .then((list) => new Map(list.map((item) => [key(item.name), item])));
     }
     return cache;
   }

@@ -650,6 +650,8 @@ input[type="search"].xn-input::-webkit-search-cancel-button { filter: invert(0.6
   html.xn-has-tabs .xn-links a { display: none; }
   html.xn-has-tabs .xn-links a.xn-admin { display: flex; align-self: center; height: 32px; min-height: 0; padding: 0 10px; font-size: 13px; border: 1px solid rgba(255, 139, 139, 0.35); border-radius: 16px; }
   .xn-tabs.has-6 .xn-tab .xn-tab-label { font-size: min(9.5px, 2.45vw); letter-spacing: -0.05em; }
+  .xn-tabs.has-7 .xn-tab svg { width: 23px; height: 23px; }
+  .xn-tabs.has-7 .xn-tab .xn-tab-label { font-size: min(9px, 2.3vw); letter-spacing: -0.06em; }
 
   /* Cards reach close to the screen edges on phones. */
   .xn-page {
@@ -999,3 +1001,34 @@ html[data-scene] .crosshatch { display: none; }
   font-variant-numeric: tabular-nums;
 }
 .xn-rank.is-compact .xn-level { margin-left: 4px; padding: 0 4px; font-size: 9px; line-height: 13px; }
+
+/* "You need internet" popup (nav.js), shown offline for the Journal, Files and Forum */
+.xn-offline {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .18s ease, visibility 0s linear .18s;
+}
+.xn-offline.is-on { opacity: 1; visibility: visible; transition: opacity .18s ease; }
+.xn-offline-card {
+  width: min(100%, 340px);
+  padding: 24px 22px 20px;
+  border: 1px solid var(--oled-line-strong);
+  border-radius: 16px;
+  background: #101014;
+  text-align: center;
+  font-family: var(--oled-font);
+}
+.xn-offline-card svg { width: 40px; height: 40px; fill: none; stroke: var(--oled-accent); stroke-width: 1.8; stroke-linecap: round; }
+.xn-offline-card svg circle { fill: var(--oled-accent); stroke: none; }
+.xn-offline-card h2 { margin: 12px 0 8px; font-size: 17px; color: var(--oled-text); }
+.xn-offline-card p { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--oled-muted); }
+.xn-offline-card .xn-btn { width: 100%; }

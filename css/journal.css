@@ -321,3 +321,16 @@ svg:hover {
   align-items: center;
   margin-top: 1rem;
 }
+
+/* Substances an admin added in the Substances Importer */
+.drug-custom {
+  margin-left: 0.5rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--line, #23202b);
+  border-radius: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #9c96aa);
+  vertical-align: middle;
+}
