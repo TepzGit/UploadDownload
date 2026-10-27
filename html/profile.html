@@ -405,18 +405,23 @@
     const gear = document.getElementById("pfGear");
     const menu = document.getElementById("options");
     const items = () => [...menu.querySelectorAll(".pf-menu-item")];
-    const setOpen = (open) => {
-      menu.hidden = !open;
-      gear.setAttribute("aria-expanded", String(open));
-      if (!open) return;
-      // Fixed to the screen, so the header card's rounded edge can't cut it off.
+    // Fixed to the screen, so the header card's rounded edge can't cut it off.
+    const place = () => {
       const g = gear.getBoundingClientRect();
       const width = menu.offsetWidth;
       menu.style.top = Math.round(g.bottom + 6) + "px";
       menu.style.left = Math.round(Math.max(8, Math.min(g.left, window.innerWidth - width - 8))) + "px";
-      items()[0].focus({ preventScroll: true });
     };
-    gear.addEventListener("click", () => setOpen(menu.hidden));
+    const setOpen = (open, { keyboard = false } = {}) => {
+      menu.hidden = !open;
+      gear.setAttribute("aria-expanded", String(open));
+      if (!open) return;
+      place();
+      // Only keyboard users get focus moved into the menu: on iPhones focusing
+      // scrolls the page, and that used to close the menu before a tap landed.
+      if (keyboard) items()[0].focus({ preventScroll: true });
+    };
+    gear.addEventListener("click", (event) => setOpen(menu.hidden, { keyboard: event.detail === 0 }));
     // Capture runs before the item's own handler, so a popup opened by the
     // item hands focus back to the gear when it closes.
     menu.addEventListener("click", (event) => {
@@ -427,8 +432,10 @@
     document.addEventListener("click", (event) => {
       if (!menu.hidden && !event.target.closest(".pf-menu-wrap")) setOpen(false);
     });
-    window.addEventListener("scroll", () => { if (!menu.hidden) setOpen(false); }, { passive: true });
-    window.addEventListener("resize", () => { if (!menu.hidden) setOpen(false); });
+    // iPhones scroll and resize the page by themselves (the address bar), so
+    // the menu follows the gear instead of closing.
+    window.addEventListener("scroll", () => { if (!menu.hidden) place(); }, { passive: true });
+    window.addEventListener("resize", () => { if (!menu.hidden) place(); });
     menu.addEventListener("keydown", (event) => {
       const list = items();
       const at = list.indexOf(document.activeElement);

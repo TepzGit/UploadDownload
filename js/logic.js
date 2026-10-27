@@ -503,7 +503,7 @@ export function addDoseToState({ amount, time, formulation }) {
 }
 
 /** Changes an added dose's amount and/or time and redraws its curve. */
-export function updateDoseInState(id, { amount, time }) {
+export function updateDoseInState(id, { amount, time, note }) {
   const dose = state.addedDoses.find((item) => item.id === id);
   if (!dose) throw new Error("That dose is no longer on the timeline.");
   const numericAmount = Number(amount);
@@ -516,6 +516,7 @@ export function updateDoseInState(id, { amount, time }) {
   const curve = buildDoseCurve(timeToHours(time), numericAmount, dose.releaseHours, dose.profile);
   dose.amount = numericAmount;
   dose.time = time;
+  if (note !== undefined) dose.note = String(note).trim().slice(0, 2000);
   dose.x = curve.x;
   dose.y = curve.y;
   return dose;
@@ -534,6 +535,7 @@ export function snapshotDoses() {
     releaseHours: dose.releaseHours || 0,
     route: dose.route || "",
     time: dose.time,
+    note: dose.note || "",
     profile: { base: { ...dose.profile.base }, commonDose: dose.profile.commonDose },
   }));
 }
@@ -560,6 +562,7 @@ function savedDose(raw) {
     releaseHours,
     route: String(raw.route || "").slice(0, 30),
     time: raw.time,
+    note: String(raw.note || "").slice(0, 2000),
     profile: { base, commonDose },
   };
 }

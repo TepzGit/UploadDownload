@@ -36,6 +36,26 @@
     .ut-chip:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
     .ut-clock { margin: 4px 0 0; font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--oled-text); }
     .ut-note { margin: 0; font-size: 11px; color: var(--oled-muted); text-align: center; }
+    .ut-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+    .ut-link { display: flex; align-items: center; gap: 12px; padding: 14px 16px; color: var(--oled-text); text-decoration: none; }
+    @media (hover: hover) { .ut-link:hover { border-color: var(--oled-accent); } }
+    .ut-link svg { flex: none; width: 26px; height: 26px; fill: var(--oled-accent); }
+    .ut-link strong { display: block; font-size: 15px; }
+    .ut-link span span { display: block; margin-top: 2px; font-size: 12px; color: var(--oled-muted); }
+    .ut-apps { grid-column: 1 / -1; }
+    .ut-apps[hidden] { display: none; }
+    .pa-folder { display: flex; gap: 8px; align-items: center; }
+    .pa-folder .xn-input { flex: 1; min-width: 0; }
+    .pa-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .pa-app { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--oled-line); border-radius: 12px; background: var(--oled-surface-2); }
+    .pa-ico { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--oled-accent-soft); color: var(--oled-accent); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+    .pa-name { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pa-meta { display: block; margin-top: 2px; font-size: 11.5px; color: var(--oled-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pa-acts { display: flex; gap: 6px; }
+    .pa-btn { display: inline-grid; place-items: center; min-width: 40px; height: 36px; padding: 0 10px; border: 1px solid var(--oled-line-strong); border-radius: 8px; background: transparent; color: var(--oled-text); font: inherit; font-size: 12.5px; text-decoration: none; cursor: pointer; }
+    .pa-btn.is-run { border-color: transparent; background: var(--oled-accent); color: #120c1f; font-weight: 600; }
+    .pa-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .pa-empty { margin: 0; padding: 18px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; font-size: 13px; color: var(--oled-muted); text-align: center; }
   </style>
 </head>
 <body class="xn-bg">
@@ -60,7 +80,18 @@
     <p class="xn-sub">Small dosing tools. They run on your phone, so they work without internet too.</p>
   </header>
 
+  <div class="ut-links" id="utLinks" hidden>
+    <a class="xn-card ut-link" href="/Notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h9.2L20 7.3V20a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 5 20V4a1.5 1.5 0 0 1 1-1.5z"/></svg><span><strong>Notes</strong><span>Dose notes by substance, trip reports</span></span></a>
+    <a class="xn-card ut-link" href="/Notes#pad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16z"/></svg><span><strong>Notepad</strong><span>Write anything, it saves as you type</span></span></a>
+  </div>
+
   <div class="ut-grid">
+    <section class="xn-card ut-card ut-apps" id="paCard" aria-labelledby="paTitle" hidden>
+      <h2 class="xn-h2" id="paTitle">Portable apps</h2>
+      <p class="ut-hint" id="paHint">The programs (.exe, .msi, .AppImage) in a Files folder you pick, ready to download.</p>
+      <label class="pa-folder"><span class="xn-sr">Apps folder</span><select class="xn-input" id="paFolder"></select></label>
+      <ul class="pa-list" id="paList"></ul>
+    </section>
     <section class="xn-card ut-card" aria-labelledby="volTitle">
       <h2 class="xn-h2" id="volTitle">Volumetric dosing</h2>
       <p class="ut-hint">Dissolve a powder in a liquid so small doses can be measured with a syringe.</p>
@@ -179,6 +210,97 @@
   }));
   $("timerStop").addEventListener("click", () => { write(0); showTimer(); });
   showTimer();
+
+  // Notes and the notepad need an account; the links show once signed in.
+  if (/(?:^|;\s*)xn_role=/.test(document.cookie)) $("utLinks").hidden = false;
+
+  // Portable apps: the programs in one Files folder. The desktop app can
+  // start them on this computer; the website offers downloads.
+  const pa = { folder: "", desktop: false };
+  const sizeText = (b) => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1e3)) + " KB";
+  const fileUrl = (p) => "/Files/" + p.split("/").map(encodeURIComponent).join("/");
+  function paRender(data) {
+    pa.folder = data.folder;
+    pa.desktop = !!data.desktop;
+    const sel = $("paFolder");
+    sel.replaceChildren(new Option(data.set ? "All of Files" : "Pick a folder…", ""));
+    data.folders.forEach((f) => sel.append(new Option(f.replace(/\//g, " › "), f)));
+    sel.value = data.set ? data.folder : "";
+    $("paHint").textContent = pa.desktop
+      ? "The programs (.exe, .msi, .AppImage) in a Files folder you pick. Open starts one on this computer."
+      : "The programs (.exe, .msi, .AppImage) in a Files folder you pick, ready to download.";
+    const ul = $("paList");
+    ul.replaceChildren();
+    if (!data.set) {
+      ul.innerHTML = '<li class="pa-empty">Pick the Files folder where you keep your portable programs.</li>';
+      return;
+    }
+    if (!data.items.length) {
+      ul.innerHTML = '<li class="pa-empty">No programs in that folder yet. Upload .exe, .msi or .AppImage files to it in Files.</li>';
+      return;
+    }
+    data.items.forEach((app) => {
+      const li = document.createElement("li");
+      li.className = "pa-app";
+      const ico = document.createElement("span");
+      ico.className = "pa-ico";
+      ico.textContent = (app.path.split(".").pop() || "").slice(0, 4).toUpperCase();
+      const text = document.createElement("span");
+      text.style.minWidth = "0";
+      const name = document.createElement("span");
+      name.className = "pa-name";
+      name.textContent = app.name;
+      name.title = app.path;
+      const meta = document.createElement("span");
+      meta.className = "pa-meta";
+      meta.textContent = [app.kind, sizeText(app.size), app.folder !== data.folder ? app.folder.slice(data.folder ? data.folder.length + 1 : 0) : ""].filter(Boolean).join(" · ");
+      text.append(name, meta);
+      const acts = document.createElement("span");
+      acts.className = "pa-acts";
+      if (app.canRun) {
+        const run = document.createElement("button");
+        run.type = "button";
+        run.className = "pa-btn is-run";
+        run.textContent = "Open";
+        run.addEventListener("click", async () => {
+          run.disabled = true;
+          try {
+            const res = await fetch("/apps/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: app.path }) });
+            if (!res.ok) throw new Error((await res.text()).trim());
+            window.xnToast && window.xnToast(`Starting ${app.name}…`);
+          } catch (error) {
+            window.xnToast && window.xnToast(error.message || "Couldn't start it.", true);
+          } finally {
+            setTimeout(() => { run.disabled = false; }, 1500);
+          }
+        });
+        acts.append(run);
+      }
+      const dl = document.createElement("a");
+      dl.className = "pa-btn";
+      dl.href = fileUrl(app.path);
+      dl.setAttribute("download", "");
+      dl.setAttribute("aria-label", "Download " + app.name);
+      dl.title = "Download";
+      dl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
+      acts.append(dl);
+      li.append(ico, text, acts);
+      ul.append(li);
+    });
+  }
+  async function paLoad(body) {
+    try {
+      const res = await fetch("/apps", body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { headers: { Accept: "application/json" } });
+      if (res.status === 401 || res.status === 403) return;
+      if (!res.ok) throw new Error((await res.text()).trim());
+      paRender(await res.json());
+      $("paCard").hidden = false;
+    } catch (error) {
+      if (body) window.xnToast && window.xnToast(error.message || "Couldn't change the folder.", true);
+    }
+  }
+  $("paFolder").addEventListener("change", (event) => paLoad({ folder: event.target.value }));
+  if (document.documentElement.classList.contains("xn-admin") || document.documentElement.classList.contains("xn-files") || /(?:^|;\s*)xn_role=/.test(document.cookie)) paLoad();
 })();
 </script>
 </body>

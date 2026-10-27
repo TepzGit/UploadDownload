@@ -152,3 +152,6 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 .si-modal-card .si-actions { margin-top: 18px; }
 @media (max-width: 520px) { .si-dl-row { grid-template-columns: 1fr; gap: 2px; } }
 .si-top .xn-btn svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* The dialog sits outside .xn-page, so give it the same box sizing. */
+.si-modal, .si-modal *, .si-modal *::before, .si-modal *::after { box-sizing: border-box; }

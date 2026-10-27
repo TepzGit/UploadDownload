@@ -7,6 +7,20 @@
 (function () {
   document.documentElement.classList.add("xn-js");
 
+  // The desktop app's server runs on this computer (it sets this cookie).
+  // There the nav is a rail down the left side instead of a top bar.
+  const LOCAL_SERVER = /(?:^|;\s*)xn_local=1(?:;|$)/.test(document.cookie);
+  if (LOCAL_SERVER) document.documentElement.classList.add("xn-desk");
+
+  // Safari's page-to-page transitions can leave the new page blank (the
+  // Admin page on iPhones did), so Safari changes pages without them.
+  const UA = navigator.userAgent;
+  if (/iP(hone|ad|od)/.test(UA) || (/AppleWebKit/.test(UA) && !/Chrome\/|Chromium\/|Edg\//.test(UA))) {
+    const skip = (event) => { if (event.viewTransition) event.viewTransition.skipTransition(); };
+    window.addEventListener("pageswap", skip);
+    window.addEventListener("pagereveal", skip);
+  }
+
   // Site color: the account's main color (Profile > Appearance), saved on
   // the server and kept in localStorage so each page paints in it at once.
   const COLOR_KEY = "xn_site_color";
@@ -289,16 +303,20 @@
     const nav = document.querySelector(".xn");
     if (!nav) return;
     const toggle = nav.querySelector(".xn-toggle");
-    // Music sits after the Forum on every page (added here, not in each page's HTML).
+    // Music sits after the Forum and Notes after the Journal on every page
+    // (added here, not in each page's HTML).
     const linkBox = nav.querySelector(".xn-links");
-    if (linkBox && !linkBox.querySelector('a[href="/Music"]')) {
-      const music = document.createElement("a");
-      music.href = "/Music";
-      music.textContent = "Music";
-      const forum = linkBox.querySelector('a[href="/Forum"]');
-      if (forum) forum.after(music);
-      else linkBox.append(music);
-    }
+    const addLink = (href, label, after) => {
+      if (!linkBox || linkBox.querySelector(`a[href="${href}"]`)) return;
+      const a = document.createElement("a");
+      a.href = href;
+      a.textContent = label;
+      const prev = linkBox.querySelector(`a[href="${after}"]`);
+      if (prev) prev.after(a);
+      else linkBox.append(a);
+    };
+    addLink("/Music", "Music", "/Forum");
+    if (signedIn) addLink("/Notes", "Notes", "/journal");
     const links = nav.querySelectorAll(".xn-links a");
     initMail(nav);
     paintNames();
@@ -311,7 +329,8 @@
       if (match) link.setAttribute("aria-current", "page");
     });
 
-    initTabs(nav, links);
+    if (LOCAL_SERVER) initRail(links);
+    else initTabs(nav, links);
     if (!toggle) return;
 
     function setOpen(open) {
@@ -348,6 +367,40 @@
     { href: "/Utility", label: "Utility", icon: '<path d="M14.7 3.2a5.5 5.5 0 0 0-5.9 7.3L3.3 16a2.3 2.3 0 0 0 3.3 3.3l5.5-5.5a5.5 5.5 0 0 0 7.3-5.9l-3 3a1.6 1.6 0 0 1-2.3 0l-1.1-1.1a1.6 1.6 0 0 1 0-2.3z"/>' },
     { href: "/Profile", label: "Profile", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
   ];
+
+  // Desktop app: every link in the rail gets the tab bar's icon.
+  const RAIL_ICONS = {
+    "/Notes": '<path d="M6 2.5h9.2L20 7.3V20a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 5 20V4a1.5 1.5 0 0 1 1-1.5z"/><path d="M15 2.6V7.5h5" fill="none" stroke="#000" stroke-width="1.2"/><path d="M8.5 12h7M8.5 15.5h7M8.5 19h4.5" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"/>',
+    "/admin": '<path d="M12 2.2 4 5.3v6.1c0 4.9 3.4 9.1 8 10.4 4.6-1.3 8-5.5 8-10.4V5.3z"/>',
+  };
+  function initRail(links) {
+    const icons = Object.fromEntries(TABS.map((tab) => [tab.href, tab.icon]));
+    Object.assign(icons, RAIL_ICONS);
+    links.forEach((link) => {
+      if (link.querySelector(".xn-rail-ico")) return;
+      const href = link.getAttribute("href") || "";
+      const icon = icons[href] || icons[href.replace(/\/+$/, "")] || '<circle cx="12" cy="12" r="4"/>';
+      const label = document.createElement("span");
+      label.className = "xn-rail-label";
+      label.append(...link.childNodes);
+      link.innerHTML = '<svg class="xn-rail-ico" viewBox="0 0 24 24" aria-hidden="true">' + icon + "</svg>";
+      link.append(label);
+      link.title = label.textContent.trim();
+    });
+    // Pages open at once: Chrome and Edge load a page while the pointer
+    // rests on its link (speculation rules), so the click just shows it.
+    if (HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules")) {
+      const rules = document.createElement("script");
+      rules.type = "speculationrules";
+      rules.textContent = JSON.stringify({
+        prerender: [{
+          where: { and: [{ href_matches: "/*" }, { not: { href_matches: "/Files/*" } }, { not: { href_matches: "/music/*" } }, { not: { href_matches: "/logout" } }, { not: { href_matches: "/download*" } }, { not: { selector_matches: "[download], [data-no-prerender]" } }] },
+          eagerness: "moderate",
+        }],
+      });
+      document.head.append(rules);
+    }
+  }
 
   function initTabs(nav, links) {
     if (!links.length || document.querySelector(".xn-tabs")) return;
@@ -499,12 +552,14 @@
   // opening a page that can't load.
   // The phone app keeps the Journal on the phone, so only the website needs internet for it.
   const IN_APP = /Geek4uApp/.test(navigator.userAgent);
+  // The desktop app serves every page from this computer, so none need internet (LOCAL_SERVER).
   const ONLINE_ONLY = [
     ...(IN_APP ? [] : [[/^\/journal(\/|$)/i, "the Journal"]]),
     [/^\/(Files\/|Uploader)/i, "Files"],
     [/^\/(Forum|u\/)/i, "the Forum"],
     ...(IN_APP ? [] : [[/^\/Music/i, "Music"]]),
     [/^\/admin/i, "the Admin page"],
+    [/^\/Notes/i, "Notes"],
   ];
   let offlineBox = null;
   function showNeedsInternet(what) {
@@ -527,7 +582,7 @@
   }
   window.xnNeedsInternet = showNeedsInternet;
   window.addEventListener("click", (event) => {
-    if (navigator.onLine !== false || event.defaultPrevented || event.button) return;
+    if (LOCAL_SERVER || navigator.onLine !== false || event.defaultPrevented || event.button) return;
     const link = event.target.closest && event.target.closest("a[href]");
     if (!link || link.target === "_blank") return;
     let url;
@@ -539,6 +594,14 @@
     event.stopImmediatePropagation();
     showNeedsInternet(hit[1]);
   }, true);
+
+  // The desktop app quits a while after its last page stops checking in
+  // (only needed when it opened in the default browser).
+  if (LOCAL_SERVER) {
+    const beat = () => fetch("/desktop/alive", { method: "POST", keepalive: true }).catch(() => {});
+    beat();
+    setInterval(beat, 30000);
+  }
 
   initLeaveFade();
   initSmoothWheel();

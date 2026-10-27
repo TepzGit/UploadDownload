@@ -23,8 +23,10 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -289,6 +291,12 @@ var db *sql.DB
 var UploadedFilesDirName string = "UploadedFiles"
 var DataBaseFileName string = "Database.db"
 
+// The desktop app (desktop.go, built with -tags desktop) sets these: it serves
+// only this computer and opens the site in its own window. `go run
+// UploadDownload.go` leaves desktop.go out, so the server is unchanged.
+var desktopMode bool
+var desktopServe func(handler http.Handler)
+
 var cookiesMu sync.Mutex
 var cookies = map[string]cookiesStruct{}
 
@@ -496,6 +504,7 @@ func main() {
 	if _, err := db.Exec(musicSchema); err != nil {
 		panic("cannot create the music tables: " + err.Error())
 	}
+	registerNotes()
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE profile_boxes ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -508,9 +517,13 @@ func main() {
 
 	port := 8000
 	loadNameColors()
+	handler := countViews(http.DefaultServeMux)
+	if desktopServe != nil {
+		desktopServe(handler)
+		return
+	}
 	fmt.Println("Serving on 0.0.0.0:" + strconv.Itoa(port))
 
-	handler := countViews(http.DefaultServeMux)
 	err = http.ListenAndServeTLS("0.0.0.0: "+strconv.Itoa(port), "cert.pem", "key.pem", handler)
 	if err != nil {
 		http.ListenAndServe("0.0.0.0:"+strconv.Itoa(port), handler)
@@ -1334,7 +1347,16 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, err := createUser(in.Username, in.Password, "user")
+	// In the desktop app the first account is the computer's owner, so it
+	// gets admin (Files, Admin page, Substances Importer).
+	authority := "user"
+	if desktopMode {
+		var anyone bool
+		if db.QueryRow("SELECT EXISTS(SELECT 1 FROM users)").Scan(&anyone) == nil && !anyone {
+			authority = "admin"
+		}
+	}
+	userId, err := createUser(in.Username, in.Password, authority)
 	if errors.Is(err, errUserExists) {
 		http.Error(w, "That username is taken.", http.StatusConflict)
 		return
@@ -1349,7 +1371,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	err = startSession(w, r, cookiesStruct{
 		Username:         strings.ToLower(in.Username),
 		OriginalUsername: in.Username,
-		Authority:        "user",
+		Authority:        authority,
 		UserId:           userId,
 	})
 	if err != nil {
@@ -2974,6 +2996,7 @@ type experienceDose struct {
 	ReleaseHours float64 `json:"releaseHours"`
 	Route        string  `json:"route"` // route of administration: oral, insufflated, ...
 	Time         string  `json:"time"`
+	Note         string  `json:"note,omitempty"` // how the dose felt, written on the Graph
 	Profile      struct {
 		Base struct {
 			Onset  float64 `json:"onset"`
@@ -3017,6 +3040,7 @@ func cleanExperienceDoses(in []experienceDose) ([]experienceDose, bool) {
 		d.Unit = cleanText(d.Unit, 12)
 		d.Formulation = cleanText(d.Formulation, 40)
 		d.Route = cleanText(d.Route, 30)
+		d.Note = cleanMultiline(d.Note, 2000)
 		b := d.Profile.Base
 		if d.Substance == "" || !clockTime.MatchString(d.Time) ||
 			!inRange(d.Amount, 0.000001, 1e6) || !inRange(d.ReleaseHours, 0, 48) ||
@@ -3079,7 +3103,7 @@ func experiences(w http.ResponseWriter, r *http.Request) {
 			experience
 			Delete bool `json:"delete"`
 		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 96<<10)).Decode(&in); err != nil {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512<<10)).Decode(&in); err != nil {
 			http.Error(w, "Couldn't read that session.", http.StatusBadRequest)
 			return
 		}
@@ -8162,4 +8186,480 @@ func musicOffline(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"playlists": lists, "songs": out})
+}
+
+// ---------------------------------------------------------------------------
+// Notes: trip reports, the notepad and the Portable Apps card.
+// Dose notes live on the doses themselves (experienceDose.Note); the Notes
+// page (/Notes) gathers them from /experiences and sorts them by substance.
+// ---------------------------------------------------------------------------
+
+const notesSchema = `
+CREATE TABLE IF NOT EXISTS trip_reports (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	experience_id INTEGER NOT NULL DEFAULT 0,
+	title TEXT NOT NULL DEFAULT '',
+	substances TEXT NOT NULL DEFAULT '',
+	setting TEXT NOT NULL DEFAULT '',
+	body TEXT NOT NULL DEFAULT '',
+	rating INTEGER NOT NULL DEFAULT 0,
+	happened_at INTEGER NOT NULL DEFAULT 0,
+	updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS trip_reports_user ON trip_reports(user_id);
+CREATE TABLE IF NOT EXISTS notepad_notes (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	title TEXT NOT NULL DEFAULT '',
+	body TEXT NOT NULL DEFAULT '',
+	pinned INTEGER NOT NULL DEFAULT 0,
+	updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS notepad_notes_user ON notepad_notes(user_id);
+CREATE TABLE IF NOT EXISTS portable_apps (
+	user_id INTEGER PRIMARY KEY,
+	folder TEXT NOT NULL DEFAULT ''
+);
+`
+
+const maxReports = 500
+const maxPadNotes = 500
+
+func registerNotes() {
+	if _, err := db.Exec(notesSchema); err != nil {
+		panic("cannot create the notes tables: " + err.Error())
+	}
+	http.HandleFunc("/Notes", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "html/notes.html")
+	}))
+	http.HandleFunc("/notes/reports", tripReports)
+	http.HandleFunc("/notes/pad", notepad)
+	http.HandleFunc("/apps", portableApps)
+	http.HandleFunc("/apps/run", portableAppRun)
+}
+
+type tripReport struct {
+	ID           int64  `json:"id"`
+	ExperienceID int64  `json:"experienceId"`
+	Title        string `json:"title"`
+	Substances   string `json:"substances"`
+	Setting      string `json:"setting"`
+	Body         string `json:"body"`
+	Rating       int    `json:"rating"`
+	HappenedAt   int64  `json:"happenedAt"`
+	UpdatedAt    int64  `json:"updatedAt"`
+}
+
+// tripReports: GET lists the account's reports, newest first. POST saves one
+// (id 0 = new) and POST {id, delete: true} removes one.
+func tripReports(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	if r.Method == http.MethodGet {
+		rows, err := db.Query(`SELECT id, experience_id, title, substances, setting, body, rating, happened_at, updated_at
+			FROM trip_reports WHERE user_id = ? ORDER BY happened_at DESC, id DESC LIMIT ?`, session.UserId, maxReports)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load your trip reports.", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		items := []tripReport{}
+		for rows.Next() {
+			var t tripReport
+			if rows.Scan(&t.ID, &t.ExperienceID, &t.Title, &t.Substances, &t.Setting, &t.Body, &t.Rating, &t.HappenedAt, &t.UpdatedAt) == nil {
+				items = append(items, t)
+			}
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"items": items})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		tripReport
+		Delete bool `json:"delete"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that report.", http.StatusBadRequest)
+		return
+	}
+	if in.Delete {
+		db.Exec("DELETE FROM trip_reports WHERE id = ? AND user_id = ?", in.ID, session.UserId)
+		writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
+		return
+	}
+	t := in.tripReport
+	t.Title = cleanText(t.Title, 120)
+	t.Substances = cleanText(t.Substances, 300)
+	t.Setting = cleanText(t.Setting, 300)
+	t.Body = cleanMultiline(t.Body, 50000)
+	if t.Rating < 0 || t.Rating > 5 {
+		t.Rating = 0
+	}
+	now := time.Now().UnixMilli()
+	if t.HappenedAt <= 0 || t.HappenedAt > now+86400000 {
+		t.HappenedAt = now
+	}
+	if t.ExperienceID > 0 {
+		var owner int
+		if db.QueryRow("SELECT user_id FROM graph_experiences WHERE id = ?", t.ExperienceID).Scan(&owner) != nil || owner != session.UserId {
+			t.ExperienceID = 0
+		}
+	}
+	if t.Title == "" && t.Body == "" {
+		http.Error(w, "Give the report a title or write something first.", http.StatusBadRequest)
+		return
+	}
+	t.UpdatedAt = now
+	if t.ID > 0 {
+		res, err := db.Exec(`UPDATE trip_reports SET experience_id = ?, title = ?, substances = ?, setting = ?, body = ?, rating = ?, happened_at = ?, updated_at = ?
+			WHERE id = ? AND user_id = ?`, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.ID, session.UserId)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save that report.", http.StatusInternalServerError)
+			return
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			writeJSON(w, t)
+			return
+		}
+	}
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM trip_reports WHERE user_id = ?", session.UserId).Scan(&count)
+	if count >= maxReports {
+		http.Error(w, fmt.Sprintf("You have %d trip reports, the most there can be. Delete an old one first.", maxReports), http.StatusConflict)
+		return
+	}
+	res, err := db.Exec(`INSERT INTO trip_reports (user_id, experience_id, title, substances, setting, body, rating, happened_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, session.UserId, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save that report.", http.StatusInternalServerError)
+		return
+	}
+	t.ID, _ = res.LastInsertId()
+	writeJSON(w, t)
+}
+
+type padNote struct {
+	ID        int64  `json:"id"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	Pinned    bool   `json:"pinned"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+// notepad: GET lists the account's notes (pinned first, then newest). POST
+// saves one (id 0 = new) and POST {id, delete: true} removes one.
+func notepad(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	if r.Method == http.MethodGet {
+		rows, err := db.Query(`SELECT id, title, body, pinned, updated_at FROM notepad_notes
+			WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC LIMIT ?`, session.UserId, maxPadNotes)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load your notes.", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		items := []padNote{}
+		for rows.Next() {
+			var n padNote
+			var pinned int
+			if rows.Scan(&n.ID, &n.Title, &n.Body, &pinned, &n.UpdatedAt) == nil {
+				n.Pinned = pinned == 1
+				items = append(items, n)
+			}
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"items": items})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		padNote
+		Delete bool `json:"delete"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that note.", http.StatusBadRequest)
+		return
+	}
+	if in.Delete {
+		db.Exec("DELETE FROM notepad_notes WHERE id = ? AND user_id = ?", in.ID, session.UserId)
+		writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
+		return
+	}
+	n := in.padNote
+	n.Title = cleanText(n.Title, 120)
+	// The notepad keeps text exactly as typed (indents, blank lines), only
+	// without stray control characters.
+	n.Body = strings.Map(func(c rune) rune {
+		if c == '\n' || c == '\t' || !unicode.IsControl(c) {
+			return c
+		}
+		return -1
+	}, strings.ReplaceAll(n.Body, "\r\n", "\n"))
+	if utf8.RuneCountInString(n.Body) > 100000 {
+		n.Body = string([]rune(n.Body)[:100000])
+	}
+	pinned := 0
+	if n.Pinned {
+		pinned = 1
+	}
+	now := time.Now().UnixMilli()
+	n.UpdatedAt = now
+	if n.ID > 0 {
+		res, err := db.Exec("UPDATE notepad_notes SET title = ?, body = ?, pinned = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+			n.Title, n.Body, pinned, now, n.ID, session.UserId)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save that note.", http.StatusInternalServerError)
+			return
+		}
+		if c, _ := res.RowsAffected(); c > 0 {
+			writeJSON(w, n)
+			return
+		}
+	}
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM notepad_notes WHERE user_id = ?", session.UserId).Scan(&count)
+	if count >= maxPadNotes {
+		http.Error(w, fmt.Sprintf("You have %d notes, the most there can be. Delete an old one first.", maxPadNotes), http.StatusConflict)
+		return
+	}
+	res, err := db.Exec("INSERT INTO notepad_notes (user_id, title, body, pinned, updated_at) VALUES (?, ?, ?, ?, ?)",
+		session.UserId, n.Title, n.Body, pinned, now)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save that note.", http.StatusInternalServerError)
+		return
+	}
+	n.ID, _ = res.LastInsertId()
+	writeJSON(w, n)
+}
+
+// portableAppKind tells programs apart from other files; "" means not a program.
+func portableAppKind(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".exe":
+		return "Windows"
+	case ".msi":
+		return "Windows installer"
+	case ".appimage":
+		return "Linux"
+	case ".apk":
+		return "Android"
+	case ".ipa":
+		return "iPhone"
+	case ".dmg":
+		return "Mac"
+	}
+	return ""
+}
+
+type portableApp struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"` // inside UploadedFiles, "a/b/App.exe"
+	Folder   string `json:"folder"`
+	Kind     string `json:"kind"`
+	Size     int64  `json:"size"`
+	Modified int64  `json:"modified"`
+	CanRun   bool   `json:"canRun"`
+}
+
+// portableAppList finds the programs in folder and its subfolders (three
+// levels, like PortableApps' App/Name/Name.exe), at most 300.
+func portableAppList(folder string, grant filesGrant) []portableApp {
+	root, ok := insideUploads(strings.Split(folder, "/")...)
+	out := []portableApp{}
+	if !ok {
+		return out
+	}
+	base := strings.Count(filepath.ToSlash(root), "/")
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || len(out) >= 300 {
+			return filepath.SkipDir
+		}
+		rel := uploadRel(p)
+		if d.IsDir() {
+			if strings.Count(filepath.ToSlash(p), "/")-base > 3 || !grant.canSee(rel) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		kind := portableAppKind(d.Name())
+		if kind == "" || !grant.allows(rel) {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		dir := path.Dir(rel)
+		if dir == "." {
+			dir = ""
+		}
+		app := portableApp{Name: strings.TrimSuffix(d.Name(), filepath.Ext(d.Name())), Path: rel, Folder: dir, Kind: kind, Size: info.Size(), Modified: info.ModTime().UnixMilli()}
+		app.CanRun = desktopMode && portableCanRun(kind)
+		out = append(out, app)
+		return nil
+	})
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
+	return out
+}
+
+// portableCanRun: the desktop app can start programs made for the computer it runs on.
+func portableCanRun(kind string) bool {
+	switch runtime.GOOS {
+	case "windows":
+		return kind == "Windows" || kind == "Windows installer"
+	case "linux":
+		return kind == "Linux"
+	}
+	return false
+}
+
+// portableApps: GET answers the account's apps folder and the programs in it;
+// POST {folder} picks the folder. Needs Files access.
+func portableApps(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	grant, ok := filesGrantFor(session)
+	if !ok {
+		http.Error(w, "You don't have access to Files.", http.StatusForbidden)
+		return
+	}
+	if r.Method == http.MethodPost {
+		var in struct {
+			Folder string `json:"folder"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+			http.Error(w, "Couldn't read that folder.", http.StatusBadRequest)
+			return
+		}
+		folder := strings.Trim(path.Clean("/"+strings.ReplaceAll(in.Folder, "\\", "/")), "/")
+		p, inside := insideUploads(strings.Split(folder, "/")...)
+		if folder != "" {
+			if fi, err := os.Stat(p); !inside || err != nil || !fi.IsDir() || !grant.canSee(folder) {
+				http.Error(w, "That folder isn't in Files.", http.StatusBadRequest)
+				return
+			}
+		}
+		if _, err := db.Exec("INSERT INTO portable_apps (user_id, folder) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET folder = excluded.folder", session.UserId, folder); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save that folder.", http.StatusInternalServerError)
+			return
+		}
+	} else if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var folder string
+	set := db.QueryRow("SELECT folder FROM portable_apps WHERE user_id = ?", session.UserId).Scan(&folder) == nil
+	// Every folder the account can see, for the picker (three levels deep).
+	folders := []string{}
+	filepath.WalkDir(UploadedFilesDirName, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() || len(folders) >= 500 {
+			return nil
+		}
+		rel := uploadRel(p)
+		if rel == "" {
+			return nil
+		}
+		if strings.Count(rel, "/") > 2 || !grant.canSee(rel) {
+			return filepath.SkipDir
+		}
+		folders = append(folders, rel)
+		return nil
+	})
+	items := []portableApp{}
+	if set {
+		items = portableAppList(folder, grant)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"folder": folder, "set": set, "folders": folders, "items": items, "desktop": desktopMode})
+}
+
+// portableAppRun starts a program from Files on this computer. Only the
+// desktop app does this: there the server and the person are on the same
+// computer. On the website the card offers downloads instead.
+func portableAppRun(w http.ResponseWriter, r *http.Request) {
+	if !desktopMode {
+		http.Error(w, "Programs can only be started from the desktop app.", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	grant, ok := filesGrantFor(session)
+	if !ok {
+		http.Error(w, "You don't have access to Files.", http.StatusForbidden)
+		return
+	}
+	// Only the app's own pages may start programs, never another website.
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if origin := r.Header.Get("Origin"); origin != "" && origin != "http://"+r.Host {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	var in struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that program.", http.StatusBadRequest)
+		return
+	}
+	rel := strings.Trim(path.Clean("/"+in.Path), "/")
+	p, inside := insideUploads(strings.Split(rel, "/")...)
+	fi, err := os.Stat(p)
+	if !inside || err != nil || fi.IsDir() || !grant.allows(rel) || !portableCanRun(portableAppKind(p)) {
+		http.Error(w, "That program can't be started here.", http.StatusBadRequest)
+		return
+	}
+	abs, _ := filepath.Abs(p)
+	var cmd *exec.Cmd
+	switch {
+	case strings.EqualFold(filepath.Ext(abs), ".msi"):
+		cmd = exec.Command("msiexec", "/i", abs)
+	default:
+		if runtime.GOOS == "linux" {
+			os.Chmod(abs, fi.Mode()|0100) // AppImages need to be executable
+		}
+		cmd = exec.Command(abs)
+	}
+	cmd.Dir = filepath.Dir(abs)
+	if err := cmd.Start(); err != nil {
+		http.Error(w, "Couldn't start it: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	go cmd.Wait()
+	fmt.Printf("[%s] RUN USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), session.OriginalUsername, rel)
+	writeJSON(w, map[string]any{"started": true})
 }
