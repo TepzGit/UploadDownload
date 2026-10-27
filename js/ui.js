@@ -649,7 +649,75 @@ async function useRecent(d) {
   }
 }
 
+// ------------------------------------------------------------
+// Past experiences: a session started on an earlier day. Its doses
+// keep their clock times and the session is saved on that day.
+// ------------------------------------------------------------
+
+/** True when the open session belongs to an earlier day than today. */
+function sessionIsPast() {
+  return !!activeExp && startOfDay(activeExp.startedAt) < startOfDay(Date.now());
+}
+
+function showSessionDay() {
+  const box = document.getElementById("sessionDay");
+  if (!box) return;
+  if (!sessionIsPast() || activeExp.viewOnly) {
+    box.hidden = true;
+    return;
+  }
+  const when = new Date(activeExp.startedAt);
+  box.replaceChildren("Past experience · ", Object.assign(document.createElement("strong"), {
+    textContent: when.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+  }));
+  box.hidden = false;
+}
+
+function askPastExperience() {
+  const dialog = document.getElementById("pastDlg");
+  const input = document.getElementById("pastDate");
+  const iso = (t) => {
+    const d = new Date(t);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  input.max = iso(Date.now());
+  input.value = iso(Date.now() - 86400000);
+  if (typeof dialog.showModal !== "function") {
+    const typed = window.prompt("Which day? (YYYY-MM-DD)", input.value);
+    if (typed) startPastExperience(typed);
+    return;
+  }
+  dialog.returnValue = "";
+  dialog.showModal();
+}
+
+function startPastExperience(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+  const day = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0).getTime() : NaN;
+  if (!(day > 0) || startOfDay(day) > startOfDay(Date.now())) {
+    showToast("Pick a day up to today.", true);
+    return;
+  }
+  handleReset(null, { quiet: true });
+  activeExp = { id: null, startedAt: day };
+  showSessionDay();
+  renderExperiences();
+  if (isPhone()) {
+    showGraphView();
+    openSheet();
+  } else {
+    els.input.focus({ preventScroll: true });
+  }
+  showToast(`Add the doses from ${longDate(day)} with the times you took them.`);
+}
+
 function bindEvents() {
+  document.getElementById("expPast")?.addEventListener("click", askPastExperience);
+  document.getElementById("gpPast")?.addEventListener("click", askPastExperience);
+  document.getElementById("pastDlg")?.addEventListener("close", (event) => {
+    const dialog = event.target;
+    if (dialog.returnValue === "ok") startPastExperience(document.getElementById("pastDate").value);
+  });
   els.input.addEventListener("input", () => {
     clearTimeout(suggestionTimer);
     const value = els.input.value.trim();
@@ -712,6 +780,7 @@ function bindEvents() {
       const dose = logic.updateDoseInState(id, {
         amount: form.querySelector("[name=amount]").value,
         time: form.querySelector("[name=time]").value,
+        note: form.querySelector("[name=note]").value,
       });
       relogDose(dose);
       renderDoseList();
@@ -1665,7 +1734,7 @@ function handleAddDose() {
     });
     const f = selectedFormulation();
     rememberDose({ substance: dose.substance, amount: dose.amount, unit: dose.unit, route: dose.route, formulation: f.key, label: f.label, releaseHours: f.releaseHours });
-    logDose(dose);
+    if (!sessionIsPast()) logDose(dose); // the tracker counts today's doses only
     renderRecent();
     renderTracker();
     renderDoseList();
@@ -1704,6 +1773,7 @@ function handleReset(event, { quiet = false } = {}) {
 
 function renderDoseList() {
   const { addedDoses } = logic.getState();
+  showSessionDay();
 
   els.doseList.replaceChildren();
   els.doseCount.textContent = addedDoses.length;
@@ -1732,12 +1802,19 @@ function renderDoseList() {
     const meta = document.createElement("span");
     meta.textContent = [`${dose.amount} ${dose.unit}`, dose.route, dose.formulation].filter(Boolean).join(" · ");
     details.append(name, meta);
+    if (dose.note) {
+      const note = document.createElement("p");
+      note.className = "dose-note";
+      note.textContent = dose.note;
+      details.append(note);
+    }
 
     const edit = document.createElement("button");
     edit.type = "button";
     edit.className = "remove-dose edit-dose";
     edit.dataset.editDose = String(dose.id);
-    edit.setAttribute("aria-label", `Edit ${dose.substance} dose at ${dose.time}`);
+    edit.setAttribute("aria-label", `Edit or add a note to ${dose.substance} dose at ${dose.time}`);
+    edit.title = "Edit, or write how it felt";
     edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/></svg>';
 
     const remove = document.createElement("button");
@@ -1770,6 +1847,7 @@ function openDoseEditor(id) {
     <p class="dose-edit-title"><strong></strong><span></span></p>
     <label class="dose-edit-field"><span>Dose</span><span class="dose-edit-amount"><input name="amount" type="number" inputmode="decimal" min="0" step="any" required class="input input-sm bg-[var(--bg)] border-[var(--line)] font-mono w-full" /><em></em></span></label>
     <label class="dose-edit-field"><span>Time</span><input name="time" type="time" required class="input input-sm bg-[var(--bg)] border-[var(--line)] font-mono w-full" /></label>
+    <label class="dose-edit-field dose-edit-note"><span>Note · how it felt</span><textarea name="note" rows="3" maxlength="2000" placeholder="Come-up, mood, body feel, anything worth remembering…"></textarea></label>
     <div class="dose-edit-actions">
       <button type="button" class="btn btn-sm btn-ghost font-mono" data-edit-cancel="${id}">Cancel</button>
       <button type="submit" class="btn btn-sm border-none text-[#160f24] font-mono font-medium dose-edit-save">Save</button>
@@ -1779,6 +1857,7 @@ function openDoseEditor(id) {
   form.querySelector("[name=amount]").value = dose.amount;
   form.querySelector(".dose-edit-amount em").textContent = dose.unit || "";
   form.querySelector("[name=time]").value = dose.time;
+  form.querySelector("[name=note]").value = dose.note || "";
   form.querySelector(".dose-edit-save").style.background = dose.color;
   fresh.replaceWith(form);
   const amount = form.querySelector("[name=amount]");

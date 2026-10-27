@@ -15,3 +15,5 @@ ios/sdk/
 *.ipa
 MusicCache/
 spotify.json
+
+desktop/dist/

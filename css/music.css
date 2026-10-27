@@ -229,3 +229,8 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 @media (hover: none) and (pointer: coarse) {
   .mu-icon-btn { width: 44px; height: 44px; }
 }
+
+/* The player, Now playing and dialog sit outside .xn-page, so give it the same box sizing. */
+.mu-modal, .mu-modal *, .mu-modal *::before, .mu-modal *::after,
+.mu-player, .mu-player *, .mu-player *::before, .mu-player *::after,
+.mu-now, .mu-now *, .mu-now *::before, .mu-now *::after { box-sizing: border-box; }

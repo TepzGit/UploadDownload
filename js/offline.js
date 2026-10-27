@@ -42,8 +42,12 @@ function tx(mode, run) {
 
 const keyOf = (name) => String(name || "").trim().toLowerCase();
 
-/** True when the browser is sure there is no connection. */
-export const isOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
+// The desktop app's server runs on this computer (it sets this cookie), so
+// our own pages and saves always work there, with or without internet.
+const LOCAL_SERVER = typeof document !== "undefined" && /(?:^|;\s*)xn_local=1(?:;|$)/.test(document.cookie);
+
+/** True when the browser is sure our server can't be reached. */
+export const isOffline = () => !LOCAL_SERVER && typeof navigator !== "undefined" && navigator.onLine === false;
 
 /** A fetch() failure that means "no connection" rather than an error answer. */
 export const isNetworkError = (error) => error instanceof TypeError || isOffline();

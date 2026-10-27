@@ -39,6 +39,10 @@
   .dose-edit-amount em{ font-style:normal; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
   .dose-edit-actions{ grid-column:1 / -1; display:flex; justify-content:flex-end; gap:.4rem; }
   .dose-edit-save:hover{ filter:brightness(1.1); }
+  .dose-edit-note{ grid-column:1 / -1; }
+  .dose-edit-note textarea{ width:100%; min-height:4.5rem; padding:.45rem .6rem; resize:vertical; background:var(--bg); border:1px solid var(--line); border-radius:.25rem; color:var(--text); font:inherit; font-size:13px; line-height:1.45; }
+  .dose-edit-note textarea:focus{ outline:none; border-color:var(--violet); }
+  .dose-card .dose-note{ margin:.3rem 0 0; font-size:12.5px; line-height:1.45; color:var(--text); opacity:.85; white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   /* Duration tiles in the substance panel */
   .sub-times{ padding:.85rem .9rem; border:1px solid var(--line); background:var(--bg); }
   .sub-times-head{ display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; margin-bottom:.65rem; }
@@ -205,6 +209,19 @@
   .ppl-primary{ background:var(--violet); border-color:var(--violet); color:#0b0716; }
   .link-btn{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); text-decoration:underline; text-underline-offset:3px; padding:.25rem 0; flex:none; }
   .link-btn:hover{ color:var(--text); }
+  .gp-head-tools{ display:flex; align-items:center; gap:.75rem; }
+  .session-day{ margin:-.25rem 0 .75rem; padding:.4rem .6rem; border:1px solid var(--line); border-left:3px solid var(--violet); border-radius:.125rem; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+  .session-day strong{ color:var(--text); font-weight:500; }
+  .past-dlg{ width:min(380px, calc(100vw - 32px)); padding:0; border:1px solid var(--line); border-radius:.5rem; background:var(--surface, #0b0b0e); color:var(--text); }
+  .past-dlg::backdrop{ background:rgba(0,0,0,.7); }
+  .past-card{ display:flex; flex-direction:column; gap:.8rem; padding:1.2rem; }
+  .past-card h2{ margin:0; font-size:16px; font-weight:600; }
+  .past-card p{ margin:0; font-size:13px; line-height:1.5; color:var(--muted); }
+  .past-field{ display:flex; flex-direction:column; gap:.35rem; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); }
+  .past-field input{ min-height:42px; padding:0 .7rem; background:var(--bg); border:1px solid var(--line); border-radius:.25rem; color:var(--text); font:inherit; font-size:15px; color-scheme:dark; }
+  .past-actions{ display:flex; justify-content:flex-end; gap:.5rem; }
+  .past-btn{ min-height:40px; padding:0 1rem; border:1px solid var(--line); border-radius:.25rem; background:transparent; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; cursor:pointer; }
+  .past-ok{ border-color:transparent; background:var(--violet); color:#160f24; font-weight:600; }
   .tracker-range{ display:flex; border:1px solid var(--line); border-radius:.125rem; overflow:hidden; flex:none; }
   .tracker-range button{ font-family:'JetBrains Mono',monospace; font-size:10px; padding:.3rem .5rem; color:var(--muted); }
   .tracker-range button + button{ border-left:1px solid var(--line); }
@@ -455,7 +472,7 @@
 <section id="gpList" class="gp-list" aria-labelledby="gpListTitle">
   <div class="gp-list-head">
     <h1 id="gpListTitle">Experiences</h1>
-    <button id="gpEditList" type="button" class="gp-link" hidden>Edit</button>
+    <span class="gp-head-tools"><button id="gpPast" type="button" class="gp-link">Add past</button><button id="gpEditList" type="button" class="gp-link" hidden>Edit</button></span>
   </div>
   <p class="gp-note" data-gp-note hidden></p>
   <div class="gp-rows" data-gp-rows role="list"></div>
@@ -467,6 +484,17 @@
 </header>
 <button id="gpFab" type="button" class="gp-fab" aria-label="New experience"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 <div id="gpScrim" class="gp-scrim" aria-hidden="true"></div>
+<dialog id="pastDlg" class="past-dlg" aria-labelledby="pastTitle">
+  <form method="dialog" class="past-card">
+    <h2 id="pastTitle">Add a past experience</h2>
+    <p>Pick the day it happened, then add each dose with the time you took it. It's saved under Experiences on that day.</p>
+    <label class="past-field"><span>Day</span><input id="pastDate" type="date" required></label>
+    <div class="past-actions">
+      <button type="submit" value="cancel" formnovalidate class="past-btn">Cancel</button>
+      <button type="submit" value="ok" class="past-btn past-ok">Start</button>
+    </div>
+  </form>
+</dialog>
 
 <div class="tl-wrap relative z-[1] py-6 sm:py-8 xl:py-5 pb-[calc(2rem+env(safe-area-inset-bottom))] flex flex-col xl:grid xl:grid-cols-[340px_minmax(0,1fr)_340px] xl:items-stretch gap-5 xl:gap-x-12">
   <div class="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0 xl:min-h-0 xl:col-start-2 xl:row-start-1">
@@ -489,7 +517,7 @@
           <section id="experiences" class="recent-box exp-box text-left" aria-labelledby="expTitle">
             <div class="box-head flex items-center justify-between gap-3 mb-3">
               <h2 id="expTitle" class="font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[var(--muted)]">Experiences · tap to open</h2>
-              <span data-exp-count class="font-mono text-[10px] text-[var(--muted)]"></span>
+              <span class="recent-tools"><span data-exp-count class="font-mono text-[10px] text-[var(--muted)]"></span><button id="expPast" type="button" class="link-btn">+ Past experience</button></span>
             </div>
             <p data-exp-note class="exp-note" hidden></p>
             <div data-exp-list class="box-list exp-list" role="list"></div>
@@ -509,6 +537,7 @@
         <button id="gpSheetClose" type="button">Done</button>
         <button id="resetButton" type="button" class="btn btn-xs btn-ghost font-mono" aria-label="Reset timeline">reset</button>
       </div>
+      <p id="sessionDay" class="session-day" hidden></p>
 
       <label class="font-mono text-[11px] text-[var(--muted)] block mb-1" for="input">Substance</label>
       <div class="join w-full mb-1 relative">
