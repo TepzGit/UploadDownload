@@ -364,7 +364,7 @@ function changed() {
 function iconFor(entry) {
   const xc = window.xnClass;
   if (!xc) return document.createElement("span");
-  const key = xc.keyForClass(entry.class || "") || "";
+  const key = xc.keyFor({ name: entry.name, class: { psychoactive: [entry.class || ""] } }) || "";
   return key ? xc.icon(key) : Object.assign(document.createElement("span"), { className: "si-noicon" });
 }
 
@@ -488,7 +488,7 @@ function inspect(entry) {
   add("Last changed", entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : "");
   const text = (label, v) => (v ? `<h3 class="si-legend">${esc(label)}</h3><p class="si-para">${esc(v)}</p>` : "");
   $("inBody").innerHTML =
-    previewSvg(entry.durations, { compact: true }) +
+    previewSvg(entry.durations) +
     `<ol class="si-pv-legend">${legendHtml(entry.durations)}</ol>` +
     text("Summary", entry.summary) +
     `<dl class="si-dl">${rowsHtml.join("")}</dl>` +

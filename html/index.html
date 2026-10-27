@@ -165,14 +165,14 @@
   .exp-note a{ color:var(--text); text-decoration:underline; text-underline-offset:2px; }
   .exp-empty{ font-size:11px; line-height:1.6; color:var(--muted); padding:.25rem 0; }
   .exp-item{ position:relative; }
-  .exp-open{ width:100%; display:flex; flex-direction:column; gap:.4rem; text-align:left; padding:.6rem 2.75rem .6rem .75rem; border:1px solid var(--line); border-left:3px solid var(--c, var(--line)); background:var(--surface-2); border-radius:.125rem; color:var(--text); transition:border-color .15s; min-height:44px; }
+  .exp-open{ width:100%; display:flex; flex-direction:column; gap:.4rem; text-align:left; padding:.6rem 2.75rem .6rem .75rem; border:1px solid var(--line); border-left:3px solid var(--c, var(--line)); background:var(--surface-2); border-radius:12px; color:var(--text); transition:border-color .15s; min-height:44px; }
   .exp-open:focus-visible{ border-color:var(--violet); outline:none; }
   @media (hover:hover){ .exp-open:hover{ border-color:var(--violet); border-left-color:var(--c, var(--violet)); } }
   .exp-top{ display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; width:100%; }
   .exp-top strong{ font-size:13px; }
   .exp-top span{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); white-space:nowrap; }
-  .exp-spark{ display:block; width:100%; height:34px; overflow:visible; }
-  .exp-spark path{ fill:none; stroke:var(--c); stroke-width:1.75; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+  .exp-spark{ display:block; width:100%; height:68px; overflow:visible; }
+  .exp-spark path{ fill:none; stroke:var(--c); stroke-width:2.75; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
   .exp-spark line{ stroke:var(--line); stroke-width:1; vector-effect:non-scaling-stroke; }
   .exp-subs{ display:flex; flex-wrap:wrap; gap:.15rem .7rem; font-size:12px; color:var(--text); }
   .exp-subs span{ display:inline-flex; align-items:center; gap:.35rem; min-width:0; }
@@ -300,6 +300,8 @@
   @media (hover:hover){ .res-link:hover{ border-color:var(--violet); } }
   .res-link img{ width:24px; height:24px; flex:none; border-radius:.125rem; background:#fff1; }
   .chart-empty + #myPlot{ height:var(--chart-h); width:100%; }
+  /* Rounded ends and corners on the graph lines. */
+  #myPlot .scatterlayer .js-line{ stroke-linecap:round; stroke-linejoin:round; }
   .chart-empty:not([hidden]) + #myPlot{ display:none; }
   .suggestion{ min-height:44px; }
   input[type=time]{ -webkit-appearance:none; appearance:none; }

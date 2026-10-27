@@ -19,9 +19,10 @@
 .si-side { display: grid; gap: 16px; position: sticky; top: calc(var(--oled-nav-h) + 12px); }
 @media (max-width: 900px) {
   .si-grid { grid-template-columns: minmax(0, 1fr); }
-  /* On phones the preview goes first and stays in view while you drag a slider;
-     the list comes after the form. */
+  /* On phones the saved list comes first so it's easy to find and edit, then the
+     preview, which stays in view while you drag a slider, then the form. */
   .si-side { display: contents; }
+  .si-list-card { order: -2; }
   .si-preview { order: -1; position: sticky; top: 4px; z-index: 3; align-self: start; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
   .si-preview .si-pv-note, .si-preview .si-pv-legend { display: none; }
   .si-preview { padding: 12px 14px; }
@@ -105,7 +106,7 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 .si-svg .si-tick, .si-svg .si-base { stroke: var(--oled-line-strong); stroke-width: 1; }
 .si-svg .si-axis { fill: var(--oled-muted); font-size: 10px; }
 .si-svg .si-area { fill: rgba(var(--xn-accent-rgb), 0.16); }
-.si-svg .si-line { fill: none; stroke: var(--oled-accent); stroke-width: 2; stroke-linejoin: round; }
+.si-svg .si-line { fill: none; stroke: var(--oled-accent); stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; }
 .si-pv-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--oled-muted); }
 .si-pv-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .si-pv-legend i { width: 10px; height: 10px; border: 1px solid var(--oled-line-strong); border-radius: 2px; }
