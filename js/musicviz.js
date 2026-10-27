@@ -384,8 +384,7 @@ window.addEventListener("popstate", () => {
   else close({ fromHistory: true });
 });
 
-$("muVizBtn")?.addEventListener("click", () => open());
-$("muNowViz")?.addEventListener("click", () => open());
+document.querySelectorAll("#muVizBtn, #muNowViz, [data-viz]").forEach((b) => b.addEventListener("click", () => open()));
 if (location.hash === "#visualizer") {
   // Web Audio needs a tap first, so show it and start on the first touch.
   addEventListener("pointerdown", () => ensureAudioGraph() && actx.resume().catch(() => {}), { once: true });

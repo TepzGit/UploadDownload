@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -505,6 +506,7 @@ func main() {
 		panic("cannot create the music tables: " + err.Error())
 	}
 	registerNotes()
+	registerAppUpdates()
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE profile_boxes ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -8791,4 +8793,158 @@ func portableAppRun(w http.ResponseWriter, r *http.Request) {
 	go cmd.Wait()
 	fmt.Printf("[%s] RUN USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), session.OriginalUsername, rel)
 	writeJSON(w, map[string]any{"started": true})
+}
+
+// App updates: the desktop app (desktop.go) asks the website for its newest
+// site files and program on start, so it keeps up with the website.
+//   GET /app-update/version            {"site", "siteTime", "build", "programs"}
+//   GET /app-update/site.zip           html, css, js and assets as one zip
+//   GET /app-update/program/<os-arch>  the program from desktop/dist
+// "site" is worked out the same way as desktopUnpack's version, so an app
+// built from the same files sees nothing to fetch.
+
+var appUpdateDirs = []string{"assets", "css", "html", "js"}
+
+var appUpdatePrograms = map[string]string{
+	"windows-amd64": "Geek4u.exe",
+	"linux-amd64":   "Geek4u-linux-x64",
+	"linux-arm64":   "Geek4u-linux-arm64",
+}
+
+var appUpdateCache struct {
+	sync.Mutex
+	checked  time.Time
+	version  string
+	siteTime int64
+	zip      []byte
+}
+
+func registerAppUpdates() {
+	if desktopMode {
+		return
+	}
+	http.HandleFunc("/app-update/version", appUpdateVersion)
+	http.HandleFunc("/app-update/site.zip", appUpdateSite)
+	http.HandleFunc("/app-update/program/", appUpdateProgram)
+}
+
+// appUpdateFiles lists the site's files in the order go:embed walks them,
+// leaving out names starting with "." or "_" as go:embed does.
+func appUpdateFiles() []string {
+	var files []string
+	for _, dir := range appUpdateDirs {
+		filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if name := d.Name(); p != dir && (strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.Type().IsRegular() {
+				files = append(files, filepath.ToSlash(p))
+			}
+			return nil
+		})
+	}
+	return files
+}
+
+// appUpdateState rebuilds the version and zip at most every 30 seconds.
+func appUpdateState() (string, int64, []byte, error) {
+	c := &appUpdateCache
+	c.Lock()
+	defer c.Unlock()
+	if c.version != "" && time.Since(c.checked) < 30*time.Second {
+		return c.version, c.siteTime, c.zip, nil
+	}
+	sum := sha256.New()
+	var newest int64
+	type entry struct {
+		name string
+		data []byte
+	}
+	var entries []entry
+	for _, name := range appUpdateFiles() {
+		b, err := os.ReadFile(filepath.FromSlash(name))
+		if err != nil {
+			return "", 0, nil, err
+		}
+		if info, err := os.Stat(filepath.FromSlash(name)); err == nil && info.ModTime().Unix() > newest {
+			newest = info.ModTime().Unix()
+		}
+		sum.Write([]byte(name + "\x00"))
+		sum.Write(b)
+		entries = append(entries, entry{name, b})
+	}
+	version := hex.EncodeToString(sum.Sum(nil))
+	if version != c.version {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		for _, e := range entries {
+			f, err := zw.Create(e.name)
+			if err != nil {
+				return "", 0, nil, err
+			}
+			f.Write(e.data)
+		}
+		if err := zw.Close(); err != nil {
+			return "", 0, nil, err
+		}
+		c.zip = buf.Bytes()
+	}
+	c.version, c.siteTime, c.checked = version, newest, time.Now()
+	return c.version, c.siteTime, c.zip, nil
+}
+
+func appUpdateVersion(w http.ResponseWriter, r *http.Request) {
+	version, siteTime, _, err := appUpdateState()
+	if err != nil {
+		http.Error(w, "Couldn't read the site files", http.StatusInternalServerError)
+		return
+	}
+	build := ""
+	if b, err := os.ReadFile(filepath.Join("desktop", "dist", "build.txt")); err == nil {
+		build = strings.TrimSpace(string(b))
+	}
+	programs := []string{}
+	for key, name := range appUpdatePrograms {
+		if info, err := os.Stat(filepath.Join("desktop", "dist", name)); err == nil && info.Mode().IsRegular() {
+			programs = append(programs, key)
+		}
+	}
+	sort.Strings(programs)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"site": version, "siteTime": siteTime, "build": build, "programs": programs})
+}
+
+func appUpdateSite(w http.ResponseWriter, r *http.Request) {
+	version, _, data, err := appUpdateState()
+	if err != nil {
+		http.Error(w, "Couldn't read the site files", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Site-Version", version)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
+}
+
+func appUpdateProgram(w http.ResponseWriter, r *http.Request) {
+	name, ok := appUpdatePrograms[strings.TrimPrefix(r.URL.Path, "/app-update/program/")]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	file := filepath.Join("desktop", "dist", name)
+	if info, err := os.Stat(file); err != nil || !info.Mode().IsRegular() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeFile(w, r, file)
 }

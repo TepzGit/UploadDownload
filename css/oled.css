@@ -920,11 +920,11 @@ html[data-scene] .crosshatch { display: none; }
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(var(--xn-accent-rgb), 0.8) 0 50%, rgba(255, 255, 255, 0.75) 50% 100%);
   opacity: var(--o);
-  animation: xn-rise var(--d) linear infinite;
+  animation: xn-pill-rise var(--d) linear infinite;
   animation-delay: var(--w);
 }
 .xn-scene[data-scene="pills"]::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, rgba(var(--xn-accent-rgb), 0.12), transparent 70%); }
-@keyframes xn-rise { from { transform: translate3d(0, 0, 0) rotate(var(--r)); } to { transform: translate3d(var(--sway), calc(-100vh - 160px), 0) rotate(calc(var(--r) + 300deg)); } }
+@keyframes xn-pill-rise { from { transform: translate3d(0, 0, 0) rotate(var(--r)); } to { transform: translate3d(var(--sway), calc(-100vh - 160px), 0) rotate(calc(var(--r) + 300deg)); } }
 
 /* Waves: layered swells rolling along the bottom. */
 .xn-scene[data-scene="waves"] span {

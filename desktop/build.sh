@@ -17,9 +17,14 @@ cp go.mod go.sum UploadDownload.go desktop.go desktop_windows.go desktop_other.g
 cp -r html css js assets "$work/"
 cp desktop/rsrc_windows_*.syso "$work/"
 
+# The build time lets the app tell whether the website has a newer one
+# (desktop/dist/build.txt goes to the website with updateServer.sh).
+stamp="$(date -u +%Y%m%d%H%M%S)"
+
 cd "$work"
 flags=(-tags desktop -trimpath)
-GOOS=windows GOARCH=amd64 go build "${flags[@]}" -ldflags "-s -w -H windowsgui" -o "$out/Geek4u.exe" .
-GOOS=linux   GOARCH=amd64 go build "${flags[@]}" -ldflags "-s -w" -o "$out/Geek4u-linux-x64" .
-GOOS=linux   GOARCH=arm64 go build "${flags[@]}" -ldflags "-s -w" -o "$out/Geek4u-linux-arm64" .
+GOOS=windows GOARCH=amd64 go build "${flags[@]}" -ldflags "-s -w -X main.desktopBuild=$stamp -H windowsgui" -o "$out/Geek4u.exe" .
+GOOS=linux   GOARCH=amd64 go build "${flags[@]}" -ldflags "-s -w -X main.desktopBuild=$stamp" -o "$out/Geek4u-linux-x64" .
+GOOS=linux   GOARCH=arm64 go build "${flags[@]}" -ldflags "-s -w -X main.desktopBuild=$stamp" -o "$out/Geek4u-linux-arm64" .
+echo "$stamp" > "$out/build.txt"
 ls -lh "$out"

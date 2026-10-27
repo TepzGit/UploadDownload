@@ -47,7 +47,22 @@ Portable copy (USB stick): make a folder named `Geek4u-data` next to the program
 and the app keeps everything there instead.
 
 Options: `--data DIR` (data folder), `--port N` (default 42068), `--no-window`
-(just the server; open http://127.0.0.1:42068 yourself).
+(just the server; open http://127.0.0.1:42068 yourself), `--server URL`.
+
+## Updates from the website
+
+On start the app asks the website (default http://87.61.252.240:42067; change
+it with `--server URL`, `GEEK4U_SERVER` or a `server.txt` in the data folder,
+`off` turns it off) for `/app-update/version`:
+
+- Newer site files (html, css, js, assets) are downloaded and used right away.
+- A newer program from the website's `desktop/dist` (its `build.txt` holds the
+  build time) replaces this one and runs from the next start; the old copy is
+  kept as `.old` until then.
+
+Without internet it gives up after 4 seconds. So the website hands out new
+versions, run `bash desktop/build.sh` (or `desktop\build.bat`) before
+`updateServer.sh`. Accounts and data are not synced; each app keeps its own.
 
 ## What needs internet
 
