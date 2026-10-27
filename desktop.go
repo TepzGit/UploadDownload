@@ -17,10 +17,13 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/sha256"
 	"database/sql"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -48,7 +51,15 @@ var (
 	desktopNoWindow   bool
 	desktopImportFrom string
 	desktopLastBeat   atomic.Int64
+	desktopServer     = "http://87.61.252.240:42067"
+	desktopSiteHash   string
+	desktopServerFlag bool
 )
+
+// desktopBuild is the build time (yyyyMMddHHmmss, UTC) that desktop/build.sh
+// and build.bat set with -ldflags; the website's desktop/dist/build.txt has
+// the time of the program it offers.
+var desktopBuild = ""
 
 func init() {
 	desktopMode = true
@@ -72,8 +83,12 @@ func init() {
 		case a == "--import" && i+1 < len(args):
 			i++
 			desktopImportFrom = args[i]
+		case a == "--server" && i+1 < len(args):
+			i++
+			desktopServer = args[i]
+			desktopServerFlag = true
 		case a == "--help" || a == "-h":
-			fmt.Println("Geek4u desktop app\n\n  --data DIR    keep the database, uploads and music in DIR\n  --port N      serve on 127.0.0.1:N (default 42068)\n  --no-window   only run the server and print its address\n  --import DIR  take the accounts and pictures from a server folder (only while the app has no accounts)")
+			fmt.Println("Geek4u desktop app\n\n  --data DIR    keep the database, uploads and music in DIR\n  --port N      serve on 127.0.0.1:N (default 42068)\n  --no-window   only run the server and print its address\n  --import DIR  take the accounts and pictures from a server folder (only while the app has no accounts)\n  --server URL  website to take updates from, or \"off\" (default " + desktopServer + ")")
 			os.Exit(0)
 		}
 	}
@@ -108,6 +123,7 @@ func init() {
 	if err := desktopUnpack(); err != nil {
 		desktopFail("Can't unpack the site into " + desktopDataDir + ": " + err.Error())
 	}
+	desktopUpdate()
 	if err := os.Chdir(desktopDataDir); err != nil {
 		desktopFail("Can't open the data folder: " + err.Error())
 	}
@@ -297,6 +313,7 @@ func desktopUnpack() error {
 		return nil
 	})
 	version := hex.EncodeToString(sum.Sum(nil))
+	desktopSiteHash = version
 	stamp := filepath.Join(desktopDataDir, "site-version.txt")
 	if b, err := os.ReadFile(stamp); err == nil && strings.TrimSpace(string(b)) == version {
 		return nil
@@ -322,6 +339,8 @@ func desktopUnpack() error {
 	if err != nil {
 		return err
 	}
+	// The files from the website (desktopUpdate) were just replaced.
+	os.Remove(filepath.Join(desktopDataDir, "server-version.txt"))
 	return os.WriteFile(stamp, []byte(version+"\n"), 0644)
 }
 
@@ -493,4 +512,194 @@ func desktopFindBrowser() string {
 func desktopIcon() []byte {
 	b, _ := desktopFiles.ReadFile("assets/brand/icon-512.png")
 	return b
+}
+
+// desktopUpdate asks the website (desktopServer, or GEEK4U_SERVER, or
+// server.txt in the data folder) for newer site files and a newer program.
+// Without internet it gives up after a few seconds and the app starts as is.
+// New site files are used right away; a new program is put in place of this
+// one and runs from the next start.
+func desktopUpdate() {
+	server := desktopServer
+	if !desktopServerFlag {
+		if env := strings.TrimSpace(os.Getenv("GEEK4U_SERVER")); env != "" {
+			server = env
+		} else if b, err := os.ReadFile(filepath.Join(desktopDataDir, "server.txt")); err == nil && strings.TrimSpace(string(b)) != "" {
+			server = strings.TrimSpace(string(b))
+		}
+	}
+	server = strings.TrimRight(strings.TrimSpace(server), "/")
+	if server == "" || strings.EqualFold(server, "off") {
+		return
+	}
+	client := &http.Client{Timeout: 4 * time.Second}
+	res, err := client.Get(server + "/app-update/version")
+	if err != nil {
+		fmt.Println("Update check skipped:", err)
+		return
+	}
+	var info struct {
+		Site     string   `json:"site"`
+		SiteTime int64    `json:"siteTime"`
+		Build    string   `json:"build"`
+		Programs []string `json:"programs"`
+	}
+	err = json.NewDecoder(io.LimitReader(res.Body, 1<<16)).Decode(&info)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || err != nil {
+		fmt.Println("Update check skipped: the website answered", res.Status)
+		return
+	}
+	go desktopUpdateProgram(server, info.Build, info.Programs)
+	if err := desktopUpdateSite(server, info.Site, info.SiteTime); err != nil {
+		fmt.Println("Site update failed:", err)
+	}
+}
+
+// desktopBuildTime is when this program was built (zero if unknown).
+func desktopBuildTime() time.Time {
+	t, _ := time.Parse("20060102150405", desktopBuild)
+	return t
+}
+
+// desktopUpdateSite swaps in the website's html, css, js and assets when they
+// differ from what the app has and are newer than this program.
+func desktopUpdateSite(server, version string, siteTime int64) error {
+	if version == "" || version == desktopSiteHash {
+		return nil
+	}
+	stampFile := filepath.Join(desktopDataDir, "server-version.txt")
+	if b, err := os.ReadFile(stampFile); err == nil && strings.TrimSpace(string(b)) == version {
+		return nil
+	}
+	// Never trade this program's own files for older ones from the website.
+	if built := desktopBuildTime(); !built.IsZero() && time.Unix(siteTime, 0).Before(built) {
+		return nil
+	}
+	client := &http.Client{Timeout: 3 * time.Minute}
+	res, err := client.Get(server + "/app-update/site.zip")
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("the website answered %s", res.Status)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, 500<<20))
+	if err != nil {
+		return err
+	}
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return err
+	}
+
+	// Unpack next to the live files, checking the version on the way.
+	tmp := filepath.Join(desktopDataDir, "site-update")
+	os.RemoveAll(tmp)
+	defer os.RemoveAll(tmp)
+	allowed := map[string]bool{"assets": true, "css": true, "html": true, "js": true}
+	sum := sha256.New()
+	hasHTML := false
+	for _, f := range zr.File {
+		name := f.Name
+		top, _, _ := strings.Cut(name, "/")
+		if !allowed[top] || strings.Contains(name, "..") || strings.Contains(name, "\\") || strings.HasSuffix(name, "/") {
+			return fmt.Errorf("unexpected file %q in the update", name)
+		}
+		hasHTML = hasHTML || top == "html"
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		b, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return err
+		}
+		sum.Write([]byte(name + "\x00"))
+		sum.Write(b)
+		target := filepath.Join(tmp, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, b, 0644); err != nil {
+			return err
+		}
+	}
+	if !hasHTML || hex.EncodeToString(sum.Sum(nil)) != version {
+		return fmt.Errorf("the update was incomplete")
+	}
+
+	for dir := range allowed {
+		os.MkdirAll(filepath.Join(tmp, dir), 0755)
+		live := filepath.Join(desktopDataDir, dir)
+		os.RemoveAll(live)
+		if err := os.Rename(filepath.Join(tmp, dir), live); err != nil {
+			// Put this program's own files back.
+			os.Remove(filepath.Join(desktopDataDir, "site-version.txt"))
+			desktopUnpack()
+			return err
+		}
+	}
+	fmt.Println("Site files updated from", server)
+	return os.WriteFile(stampFile, []byte(version+"\n"), 0644)
+}
+
+// desktopUpdateProgram downloads a newer program from the website and puts it
+// in place of this one (the running copy is kept as .old until next time).
+func desktopUpdateProgram(server, build string, programs []string) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = real
+	}
+	os.Remove(exe + ".old")
+	key := runtime.GOOS + "-" + runtime.GOARCH
+	offered := false
+	for _, p := range programs {
+		offered = offered || p == key
+	}
+	// Build times are yyyyMMddHHmmss, so newer sorts later.
+	if !offered || desktopBuild == "" || len(build) != len(desktopBuild) || build <= desktopBuild {
+		return
+	}
+	client := &http.Client{Timeout: 15 * time.Minute}
+	res, err := client.Get(server + "/app-update/program/" + key)
+	if err != nil {
+		fmt.Println("Program update failed:", err)
+		return
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		fmt.Println("Program update failed: the website answered", res.Status)
+		return
+	}
+	next := exe + ".new"
+	f, err := os.OpenFile(next, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+	if err != nil {
+		fmt.Println("Program update failed:", err)
+		return
+	}
+	n, err := io.Copy(f, io.LimitReader(res.Body, 300<<20))
+	f.Close()
+	if err != nil || n < 1<<20 || (res.ContentLength > 0 && n != res.ContentLength) {
+		os.Remove(next)
+		fmt.Println("Program update failed: the download was incomplete")
+		return
+	}
+	// A running program can be renamed (also on Windows), not overwritten.
+	if err := os.Rename(exe, exe+".old"); err != nil {
+		os.Remove(next)
+		fmt.Println("Program update failed:", err)
+		return
+	}
+	if err := os.Rename(next, exe); err != nil {
+		os.Rename(exe+".old", exe)
+		fmt.Println("Program update failed:", err)
+		return
+	}
+	fmt.Println("Program updated to build", build, "- it is used from the next start")
 }
