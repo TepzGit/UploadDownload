@@ -72,6 +72,7 @@
     <span id="muLength">0:00</span>
   </div>
   <div class="mu-vol">
+    <button type="button" class="mu-ctl mu-ctl-opt mu-viz-btn" id="muVizBtn" aria-label="Visualizer" title="Visualizer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v4M8 10v8M12 5v13M16 9v9M20 12v6"/></svg></button>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path class="mu-fill" d="M4 9h3l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.8 6a8.5 8.5 0 0 1 0 12"/></svg>
     <input type="range" id="muVolume" min="0" max="100" value="100" aria-label="Volume">
   </div>
@@ -82,7 +83,7 @@
   <div class="mu-now-top">
     <button type="button" class="mu-ctl" id="muCloseNow" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
     <span class="mu-now-from" id="muNowFrom"></span>
-    <span></span>
+    <button type="button" class="mu-ctl" id="muNowViz" aria-label="Visualizer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v4M8 10v8M12 5v13M16 9v9M20 12v6"/></svg></button>
   </div>
   <span class="mu-art mu-art-xl" id="muNowArt"></span>
   <div class="mu-now-text mu-now-big"><strong id="muNowTitle"></strong><span id="muNowArtist"></span></div>
@@ -104,5 +105,7 @@
 
 <audio id="muAudio" preload="metadata" playsinline></audio>
 <script type="module" src="/music.js"></script>
+<script type="module" src="/musicviz.js"></script>
+<script type="module" src="/musicshell.js"></script>
 </body>
 </html>

@@ -8288,10 +8288,16 @@ func registerNotes() {
 	if _, err := db.Exec(notesSchema); err != nil {
 		panic("cannot create the notes tables: " + err.Error())
 	}
+	// Public trip reports can be read by every account (/notes/reports/public).
+	if _, err := db.Exec("ALTER TABLE trip_reports ADD COLUMN public INTEGER NOT NULL DEFAULT 0"); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		panic("cannot add trip_reports.public: " + err.Error())
+	}
+	db.Exec("CREATE INDEX IF NOT EXISTS trip_reports_public ON trip_reports(public, happened_at)")
 	http.HandleFunc("/Notes", requireLogin(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "html/notes.html")
 	}))
 	http.HandleFunc("/notes/reports", tripReports)
+	http.HandleFunc("/notes/reports/public", publicTripReports)
 	http.HandleFunc("/notes/pad", notepad)
 	http.HandleFunc("/apps", portableApps)
 	http.HandleFunc("/apps/run", portableAppRun)
@@ -8307,6 +8313,7 @@ type tripReport struct {
 	Rating       int    `json:"rating"`
 	HappenedAt   int64  `json:"happenedAt"`
 	UpdatedAt    int64  `json:"updatedAt"`
+	Public       bool   `json:"public"`
 }
 
 // tripReports: GET lists the account's reports, newest first. POST saves one
@@ -8318,7 +8325,7 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		rows, err := db.Query(`SELECT id, experience_id, title, substances, setting, body, rating, happened_at, updated_at
+		rows, err := db.Query(`SELECT id, experience_id, title, substances, setting, body, rating, happened_at, updated_at, public
 			FROM trip_reports WHERE user_id = ? ORDER BY happened_at DESC, id DESC LIMIT ?`, session.UserId, maxReports)
 		if err != nil {
 			fmt.Println(err)
@@ -8329,7 +8336,7 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 		items := []tripReport{}
 		for rows.Next() {
 			var t tripReport
-			if rows.Scan(&t.ID, &t.ExperienceID, &t.Title, &t.Substances, &t.Setting, &t.Body, &t.Rating, &t.HappenedAt, &t.UpdatedAt) == nil {
+			if rows.Scan(&t.ID, &t.ExperienceID, &t.Title, &t.Substances, &t.Setting, &t.Body, &t.Rating, &t.HappenedAt, &t.UpdatedAt, &t.Public) == nil {
 				items = append(items, t)
 			}
 		}
@@ -8378,8 +8385,8 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 	}
 	t.UpdatedAt = now
 	if t.ID > 0 {
-		res, err := db.Exec(`UPDATE trip_reports SET experience_id = ?, title = ?, substances = ?, setting = ?, body = ?, rating = ?, happened_at = ?, updated_at = ?
-			WHERE id = ? AND user_id = ?`, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.ID, session.UserId)
+		res, err := db.Exec(`UPDATE trip_reports SET experience_id = ?, title = ?, substances = ?, setting = ?, body = ?, rating = ?, happened_at = ?, updated_at = ?, public = ?
+			WHERE id = ? AND user_id = ?`, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.Public, t.ID, session.UserId)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Couldn't save that report.", http.StatusInternalServerError)
@@ -8396,8 +8403,8 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("You have %d trip reports, the most there can be. Delete an old one first.", maxReports), http.StatusConflict)
 		return
 	}
-	res, err := db.Exec(`INSERT INTO trip_reports (user_id, experience_id, title, substances, setting, body, rating, happened_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, session.UserId, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now)
+	res, err := db.Exec(`INSERT INTO trip_reports (user_id, experience_id, title, substances, setting, body, rating, happened_at, updated_at, public)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, session.UserId, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.Public)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, "Couldn't save that report.", http.StatusInternalServerError)
@@ -8405,6 +8412,70 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 	}
 	t.ID, _ = res.LastInsertId()
 	writeJSON(w, t)
+}
+
+// publicTripReports: GET lists everyone's public trip reports, newest first,
+// with who wrote them. ?before=<happenedAt>_<id> pages back; ?user=<name> keeps
+// one person's. The Graph session link stays private.
+func publicTripReports(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	const page = 30
+	where := "t.public = 1"
+	args := []any{}
+	if b := r.URL.Query().Get("before"); b != "" {
+		parts := strings.SplitN(b, "_", 2)
+		at, _ := strconv.ParseInt(parts[0], 10, 64)
+		var id int64
+		if len(parts) == 2 {
+			id, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+		where += " AND (t.happened_at < ? OR (t.happened_at = ? AND t.id < ?))"
+		args = append(args, at, at, id)
+	}
+	if u := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("user"))); u != "" {
+		where += " AND u.username = ?"
+		args = append(args, u)
+	}
+	args = append(args, page+1)
+	rows, err := db.Query(`SELECT t.id, t.title, t.substances, t.setting, t.body, t.rating, t.happened_at, t.updated_at,
+			u.id, u.originalUsername, u.pathToProfilePic
+		FROM trip_reports t JOIN users u ON u.id = t.user_id
+		WHERE `+where+` ORDER BY t.happened_at DESC, t.id DESC LIMIT ?`, args...)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load the public trip reports.", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type author struct {
+		Name   string `json:"name"`
+		Avatar string `json:"avatar"`
+	}
+	type item struct {
+		tripReport
+		Author author `json:"author"`
+		Mine   bool   `json:"mine"`
+	}
+	items := []item{}
+	for rows.Next() {
+		var it item
+		var uid int
+		if rows.Scan(&it.ID, &it.Title, &it.Substances, &it.Setting, &it.Body, &it.Rating, &it.HappenedAt, &it.UpdatedAt, &uid, &it.Author.Name, &it.Author.Avatar) == nil {
+			it.Public = true
+			it.Mine = uid == session.UserId
+			items = append(items, it)
+		}
+	}
+	more := len(items) > page
+	if more {
+		items = items[:page]
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"items": items, "more": more})
 }
 
 type padNote struct {

@@ -1,0 +1,126 @@
+/* ============================================================
+   notes.css — the Notes page (/Notes): dose notes by substance,
+   trip reports and the notepad. Builds on the .xn-* kit in oled.css.
+   ============================================================ */
+
+.nt { display: flex; flex-direction: column; gap: 18px; max-width: 1080px; }
+.nt-top .xn-sub { margin-top: 6px; }
+
+.nt-seg { display: inline-flex; align-self: flex-start; max-width: 100%; padding: 3px; border: 1px solid var(--oled-line); border-radius: 12px; background: var(--oled-surface-2); overflow-x: auto; scrollbar-width: none; }
+.nt-seg-btn {
+  flex: none; min-height: 38px; padding: 0 16px; border: 0; border-radius: 9px; background: transparent;
+  color: var(--oled-muted); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.nt-seg-btn[aria-selected="true"] { background: var(--oled-accent-soft); color: var(--oled-text); }
+.nt-seg-btn:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+
+.nt-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.nt-bar { display: flex; align-items: center; gap: 10px; }
+.nt-find { flex: 1; min-width: 0; }
+.nt-count { flex: none; font-size: 12px; color: var(--oled-muted); }
+.nt-empty { margin: 0; padding: 28px 16px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; font-size: 13px; line-height: 1.6; color: var(--oled-muted); text-align: center; }
+.nt-empty a { color: var(--oled-accent); }
+.nt .xn-btn svg, .nt-dlg .xn-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.nt-icon-btn { width: 40px; padding: 0; justify-content: center; }
+
+/* By substance */
+.nt-groups { display: flex; flex-direction: column; gap: 14px; }
+.nt-group { padding: 0; overflow: hidden; }
+.nt-group > summary {
+  display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; list-style: none;
+  font-size: 15px; font-weight: 600;
+}
+.nt-group > summary::-webkit-details-marker { display: none; }
+.nt-group > summary::after {
+  content: ""; width: 8px; height: 8px; margin-left: 4px; border-right: 2px solid var(--oled-muted); border-bottom: 2px solid var(--oled-muted);
+  transform: rotate(-45deg); transition: transform 0.15s ease;
+}
+.nt-group[open] > summary::after { transform: rotate(45deg); }
+.nt-group-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.nt-group-count { flex: none; padding: 2px 8px; border-radius: 10px; background: var(--oled-accent-soft); font-size: 11px; font-weight: 500; color: var(--oled-text); }
+.nt-notes { margin: 0; padding: 0 16px 8px; list-style: none; }
+.nt-note { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: 0 12px; padding: 12px 0; border-top: 1px solid var(--oled-line); }
+.nt-note-bar { grid-row: span 2; border-radius: 2px; background: var(--oled-accent); opacity: 0.7; }
+.nt-note-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--oled-muted); }
+.nt-note-meta strong { color: var(--oled-text); font-weight: 500; }
+.nt-note-text { margin: 6px 0 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nt-note mark { background: rgba(var(--xn-accent-rgb), 0.3); color: inherit; border-radius: 2px; }
+
+/* Trip reports */
+.nt-reports { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+.nt-report {
+  display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; cursor: pointer;
+  color: var(--oled-text); font: inherit;
+}
+.nt-report:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+@media (hover: hover) { .nt-report:hover { border-color: var(--oled-accent); } }
+.nt-report-day { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--oled-accent); }
+.nt-report-title { margin: 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.nt-report-subs { font-size: 12px; color: var(--oled-muted); overflow-wrap: anywhere; }
+.nt-report-text { margin: 0; font-size: 13px; line-height: 1.55; color: var(--oled-muted); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.nt-report-stars { color: var(--oled-accent); letter-spacing: 2px; font-size: 13px; }
+
+/* Report dialog */
+.nt-dlg { width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; background: transparent; color: var(--oled-text); }
+.nt-dlg::backdrop { background: rgba(0, 0, 0, 0.72); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.nt-dlg, .nt-dlg * { box-sizing: border-box; }
+.nt-dlg-card { display: flex; flex-direction: column; gap: 12px; margin: 0; max-height: calc(100dvh - 24px); overflow-y: auto; }
+.nt-dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.nt-dlg-head .xn-h2 { margin: 0; }
+.nt-x { width: 36px; height: 36px; border: 1px solid var(--oled-line); border-radius: 8px; background: transparent; color: var(--oled-muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.nt-x:hover { color: var(--oled-text); }
+.nt-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.nt-field .xn-label { margin: 0; }
+.nt-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
+@media (max-width: 520px) { .nt-row { grid-template-columns: 1fr; } }
+.nt-dlg input[type="date"] { color-scheme: dark; }
+.nt-report-text { min-height: 220px; padding: 10px 12px; line-height: 1.6; resize: vertical; }
+.nt-stars { display: flex; gap: 4px; }
+.nt-star { width: 40px; height: 40px; padding: 0; border: 1px solid var(--oled-line); border-radius: 8px; background: transparent; color: var(--oled-line-strong); font-size: 20px; cursor: pointer; }
+.nt-star.is-on { color: var(--oled-accent); border-color: rgba(var(--xn-accent-rgb), 0.4); }
+.nt-star:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.nt-error { margin: 0; padding: 10px 12px; border: 1px solid rgba(248, 113, 113, 0.4); border-radius: 8px; background: rgba(248, 113, 113, 0.08); font-size: 12px; color: #fca5a5; }
+.nt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nt-spacer { flex: 1; }
+
+/* Notepad */
+.nt-pad { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }
+.nt-pad-side { display: flex; flex-direction: column; gap: 10px; position: sticky; top: calc(var(--oled-nav-h) + 12px); }
+.nt-pad-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; max-height: calc(100dvh - var(--oled-nav-h) - 160px); overflow-y: auto; }
+.nt-pad-item {
+  display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px;
+  background: transparent; color: var(--oled-text); font: inherit; text-align: left; cursor: pointer;
+}
+.nt-pad-item:hover { background: var(--oled-surface-2); }
+.nt-pad-item[aria-current="true"] { border-color: var(--oled-line-strong); background: var(--oled-accent-soft); }
+.nt-pad-item strong { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-pad-item strong svg { flex: none; width: 12px; height: 12px; fill: var(--oled-accent); }
+.nt-pad-item span { font-size: 11.5px; color: var(--oled-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-pad-main { display: flex; flex-direction: column; gap: 8px; min-height: 60vh; }
+.nt-pad-head { display: flex; align-items: center; gap: 6px; }
+.nt-back { display: none; align-items: center; gap: 4px; min-height: 36px; padding: 0 6px 0 0; border: 0; background: none; color: var(--oled-accent); font: inherit; font-size: 15px; cursor: pointer; }
+.nt-back svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nt-saved { flex: 1; font-size: 11.5px; color: var(--oled-muted); }
+.nt-tool { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--oled-muted); cursor: pointer; }
+.nt-tool:hover { border-color: var(--oled-line); color: var(--oled-text); }
+.nt-tool[aria-pressed="true"] { color: var(--oled-accent); border-color: rgba(var(--xn-accent-rgb), 0.4); }
+.nt-tool svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nt-del.is-armed { color: #fca5a5; border-color: rgba(248, 113, 113, 0.5); }
+.nt-pad-title { width: 100%; padding: 4px 0; border: 0; background: transparent; color: var(--oled-text); font: inherit; font-size: 22px; font-weight: 700; outline: none; }
+.nt-pad-text {
+  flex: 1; width: 100%; min-height: 50vh; padding: 0; border: 0; background: transparent; color: var(--oled-text);
+  font: inherit; font-size: 15px; line-height: 1.7; resize: none; outline: none; tab-size: 4;
+}
+.nt-pad-text.is-mono { font-family: "JetBrains Mono", "Roboto Mono", ui-monospace, monospace; font-size: 13.5px; }
+.nt-pad-foot { margin: 0; font-size: 11px; color: var(--oled-muted); text-align: right; }
+.nt-pad-main[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .nt-pad { grid-template-columns: minmax(0, 1fr); }
+  .nt-pad-side { position: static; }
+  .nt-pad-list { max-height: none; }
+  .nt-back { display: inline-flex; }
+  /* Phones show the list or the open note, like the iPhone Notes app. */
+  .nt-pad.is-editing .nt-pad-side { display: none; }
+  .nt-pad:not(.is-editing) .nt-pad-main { display: none; }
+}

@@ -44,6 +44,7 @@
     <button type="button" role="tab" class="nt-seg-btn" id="tabDoses" aria-controls="paneDoses" data-tab="doses">By substance</button>
     <button type="button" role="tab" class="nt-seg-btn" id="tabReports" aria-controls="paneReports" data-tab="reports">Trip reports</button>
     <button type="button" role="tab" class="nt-seg-btn" id="tabPad" aria-controls="panePad" data-tab="pad">Notepad</button>
+    <button type="button" role="tab" class="nt-seg-btn" id="tabPublic" aria-controls="panePublic" data-tab="public">Public reports</button>
   </div>
 
   <section class="nt-pane" id="paneDoses" role="tabpanel" aria-labelledby="tabDoses">
@@ -60,6 +61,15 @@
       <button type="button" class="xn-btn xn-btn-primary" id="repNew"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New report</button>
     </div>
     <div class="nt-reports" id="repList" aria-live="polite"><p class="nt-empty">Loading…</p></div>
+  </section>
+
+  <section class="nt-pane" id="panePublic" role="tabpanel" aria-labelledby="tabPublic" hidden>
+    <div class="nt-bar">
+      <label class="nt-find"><span class="xn-sr">Find a public report</span><input class="xn-input" id="pubFind" type="search" placeholder="Find a substance, word or person…" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <p class="nt-hint">Trip reports people chose to share. Anyone with an account can read them.</p>
+    <div class="nt-reports" id="pubList" aria-live="polite"><p class="nt-empty">Loading…</p></div>
+    <button type="button" class="xn-btn nt-more" id="pubMore" hidden>Show older reports</button>
   </section>
 
   <section class="nt-pane" id="panePad" role="tabpanel" aria-labelledby="tabPad" hidden>
@@ -87,6 +97,20 @@
   </section>
 </main>
 
+<dialog class="nt-dlg" id="pubDlg" aria-labelledby="pubTitle">
+  <article class="nt-dlg-card xn-card">
+    <div class="nt-dlg-head">
+      <a class="nt-author" id="pubAuthor" href="#"></a>
+      <button type="button" class="nt-x" id="pubClose" aria-label="Close">×</button>
+    </div>
+    <span class="nt-report-day" id="pubDay"></span>
+    <h2 class="xn-h2 nt-pub-title" id="pubTitle"></h2>
+    <span class="nt-report-stars" id="pubStars"></span>
+    <dl class="nt-pub-facts" id="pubFacts"></dl>
+    <p class="nt-pub-body" id="pubBody"></p>
+  </article>
+</dialog>
+
 <dialog class="nt-dlg" id="repDlg" aria-labelledby="repDlgTitle">
   <form class="nt-dlg-card xn-card" id="repForm">
     <div class="nt-dlg-head">
@@ -104,6 +128,7 @@
       <div class="nt-stars" role="radiogroup" aria-labelledby="rateLabel" id="repStars"></div>
     </div>
     <label class="nt-field"><span class="xn-label">Report</span><textarea class="xn-input nt-report-text" name="body" rows="12" placeholder="The come-up, the peak, the come-down, what you learned…"></textarea></label>
+    <label class="nt-public"><input type="checkbox" name="public"><span><strong>Public</strong><small>Anyone with an account can read it under Public reports, with your name on it. Your Graph session stays private.</small></span></label>
     <p class="nt-error" id="repError" hidden></p>
     <div class="nt-actions">
       <button type="button" class="xn-btn xn-btn-danger" id="repDelete">Delete</button>

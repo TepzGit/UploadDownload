@@ -40,7 +40,7 @@ const ago = (t) => {
 
 // ---------------------------------------------------------------- tabs
 
-const TABS = ["doses", "reports", "pad"];
+const TABS = ["doses", "reports", "pad", "public"];
 const loaded = {};
 
 function showTab(name, { push = true } = {}) {
@@ -53,10 +53,11 @@ function showTab(name, { push = true } = {}) {
   $("paneDoses").hidden = name !== "doses";
   $("paneReports").hidden = name !== "reports";
   $("panePad").hidden = name !== "pad";
+  $("panePublic").hidden = name !== "public";
   if (push) history.replaceState(null, "", name === "doses" ? location.pathname : "#" + name);
   if (!loaded[name]) {
     loaded[name] = true;
-    ({ doses: loadDoses, reports: loadReports, pad: loadPad })[name]();
+    ({ doses: loadDoses, reports: loadReports, pad: loadPad, public: loadPublic })[name]();
   }
 }
 
@@ -238,6 +239,12 @@ function renderReports() {
     title.className = "nt-report-title";
     title.textContent = r.title || "Untitled report";
     card.append(day, title);
+    if (r.public) {
+      const tag = document.createElement("span");
+      tag.className = "nt-tag";
+      tag.textContent = "Public";
+      day.append(tag);
+    }
     if (r.rating) {
       const stars = document.createElement("span");
       stars.className = "nt-report-stars";
@@ -302,6 +309,7 @@ async function openReport(report) {
   form.elements.substances.value = report?.substances || "";
   form.elements.setting.value = report?.setting || "";
   form.elements.body.value = report?.body || "";
+  form.elements.public.checked = Boolean(report?.public);
   rating = report?.rating || 0;
   paintStars();
 
@@ -351,6 +359,7 @@ $("repForm").addEventListener("submit", async (event) => {
     body: form.elements.body.value,
     rating,
     happenedAt: y ? new Date(y, m - 1, d, 12).getTime() : Date.now(),
+    public: form.elements.public.checked,
   };
   $("repSave").disabled = true;
   try {
@@ -358,7 +367,9 @@ $("repForm").addEventListener("submit", async (event) => {
     reports = [saved, ...reports.filter((r) => r.id !== saved.id)].sort((a, b) => b.happenedAt - a.happenedAt || b.id - a.id);
     renderReports();
     closeReport();
-    toast(editing ? "Report saved." : "Report added.");
+    toast(saved.public ? "Report saved. Everyone can read it under Public reports." : editing ? "Report saved." : "Report added.");
+    // The public list shows it (or drops it) the next time it opens.
+    loaded.public = false;
   } catch (error) {
     $("repError").textContent = error.message;
     $("repError").hidden = false;
@@ -384,6 +395,123 @@ $("repDelete").addEventListener("click", async (event) => {
   } catch (error) {
     toast(error.message, true);
   }
+});
+
+// ---------------------------------------------------------------- public reports
+
+let pubItems = [];
+let pubMore = false;
+
+async function loadPublic({ older = false } = {}) {
+  const last = pubItems[pubItems.length - 1];
+  const url = "/notes/reports/public" + (older && last ? `?before=${last.happenedAt}_${last.id}` : "");
+  $("pubMore").disabled = true;
+  try {
+    const data = await api(url);
+    pubItems = older ? [...pubItems, ...(data.items || [])] : data.items || [];
+    pubMore = Boolean(data.more);
+    renderPublic();
+  } catch (error) {
+    $("pubList").innerHTML = '<p class="nt-empty"></p>';
+    $("pubList").firstChild.textContent = error.message;
+  } finally {
+    $("pubMore").disabled = false;
+  }
+}
+
+function authorChip(a) {
+  const span = document.createElement("span");
+  span.className = "nt-author-chip";
+  const img = document.createElement("img");
+  img.alt = "";
+  img.src = a.avatar || "/profiles/Default/default.png";
+  img.loading = "lazy";
+  img.addEventListener("error", () => (img.style.visibility = "hidden"), { once: true });
+  span.append(img, a.name);
+  return span;
+}
+
+function renderPublic() {
+  const box = $("pubList");
+  const q = $("pubFind").value.trim().toLowerCase();
+  box.replaceChildren();
+  $("pubMore").hidden = !pubMore;
+  if (!pubItems.length) {
+    box.innerHTML = '<p class="nt-empty">No public trip reports yet. Turn on Public when you save one of yours and it shows here.</p>';
+    return;
+  }
+  const list = pubItems.filter((r) => !q || [r.title, r.substances, r.setting, r.body, r.author.name].some((v) => (v || "").toLowerCase().includes(q)));
+  if (!list.length) {
+    box.innerHTML = '<p class="nt-empty">Nothing matches that.</p>';
+    return;
+  }
+  list.forEach((r) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "xn-card nt-report";
+    card.dataset.id = String(r.id);
+    const day = document.createElement("span");
+    day.className = "nt-report-day";
+    day.textContent = dayLabel(r.happenedAt);
+    const title = document.createElement("h3");
+    title.className = "nt-report-title";
+    title.textContent = r.title || "Untitled report";
+    card.append(authorChip(r.author), day, title);
+    if (r.rating) {
+      const stars = document.createElement("span");
+      stars.className = "nt-report-stars";
+      stars.textContent = "★".repeat(r.rating) + "☆".repeat(5 - r.rating);
+      stars.setAttribute("aria-label", `${r.rating} of 5`);
+      card.append(stars);
+    }
+    if (r.substances) {
+      const subs = document.createElement("span");
+      subs.className = "nt-report-subs";
+      subs.textContent = r.substances;
+      card.append(subs);
+    }
+    if (r.body) {
+      const text = document.createElement("p");
+      text.className = "nt-report-text";
+      text.textContent = r.body;
+      card.append(text);
+    }
+    box.append(card);
+  });
+}
+$("pubFind").addEventListener("input", renderPublic);
+$("pubMore").addEventListener("click", () => loadPublic({ older: true }));
+$("pubList").addEventListener("click", (event) => {
+  const card = event.target.closest(".nt-report");
+  if (card) openPublic(pubItems.find((r) => r.id === Number(card.dataset.id)));
+});
+
+function openPublic(r) {
+  if (!r) return;
+  const author = $("pubAuthor");
+  author.replaceChildren(authorChip(r.author));
+  author.href = "/u/" + encodeURIComponent(r.author.name);
+  $("pubDay").textContent = dayLabel(r.happenedAt);
+  $("pubTitle").textContent = r.title || "Untitled report";
+  $("pubStars").textContent = r.rating ? "★".repeat(r.rating) + "☆".repeat(5 - r.rating) : "";
+  $("pubStars").hidden = !r.rating;
+  const facts = $("pubFacts");
+  facts.replaceChildren();
+  [["Substances", r.substances], ["Set and setting", r.setting]].forEach(([k, v]) => {
+    if (!v) return;
+    const dt = document.createElement("dt");
+    dt.textContent = k;
+    const dd = document.createElement("dd");
+    dd.textContent = v;
+    facts.append(dt, dd);
+  });
+  $("pubBody").textContent = r.body || "";
+  $("pubDlg").showModal();
+  $("pubClose").focus();
+}
+$("pubClose").addEventListener("click", () => $("pubDlg").close());
+$("pubDlg").addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
 // ---------------------------------------------------------------- notepad
