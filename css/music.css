@@ -100,7 +100,7 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 /* The player bar */
 .mu-player {
   position: fixed; left: 0; right: 0; bottom: calc(var(--xn-tabs-h, 0px) + env(safe-area-inset-bottom)); z-index: 900;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) 150px; align-items: center; gap: 18px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.4fr) 190px; align-items: center; gap: 18px;
   height: var(--mu-player-h); padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
   border-top: 1px solid var(--oled-line); background: rgba(10, 10, 12, 0.92);
   -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
@@ -250,3 +250,39 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 .mu-edit-pic-btns .mu-hint { margin: 0; }
 .mu-btn-quiet { border-color: transparent; background: transparent; }
 @media (max-width: 420px) { .mu-edit-pic { flex-direction: column; align-items: flex-start; } }
+
+/* Visualizer (js/musicviz.js) */
+.mu-viz-btn { width: 34px; height: 34px; flex: none; }
+.mv { position: fixed; inset: 0; z-index: 1180; overflow: hidden; background: #000; color: #fff; }
+.mv[hidden] { display: none; }
+.mv-backdrop { position: absolute; inset: -10%; background: center / cover no-repeat; filter: blur(60px) saturate(1.6); opacity: 0.28; transform: scale(1.1); }
+.mv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; mix-blend-mode: screen; cursor: pointer; }
+.mv-ui { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: 0 max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left)); transition: opacity 0.4s ease; z-index: 1; }
+.mv.is-idle .mv-ui { opacity: 0; pointer-events: none; }
+.mv.is-idle { cursor: none; }
+.mv-top { top: max(14px, env(safe-area-inset-top)); justify-content: space-between; }
+.mv-bottom { bottom: max(22px, env(safe-area-inset-bottom)); flex-direction: column; gap: 14px; }
+.mv-btn { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.mv-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mv-btn .mv-fill { fill: currentColor; stroke: none; }
+.mv-btn:focus-visible, .mv-mode:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.mv-play { width: 62px; height: 62px; border: 0; background: #fff; color: #000; }
+.mv-play svg { width: 26px; height: 26px; }
+.mv-i-pause, .mv.is-playing .mv-i-play { display: none; }
+.mv.is-playing .mv-i-pause { display: block; }
+.mv-controls { display: flex; align-items: center; gap: 22px; }
+.mv-modes { display: flex; gap: 4px; padding: 4px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.mv-mode { min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 255, 255, 0.7); font: inherit; font-size: 12.5px; cursor: pointer; }
+.mv-mode[aria-pressed="true"] { background: rgba(var(--xn-accent-rgb), 0.85); color: #fff; }
+.mv-text { display: grid; gap: 4px; max-width: min(640px, 90vw); text-align: center; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8); }
+.mv-text strong { font-size: clamp(18px, 3vw, 28px); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv-text span { font-size: 14px; color: rgba(255, 255, 255, 0.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: 15px; color: rgba(255, 255, 255, 0.6); pointer-events: none; }
+
+/* Other pages open in a frame above the player while music plays (js/musicshell.js). */
+.mu-shell { position: fixed; inset: 0; z-index: 880; background: #000; }
+.mu-shell[hidden] { display: none; }
+.mu-shell iframe { display: block; width: 100%; height: calc(100% - var(--mu-player-h) - env(safe-area-inset-bottom)); border: 0; }
+html.mu-shell-open body { overflow: hidden; }
+html.mu-shell-open .xn-tabs { display: none; }
+html.mu-shell-open .mu-player { left: 0; bottom: env(safe-area-inset-bottom); }

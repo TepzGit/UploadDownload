@@ -12,6 +12,25 @@
   const LOCAL_SERVER = /(?:^|;\s*)xn_local=1(?:;|$)/.test(document.cookie);
   if (LOCAL_SERVER) document.documentElement.classList.add("xn-desk");
 
+  // Inside the Music page's frame (js/musicshell.js) the song keeps playing in
+  // the page around us, so the Music link just closes the frame.
+  const MUSIC_SHELL = (() => {
+    try { return window.parent !== window && window.parent.xnMusicShell ? window.parent.xnMusicShell : null; } catch { return null; }
+  })();
+  if (MUSIC_SHELL) {
+    document.documentElement.classList.add("xn-in-music");
+    document.addEventListener("click", (event) => {
+      const a = event.target.closest?.("a[href]");
+      if (!a || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      let url;
+      try { url = new URL(a.href, location.href); } catch { return; }
+      if (url.origin === location.origin && /^\/music\/?$/i.test(url.pathname)) {
+        event.preventDefault();
+        MUSIC_SHELL.close();
+      }
+    }, true);
+  }
+
   // Safari's page-to-page transitions can leave the new page blank (the
   // Admin page on iPhones did), so Safari changes pages without them.
   const UA = navigator.userAgent;
