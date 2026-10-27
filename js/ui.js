@@ -1266,19 +1266,19 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 function experienceSpark(preview, colors) {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "exp-spark");
-  svg.setAttribute("viewBox", "0 0 100 34");
+  svg.setAttribute("viewBox", "0 0 100 68");
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("aria-hidden", "true");
   const base = document.createElementNS(SVG_NS, "line");
   base.setAttribute("x1", "0");
   base.setAttribute("x2", "100");
-  base.setAttribute("y1", "33");
-  base.setAttribute("y2", "33");
+  base.setAttribute("y1", "66");
+  base.setAttribute("y2", "66");
   svg.appendChild(base);
   preview.series.forEach((item, index) => {
     const step = 100 / (item.y.length - 1);
     const d = item.y
-      .map((value, i) => `${i ? "L" : "M"}${(i * step).toFixed(2)} ${(33 - (value / preview.peak) * 30).toFixed(2)}`)
+      .map((value, i) => `${i ? "L" : "M"}${(i * step).toFixed(2)} ${(66 - (value / preview.peak) * 60).toFixed(2)}`)
       .join("");
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("d", d);

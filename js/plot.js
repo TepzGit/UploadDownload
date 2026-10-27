@@ -45,7 +45,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
   // day suffix except at midnight, and some are blanked out when there
   // isn't room for all of them.
   const tickValues = timeline.tickValues;
-  const plotWidth = Math.max(200, (container?.clientWidth || window.innerWidth) - (narrow ? 44 : 70));
+  const plotWidth = Math.max(200, (container?.clientWidth || window.innerWidth) - (narrow ? 72 : 100));
   const maxLabels = Math.max(2, Math.floor(plotWidth / (narrow ? 27 : 36)));
   const labelEvery = Math.max(1, Math.ceil(tickValues.length / maxLabels));
   const tickText = timeline.tickText.map((text, index) => {
@@ -55,6 +55,10 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     return time.slice(0, 2);
   });
   const last = timeline.x[timeline.x.length - 1];
+  // Headroom above the highest point so the thick line's top isn't clipped.
+  const top = Math.max(100, ...timeline.series.flatMap((series) => series.y.filter(Number.isFinite)));
+  const yTop = top * 1.08;
+  const yStep = top > 300 ? 100 : top > 150 ? 50 : 25;
 
   const traces = timeline.series.map((series) => ({
     x: timeline.x,
@@ -64,7 +68,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     type: "scatter",
     hovertext: timeline.hoverTimes,
     hovertemplate: `${series.name}<br>Time: %{hovertext}<br>Relative intensity: %{y:.0f}%<extra></extra>`,
-    line: { color: series.color, width: narrow ? 3.5 : 4, shape: "spline", smoothing: 0.35 },
+    line: { color: series.color, width: narrow ? 5 : 6, shape: "spline", smoothing: 0.35 },
     fill: "tozeroy",
     fillcolor: hexToRgba(series.color, timeline.series.length > 1 ? 0.16 : 0.3),
   }));
@@ -98,7 +102,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
   };
 
   const layout = {
-    margin: narrow ? { t: 30, r: 12, b: 30, l: 12 } : { t: 34, r: 18, b: 34, l: 18 },
+    margin: narrow ? { t: 30, r: 12, b: 30, l: 40 } : { t: 34, r: 18, b: 34, l: 48 },
     autosize: true,
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
@@ -107,12 +111,20 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     hoverlabel: { bgcolor: "#000000", bordercolor: "#2f2a3a", font: { color: "#f5f3fa" } },
     xaxis: { ...hourAxis, showgrid: true, gridcolor: "rgba(255,255,255,0.05)" },
     xaxis2: { ...hourAxis, overlaying: "x", side: "top", anchor: "y" },
+    // Intensity in percent of one common dose, labelled on the left.
     yaxis: {
-      rangemode: "tozero",
-      showticklabels: false,
-      showgrid: false,
+      range: [0, yTop],
+      tickmode: "linear",
+      tick0: 0,
+      dtick: yStep,
+      ticksuffix: "%",
+      showticklabels: true,
+      tickfont: { color: "#9c96aa", size: narrow ? 10 : 11 },
+      showgrid: true,
+      gridcolor: "rgba(255,255,255,0.05)",
       zeroline: false,
       fixedrange: true,
+      automargin: true,
     },
     showlegend: multi,
     legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: "#f5f3fa" }, bgcolor: "rgba(0,0,0,0)" },

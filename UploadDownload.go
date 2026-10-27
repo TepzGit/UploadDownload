@@ -7888,7 +7888,10 @@ func musicStoreImport(id int64, pl spotifyList, keep bool) error {
 			return err
 		}
 	}
-	if pl.Image != "" {
+	var current string
+	db.QueryRow("SELECT image FROM music_playlists WHERE id = ?", id).Scan(&current)
+	// A picture the owner uploaded ("u" versions) wins over Spotify's cover.
+	if pl.Image != "" && !strings.HasPrefix(current, "u") {
 		if saved := musicSaveCover(id, pl.Image); saved != "" {
 			tx.Exec("UPDATE music_playlists SET image = ? WHERE id = ?", saved, id)
 		}
@@ -8141,16 +8144,71 @@ func musicArt(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// musicCover: GET /music/cover/<playlist id> sends an imported playlist's cover.
+// musicCover: GET /music/cover/<playlist id> sends a playlist's picture.
+// The owner can POST multipart with an "image" file (JPG, PNG, GIF or WebP)
+// or remove=1; it answers {"image": "<new link or empty>"}.
 func musicCover(w http.ResponseWriter, r *http.Request) {
 	s, _ := sessionFromRequest(r)
 	id, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/music/cover/"), 10, 64)
-	if musicPlaylistRole(id, s.UserId) == "" {
+	role := musicPlaylistRole(id, s.UserId)
+	if role == "" {
 		http.NotFound(w, r)
 		return
 	}
+	file := filepath.Join(musicCacheDir, "covers", fmt.Sprintf("%d.jpg", id))
+	if r.Method == http.MethodPost {
+		if role != "owner" {
+			http.Error(w, "Only the playlist's owner can change its picture.", http.StatusForbidden)
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 12<<20)
+		if err := r.ParseMultipartForm(12 << 20); err != nil {
+			http.Error(w, "The picture is too big. Use one under 10 MB.", http.StatusRequestEntityTooLarge)
+			return
+		}
+		version := ""
+		if r.FormValue("remove") != "1" {
+			upload, _, err := r.FormFile("image")
+			if err != nil {
+				http.Error(w, "Choose a picture.", http.StatusBadRequest)
+				return
+			}
+			data, err := io.ReadAll(io.LimitReader(upload, 10<<20+1))
+			upload.Close()
+			if err != nil || len(data) > 10<<20 {
+				http.Error(w, "The picture is too big. Use one under 10 MB.", http.StatusRequestEntityTooLarge)
+				return
+			}
+			switch http.DetectContentType(data) {
+			case "image/jpeg", "image/png", "image/gif", "image/webp":
+			default:
+				http.Error(w, "Use a JPG, PNG, GIF or WebP picture.", http.StatusUnsupportedMediaType)
+				return
+			}
+			os.MkdirAll(filepath.Dir(file), 0755)
+			if err := os.WriteFile(file, data, 0644); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
+				return
+			}
+			sum := sha256.Sum256(data)
+			version = "u" + hex.EncodeToString(sum[:4])
+		} else {
+			os.Remove(file)
+		}
+		db.Exec("UPDATE music_playlists SET image = ?, updated_at = ? WHERE id = ?", version, time.Now().UnixMilli(), id)
+		writeJSON(w, map[string]any{"image": playlistCover(id, version)})
+		return
+	}
+	// The file is named .jpg but may hold any of the picture types above.
+	if f, err := os.Open(file); err == nil {
+		head := make([]byte, 512)
+		n, _ := io.ReadFull(f, head)
+		f.Close()
+		w.Header().Set("Content-Type", http.DetectContentType(head[:n]))
+	}
 	w.Header().Set("Cache-Control", "private, max-age=86400")
-	http.ServeFile(w, r, filepath.Join(musicCacheDir, "covers", fmt.Sprintf("%d.jpg", id)))
+	http.ServeFile(w, r, file)
 }
 
 // musicOffline: GET /music/offline?playlists=1,2 lists the songs the phone

@@ -161,13 +161,13 @@ async function wikiSuggestions(name) {
 // PsychonautWiki and is kept in localStorage so lists don't refetch it.
 // ------------------------------------------------------------
 
-const CLASS_KEY = "gp-classes-2"; // -2: opioid and empathogen icons were added
+const CLASS_KEY = "gp-classes-3"; // -3: per-drug icons (blotter, bar, leaf...)
 let classCache = null;
 const classRequests = new Map();
 
 function readClassCache() {
   if (classCache) return classCache;
-  try { classCache = JSON.parse(localStorage.getItem(CLASS_KEY)) || {}; localStorage.removeItem("gp-classes"); } catch { classCache = {}; }
+  try { classCache = JSON.parse(localStorage.getItem(CLASS_KEY)) || {}; localStorage.removeItem("gp-classes"); localStorage.removeItem("gp-classes-2"); } catch { classCache = {}; }
   return classCache;
 }
 

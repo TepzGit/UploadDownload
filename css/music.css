@@ -234,3 +234,19 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 .mu-modal, .mu-modal *, .mu-modal *::before, .mu-modal *::after,
 .mu-player, .mu-player *, .mu-player *::before, .mu-player *::after,
 .mu-now, .mu-now *, .mu-now *::before, .mu-now *::after { box-sizing: border-box; }
+
+/* Playlist picture: the owner taps the cover, or Edit, to change it. */
+.mu-art.is-editable { position: relative; }
+.mu-art-edit {
+  position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 36px; height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; background: rgba(0, 0, 0, 0.65); color: #fff; cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.mu-art-edit svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mu-art-edit:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.mu-edit-pic { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.mu-edit-art { width: 104px; height: 104px; flex: none; }
+.mu-edit-pic-btns { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.mu-edit-pic-btns .mu-hint { margin: 0; }
+.mu-btn-quiet { border-color: transparent; background: transparent; }
+@media (max-width: 420px) { .mu-edit-pic { flex-direction: column; align-items: flex-start; } }

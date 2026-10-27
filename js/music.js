@@ -56,6 +56,7 @@ const ICONS = {
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M12 8v6M9.5 11.5 12 14l2.5-2.5"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   trash: '<path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   back: '<path d="m15 6-6 6 6 6"/>',
   library: '<path d="M4 4v16M8.5 4v16M13 4.5l5.5 15"/>',
@@ -319,6 +320,17 @@ function renderPlaylist() {
     img.addEventListener("error", () => img.replaceWith(icon(ICONS.note)));
     cover.append(img);
   } else cover.append(icon(ICONS.note));
+  if (data.mine) {
+    // The owner taps the cover to change the picture.
+    const pick = el("button", "mu-art-edit");
+    pick.type = "button";
+    pick.title = "Change picture";
+    pick.setAttribute("aria-label", "Change the playlist's picture");
+    pick.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.image}</svg>`;
+    pick.addEventListener("click", () => editPlaylist(p, firstArt));
+    cover.classList.add("is-editable");
+    cover.append(pick);
+  }
   const text = el("div", "mu-head-text");
   text.append(el("p", "xn-eyebrow", p.source === "spotify" ? "Playlist from Spotify" : "Playlist"), el("h2", "xn-h1 mu-title", p.name));
   const total = data.songs.reduce((s, x) => s + (x.track?.duration || x.durationMs / 1000 || 0), 0);
@@ -353,7 +365,7 @@ function renderPlaylist() {
   if (data.mine) {
     actions.append(button("Share", ICONS.share, () => sharePlaylist(data)));
     if (data.spotify) actions.append(button("Update from Spotify", ICONS.sync, () => resync(p), "mu-btn-icon-only"));
-    actions.append(button("Rename", ICONS.edit, () => renamePlaylist(p), "mu-btn-icon-only"));
+    actions.append(button("Edit", ICONS.edit, () => editPlaylist(p, firstArt)));
     actions.append(button("Delete", ICONS.trash, () => deletePlaylist(p), "mu-btn-icon-only xn-btn-danger"));
   }
   view.append(actions);
@@ -639,14 +651,72 @@ function importPlaylist() {
   }));
 }
 
-function renamePlaylist(p) {
+/** Change a playlist's name and picture. */
+function editPlaylist(p, firstArt) {
   const name = el("input", "xn-input");
   name.maxLength = 100;
   name.value = p.name;
+
+  let file = null;
+  let remove = false;
+  const preview = el("span", "mu-art mu-edit-art");
+  const showPreview = () => {
+    preview.replaceChildren();
+    let src = "";
+    if (file) src = URL.createObjectURL(file);
+    else if (p.image && !remove) src = p.image;
+    else if (firstArt) src = `/music/art/${firstArt.id}?v=${firstArt.v}`;
+    if (src) {
+      const img = el("img");
+      img.alt = "";
+      img.src = src;
+      img.addEventListener("error", () => img.replaceWith(icon(ICONS.note)));
+      preview.append(img);
+    } else preview.append(icon(ICONS.note));
+    clear.hidden = !(file || (p.image && !remove));
+  };
+  const input = el("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/gif,image/webp";
+  input.hidden = true;
+  input.addEventListener("change", () => {
+    const chosen = input.files[0];
+    input.value = "";
+    if (!chosen) return;
+    if (chosen.size > 10 * 1024 * 1024) return modalError("That picture is too big. Use one under 10 MB.");
+    file = chosen;
+    remove = false;
+    $("muModalError").hidden = true;
+    showPreview();
+  });
+  const choose = button("Choose picture", ICONS.image, () => input.click());
+  const clear = button("Remove picture", ICONS.trash, () => {
+    file = null;
+    remove = true;
+    showPreview();
+  }, "mu-btn-quiet");
+  const picBox = el("div", "mu-edit-pic");
+  const picButtons = el("div", "mu-edit-pic-btns");
+  picButtons.append(choose, clear, el("span", "mu-hint", "JPG, PNG, GIF or WebP, up to 10 MB. Square looks best."));
+  picBox.append(preview, picButtons, input);
+  showPreview();
+
   const save = submitButton("Save");
-  openModal("Rename playlist", [field("Name", name)], [save, cancelButton()], () => busy(save, async () => {
+  openModal("Edit playlist", [field("Name", name), picBox], [save, cancelButton()], () => busy(save, async () => {
     if (!name.value.trim()) throw new Error("Give the playlist a name.");
-    await api("/music/playlists", { action: "rename", id: p.id, name: name.value });
+    if (name.value.trim() !== p.name) await api("/music/playlists", { action: "rename", id: p.id, name: name.value });
+    if (file || remove) {
+      const form = new FormData();
+      if (file) form.append("image", file);
+      else form.append("remove", "1");
+      let res;
+      try {
+        res = await fetch(`/music/cover/${p.id}`, { method: "POST", body: form });
+      } catch {
+        throw new Error(navigator.onLine === false ? "You're offline." : "Couldn't reach the server. Try again.");
+      }
+      if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save the picture. Try again.");
+    }
     closeModal();
     await loadLists();
     openPlaylist(p.id, { quiet: true });
