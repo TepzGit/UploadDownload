@@ -22,6 +22,10 @@ func desktopAlert(msg string) {
 // the program was moved.
 func desktopShortcut() {
 	exe, err := os.Executable()
+	// Started by the Electron window: the shortcut opens that instead.
+	if shell := os.Getenv("GEEK4U_SHELL"); shell != "" {
+		exe = shell
+	}
 	if err != nil || os.Getenv("APPDATA") == "" {
 		return
 	}

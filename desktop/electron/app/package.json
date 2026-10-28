@@ -1,0 +1,7 @@
+{
+  "name": "geek4u",
+  "productName": "Geek4u",
+  "version": "1.0.0",
+  "description": "Geek4u desktop app",
+  "main": "main.js"
+}

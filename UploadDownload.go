@@ -6892,42 +6892,50 @@ var musicMu sync.Mutex // guards the scan state below
 var musicScanning bool
 var musicScannedAt time.Time
 
-var ffOnce sync.Once
+var ffMu sync.Mutex
+var ffCheckedAt time.Time
 var ffmpegBin, ffprobeBin string
 
-// ffmpegPath is ffmpeg's location, "" when it isn't installed (PATH, or next to the server).
+// ffmpegPath is ffmpeg's location, "" when it isn't installed (PATH, the
+// usual install folders, or next to the server). While it's missing it looks
+// again every 30 seconds, so installing it needs no restart.
 func ffmpegPath() string {
-	ffOnce.Do(func() {
-		exeDir := ""
-		if exe, err := os.Executable(); err == nil {
-			exeDir = filepath.Dir(exe)
+	ffMu.Lock()
+	defer ffMu.Unlock()
+	if ffmpegBin != "" || time.Since(ffCheckedAt) < 30*time.Second {
+		return ffmpegBin
+	}
+	first := ffCheckedAt.IsZero()
+	ffCheckedAt = time.Now()
+	home, _ := os.UserHomeDir()
+	dirs := []string{"ffmpeg/bin", "ffmpeg", "LinkTools", "/usr/bin", "/usr/local/bin", "/snap/bin", "/opt/ffmpeg/bin", "/opt/homebrew/bin"}
+	if home != "" {
+		dirs = append(dirs, filepath.Join(home, "bin"), filepath.Join(home, ".local", "bin"), filepath.Join(home, "ffmpeg", "bin"), filepath.Join(home, "ffmpeg"))
+	}
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		dirs = append([]string{exeDir, filepath.Join(exeDir, "ffmpeg", "bin")}, dirs...)
+	}
+	find := func(name string) string {
+		if p, err := exec.LookPath(name); err == nil {
+			return p
 		}
-		find := func(name string) string {
-			if p, err := exec.LookPath(name); err == nil {
-				return p
-			}
-			candidates := []string{name, name + ".exe", filepath.Join("ffmpeg", "bin", name+".exe"), filepath.Join("ffmpeg", "bin", name)}
-			if exeDir != "" {
-				candidates = append([]string{
-					filepath.Join(exeDir, name),
-					filepath.Join(exeDir, name+".exe"),
-					filepath.Join(exeDir, "ffmpeg", "bin", name+".exe"),
-					filepath.Join(exeDir, "ffmpeg", "bin", name),
-				}, candidates...)
-			}
-			for _, cand := range candidates {
+		for _, dir := range append([]string{"."}, dirs...) {
+			for _, cand := range []string{filepath.Join(dir, name), filepath.Join(dir, name+".exe")} {
 				if st, err := os.Stat(cand); err == nil && !st.IsDir() {
 					abs, _ := filepath.Abs(cand)
 					return abs
 				}
 			}
-			return ""
 		}
-		ffmpegBin, ffprobeBin = find("ffmpeg"), find("ffprobe")
-		if ffmpegBin == "" {
-			fmt.Println("Music: ffmpeg not found, so ogg/opus/wma files won't play and covers come only from cover.jpg files.")
-		}
-	})
+		return ""
+	}
+	ffmpegBin, ffprobeBin = find("ffmpeg"), find("ffprobe")
+	if ffmpegBin != "" {
+		fmt.Println("FFmpeg found:", ffmpegBin)
+	} else if first {
+		fmt.Println("Music: ffmpeg not found, so ogg/opus/wma files won't play and covers come only from cover.jpg files.")
+	}
 	return ffmpegBin
 }
 
@@ -9509,7 +9517,7 @@ func uploadLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if ffmpegPath() == "" {
-		http.Error(w, "FFmpeg isn't installed on the server. Put ffmpeg.exe in an ffmpeg\\bin folder next to the server, or on PATH, and restart it.", http.StatusServiceUnavailable)
+		http.Error(w, "The server can't find FFmpeg. Install it (on Linux: sudo apt install ffmpeg), or put the ffmpeg program in an ffmpeg/bin folder next to the server. It's picked up within a minute, no restart needed.", http.StatusServiceUnavailable)
 		return
 	}
 	u, err := url.Parse(strings.TrimSpace(in.URL))

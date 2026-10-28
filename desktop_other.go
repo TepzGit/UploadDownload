@@ -39,6 +39,10 @@ func desktopShortcut() {
 		return
 	}
 	exe, err := os.Executable()
+	// Started by the Electron window: the shortcut opens that instead.
+	if shell := os.Getenv("GEEK4U_SHELL"); shell != "" {
+		exe = shell
+	}
 	home, herr := os.UserHomeDir()
 	if err != nil || herr != nil {
 		return

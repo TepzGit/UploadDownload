@@ -100,7 +100,7 @@
       const data = await api();
       render(data.jobs || []);
       if (!data.ffmpeg) {
-        showNote("FFmpeg isn't installed on the server yet, so link downloads won't work. Put ffmpeg.exe in an ffmpeg\\bin folder next to the server and restart it.", true);
+        showNote("The server can't find FFmpeg yet, so link downloads won't work. Once it's installed (on Linux: sudo apt install ffmpeg) it's picked up within a minute; reload this page then.", true);
         go.disabled = true;
       } else if (note.dataset.intro !== "1") {
         note.dataset.intro = "1";
