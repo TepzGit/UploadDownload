@@ -41,19 +41,41 @@ function dataArgs() {
 function startEngine() {
   return new Promise((resolve, reject) => {
     const args = ["--no-window", ...dataArgs(), ...process.argv.slice(app.isPackaged ? 1 : 2).filter((a) => a.startsWith("--") && a !== "--no-window")];
-    engine = spawn(enginePath(), args, { cwd: path.dirname(enginePath()), windowsHide: true, env: { ...process.env, GEEK4U_SHELL: process.execPath } });
+    // The engine writes its address to this file (and prints it too).
+    const addrFile = path.join(app.getPath("temp"), "geek4u-addr-" + process.pid + ".txt");
+    try { fs.unlinkSync(addrFile); } catch {}
+    engine = spawn(enginePath(), args, { cwd: path.dirname(enginePath()), windowsHide: true, env: { ...process.env, GEEK4U_SHELL: process.execPath, GEEK4U_ADDR_FILE: addrFile } });
     let out = "";
+    let done = false;
+    const found = (url) => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      try { fs.unlinkSync(addrFile); } catch {}
+      resolve(url);
+    };
+    const fromFile = () => {
+      try {
+        const url = fs.readFileSync(addrFile, "utf8").trim();
+        if (/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) found(url);
+      } catch {}
+    };
+    const poll = setInterval(fromFile, 150);
     const look = (chunk) => {
       out += chunk.toString();
       const m = out.match(/(?:is running|is already running) at (http:\/\/127\.0\.0\.1:\d+)/);
-      if (m) resolve(m[1]);
+      if (m) found(m[1]);
     };
     engine.stdout.on("data", look);
     engine.stderr.on("data", look);
-    engine.on("error", reject);
+    engine.on("error", (err) => { clearInterval(poll); reject(err); });
     engine.on("exit", (code) => {
       engine = null;
-      if (!siteURL) reject(new Error("The Geek4u engine stopped (" + code + "):\n" + out.slice(-800)));
+      // "Already running" ends the engine at once; the address is in the file.
+      fromFile();
+      if (done) return;
+      clearInterval(poll);
+      reject(new Error("The Geek4u engine stopped (" + code + "):\n" + (out.slice(-800) || "no output, see geek4u.log in the data folder")));
     });
     setTimeout(() => reject(new Error("The Geek4u engine didn't start in time.\n" + out.slice(-800))), 60000);
   });
@@ -93,6 +115,8 @@ async function start() {
   const wc = view.webContents;
   const nav = () => send("nav", { back: wc.navigationHistory.canGoBack(), forward: wc.navigationHistory.canGoForward() });
   wc.on("page-title-updated", (_e, title) => { send("title", title); win?.setTitle(title); });
+  // The title bar already has the logo, so the site's own nav logo is hidden here.
+  wc.on("dom-ready", () => wc.insertCSS(".xn > .xn-brand { display: none !important; }").catch(() => {}));
   wc.on("did-navigate", nav);
   wc.on("did-navigate-in-page", nav);
   wc.on("did-start-loading", () => send("loading", true));

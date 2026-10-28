@@ -324,3 +324,14 @@
 .mv-go-in { color: var(--oled-muted); font-size: 18px; }
 .mv-empty { margin: auto; padding: 16px; text-align: center; }
 .mv-go:disabled { opacity: 0.5; cursor: default; }
+
+/* The open folder's own picture, left of the title */
+.fx-headicon { display: flex; align-items: center; justify-content: center; flex: none; align-self: center; width: 88px; height: 88px; overflow: hidden; border: 1px solid rgba(var(--xn-accent-rgb), 0.3); border-radius: 2px; background: var(--oled-accent-soft); }
+.fx-headicon img { width: 100%; height: 100%; object-fit: cover; }
+.fx-heademoji { font-size: 48px; line-height: 1; }
+.fx-headicon + .fx-titles { flex: 1 1 200px; }
+@media (max-width: 640px) {
+  .fx-headicon { width: 64px; height: 64px; }
+  .fx-heademoji { font-size: 34px; }
+  .fx-headicon + .fx-titles { flex-basis: 0; }
+}

@@ -1696,7 +1696,8 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			BackPath string
 			CanEdit  bool
 			IsAdmin  bool
-		}{CanEdit: grant.canChangeIn(rel), IsAdmin: session.Authority == "admin"}
+			Icon     folderIcon // this folder's own picture, shown in the header
+		}{CanEdit: grant.canChangeIn(rel), IsAdmin: session.Authority == "admin", Icon: folderIconFor(rel)}
 		if path == "/Files" {
 			d.IsRoot = true
 		} else {

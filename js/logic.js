@@ -693,8 +693,11 @@ export function computeTimeline() {
   // One grid line per hour; only very long timelines (over 2 days) step wider.
   const span = maximum - minimum;
   const tickStep = span <= 48 ? 1 : Math.ceil(span / 24);
+  // Hours run well past both ends so the clock labels and grid still show
+  // when the Graph is zoomed out beyond the doses.
+  const extra = Math.ceil(Math.max(8, span * 3) / tickStep) * tickStep;
   const tickValues = [];
-  for (let hour = minimum; hour <= maximum; hour += tickStep) tickValues.push(hour);
+  for (let hour = minimum - extra; hour <= maximum + extra; hour += tickStep) tickValues.push(hour);
 
   return {
     x: allX,

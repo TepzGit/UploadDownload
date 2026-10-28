@@ -753,6 +753,11 @@ function bindEvents() {
       openDoseEditor(Number(edit.dataset.editDose));
       return;
     }
+    const noteBtn = event.target.closest("[data-note-dose]");
+    if (noteBtn) {
+      openDoseEditor(Number(noteBtn.dataset.noteDose), true);
+      return;
+    }
     const cancel = event.target.closest("[data-edit-cancel]");
     if (cancel) {
       const id = Number(cancel.dataset.editCancel);
@@ -1817,6 +1822,14 @@ function renderDoseList() {
     edit.title = "Edit, or write how it felt";
     edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/></svg>';
 
+    const note = document.createElement("button");
+    note.type = "button";
+    note.className = "remove-dose edit-dose note-dose" + (dose.note ? " has-note" : "");
+    note.dataset.noteDose = String(dose.id);
+    note.setAttribute("aria-label", `${dose.note ? "Change the note" : "Write a note"} for ${dose.substance} dose at ${dose.time}`);
+    note.title = dose.note ? "Change your note" : "Write a note about how it felt";
+    note.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h5"/></svg>';
+
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "remove-dose";
@@ -1825,13 +1838,13 @@ function renderDoseList() {
     remove.textContent = "×";
 
     card.dataset.doseId = String(dose.id);
-    card.append(time, details, edit, remove);
+    card.append(time, details, edit, note, remove);
     els.doseList.appendChild(card);
   });
 }
 
 /** Swaps a dose card for a small form to change its amount and time. */
-function openDoseEditor(id) {
+function openDoseEditor(id, toNote = false) {
   const dose = logic.getState().addedDoses.find((item) => item.id === id);
   const card = els.doseList.querySelector(`[data-dose-id="${id}"]`);
   if (!dose || !card) return;
@@ -1860,9 +1873,15 @@ function openDoseEditor(id) {
   form.querySelector("[name=note]").value = dose.note || "";
   form.querySelector(".dose-edit-save").style.background = dose.color;
   fresh.replaceWith(form);
-  const amount = form.querySelector("[name=amount]");
-  amount.focus({ preventScroll: true });
-  amount.select();
+  if (toNote) {
+    const text = form.querySelector("[name=note]");
+    text.focus({ preventScroll: true });
+    text.setSelectionRange(text.value.length, text.value.length);
+  } else {
+    const amount = form.querySelector("[name=amount]");
+    amount.focus({ preventScroll: true });
+    amount.select();
+  }
   form.scrollIntoView({ block: "nearest" });
 }
 

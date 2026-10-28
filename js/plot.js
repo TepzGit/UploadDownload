@@ -216,7 +216,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     doubleClick: tools ? "reset" : false,
   });
   hasPlot = true;
-  if (tools) setupTools(container, full, timeline, plotWidth, narrow);
+  if (tools) setupTools(container, full, timeline, plotWidth, narrow, [yBottom, yTop], yStep);
 }
 
 /** Hour labels (like a clock: 12 13 14 ... 00), thinned out to fit the visible range. */
@@ -241,9 +241,11 @@ const TOOL_ICONS = {
   save: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
 };
 
-function setupTools(container, full, timeline, plotWidth, narrow) {
+function setupTools(container, full, timeline, plotWidth, narrow, yFull, yStep) {
   const state = container._xnTools || (container._xnTools = {});
   state.full = full;
+  state.yFull = yFull;
+  state.yStep = yStep;
   state.timeline = timeline;
   state.plotWidth = plotWidth;
   state.narrow = narrow;
@@ -289,8 +291,17 @@ function setupTools(container, full, timeline, plotWidth, narrow) {
   state.bar.hidden = false;
 }
 
+// Past the whole graph the curve shrinks in height too, so zooming out
+// leaves room around it on every side.
 function setRange(container, range) {
-  window.Plotly.relayout(container, { "xaxis.range": range });
+  const state = container._xnTools;
+  const update = { "xaxis.range": range };
+  if (state?.yFull) {
+    const z = Math.max(1, (range[1] - range[0]) / (state.full[1] - state.full[0]));
+    update["yaxis.range"] = [state.yFull[0] * z, state.yFull[1] * z];
+    update["yaxis.dtick"] = state.yStep * Math.ceil(z);
+  }
+  window.Plotly.relayout(container, update);
 }
 
 function zoomBy(container, factor) {
@@ -298,9 +309,14 @@ function zoomBy(container, factor) {
   const [a, b] = container._fullLayout?.xaxis?.range || state.full;
   const center = (a + b) / 2;
   const fullSpan = state.full[1] - state.full[0];
-  const half = Math.min(fullSpan / 2, Math.max(0.25, ((b - a) / 2) * factor));
+  // Up to 4x the whole graph when zooming out.
+  const half = Math.min(fullSpan * 2, Math.max(0.25, ((b - a) / 2) * factor));
+  if (half >= fullSpan / 2) {
+    // Wider than the graph: keep it in the middle.
+    const mid = (state.full[0] + state.full[1]) / 2;
+    return setRange(container, [mid - half, mid + half]);
+  }
   let lo = center - half, hi = center + half;
-  // Stay inside the graph when zooming out.
   if (lo < state.full[0]) { hi += state.full[0] - lo; lo = state.full[0]; }
   if (hi > state.full[1]) { lo -= hi - state.full[1]; hi = state.full[1]; }
   setRange(container, [Math.max(state.full[0], lo), Math.min(state.full[1], hi)]);
