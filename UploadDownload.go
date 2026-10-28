@@ -6898,11 +6898,24 @@ var ffmpegBin, ffprobeBin string
 // ffmpegPath is ffmpeg's location, "" when it isn't installed (PATH, or next to the server).
 func ffmpegPath() string {
 	ffOnce.Do(func() {
+		exeDir := ""
+		if exe, err := os.Executable(); err == nil {
+			exeDir = filepath.Dir(exe)
+		}
 		find := func(name string) string {
 			if p, err := exec.LookPath(name); err == nil {
 				return p
 			}
-			for _, cand := range []string{name, name + ".exe", filepath.Join("ffmpeg", "bin", name+".exe"), filepath.Join("ffmpeg", "bin", name)} {
+			candidates := []string{name, name + ".exe", filepath.Join("ffmpeg", "bin", name+".exe"), filepath.Join("ffmpeg", "bin", name)}
+			if exeDir != "" {
+				candidates = append([]string{
+					filepath.Join(exeDir, name),
+					filepath.Join(exeDir, name+".exe"),
+					filepath.Join(exeDir, "ffmpeg", "bin", name+".exe"),
+					filepath.Join(exeDir, "ffmpeg", "bin", name),
+				}, candidates...)
+			}
+			for _, cand := range candidates {
 				if st, err := os.Stat(cand); err == nil && !st.IsDir() {
 					abs, _ := filepath.Abs(cand)
 					return abs
