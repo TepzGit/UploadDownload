@@ -1,7 +1,7 @@
 /* Admin pages (html/AdminPanel.html, html/AdminPanelCreateUser.html).
    Cards, buttons, inputs and the background come from oled.css. */
 
-.xn-page.ad { max-width: 960px; }
+.xn-page.adm { max-width: 960px; }
 
 .AdminPanelOptions { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
 .AdminPanelOption {
@@ -20,7 +20,7 @@
 }
 @media (hover: hover) { .AdminPanelOption:hover { border-color: var(--oled-accent); background: #16161b; } }
 .AdminPanelOption:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
-.ad-ico {
+.adm-ico {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -31,8 +31,8 @@
   background: var(--oled-accent-soft);
   color: var(--oled-accent);
 }
-.ad-ico svg,
-.ad-chev {
+.adm-ico svg,
+.adm-chev {
   width: 20px;
   height: 20px;
   fill: none;
@@ -41,22 +41,22 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.ad-chev { width: 18px; height: 18px; color: var(--oled-muted); }
-.ad-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.ad-text strong { font-size: 14px; font-weight: 600; }
-.ad-text span { font-size: 11px; color: var(--oled-muted); }
+.adm-chev { width: 18px; height: 18px; color: var(--oled-muted); }
+.adm-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.adm-text strong { font-size: 14px; font-weight: 600; }
+.adm-text span { font-size: 11px; color: var(--oled-muted); }
 
-.ad-back {
+.adm-back {
   display: inline-block;
   margin-bottom: 14px;
   font-size: 12px;
   color: var(--oled-muted);
   text-decoration: none;
 }
-@media (hover: hover) { .ad-back:hover { color: var(--oled-text); } }
-.ad-form { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
-.ad-form .xn-btn { margin-top: 4px; }
-.ad-result {
+@media (hover: hover) { .adm-back:hover { color: var(--oled-text); } }
+.adm-form { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+.adm-form .xn-btn { margin-top: 4px; }
+.adm-result {
   margin: 0;
   padding: 10px 12px;
   border: 1px solid rgba(74, 222, 128, 0.3);
@@ -65,12 +65,12 @@
   color: #bbf7d0;
   font-size: 12px;
 }
-.ad-result.is-error { border-color: #f8717155; background: rgba(248, 113, 113, 0.08); color: #fca5a5; }
+.adm-result.is-error { border-color: #f8717155; background: rgba(248, 113, 113, 0.08); color: #fca5a5; }
 
 /* Files access (AdminPanel.html). */
-.ad-card + .ad-card { margin-top: 16px; }
-.ad-h2 { font-size: 1.35rem; }
-.ad-find { display: block; margin-top: 16px; }
+.adm-card + .adm-card { margin-top: 16px; }
+.adm-h2 { font-size: 1.35rem; }
+.adm-find { display: block; margin-top: 16px; }
 .fa-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .fa-empty { margin: 0; padding: 28px 12px; text-align: center; font-size: 12px; color: var(--oled-muted); }
 .fa-user { border: 1px solid var(--oled-line); border-radius: 2px; background: var(--oled-surface-2); }
@@ -89,8 +89,8 @@
 }
 .fa-user summary::-webkit-details-marker { display: none; }
 .fa-user summary:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
-.fa-user .ad-chev { transition: transform 0.2s ease; }
-.fa-user[open] .ad-chev { transform: rotate(90deg); }
+.fa-user .adm-chev { transition: transform 0.2s ease; }
+.fa-user[open] .adm-chev { transform: rotate(90deg); }
 .fa-face { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--oled-surface); color: var(--oled-muted); font-size: 13px; font-weight: 600; }
 .fa-user.has-access .fa-face { background: var(--oled-accent-soft); color: var(--oled-accent); }
 .fa-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }

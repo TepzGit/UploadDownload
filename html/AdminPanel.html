@@ -32,28 +32,28 @@
 <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
 <div class="xn-hatch" aria-hidden="true"></div>
 
-<main class="xn-page ad">
-  <section class="xn-card ad-card">
+<main class="xn-page adm">
+  <section class="xn-card adm-card">
     <p class="xn-eyebrow">Admin</p>
     <h1 class="xn-h1">Admin panel</h1>
     <p class="xn-sub">Site visits, every account and its numbers, who can sign in and who can open Files.</p>
     <div class="AdminPanelOptions">
       <a class="AdminPanelOption" href="/admin/createUser">
-        <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/></svg></span>
-        <span class="ad-text"><strong>Create user</strong><span>Add an account and choose its role.</span></span>
-        <svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <span class="adm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/></svg></span>
+        <span class="adm-text"><strong>Create user</strong><span>Add an account and choose its role.</span></span>
+        <svg class="adm-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
       </a>
       <a class="AdminPanelOption" href="/admin/substances">
-        <span class="ad-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8.5 2h7M7 15h10"/></svg></span>
-        <span class="ad-text"><strong>Substances Importer</strong><span>Add medications and substances PsychonautWiki doesn't have.</span></span>
-        <svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <span class="adm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8.5 2h7M7 15h10"/></svg></span>
+        <span class="adm-text"><strong>Substances Importer</strong><span>Add medications and substances PsychonautWiki doesn't have.</span></span>
+        <svg class="adm-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
       </a>
     </div>
   </section>
 
-  <section class="xn-card ad-card ad-wide" aria-labelledby="stTitle">
+  <section class="xn-card adm-card adm-wide" aria-labelledby="stTitle">
     <p class="xn-eyebrow">Stats</p>
-    <h2 class="xn-h1 ad-h2" id="stTitle">Site views</h2>
+    <h2 class="xn-h1 adm-h2" id="stTitle">Site views</h2>
     <div class="st-tiles" id="stTiles"></div>
     <div class="st-chart-head">
       <span class="xn-label">Page views per day, last 30 days</span>
@@ -76,22 +76,22 @@
     </div>
   </section>
 
-  <section class="xn-card ad-card ad-wide" aria-labelledby="acTitle">
+  <section class="xn-card adm-card adm-wide" aria-labelledby="acTitle">
     <p class="xn-eyebrow">Accounts</p>
-    <h2 class="xn-h1 ad-h2" id="acTitle">All accounts</h2>
+    <h2 class="xn-h1 adm-h2" id="acTitle">All accounts</h2>
     <p class="xn-sub" id="acSub">Tap a column to sort.</p>
-    <label class="ad-find">
+    <label class="adm-find">
       <span class="xn-sr">Find an account</span>
       <input class="xn-input" id="acFind" type="search" placeholder="Find an account…" autocomplete="off" autocapitalize="off" spellcheck="false">
     </label>
     <div class="st-scroll ac-scroll"><table class="st-table ac-table" id="acTable"></table></div>
   </section>
 
-  <section class="xn-card ad-card" aria-labelledby="faTitle">
+  <section class="xn-card adm-card" aria-labelledby="faTitle">
     <p class="xn-eyebrow">Files</p>
-    <h2 class="xn-h1 ad-h2" id="faTitle">Files access</h2>
+    <h2 class="xn-h1 adm-h2" id="faTitle">Files access</h2>
     <p class="xn-sub">Pick who can open Files and which folders they see. Admins can always open everything. Changes save by themselves.</p>
-    <label class="ad-find">
+    <label class="adm-find">
       <span class="xn-sr">Find an account</span>
       <input class="xn-input" id="faFind" type="search" placeholder="Find an account…" autocomplete="off" autocapitalize="off" spellcheck="false">
     </label>
@@ -268,7 +268,7 @@
       item.dataset.name = user.name.toLowerCase();
       item.innerHTML =
         '<summary><span class="fa-face" aria-hidden="true"></span><span class="fa-who"><strong></strong><span class="fa-state"></span></span>' +
-        '<svg class="ad-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></summary>';
+        '<svg class="adm-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></summary>';
       item.querySelector(".fa-face").textContent = user.name.charAt(0).toUpperCase();
       item.querySelector("strong").textContent = user.name;
       const state = item.querySelector(".fa-state");

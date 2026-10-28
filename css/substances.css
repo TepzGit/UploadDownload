@@ -156,3 +156,20 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 
 /* The dialog sits outside .xn-page, so give it the same box sizing. */
 .si-modal, .si-modal *, .si-modal *::before, .si-modal *::after { box-sizing: border-box; }
+
+/* Ingestion methods: one chip per method, + to add another */
+.si-methods-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; }
+.si-methods-head .xn-label { margin: 0; }
+.si-methods { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.si-method { display: inline-flex; align-items: stretch; border: 1px solid var(--oled-line); border-radius: 999px; overflow: hidden; }
+.si-method.is-on { border-color: var(--oled-accent); background: var(--oled-accent-soft); }
+.si-method-pick, .si-method-x, .si-method-add {
+  min-height: 34px; border: 0; background: transparent; color: var(--oled-muted); font-size: 12px; cursor: pointer;
+}
+.si-method-pick { padding: 0 14px; }
+.si-method.is-on .si-method-pick { color: var(--oled-text); font-weight: 600; }
+.si-method-x { padding: 0 10px 0 2px; font-size: 16px; line-height: 1; }
+.si-method-x:hover, .si-method-pick:hover { color: var(--oled-text); }
+.si-method-add { padding: 0 14px; border: 1px dashed var(--oled-line-strong, var(--oled-line)); border-radius: 999px; color: var(--oled-accent); }
+.si-method-add:hover { border-color: var(--oled-accent); }
+.si-legend .si-hint { margin-left: 6px; text-transform: none; letter-spacing: 0; }

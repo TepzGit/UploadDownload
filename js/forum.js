@@ -193,7 +193,7 @@ function commentsArea(post) {
   };
   const grow = () => {
     text.style.height = "auto";
-    text.style.height = Math.min(text.scrollHeight + 2, 160) + "px";
+    text.style.height = Math.max(48, Math.min(text.scrollHeight + 2, 240)) + "px";
     sendBtn.disabled = !text.value.trim();
   };
 

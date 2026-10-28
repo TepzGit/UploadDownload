@@ -78,7 +78,7 @@
       {{range .Files}}
       <div class="item" tabindex="0" data-path="{{.Path}}" data-type="{{if .IsDir}}Dir{{else if .IsImg}}Image{{else if .IsVid}}Video{{else if .IsAudio}}Audio{{else}}None{{end}}">
         <span class="fx-thumb">
-          {{if .IsDir}}<svg class="fx-ico" aria-hidden="true"><use href="#i-folder"/></svg>
+          {{if .IsDir}}{{if .IconImage}}<img class="fx-ficon" src="{{.IconImage}}" alt="" loading="lazy">{{else if .IconEmoji}}<span class="fx-femoji" aria-hidden="true">{{.IconEmoji}}</span>{{else}}<svg class="fx-ico" aria-hidden="true"><use href="#i-folder"/></svg>{{end}}
           {{else if .IsImg}}<img class="preview" src="{{.Path}}" alt="" loading="lazy" decoding="async">
           {{else if .IsVid}}<svg class="fx-ico" aria-hidden="true"><use href="#i-video"/></svg>
           {{else if .IsAudio}}<svg class="fx-ico" aria-hidden="true"><use href="#i-audio"/></svg>
@@ -107,11 +107,13 @@
   <button type="button" role="menuitem" data-act="download">Download</button>
   {{if .CanEdit}}
   <button type="button" role="menuitem" data-act="rename">Rename</button>
+  {{if .IsAdmin}}<button type="button" role="menuitem" data-act="icon">Folder icon…</button>{{end}}
   <hr>
   <button type="button" role="menuitem" data-act="delete" class="is-danger">Delete</button>
   {{end}}
 </div>
 <script>window.xnFilesCanEdit = {{if .CanEdit}}true{{else}}false{{end}};</script>
+{{if .IsAdmin}}<script src="/foldericon.js"></script>{{end}}
 
 <div id="previewModal" class="fx-modal" role="dialog" aria-modal="true" aria-labelledby="modalName" hidden>
   <div class="fx-modal-card">

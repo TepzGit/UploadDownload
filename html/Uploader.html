@@ -35,6 +35,7 @@
 
 <main class="xn-page up">
   <div class="up-grid">
+    <div class="up-col">
     <form id="box" class="xn-card up-card" action="/upload" method="post" enctype="multipart/form-data">
       <div class="up-head">
         <div>
@@ -83,6 +84,29 @@
       <button id="submit" type="submit" class="xn-btn xn-btn-primary up-submit" disabled>Upload</button>
       <input type="hidden" name="currentPath" id="currentPathInput" value=".">
     </form>
+
+    <form id="linkBox" class="xn-card up-card up-link" novalidate>
+      <div>
+        <p class="xn-eyebrow">From a link</p>
+        <h2 class="xn-h2">Download a video</h2>
+        <p class="xn-sub">Paste a link to a video or song. The server downloads it with FFmpeg and puts it straight into <strong class="up-link-dest">/</strong>.</p>
+      </div>
+      <label class="xn-label" for="linkUrl">Link</label>
+      <input type="url" id="linkUrl" class="xn-input" placeholder="https://…/video.mp4 or .m3u8" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      <label class="xn-label" for="linkName">File name <span class="up-opt">(optional)</span></label>
+      <input type="text" id="linkName" class="xn-input" placeholder="Taken from the link" maxlength="120" autocomplete="off">
+      <p class="up-link-note" id="linkNote" hidden></p>
+      <button id="linkGo" type="submit" class="xn-btn xn-btn-primary up-submit">
+        <svg viewBox="0 0 24 24" class="up-ico" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+        Download to folder
+      </button>
+      <div class="up-jobs-head" id="linkJobsHead" hidden>
+        <span class="xn-label">Downloads</span>
+        <button type="button" class="up-clear" id="linkClear">Clear finished</button>
+      </div>
+      <ul class="up-jobs" id="linkJobs" aria-live="polite"></ul>
+    </form>
+    </div>
 
     <section class="xn-card UploadExplorer" id="folders" data-path=".">
       <h2 class="xn-h2">Destination folder</h2>
@@ -245,7 +269,9 @@
       item.className = "UploadExplorerUploadItem";
       item.dataset.name = Folders[i];
       item.onclick = function() { getFolders(this); };
-      item.innerHTML = `${FOLDER_ICON}<span class="filename">${escapeHTML(Folders[i])}</span>`;
+      const ic = (data.Icons || {})[Folders[i]];
+      const pic = ic && ic.image ? `<img class="up-ficon" src="${escapeHTML(ic.image)}" alt="">` : ic && ic.emoji ? `<span class="up-femoji" aria-hidden="true">${escapeHTML(ic.emoji)}</span>` : FOLDER_ICON;
+      item.innerHTML = `${pic}<span class="filename">${escapeHTML(Folders[i])}</span>`;
       UploadExplorerUploadItems.appendChild(item);
     }
     if (!Folders.length) UploadExplorerUploadItems.innerHTML = '<p class="xn-empty">No folders in here.</p>';
@@ -255,6 +281,7 @@
     UploadExplorer.querySelector(".backbut").disabled = currentPath === ".";
     document.querySelector("#currentPathInput").value = currentPath;
     document.querySelector("#upDest").textContent = shown;
+    document.querySelector(".up-link-dest").textContent = shown;
   }
 
   getFolders(".");
@@ -332,5 +359,6 @@
     xhr.send(formData);
   }
 </script>
+<script src="/linkdownload.js"></script>
 </body>
 </html>

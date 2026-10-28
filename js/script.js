@@ -217,6 +217,8 @@ function byteConverter(size) {
 			const isDir = item.dataset.type === "Dir"
 			menu.querySelector('[data-act="open"]').textContent = isDir ? "Open" : "Preview"
 			menu.querySelector('[data-act="download"]').hidden = isDir
+			const iconAct = menu.querySelector('[data-act="icon"]')
+			if (iconAct) iconAct.hidden = !isDir
 			menu.hidden = false
 			const rect = menu.getBoundingClientRect()
 			const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))
@@ -242,6 +244,7 @@ function byteConverter(size) {
 			else if (act === "download") window.location.href = item.dataset.path
 			else if (act === "rename") startRename(item)
 			else if (act === "delete") deleteItem(item)
+			else if (act === "icon" && window.xnFolderIcon) window.xnFolderIcon(item)
 		})
 
 		document.addEventListener("click", (e) => {

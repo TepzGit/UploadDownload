@@ -14,6 +14,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
+  <link rel="stylesheet" href="/classicons.css" />
+  <script src="/classicons.js"></script>
   <script src="/nav.js"></script>
   <script src="/likes.js"></script>
   <script src="/media.js"></script>
@@ -296,6 +298,46 @@
       <button type="button" class="pop-x" data-close aria-label="Close">×</button>
     </div>
     <div class="APcontent">
+      <span class="xn-label" id="psLabel">Graph style</span>
+      <p class="pf-note">How the Graph page draws your doses. Changes save by themselves.</p>
+      <div class="ps-preview" id="psPreview" aria-label="Preview of the graph style"><p class="pf-note">Loading the preview…</p></div>
+      <div class="ps-form" id="psForm" aria-labelledby="psLabel">
+        <label class="xn-label pf-ap-label" for="psWidth">Line thickness</label>
+        <div class="pf-range-row">
+          <input type="range" id="psWidth" class="pf-slider" min="2" max="12" step="1" value="6">
+          <output id="psWidthOut" for="psWidth">6 px</output>
+        </div>
+        <label class="xn-label pf-ap-label" for="psFill">Fill under the line</label>
+        <div class="pf-range-row">
+          <input type="range" id="psFill" class="pf-slider" min="0" max="60" step="5" value="30">
+          <output id="psFillOut" for="psFill">30%</output>
+        </div>
+        <span class="xn-label pf-ap-label" id="psShapeLabel">Line</span>
+        <div class="ps-seg" role="radiogroup" aria-labelledby="psShapeLabel" data-key="shape">
+          <button type="button" role="radio" data-value="smooth">Smooth</button>
+          <button type="button" role="radio" data-value="sharp">Sharp</button>
+        </div>
+        <span class="xn-label pf-ap-label" id="psHeightLabel">Height</span>
+        <div class="ps-seg" role="radiogroup" aria-labelledby="psHeightLabel" data-key="height">
+          <button type="button" role="radio" data-value="compact">Compact</button>
+          <button type="button" role="radio" data-value="normal">Normal</button>
+          <button type="button" role="radio" data-value="tall">Tall</button>
+        </div>
+        <span class="xn-label pf-ap-label">Show</span>
+        <div class="ps-checks">
+          <label class="ps-check"><input type="checkbox" data-key="glow"><span>Glow</span></label>
+          <label class="ps-check"><input type="checkbox" data-key="grid"><span>Grid lines</span></label>
+          <label class="ps-check"><input type="checkbox" data-key="yLabels"><span>Intensity %</span></label>
+          <label class="ps-check"><input type="checkbox" data-key="topHours"><span>Hours on top</span></label>
+          <label class="ps-check"><input type="checkbox" data-key="dots"><span>Dose dots</span></label>
+          <label class="ps-check"><input type="checkbox" data-key="now"><span>Now line</span></label>
+        </div>
+        <div class="ps-actions">
+          <button type="button" class="xn-btn" id="psReset">Back to default</button>
+          <span class="pf-note" id="psStatus" aria-live="polite"></span>
+        </div>
+      </div>
+      <hr class="ps-rule">
       <span class="xn-label" id="gcLabel">Graph colors</span>
       <p class="pf-note">Pick the line color a substance gets on the Graph page.</p>
       <div class="gc-search">
@@ -1379,6 +1421,7 @@
     bannerImg.addEventListener("error", () => showPicture("banner", ""));
   })();
 </script>
+<script type="module" src="/plotstyle.js"></script>
 <script type="module">
   // ---------------- Boxes from the + button ----------------
   import { mountBoxes, MAX_BOXES, sessionChart, dayLabel } from "/boxes.js";

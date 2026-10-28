@@ -17,3 +17,7 @@ MusicCache/
 spotify.json
 
 desktop/dist/
+
+# Downloaded by the server for link downloads (yt-dlp, Deno) and its temp folder
+LinkTools/
+LinkDownloads/

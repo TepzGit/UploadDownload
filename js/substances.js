@@ -32,6 +32,10 @@ let list = [];
 let editingId = 0;
 let dirty = false;
 let inspecting = null;
+// Ingestion methods: route, doses and timeline each. The form shows one at a time.
+let methods = [];
+let cur = 0;
+const DEFAULT_TIMES = { onset: 0.5, comeup: 0.5, peak: 2, comedown: 0, offset: 2 };
 const rows = {}; // key -> { range, number, def, pct, max }
 
 // ---------------------------------------------------------------- small helpers
@@ -171,13 +175,132 @@ function readDurations() {
   return durations;
 }
 
-function readForm() {
+/** The method shown in the form: route, doses and timeline. */
+function readMethod() {
   const range = (a, b) => {
     const min = numOrNull($(a).value), max = numOrNull($(b).value);
     if (min == null && max == null) return null;
     return { ...(min != null ? { min } : {}), ...(max != null ? { max } : {}) };
   };
   const one = (id) => numOrNull($(id).value);
+  return {
+    route: $("fRoute").value,
+    dose: {
+      threshold: one("dThreshold"),
+      light: range("dLightMin", "dLightMax"),
+      common: range("dCommonMin", "dCommonMax"),
+      strong: range("dStrongMin", "dStrongMax"),
+      heavy: one("dHeavy"),
+    },
+    durations: readDurations(),
+  };
+}
+
+function writeMethod(m) {
+  const set = (id, v) => ($(id).value = v == null ? "" : v);
+  $("fRoute").value = m.route || "oral";
+  const d = m.dose || {};
+  set("dThreshold", d.threshold);
+  set("dLightMin", d.light?.min); set("dLightMax", d.light?.max);
+  set("dCommonMin", d.common?.min); set("dCommonMax", d.common?.max);
+  set("dStrongMin", d.strong?.min); set("dStrongMax", d.strong?.max);
+  set("dHeavy", d.heavy);
+  const t = m.durations || DEFAULT_TIMES;
+  ["onset", "comeup", "peak", "comedown", "offset"].forEach((k) => writeRow(k, t[k] || 0));
+  writeRow("comedownLevel", t.comedown > 0 ? t.comedownLevel || 0.35 : 0.35);
+  const p2 = t.peak2;
+  $("fPeak2On").checked = !!p2;
+  $("siPeak2").hidden = !p2;
+  PEAK2.forEach((r) => writeRow(r.key, p2 ? p2[r.key] : r.pct ? r.def / 100 : r.def));
+}
+
+const routeLabel = (route) => {
+  const opt = [...$("fRoute").options].find((o) => o.value === route);
+  return opt ? opt.textContent : route ? route[0].toUpperCase() + route.slice(1) : "Oral";
+};
+
+function renderMethods() {
+  const box = $("siMethods");
+  box.replaceChildren();
+  methods.forEach((m, i) => {
+    const chip = document.createElement("span");
+    chip.className = "si-method" + (i === cur ? " is-on" : "");
+    const pick = document.createElement("button");
+    pick.type = "button";
+    pick.className = "si-method-pick";
+    pick.setAttribute("role", "tab");
+    pick.setAttribute("aria-selected", String(i === cur));
+    pick.textContent = routeLabel(m.route);
+    pick.addEventListener("click", () => switchMethod(i));
+    chip.append(pick);
+    if (methods.length > 1) {
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "si-method-x";
+      x.setAttribute("aria-label", `Remove ${routeLabel(m.route)}`);
+      x.textContent = "×";
+      x.addEventListener("click", () => removeMethod(i));
+      chip.append(x);
+    }
+    box.append(chip);
+  });
+  const free = [...$("fRoute").options].map((o) => o.value).filter((r) => !methods.some((m) => m.route === r));
+  if (free.length) {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "si-method-add";
+    add.textContent = "+ Add method";
+    add.addEventListener("click", addMethod);
+    box.append(add);
+  }
+  // A route can only be used once.
+  [...$("fRoute").options].forEach((o) => (o.disabled = methods.some((m, i) => i !== cur && m.route === o.value)));
+  $("siTimeFor").textContent = methods.length > 1 ? `for ${routeLabel(methods[cur]?.route).toLowerCase()}` : "";
+}
+
+function switchMethod(i) {
+  if (i === cur || !methods[i]) return;
+  methods[cur] = readMethod();
+  cur = i;
+  writeMethod(methods[cur]);
+  renderMethods();
+  drawPreview();
+}
+
+function addMethod() {
+  methods[cur] = readMethod();
+  const route = [...$("fRoute").options].map((o) => o.value).find((r) => !methods.some((m) => m.route === r));
+  if (!route) return;
+  // Starts with the current timeline; doses are left for you to fill in.
+  methods.push({ route, dose: {}, durations: JSON.parse(JSON.stringify(methods[cur].durations)) });
+  cur = methods.length - 1;
+  writeMethod(methods[cur]);
+  renderMethods();
+  drawPreview();
+  dirty = true;
+  $("fRoute").focus();
+}
+
+function removeMethod(i) {
+  if (methods.length < 2) return;
+  if (!confirm(`Remove ${routeLabel(methods[i].route).toLowerCase()} and its doses?`)) return;
+  methods[cur] = readMethod();
+  methods.splice(i, 1);
+  cur = Math.min(i === cur ? Math.max(0, i - 1) : cur > i ? cur - 1 : cur, methods.length - 1);
+  writeMethod(methods[cur]);
+  renderMethods();
+  drawPreview();
+  dirty = true;
+}
+
+function readForm() {
+  const range = (a, b) => {
+    const min = numOrNull($(a).value), max = numOrNull($(b).value);
+    if (min == null && max == null) return null;
+    return { ...(min != null ? { min } : {}), ...(max != null ? { max } : {}) };
+  };
+  methods[cur] = readMethod();
+  const [first, ...more] = methods;
   return {
     id: editingId,
     name: $("fName").value.trim(),
@@ -190,16 +313,11 @@ function readForm() {
     risks: $("fRisks").value.trim(),
     notes: $("fNotes").value.trim(),
     interactions: { dangerous: splitList($("fDangerous").value), unsafe: splitList($("fUnsafe").value), uncertain: splitList($("fUncertain").value) },
-    route: $("fRoute").value,
     units: $("fUnits").value,
-    dose: {
-      threshold: one("dThreshold"),
-      light: range("dLightMin", "dLightMax"),
-      common: range("dCommonMin", "dCommonMax"),
-      strong: range("dStrongMin", "dStrongMax"),
-      heavy: one("dHeavy"),
-    },
-    durations: readDurations(),
+    route: first.route,
+    dose: first.dose,
+    durations: first.durations,
+    methods: more,
   };
 }
 
@@ -209,7 +327,24 @@ function validate(entry) {
   const bad = (v) => v != null && (Number.isNaN(v) || v < 0);
   const badRange = (r) => r && (bad(r.min) || bad(r.max) || (r.min != null && r.max != null && r.min > r.max));
   if (badRange(entry.halfLife)) return ["fHalfMin", "The half-life needs numbers from 0 up, with the lowest first."];
-  const d = entry.dose;
+  // The method on screen first, then the others (shown when one has a problem).
+  const order = [cur, ...methods.map((_, i) => i).filter((i) => i !== cur)];
+  for (const i of order) {
+    if (i !== cur) switchMethod(i);
+    const problem = validateMethod(methods[i]);
+    if (problem) {
+      if (methods.length > 1) problem[1] = `${routeLabel(methods[i].route)}: ${problem[1]}`;
+      return problem;
+    }
+  }
+  if (order[0] !== cur) switchMethod(order[0]);
+  return null;
+}
+
+function validateMethod(method) {
+  const bad = (v) => v != null && (Number.isNaN(v) || v < 0);
+  const badRange = (r) => r && (bad(r.min) || bad(r.max) || (r.min != null && r.max != null && r.min > r.max));
+  const d = method.dose;
   for (const [key, id] of [["light", "dLightMin"], ["common", "dCommonMin"], ["strong", "dStrongMin"]]) {
     if (badRange(d[key])) return [id, "Each dose range needs numbers from 0 up, with the lowest first."];
   }
@@ -222,7 +357,7 @@ function validate(entry) {
     if (Number.isNaN(v) || (v != null && v < 0) || (rows[key].pct && v > 1)) return ["t_" + key, `${rows[key].label} must be a number${rows[key].pct ? " from 0 to 100" : " from 0 up"}.`];
     if (!rows[key].pct && v > 240) return ["t_" + key, `${rows[key].label} can be at most 240 hours.`];
   }
-  const t = entry.durations;
+  const t = method.durations;
   if (t.comeup + t.peak + t.comedown + t.offset <= 0) return ["t_comeup", "Set at least the come-up, peak or offset, so there's a curve to draw."];
   if (t.peak2 && !(t.peak2.duration > 0)) return ["t_duration", "Give the second peak a length, or untick Second peak."];
   if (t.peak2 && !(t.peak2.level > 0)) return ["t_level", "The second peak's strength must be more than 0%."];
@@ -261,21 +396,11 @@ function fillForm(entry) {
   set("fDangerous", (e.interactions?.dangerous || []).join(", "));
   set("fUnsafe", (e.interactions?.unsafe || []).join(", "));
   set("fUncertain", (e.interactions?.uncertain || []).join(", "));
-  $("fRoute").value = e.route || "oral";
   $("fUnits").value = e.units || "mg";
-  const d = e.dose || {};
-  set("dThreshold", d.threshold);
-  set("dLightMin", d.light?.min); set("dLightMax", d.light?.max);
-  set("dCommonMin", d.common?.min); set("dCommonMax", d.common?.max);
-  set("dStrongMin", d.strong?.min); set("dStrongMax", d.strong?.max);
-  set("dHeavy", d.heavy);
-  const t = e.durations || { onset: 0.5, comeup: 0.5, peak: 2, comedown: 0, offset: 2 };
-  ["onset", "comeup", "peak", "comedown", "offset"].forEach((k) => writeRow(k, t[k] || 0));
-  writeRow("comedownLevel", t.comedown > 0 ? t.comedownLevel || 0.35 : 0.35);
-  const p2 = t.peak2;
-  $("fPeak2On").checked = !!p2;
-  $("siPeak2").hidden = !p2;
-  PEAK2.forEach((r) => writeRow(r.key, p2 ? p2[r.key] : r.pct ? r.def / 100 : r.def));
+  methods = [{ route: e.route || "oral", dose: e.dose || {}, durations: e.durations || DEFAULT_TIMES }, ...(e.methods || [])];
+  cur = 0;
+  writeMethod(methods[0]);
+  renderMethods();
 
   editingId = e.id || 0;
   $("siFormTitle").textContent = editingId ? `Edit ${e.name}` : "New substance";
@@ -398,7 +523,7 @@ function renderList() {
     name.append(iconFor(e), e.name);
     const meta = document.createElement("span");
     meta.className = "si-item-meta";
-    meta.textContent = [e.class, e.route, `${fmtHours(effectHours(e.durations))}`, e.durations?.peak2 ? "2 peaks" : ""].filter(Boolean).join(" · ");
+    meta.textContent = [e.class, [e.route, ...(e.methods || []).map((m) => m.route)].filter(Boolean).join(", "), `${fmtHours(effectHours(e.durations))}`, e.durations?.peak2 ? "2 peaks" : ""].filter(Boolean).join(" · ");
     main.append(name, meta);
     main.addEventListener("click", () => inspect(e));
     const edit = iconButton("Edit", '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>', () => startEdit(e));
@@ -472,24 +597,30 @@ function inspect(entry) {
   add("Class", [entry.class, entry.chemicalClass].filter(Boolean).join(" · "));
   add("Half-life", r(entry.halfLife) ? r(entry.halfLife) + " h" : "");
   add("Addiction potential", entry.addictionPotential);
-  add("Route", entry.route);
-  const d = entry.dose || {};
-  add("Doses", [
-    d.threshold != null ? `threshold ${d.threshold} ${u}` : "",
-    r(d.light) ? `light ${r(d.light)} ${u}` : "",
-    r(d.common) ? `common ${r(d.common)} ${u}` : "",
-    r(d.strong) ? `strong ${r(d.strong)} ${u}` : "",
-    d.heavy != null ? `heavy ${d.heavy}+ ${u}` : "",
-  ].filter(Boolean).join(" · "));
+  const all = [{ route: entry.route, dose: entry.dose, durations: entry.durations }, ...(entry.methods || [])];
+  add(all.length > 1 ? "Methods" : "Method", all.map((m) => routeLabel(m.route)));
+  all.forEach((m) => {
+    const d = m.dose || {};
+    add(all.length > 1 ? `Doses, ${routeLabel(m.route).toLowerCase()}` : "Doses", [
+      d.threshold != null ? `threshold ${d.threshold} ${u}` : "",
+      r(d.light) ? `light ${r(d.light)} ${u}` : "",
+      r(d.common) ? `common ${r(d.common)} ${u}` : "",
+      r(d.strong) ? `strong ${r(d.strong)} ${u}` : "",
+      d.heavy != null ? `heavy ${d.heavy}+ ${u}` : "",
+    ].filter(Boolean).join(" · "));
+  });
   add("Dangerous with", entry.interactions?.dangerous);
   add("Unsafe with", entry.interactions?.unsafe);
   add("Caution with", entry.interactions?.uncertain);
   add("Added by", entry.createdBy);
   add("Last changed", entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : "");
   const text = (label, v) => (v ? `<h3 class="si-legend">${esc(label)}</h3><p class="si-para">${esc(v)}</p>` : "");
+  const charts = all.map((m) =>
+    (all.length > 1 ? `<h3 class="si-legend">${esc(routeLabel(m.route))} <span class="si-hint">${esc(fmtHours(effectHours(m.durations)))}</span></h3>` : "") +
+    previewSvg(m.durations) +
+    `<ol class="si-pv-legend">${legendHtml(m.durations)}</ol>`).join("");
   $("inBody").innerHTML =
-    previewSvg(entry.durations) +
-    `<ol class="si-pv-legend">${legendHtml(entry.durations)}</ol>` +
+    charts +
     text("Summary", entry.summary) +
     `<dl class="si-dl">${rowsHtml.join("")}</dl>` +
     text("Risks", entry.risks) +
@@ -547,6 +678,10 @@ function init() {
     if (!$("siError").hidden) showError(null);
   });
   document.querySelectorAll(".si-unit-btn").forEach((b) => b.addEventListener("click", () => switchUnit(b.dataset.unit)));
+  $("fRoute").addEventListener("change", () => {
+    methods[cur] = readMethod();
+    renderMethods();
+  });
   $("fPeak2On").addEventListener("change", () => {
     $("siPeak2").hidden = !$("fPeak2On").checked;
     changed();
