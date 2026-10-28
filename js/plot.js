@@ -107,11 +107,12 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
   const last = timeline.x[timeline.x.length - 1];
   // A little room on both sides so the whole curve, its rounded ends and
   // the dose dots are always in view.
-  const pad = Math.max(0.2, (last - first) * 0.035);
+  const pad = Math.max(0.5, (last - first) * 0.1);
   const full = [first - pad, last + pad];
-  // Headroom above the highest point so the thick line's top isn't clipped.
+  // Room above the highest point and below 0% so the curve never fills the box edge to edge.
   const top = Math.max(100, ...timeline.series.flatMap((series) => series.y.filter(Number.isFinite)));
-  const yTop = top * 1.14;
+  const yTop = top * 1.3;
+  const yBottom = -top * 0.07; // the line at 0% sits a bit above the bottom edge
   const yStep = top > 300 ? 100 : top > 150 ? 50 : 25;
   const width = Math.max(1, look.width - (narrow ? 1 : 0));
 
@@ -185,7 +186,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     xaxis2: { ...hourAxis, overlaying: "x", side: "top", anchor: "y", matches: "x" },
     // Intensity in percent of one common dose, labelled on the left.
     yaxis: {
-      range: [0, yTop],
+      range: [yBottom, yTop],
       tickmode: "linear",
       tick0: 0,
       dtick: yStep,
