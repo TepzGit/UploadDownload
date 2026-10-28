@@ -9364,7 +9364,8 @@ func registerLinkDownloads() {
 		}()
 	}
 	http.HandleFunc("/upload/link", requireFilesLogin(uploadLink))
-	http.HandleFunc("/files/folder-icon", requireAdminLogin(setFolderIcon))
+	http.HandleFunc("/files/folder-icon", requireFilesLogin(setFolderIcon))
+	http.HandleFunc("/files/move", requireFilesLogin(moveItem))
 	http.HandleFunc("/folder-icon/", requireFilesLogin(serveFolderIcon))
 }
 
@@ -9990,6 +9991,10 @@ func setFolderIcon(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rel := uploadRel(p)
+	if !filesGrantOf(r).canChange(rel) {
+		http.Error(w, "You can't change that folder's picture.", http.StatusForbidden)
+		return
+	}
 	if r.FormValue("remove") == "1" {
 		forgetFolderIcon(rel)
 		writeJSON(w, folderIcon{})
@@ -10035,6 +10040,79 @@ func setFolderIcon(w http.ResponseWriter, r *http.Request) {
 	folderIcons[rel] = ic
 	folderIconsMu.Unlock()
 	writeJSON(w, ic)
+}
+
+// moveItem moves a file or folder into another folder (POST {path, to}: the
+// item's /Files/ link and the target folder's path inside Files, "" = top).
+// A name that's already taken there gets " (2)".
+func moveItem(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Path string `json:"path"`
+		To   string `json:"to"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		http.Error(w, "Not valid move data", http.StatusBadRequest)
+		return
+	}
+	src, ok := uploadPathFromURL(req.Path)
+	if !ok {
+		http.Error(w, "Not a valid file", http.StatusBadRequest)
+		return
+	}
+	dst, ok := insideUploads(strings.Split(strings.Trim(req.To, "/"), "/")...)
+	if !ok {
+		http.Error(w, "Not a valid folder", http.StatusBadRequest)
+		return
+	}
+	srcRel, dstRel := uploadRel(src), uploadRel(dst)
+	grant := filesGrantOf(r)
+	if !grant.canChange(srcRel) {
+		http.Error(w, "You can't move that.", http.StatusForbidden)
+		return
+	}
+	if !grant.canChangeIn(dstRel) {
+		http.Error(w, "You can't put things in that folder.", http.StatusForbidden)
+		return
+	}
+	st, err := os.Stat(src)
+	if err != nil {
+		http.Error(w, "That file doesn't exist any more.", http.StatusNotFound)
+		return
+	}
+	if ds, err := os.Stat(dst); err != nil || !ds.IsDir() {
+		http.Error(w, "That folder doesn't exist.", http.StatusBadRequest)
+		return
+	}
+	if filepath.Dir(src) == filepath.Clean(dst) {
+		http.Error(w, "It's already in that folder.", http.StatusBadRequest)
+		return
+	}
+	if st.IsDir() && (dstRel == srcRel || strings.HasPrefix(dstRel, srcRel+"/")) {
+		http.Error(w, "A folder can't go inside itself.", http.StatusBadRequest)
+		return
+	}
+	base := filepath.Base(src)
+	ext := ""
+	if !st.IsDir() {
+		ext = filepath.Ext(base)
+	}
+	name := freeName(dst, strings.TrimSuffix(base, ext), ext)
+	to := filepath.Join(dst, name)
+	if err := os.Rename(src, to); err != nil {
+		if st.IsDir() || moveFile(src, to) != nil {
+			fmt.Println("move:", err)
+			http.Error(w, "Couldn't move it.", http.StatusInternalServerError)
+			return
+		}
+	}
+	if st.IsDir() {
+		moveFolderIcons(srcRel, uploadRel(to))
+	}
+	writeJSON(w, map[string]string{"name": name, "folder": dstRel})
 }
 
 func serveFolderIcon(w http.ResponseWriter, r *http.Request) {

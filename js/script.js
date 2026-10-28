@@ -245,6 +245,7 @@ function byteConverter(size) {
 			else if (act === "rename") startRename(item)
 			else if (act === "delete") deleteItem(item)
 			else if (act === "icon" && window.xnFolderIcon) window.xnFolderIcon(item)
+			else if (act === "move" && window.xnMoveItem) window.xnMoveItem(item)
 		})
 
 		document.addEventListener("click", (e) => {

@@ -1,5 +1,5 @@
-// Files page, admins only: "Folder icon…" in a folder's ⋯ menu lets an admin
-// give the folder an emoji or a picture (POST /files/folder-icon).
+// Files page, anyone who can edit: "Folder picture…" in a folder's ⋯ menu
+// gives the folder an emoji or a picture (POST /files/folder-icon).
 (function () {
   const PICKS = ["📁", "🎵", "🎬", "📷", "🖼️", "🎮", "📚", "📝", "💊", "🍄", "🌿", "🧪", "⭐", "❤️", "🔥", "💾", "🔒", "🗂️", "🎨", "🌈", "👽", "💀", "🐸", "🚀"];
   let dlg = null;
@@ -10,7 +10,7 @@
     dlg.className = "fi-dlg";
     dlg.innerHTML =
       '<form method="dialog" class="fi-card xn-card">' +
-      '<div class="fi-head"><h2 class="xn-h2">Folder icon</h2><button type="button" class="fi-x" value="close" aria-label="Close">×</button></div>' +
+      '<div class="fi-head"><h2 class="xn-h2">Folder picture</h2><button type="button" class="fi-x" value="close" aria-label="Close">×</button></div>' +
       '<p class="xn-sub fi-name"></p>' +
       '<div class="fi-preview" aria-hidden="true"></div>' +
       '<span class="xn-label">Pick an emoji</span>' +
