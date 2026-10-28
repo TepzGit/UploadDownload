@@ -122,6 +122,7 @@ func init() {
 		if desktopIsOurs(p) {
 			url := "http://127.0.0.1:" + strconv.Itoa(p)
 			fmt.Println("Geek4u is already running at " + url)
+			desktopAnnounce(url)
 			if !desktopNoWindow {
 				desktopOpenWindow(url + "/Main")
 			}
@@ -270,6 +271,14 @@ func desktopPickDataDir(flagDir string) string {
 
 // desktopLog sends the server's log to geek4u.log in the data folder, and
 // also to the terminal when it was started from one.
+// desktopAnnounce writes the address to the file the Electron window names
+// in GEEK4U_ADDR_FILE, so it doesn't depend on reading our output.
+func desktopAnnounce(url string) {
+	if f := os.Getenv("GEEK4U_ADDR_FILE"); f != "" {
+		os.WriteFile(f, []byte(url), 0644)
+	}
+}
+
 func desktopLog() {
 	name := filepath.Join(desktopDataDir, "geek4u.log")
 	if fi, err := os.Stat(name); err == nil && fi.Size() > 5<<20 {
@@ -409,6 +418,7 @@ func desktopRun(handler http.Handler) {
 		desktopFail("The server stopped: " + fmt.Sprint(err))
 	}()
 	fmt.Println("Geek4u is running at " + desktopURL + " (data in " + desktopDataDir + ")")
+	desktopAnnounce(desktopURL)
 
 	if desktopNoWindow {
 		select {}

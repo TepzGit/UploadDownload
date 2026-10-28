@@ -52,6 +52,7 @@
 <main class="xn-page fx">
   <section class="xn-card fx-card">
     <div class="fx-head">
+      {{if .Icon.Image}}<span class="fx-headicon"><img src="{{.Icon.Image}}" alt=""></span>{{else if .Icon.Emoji}}<span class="fx-headicon fx-heademoji" aria-hidden="true">{{.Icon.Emoji}}</span>{{end}}
       <div class="fx-titles">
         <p class="xn-eyebrow">Files</p>
         <h1 class="xn-h1" id="title">File explorer</h1>
