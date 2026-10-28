@@ -107,13 +107,14 @@
   <button type="button" role="menuitem" data-act="download">Download</button>
   {{if .CanEdit}}
   <button type="button" role="menuitem" data-act="rename">Rename</button>
-  {{if .IsAdmin}}<button type="button" role="menuitem" data-act="icon">Folder icon…</button>{{end}}
+  <button type="button" role="menuitem" data-act="move">Move…</button>
+  <button type="button" role="menuitem" data-act="icon">Folder picture…</button>
   <hr>
   <button type="button" role="menuitem" data-act="delete" class="is-danger">Delete</button>
   {{end}}
 </div>
 <script>window.xnFilesCanEdit = {{if .CanEdit}}true{{else}}false{{end}};</script>
-{{if .IsAdmin}}<script src="/foldericon.js"></script>{{end}}
+{{if .CanEdit}}<script src="/foldericon.js"></script><script src="/filemove.js"></script>{{end}}
 
 <div id="previewModal" class="fx-modal" role="dialog" aria-modal="true" aria-labelledby="modalName" hidden>
   <div class="fx-modal-card">
