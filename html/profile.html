@@ -228,7 +228,78 @@
         </label>
       </div>
       <p class="pf-note">Changes the main color of the whole site for your account.</p>
-      <span class="xn-label pf-ap-label" id="sceneLabel">Site background</span>
+      <p class="pf-note pf-moved">Site background, font, text size and the logo are under Preferences.</p>
+      {{if .IsAdmin}}
+      <span class="xn-label pf-ap-label" id="nameColorLabel">Name color <small class="pf-admin-tag">Admin</small></span>
+      <div class="pf-colors" role="radiogroup" aria-labelledby="nameColorLabel" id="namePicks" data-current="{{.NameColor}}">
+        <button type="button" role="radio" class="pf-swatch pf-swatch-none" data-color="" aria-label="No color (white)"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#a67cff" style="--sw:#a67cff" aria-label="Violet"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#60a5fa" style="--sw:#60a5fa" aria-label="Blue"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#2dd4bf" style="--sw:#2dd4bf" aria-label="Teal"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#a3e635" style="--sw:#a3e635" aria-label="Lime"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#fbbf24" style="--sw:#fbbf24" aria-label="Amber"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#fb923c" style="--sw:#fb923c" aria-label="Orange"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#f87171" style="--sw:#f87171" aria-label="Red"></button>
+        <button type="button" role="radio" class="pf-swatch" data-color="#f472b6" style="--sw:#f472b6" aria-label="Pink"></button>
+        <label class="pf-swatch pf-swatch-custom" title="Pick any color">
+          <input type="color" id="nameCustom" value="#ffffff" aria-label="Pick any color for your name">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </label>
+      </div>
+      <p class="pf-note">Your name shows in this color everywhere: posts, comments, members, friends and your profile.</p>
+      {{end}}
+    </div>
+    <button type="button" id="CSA" class="xn-btn xn-btn-primary pop-done">Close</button>
+  </div>
+</div>
+
+<div class="popup" id="DT" role="dialog" aria-modal="true" aria-labelledby="DTtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="DTtitle">Data settings</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="content">
+      <button type="button" class="xn-btn">Import data</button>
+      <button type="button" class="xn-btn xn-btn-danger">Clear</button>
+    </div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSD">Done</button>
+  </div>
+</div>
+
+<div class="popup pr-big" id="PR" role="dialog" aria-modal="true" aria-labelledby="PRtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="PRtitle">Preferences</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="pr-grid">
+    <section class="APcontent pr-col" aria-labelledby="lkLabel">
+      <span class="xn-label" id="lkLabel">Site look</span>
+      <p class="pf-note">How every page looks for your account. Changes save by themselves.</p>
+      <span class="xn-label pf-ap-label" id="lkFontLabel">Font</span>
+      <div class="pr-fonts" role="radiogroup" aria-labelledby="lkFontLabel" id="lkFonts">
+          <button type="button" role="radio" class="pr-font" data-font=""><span class="pr-font-aa" data-font-sample="">Aa</span><span class="pr-font-name">Default</span></button>
+          <button type="button" role="radio" class="pr-font" data-font="jetbrains"><span class="pr-font-aa" data-font-sample="jetbrains">Aa</span><span class="pr-font-name">JetBrains</span></button>
+          <button type="button" role="radio" class="pr-font" data-font="inter"><span class="pr-font-aa" data-font-sample="inter">Aa</span><span class="pr-font-name">Inter</span></button>
+          <button type="button" role="radio" class="pr-font" data-font="grotesk"><span class="pr-font-aa" data-font-sample="grotesk">Aa</span><span class="pr-font-name">Grotesk</span></button>
+          <button type="button" role="radio" class="pr-font" data-font="system"><span class="pr-font-aa" data-font-sample="system">Aa</span><span class="pr-font-name">System</span></button>
+          <button type="button" role="radio" class="pr-font" data-font="serif"><span class="pr-font-aa" data-font-sample="serif">Aa</span><span class="pr-font-name">Serif</span></button>
+          <button type="button" role="radio" class="pr-font" data-font="rounded"><span class="pr-font-aa" data-font-sample="rounded">Aa</span><span class="pr-font-name">Rounded</span></button>
+      </div>
+      <label class="xn-label pf-ap-label" for="lkSize">Text size</label>
+      <div class="pf-range-row">
+        <input type="range" id="lkSize" class="pf-slider" min="80" max="130" step="5" value="100">
+        <output id="lkSizeOut" for="lkSize">100%</output>
+      </div>
+      <span class="xn-label pf-ap-label">Menu</span>
+      <label class="ps-check pr-check"><input type="checkbox" id="lkLogo" checked><span>Show the geek⁴u logo in the menu</span></label>
+      <div class="ps-actions">
+        <button type="button" class="xn-btn" id="lkReset">Back to default</button>
+        <span class="pf-note" id="lkStatus" aria-live="polite"></span>
+      </div>
+      <hr class="ps-rule">
+      <span class="xn-label" id="sceneLabel">Site background</span>
       <div class="pf-scenes" role="radiogroup" aria-labelledby="sceneLabel" id="scenePicks">
         <button type="button" role="radio" class="pf-scene" data-scene=""><span class="pf-scene-thumb" data-thumb="drift"></span><span>Drift</span></button>
         <button type="button" role="radio" class="pf-scene" data-scene="aurora"><span class="pf-scene-thumb" data-thumb="aurora"></span><span>Aurora</span></button>
@@ -252,52 +323,8 @@
       </div>
       <input type="file" class="pf-file" id="sceneFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
       <p class="pf-note">The background behind every page of the site, for your account.</p>
-      {{if .IsAdmin}}
-      <span class="xn-label pf-ap-label" id="nameColorLabel">Name color <small class="pf-admin-tag">Admin</small></span>
-      <div class="pf-colors" role="radiogroup" aria-labelledby="nameColorLabel" id="namePicks" data-current="{{.NameColor}}">
-        <button type="button" role="radio" class="pf-swatch pf-swatch-none" data-color="" aria-label="No color (white)"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#a67cff" style="--sw:#a67cff" aria-label="Violet"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#60a5fa" style="--sw:#60a5fa" aria-label="Blue"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#2dd4bf" style="--sw:#2dd4bf" aria-label="Teal"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#a3e635" style="--sw:#a3e635" aria-label="Lime"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#fbbf24" style="--sw:#fbbf24" aria-label="Amber"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#fb923c" style="--sw:#fb923c" aria-label="Orange"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#f87171" style="--sw:#f87171" aria-label="Red"></button>
-        <button type="button" role="radio" class="pf-swatch" data-color="#f472b6" style="--sw:#f472b6" aria-label="Pink"></button>
-        <label class="pf-swatch pf-swatch-custom" title="Pick any color">
-          <input type="color" id="nameCustom" value="#ffffff" aria-label="Pick any color for your name">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        </label>
-      </div>
-      <p class="pf-note">Your name shows in this color everywhere: posts, comments, members, friends and your profile.</p>
-      {{end}}
-    </div>
-    <p class="pf-note">Graph colors for each substance are under Preferences.</p>
-    <button type="button" id="CSA" class="xn-btn xn-btn-primary pop-done">Close</button>
-  </div>
-</div>
-
-<div class="popup" id="DT" role="dialog" aria-modal="true" aria-labelledby="DTtitle">
-  <div class="popcase">
-    <div class="pop-head">
-      <h2 class="xn-h2" id="DTtitle">Data settings</h2>
-      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
-    </div>
-    <div class="content">
-      <button type="button" class="xn-btn">Import data</button>
-      <button type="button" class="xn-btn xn-btn-danger">Clear</button>
-    </div>
-    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSD">Done</button>
-  </div>
-</div>
-
-<div class="popup" id="PR" role="dialog" aria-modal="true" aria-labelledby="PRtitle">
-  <div class="popcase">
-    <div class="pop-head">
-      <h2 class="xn-h2" id="PRtitle">Preferences</h2>
-      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
-    </div>
-    <div class="APcontent">
+    </section>
+    <section class="APcontent pr-col">
       <span class="xn-label" id="psLabel">Graph style</span>
       <p class="pf-note">How the Graph page draws your doses. Changes save by themselves.</p>
       <div class="ps-preview" id="psPreview" aria-label="Preview of the graph style"><p class="pf-note">Loading the preview…</p></div>
@@ -349,6 +376,7 @@
       <p class="pf-note gc-status" id="gcStatus" aria-live="polite"></p>
       <div class="gc-list" id="gcList"></div>
       <p class="xn-empty" id="gcEmpty" hidden>No custom colors yet. Search for a substance to add one.</p>
+    </section>
     </div>
     <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSP">Done</button>
   </div>
@@ -1100,6 +1128,57 @@
         closeSug();
       }
     });
+  })();
+
+  // ---------------- Site look (Preferences): font, text size, logo ----------------
+  (function siteLook() {
+    if (!window.xnLook) return;
+    const fonts = [...document.querySelectorAll("#lkFonts .pr-font")];
+    const size = document.getElementById("lkSize");
+    const sizeOut = document.getElementById("lkSizeOut");
+    const logo = document.getElementById("lkLogo");
+    const status = document.getElementById("lkStatus");
+    let timer = 0;
+    function show(look) {
+      fonts.forEach((b) => {
+        const on = b.dataset.font === look.font;
+        b.setAttribute("aria-checked", String(on));
+        b.tabIndex = on ? 0 : -1;
+      });
+      size.value = look.size;
+      sizeOut.textContent = look.size + "%";
+      logo.checked = look.logo;
+    }
+    function change(part, saveNow) {
+      const look = window.xnLook.clean(Object.assign(window.xnLook.get(), part));
+      window.xnLook.use(look);
+      show(look);
+      clearTimeout(timer);
+      status.textContent = "Saving…";
+      timer = setTimeout(() => {
+        fetch("/profile/appearance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ siteLook: look }), keepalive: true })
+          .then((res) => { status.textContent = res.ok ? "Saved." : "Couldn't save."; })
+          .catch(() => { status.textContent = "Couldn't save. Check your connection."; });
+      }, saveNow ? 0 : 400);
+    }
+    fonts.forEach((b, i) => {
+      b.addEventListener("click", () => change({ font: b.dataset.font }, true));
+      b.addEventListener("keydown", (e) => {
+        const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const next = fonts[(i + step + fonts.length) % fonts.length];
+        next.focus();
+        next.click();
+      });
+    });
+    // The size applies when the slider is let go, so the window doesn't
+    // jump around under the finger while dragging.
+    size.addEventListener("input", () => { sizeOut.textContent = size.value + "%"; });
+    size.addEventListener("change", () => change({ size: Number(size.value) }));
+    logo.addEventListener("change", () => change({ logo: logo.checked }, true));
+    document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true }, true));
+    show(window.xnLook.get());
   })();
 
   // ---------------- Widget transparency and site color ----------------

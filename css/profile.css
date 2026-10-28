@@ -1053,3 +1053,32 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 /* Drug names in notes get their icon in front (js/notedrugs.js) */
 .nd-drug { white-space: nowrap; }
 .nd-drug .nd-icon { width: 1.15em; height: 1.15em; margin-right: 0.2em; vertical-align: -0.2em; color: var(--oled-accent); }
+
+/* Preferences: a big window with Site look on the left, Graph on the right */
+.popup.pr-big .popcase { box-sizing: border-box; width: min(1180px, 100%); height: calc(100dvh - 48px); max-height: none; overflow: hidden; }
+.pr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 32px; align-items: start; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -8px; padding: 0 8px 8px; }
+.popup.pr-big .pop-done { flex: none; }
+.pr-col { min-width: 0; }
+.pr-fonts { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.pr-font { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 72px; padding: 10px 12px; border: 1px solid var(--oled-line); border-radius: 2px; background: var(--oled-surface-2); color: var(--oled-text); text-align: left; cursor: pointer; transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.12s ease; }
+.pr-font[aria-checked="true"] { border-color: var(--oled-accent); background: var(--oled-accent-soft); }
+@media (hover: hover) { .pr-font:hover { border-color: rgba(var(--xn-accent-rgb), 0.5); } }
+.pr-font:active { transform: scale(0.97); }
+.pr-font:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pr-font-aa { font-size: 26px; line-height: 1; }
+.pr-font-name { font-size: 12px; color: var(--oled-muted); }
+/* Each tile shows its own font (the site rule sets fonts with !important). */
+.pr-font [data-font-sample=""] { font-family: "Roboto Mono", monospace !important; }
+.pr-font [data-font-sample="jetbrains"] { font-family: "JetBrains Mono", monospace !important; }
+.pr-font [data-font-sample="inter"] { font-family: "Inter", system-ui, sans-serif !important; }
+.pr-font [data-font-sample="grotesk"] { font-family: "Space Grotesk", system-ui, sans-serif !important; }
+.pr-font [data-font-sample="system"] { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important; }
+.pr-font [data-font-sample="serif"] { font-family: Georgia, "Times New Roman", serif !important; }
+.pr-font [data-font-sample="rounded"] { font-family: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Varela Round", system-ui, sans-serif !important; }
+.pr-check { align-self: flex-start; }
+@media (max-width: 860px) {
+  .pr-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .popup.pr-big .popcase { height: calc(100dvh - 24px - env(safe-area-inset-top)); max-height: none; }
+}

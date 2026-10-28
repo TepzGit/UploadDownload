@@ -494,7 +494,7 @@ func main() {
 	// createdAt and lastSeen (ms) feed the Admin page's account list.
 	// graphsMade and postsMade count every Graph session and Forum post ever made
 	// (for the geek rank), so deleting or the session limit doesn't lower it.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0"} {
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
@@ -3867,6 +3867,7 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 			SiteBg      *string    `json:"siteBg"`
 			SiteBgDim   *int       `json:"siteBgDim"`
 			PlotStyle   *plotStyle `json:"plotStyle"`
+			SiteLook    *siteLook  `json:"siteLook"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in); err != nil {
 			http.Error(w, "Bad request.", http.StatusBadRequest)
@@ -3928,6 +3929,14 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if in.SiteLook != nil {
+			body, _ := json.Marshal(in.SiteLook.clean())
+			if _, err := db.Exec("UPDATE users SET siteLook = ? WHERE id = ?", string(body), uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the site look.", http.StatusInternalServerError)
+				return
+			}
+		}
 		if in.WidgetClear != nil {
 			clear := min(max(*in.WidgetClear, 0), 100)
 			if _, err := db.Exec("UPDATE users SET widgetClear = ? WHERE id = ?", clear, uid); err != nil {
@@ -3948,9 +3957,15 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 		SiteBgImage string     `json:"siteBgImage"`
 		SiteBgDim   int        `json:"siteBgDim"`
 		PlotStyle   *plotStyle `json:"plotStyle"`
+		SiteLook    siteLook   `json:"siteLook"`
 	}
-	var storedPlot string
-	db.QueryRow("SELECT siteColor, widgetClear, nameColor, siteBg, siteBgImage, siteBgDim, plotStyle FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor, &out.SiteBg, &out.SiteBgImage, &out.SiteBgDim, &storedPlot)
+	var storedPlot, storedLook string
+	db.QueryRow("SELECT siteColor, widgetClear, nameColor, siteBg, siteBgImage, siteBgDim, plotStyle, siteLook FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor, &out.SiteBg, &out.SiteBgImage, &out.SiteBgDim, &storedPlot, &storedLook)
+	out.SiteLook = siteLook{Size: 100, Logo: true}
+	if storedLook != "" {
+		json.Unmarshal([]byte(storedLook), &out.SiteLook)
+	}
+	out.SiteLook = out.SiteLook.clean()
 	if storedPlot != "" {
 		var ps plotStyle
 		if json.Unmarshal([]byte(storedPlot), &ps) == nil {
@@ -3960,6 +3975,27 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 	}
 	out.SiteBgImage = existingPicture(out.SiteBgImage)
 	writeJSON(w, out)
+}
+
+// siteLook is the account's font, text size (percent) and whether the menu
+// shows the logo (Profile > Preferences, applied by nav.js).
+type siteLook struct {
+	Font string `json:"font"`
+	Size int    `json:"size"`
+	Logo bool   `json:"logo"`
+}
+
+var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "inter": true, "grotesk": true, "system": true, "serif": true, "rounded": true}
+
+func (l siteLook) clean() siteLook {
+	if !siteLookFonts[l.Font] {
+		l.Font = ""
+	}
+	if l.Size < 80 || l.Size > 130 {
+		l.Size = 100
+	}
+	l.Size = (l.Size + 2) / 5 * 5
+	return l
 }
 
 // plotStyle is how an account likes the Graph drawn (Profile > Preferences);

@@ -150,6 +150,39 @@
     },
   };
 
+  // Site look (Profile > Preferences): font, text size and the menu logo.
+  // { font: "" | "jetbrains" | "inter" | "grotesk" | "system" | "serif" | "rounded", size: 80-130, logo: true }
+  const LOOK_KEY = "xn_site_look";
+  const LOOK_FONTS = ["", "jetbrains", "inter", "grotesk", "system", "serif", "rounded"];
+  const cleanLook = (raw) => {
+    const look = { font: "", size: 100, logo: true };
+    if (raw && LOOK_FONTS.includes(raw.font)) look.font = raw.font;
+    const size = Number(raw && raw.size);
+    if (size >= 80 && size <= 130) look.size = Math.round(size / 5) * 5;
+    if (raw && raw.logo === false) look.logo = false;
+    return look;
+  };
+  let look = cleanLook(null);
+  try { if (signedIn) look = cleanLook(JSON.parse(localStorage.getItem(LOOK_KEY) || "null")); } catch (_) {}
+  if (!signedIn) { try { localStorage.removeItem(LOOK_KEY); } catch (_) {} }
+  function applyLook(next) {
+    look = cleanLook(next);
+    const root = document.documentElement;
+    if (look.font) root.dataset.font = look.font;
+    else delete root.dataset.font;
+    root.classList.toggle("xn-nologo", !look.logo);
+    root.style.zoom = look.size === 100 ? "" : String(look.size / 100);
+  }
+  applyLook(look);
+  window.xnLook = {
+    get: () => Object.assign({}, look),
+    clean: cleanLook,
+    use(next) {
+      applyLook(next);
+      try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (_) {}
+    },
+  };
+
   if (signedIn) {
     fetch("/profile/appearance", { headers: { Accept: "application/json" } })
       .then((res) => (res.ok ? res.json() : null))
@@ -159,6 +192,8 @@
         if (color !== cached) window.xnSiteColor.use(color);
         const next = { scene: data.siteBg || "", image: data.siteBgImage || "", dim: data.siteBgDim == null ? 40 : data.siteBgDim };
         if (JSON.stringify(next) !== JSON.stringify(scene)) window.xnScene.use(next);
+        const nextLook = cleanLook(data.siteLook);
+        if (JSON.stringify(nextLook) !== JSON.stringify(look)) window.xnLook.use(nextLook);
         // Graph style (Profile > Preferences), read by js/plot.js.
         try {
           const plotStyle = JSON.stringify(data.plotStyle || {});
