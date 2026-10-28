@@ -1035,3 +1035,21 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .sy-bar { height: 6px; border-radius: 3px; background: var(--oled-line); overflow: hidden; }
 .sy-bar[hidden] { display: none; }
 .sy-bar span { display: block; height: 100%; width: 0; background: var(--oled-accent); transition: width .2s; }
+
+/* Preferences: Graph style (js/plotstyle.js) */
+.ps-preview { height: 190px; margin: 8px 0 4px; border: 1px solid var(--oled-line); border-radius: 12px; background: #000; overflow: hidden; }
+.ps-preview > .pf-note { padding: 16px; }
+.ps-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--oled-line); border-radius: 999px; overflow: hidden; }
+.ps-seg button { min-height: 34px; padding: 0 14px; border: 0; background: transparent; color: var(--oled-muted); font-size: 12px; cursor: pointer; }
+.ps-seg button[aria-checked="true"] { background: var(--oled-accent-soft); color: var(--oled-text); font-weight: 600; }
+.ps-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.ps-check { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border: 1px solid var(--oled-line); border-radius: 8px; font-size: 13px; cursor: pointer; }
+.ps-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--oled-accent); }
+.ps-check:has(input:checked) { border-color: rgba(var(--xn-accent-rgb), 0.5); }
+.ps-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+.ps-actions .pf-note { margin: 0; }
+.ps-rule { margin: 20px 0 14px; border: 0; border-top: 1px solid var(--oled-line); }
+
+/* Drug names in notes get their icon in front (js/notedrugs.js) */
+.nd-drug { white-space: nowrap; }
+.nd-drug .nd-icon { width: 1.15em; height: 1.15em; margin-right: 0.2em; vertical-align: -0.2em; color: var(--oled-accent); }

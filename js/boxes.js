@@ -4,6 +4,7 @@
 // Needs media.js (xnViewer, xnShrinkPicture) on the page.
 import { previewTimeline, previewColors, setCustomColors, timeToHours, formatChartTime } from "/logic.js";
 import { avatar, profileLink } from "/forum.js";
+import { markDrugs } from "/notedrugs.js";
 
 export const MAX_BOXES = 12;
 const PER_BOX = 4;
@@ -361,7 +362,7 @@ export async function mountBoxes({ grid, user = "", editable = false }) {
     if (box.note) {
       const text = document.createElement("div");
       text.className = "pf-note-text";
-      text.textContent = box.note;
+      markDrugs(text, box.note);
       card.append(text);
     } else if (editable) {
       const write = document.createElement("button");

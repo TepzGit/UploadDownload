@@ -69,10 +69,29 @@ let customList = null;
 /** A custom entry from /substances/custom in PsychonautWiki's shape. */
 export function customToSubstance(c) {
   const hours = (v) => (Number(v) > 0 ? { min: Number(v), max: Number(v), units: "hours" } : null);
-  const d = c.durations || {};
-  const total = effectHours(d);
   const range = (r) => (r && (r.min != null || r.max != null) ? { min: r.min ?? r.max, max: r.max ?? r.min } : null);
   const named = (list) => (list || []).map((name) => ({ name }));
+  // The first ingestion method sits on the substance itself, more in methods.
+  const methods = [{ route: c.route, dose: c.dose, durations: c.durations }, ...(Array.isArray(c.methods) ? c.methods : [])];
+  const roa = (m) => {
+    const d = m.durations || {};
+    return {
+      name: m.route || "oral",
+      dose: {
+        units: c.units || "mg",
+        threshold: m.dose?.threshold ?? null,
+        heavy: m.dose?.heavy ?? null,
+        light: range(m.dose?.light),
+        common: range(m.dose?.common),
+        strong: range(m.dose?.strong),
+      },
+      duration: {
+        onset: hours(d.onset), comeup: hours(d.comeup), peak: hours(d.peak), offset: hours(d.offset),
+        total: hours(effectHours(d)),
+      },
+      extended: { comedown: d.comedown, comedownLevel: d.comedownLevel, peak2: d.peak2 },
+    };
+  };
   return {
     name: c.name,
     custom: true,
@@ -88,22 +107,7 @@ export function customToSubstance(c) {
     dangerousInteractions: named(c.interactions?.dangerous),
     unsafeInteractions: named(c.interactions?.unsafe),
     uncertainInteractions: named(c.interactions?.uncertain),
-    roas: [{
-      name: c.route || "oral",
-      dose: {
-        units: c.units || "mg",
-        threshold: c.dose?.threshold ?? null,
-        heavy: c.dose?.heavy ?? null,
-        light: range(c.dose?.light),
-        common: range(c.dose?.common),
-        strong: range(c.dose?.strong),
-      },
-      duration: {
-        onset: hours(d.onset), comeup: hours(d.comeup), peak: hours(d.peak), offset: hours(d.offset),
-        total: hours(total),
-      },
-      extended: { comedown: d.comedown, comedownLevel: d.comedownLevel, peak2: d.peak2 },
-    }],
+    roas: methods.map(roa),
   };
 }
 

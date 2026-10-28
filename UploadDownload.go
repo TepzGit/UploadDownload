@@ -106,6 +106,9 @@ type FileFolderInfo struct {
 	IsVid   bool
 	Size    int
 	Date    time.Time
+	// Set by an admin for folders (withFolderIcons).
+	IconEmoji string `json:",omitempty"`
+	IconImage string `json:",omitempty"`
 }
 
 type MakeFolderData struct {
@@ -491,7 +494,7 @@ func main() {
 	// createdAt and lastSeen (ms) feed the Admin page's account list.
 	// graphsMade and postsMade count every Graph session and Forum post ever made
 	// (for the geek rank), so deleting or the session limit doesn't lower it.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0"} {
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
@@ -507,6 +510,7 @@ func main() {
 	}
 	registerNotes()
 	registerAppUpdates()
+	registerLinkDownloads()
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE profile_boxes ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -1691,7 +1695,8 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			IsRoot   bool
 			BackPath string
 			CanEdit  bool
-		}{CanEdit: grant.canChangeIn(rel)}
+			IsAdmin  bool
+		}{CanEdit: grant.canChangeIn(rel), IsAdmin: session.Authority == "admin"}
 		if path == "/Files" {
 			d.IsRoot = true
 		} else {
@@ -1708,7 +1713,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Cant find folder/file", http.StatusBadRequest)
 			return
 		}
-		d.Files = grant.visible(d.Files, rel)
+		d.Files = withFolderIcons(grant.visible(d.Files, rel), rel)
 
 		tpl, err := template.ParseFiles("html/Downloader.html")
 		if err != nil {
@@ -1840,9 +1845,11 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var FoldersReturn struct {
-		Folders     []string `json:"Folders"`
-		CurrentPath string   `json:"CurrentPath"`
+		Folders     []string              `json:"Folders"`
+		CurrentPath string                `json:"CurrentPath"`
+		Icons       map[string]folderIcon `json:"Icons"`
 	}
+	FoldersReturn.Icons = map[string]folderIcon{}
 
 	err := json.NewDecoder(r.Body).Decode(&getFolderData)
 	if err != nil {
@@ -1872,6 +1879,9 @@ func getFolders(w http.ResponseWriter, r *http.Request) {
 	for _, Dir := range Dirs {
 		if Dir.IsDir() && grant.canSee(joinRel(uploadRel(Path), Dir.Name())) {
 			FoldersReturn.Folders = append(FoldersReturn.Folders, Dir.Name())
+			if ic := folderIconFor(joinRel(uploadRel(Path), Dir.Name())); ic != (folderIcon{}) {
+				FoldersReturn.Icons[Dir.Name()] = ic
+			}
 		}
 	}
 	rel, _ := filepath.Rel(UploadedFilesDirName, Path)
@@ -2170,6 +2180,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
 		return
 	}
+	forgetFolderIcon(uploadRel(path))
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -2205,6 +2216,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 			return
 
 		}
+		moveFolderIcons(uploadRel(currentFilePath), uploadRel(newFilePath))
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -3848,11 +3860,12 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 	uid := session.UserId
 	if r.Method == http.MethodPost {
 		var in struct {
-			SiteColor   *string `json:"siteColor"`
-			WidgetClear *int    `json:"widgetClear"`
-			NameColor   *string `json:"nameColor"`
-			SiteBg      *string `json:"siteBg"`
-			SiteBgDim   *int    `json:"siteBgDim"`
+			SiteColor   *string    `json:"siteColor"`
+			WidgetClear *int       `json:"widgetClear"`
+			NameColor   *string    `json:"nameColor"`
+			SiteBg      *string    `json:"siteBg"`
+			SiteBgDim   *int       `json:"siteBgDim"`
+			PlotStyle   *plotStyle `json:"plotStyle"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in); err != nil {
 			http.Error(w, "Bad request.", http.StatusBadRequest)
@@ -3906,6 +3919,14 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if in.PlotStyle != nil {
+			body, _ := json.Marshal(in.PlotStyle.clean())
+			if _, err := db.Exec("UPDATE users SET plotStyle = ? WHERE id = ?", string(body), uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the graph style.", http.StatusInternalServerError)
+				return
+			}
+		}
 		if in.WidgetClear != nil {
 			clear := min(max(*in.WidgetClear, 0), 100)
 			if _, err := db.Exec("UPDATE users SET widgetClear = ? WHERE id = ?", clear, uid); err != nil {
@@ -3919,16 +3940,58 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var out struct {
-		SiteColor   string `json:"siteColor"`
-		WidgetClear int    `json:"widgetClear"`
-		NameColor   string `json:"nameColor"`
-		SiteBg      string `json:"siteBg"`
-		SiteBgImage string `json:"siteBgImage"`
-		SiteBgDim   int    `json:"siteBgDim"`
+		SiteColor   string     `json:"siteColor"`
+		WidgetClear int        `json:"widgetClear"`
+		NameColor   string     `json:"nameColor"`
+		SiteBg      string     `json:"siteBg"`
+		SiteBgImage string     `json:"siteBgImage"`
+		SiteBgDim   int        `json:"siteBgDim"`
+		PlotStyle   *plotStyle `json:"plotStyle"`
 	}
-	db.QueryRow("SELECT siteColor, widgetClear, nameColor, siteBg, siteBgImage, siteBgDim FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor, &out.SiteBg, &out.SiteBgImage, &out.SiteBgDim)
+	var storedPlot string
+	db.QueryRow("SELECT siteColor, widgetClear, nameColor, siteBg, siteBgImage, siteBgDim, plotStyle FROM users WHERE id = ?", uid).Scan(&out.SiteColor, &out.WidgetClear, &out.NameColor, &out.SiteBg, &out.SiteBgImage, &out.SiteBgDim, &storedPlot)
+	if storedPlot != "" {
+		var ps plotStyle
+		if json.Unmarshal([]byte(storedPlot), &ps) == nil {
+			ps = ps.clean()
+			out.PlotStyle = &ps
+		}
+	}
 	out.SiteBgImage = existingPicture(out.SiteBgImage)
 	writeJSON(w, out)
+}
+
+// plotStyle is how an account likes the Graph drawn (Profile > Preferences);
+// js/plot.js has the same fields and defaults.
+type plotStyle struct {
+	Width    *int   `json:"width,omitempty"`
+	Shape    string `json:"shape,omitempty"`
+	Fill     *int   `json:"fill,omitempty"`
+	Glow     *bool  `json:"glow,omitempty"`
+	Grid     *bool  `json:"grid,omitempty"`
+	YLabels  *bool  `json:"yLabels,omitempty"`
+	TopHours *bool  `json:"topHours,omitempty"`
+	Dots     *bool  `json:"dots,omitempty"`
+	Now      *bool  `json:"now,omitempty"`
+	Height   string `json:"height,omitempty"`
+}
+
+func (p plotStyle) clean() plotStyle {
+	if p.Width != nil {
+		v := min(max(*p.Width, 2), 12)
+		p.Width = &v
+	}
+	if p.Fill != nil {
+		v := min(max(*p.Fill, 0), 60)
+		p.Fill = &v
+	}
+	if p.Shape != "smooth" && p.Shape != "sharp" {
+		p.Shape = ""
+	}
+	if p.Height != "compact" && p.Height != "normal" && p.Height != "tall" {
+		p.Height = ""
+	}
+	return p
 }
 
 // profileLayout splits the stored card order ("intake,totals,b12") into keys.
@@ -4691,6 +4754,8 @@ func adminNameColor(name, authority string) string {
 var sitePictureSlots = map[string]string{
 	"member1": "/hookey.jpg",
 	"member2": "/tepz.jpg",
+	// Music page Library picture; "" = the built-in icon.
+	"musicLibrary": "",
 }
 
 var sitePicturesDir = filepath.Join(ProfilePicturesDirName, "site")
@@ -4717,6 +4782,10 @@ func sitePicture(w http.ResponseWriter, r *http.Request) {
 	}
 	var path string
 	if db.QueryRow("SELECT path FROM site_pictures WHERE slot = ?", slot).Scan(&path) != nil {
+		if fallback == "" {
+			http.NotFound(w, r)
+			return
+		}
 		http.Redirect(w, r, fallback, http.StatusFound)
 		return
 	}
@@ -6435,28 +6504,42 @@ type customSubstance struct {
 		Unsafe    []string `json:"unsafe"`
 		Uncertain []string `json:"uncertain"`
 	} `json:"interactions"`
-	Route string `json:"route"`
-	Units string `json:"units"`
-	Dose  struct {
-		Threshold *float64    `json:"threshold,omitempty"`
-		Light     *rangeValue `json:"light,omitempty"`
-		Common    *rangeValue `json:"common,omitempty"`
-		Strong    *rangeValue `json:"strong,omitempty"`
-		Heavy     *float64    `json:"heavy,omitempty"`
-	} `json:"dose"`
-	// All in hours, the same shape the Graph draws (js/curve.js).
-	Durations struct {
-		Onset         float64     `json:"onset"`
-		Comeup        float64     `json:"comeup"`
-		Peak          float64     `json:"peak"`
-		Comedown      float64     `json:"comedown"`
-		ComedownLevel float64     `json:"comedownLevel"`
-		Offset        float64     `json:"offset"`
-		Peak2         *secondPeak `json:"peak2,omitempty"`
-	} `json:"durations"`
-	CreatedBy string `json:"createdBy,omitempty"`
-	CreatedAt int64  `json:"createdAt,omitempty"`
-	UpdatedAt int64  `json:"updatedAt,omitempty"`
+	// The first ingestion method; Methods holds any others.
+	Route     string          `json:"route"`
+	Units     string          `json:"units"`
+	Dose      customDose      `json:"dose"`
+	Durations customDurations `json:"durations"`
+	Methods   []customMethod  `json:"methods,omitempty"`
+	CreatedBy string          `json:"createdBy,omitempty"`
+	CreatedAt int64           `json:"createdAt,omitempty"`
+	UpdatedAt int64           `json:"updatedAt,omitempty"`
+}
+
+type customDose struct {
+	Threshold *float64    `json:"threshold,omitempty"`
+	Light     *rangeValue `json:"light,omitempty"`
+	Common    *rangeValue `json:"common,omitempty"`
+	Strong    *rangeValue `json:"strong,omitempty"`
+	Heavy     *float64    `json:"heavy,omitempty"`
+}
+
+// All in hours, the same shape the Graph draws (js/curve.js).
+type customDurations struct {
+	Onset         float64     `json:"onset"`
+	Comeup        float64     `json:"comeup"`
+	Peak          float64     `json:"peak"`
+	Comedown      float64     `json:"comedown"`
+	ComedownLevel float64     `json:"comedownLevel"`
+	Offset        float64     `json:"offset"`
+	Peak2         *secondPeak `json:"peak2,omitempty"`
+}
+
+// customMethod is one more way to take the substance (rectal, insufflated...)
+// with its own doses and timeline.
+type customMethod struct {
+	Route     string          `json:"route"`
+	Dose      customDose      `json:"dose"`
+	Durations customDurations `json:"durations"`
 }
 
 func cleanList(in []string, maxItems, maxLen int) []string {
@@ -6506,10 +6589,6 @@ func (c *customSubstance) clean() string {
 	c.Interactions.Dangerous = cleanList(c.Interactions.Dangerous, 60, 80)
 	c.Interactions.Unsafe = cleanList(c.Interactions.Unsafe, 60, 80)
 	c.Interactions.Uncertain = cleanList(c.Interactions.Uncertain, 60, 80)
-	c.Route = strings.ToLower(cleanText(c.Route, 30))
-	if c.Route == "" {
-		c.Route = "oral"
-	}
 	c.Units = cleanText(c.Units, 12)
 	if c.Units == "" {
 		c.Units = "mg"
@@ -6517,7 +6596,32 @@ func (c *customSubstance) clean() string {
 	if !okRange(c.HalfLife, 24*365) {
 		return "The half-life needs numbers from 0 up, with the lowest first."
 	}
-	d := &c.Dose
+	if msg := cleanCustomMethod(&c.Route, &c.Dose, &c.Durations); msg != "" {
+		return msg
+	}
+	if len(c.Methods) > 12 {
+		return "A substance can have at most 13 ingestion methods."
+	}
+	seen := map[string]bool{c.Route: true}
+	for i := range c.Methods {
+		m := &c.Methods[i]
+		if msg := cleanCustomMethod(&m.Route, &m.Dose, &m.Durations); msg != "" {
+			return m.Route + ": " + msg
+		}
+		if seen[m.Route] {
+			return "Each ingestion method can only be added once (" + m.Route + " is there twice)."
+		}
+		seen[m.Route] = true
+	}
+	return ""
+}
+
+// cleanCustomMethod checks one ingestion method's route, doses and timeline.
+func cleanCustomMethod(route *string, d *customDose, t *customDurations) string {
+	*route = strings.ToLower(cleanText(*route, 30))
+	if *route == "" {
+		*route = "oral"
+	}
 	if !okNumber(d.Threshold, 1e6) || !okNumber(d.Heavy, 1e6) || !okRange(d.Light, 1e6) || !okRange(d.Common, 1e6) || !okRange(d.Strong, 1e6) {
 		return "Doses need numbers from 0 up, with the lowest first."
 	}
@@ -6527,7 +6631,6 @@ func (c *customSubstance) clean() string {
 	if (d.Common.Min != nil && *d.Common.Min <= 0) || (d.Common.Min == nil && *d.Common.Max <= 0) {
 		return "The common dose must be more than 0."
 	}
-	t := &c.Durations
 	for _, v := range []float64{t.Onset, t.Comeup, t.Peak, t.Comedown, t.Offset} {
 		if !inRange(v, 0, 240) {
 			return "Durations must be between 0 and 240 hours."
@@ -7253,7 +7356,8 @@ func musicLibrary(w http.ResponseWriter, r *http.Request) {
 		scanning = musicRefresh(r.URL.Query().Get("wait") == "1")
 	}
 	w.Header().Set("Cache-Control", "no-cache")
-	writeJSON(w, map[string]any{"tracks": musicLibraryFor(s), "scanning": scanning, "ffmpeg": ffmpegPath() != "", "access": access})
+	writeJSON(w, map[string]any{"tracks": musicLibraryFor(s), "scanning": scanning, "ffmpeg": ffmpegPath() != "", "access": access,
+		"libraryIcon": sitePictureLink("musicLibrary"), "admin": s.Authority == "admin"})
 }
 
 type playlistSummary struct {
@@ -8947,4 +9051,980 @@ func appUpdateProgram(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "no-store")
 	http.ServeFile(w, r, file)
+}
+
+// ---- Link downloads (Upload page): ffmpeg saves a video or audio link straight into a Files folder ----
+
+// Pages like YouTube aren't video files, so those go through yt-dlp when it
+// is installed (PATH or next to the server); yt-dlp then uses our ffmpeg.
+
+type linkJob struct {
+	ID       string  `json:"id"`
+	URL      string  `json:"url"`
+	Folder   string  `json:"folder"`
+	Name     string  `json:"name"`
+	State    string  `json:"state"` // running | done | error | cancelled
+	Error    string  `json:"error,omitempty"`
+	Tool     string  `json:"tool"`
+	Bytes    int64   `json:"bytes"`
+	Seconds  float64 `json:"seconds"`
+	Duration float64 `json:"duration"`
+	Percent  float64 `json:"percent"`
+	Started  int64   `json:"started"`
+	Ended    int64   `json:"ended,omitempty"`
+	user     int
+	cancel   context.CancelFunc
+}
+
+var (
+	linkJobsMu  sync.Mutex
+	linkJobs    = map[string]*linkJob{}
+	ytdlpOnce   sync.Once
+	ytdlpBin    string
+	linkTempDir = "LinkDownloads"
+)
+
+const linkJobsPerUser = 3
+const linkJobsTotal = 6
+
+var linkMediaExt = map[string]bool{".mp4": true, ".m4v": true, ".mkv": true, ".webm": true, ".mov": true, ".avi": true, ".flv": true, ".ts": true, ".mp3": true, ".m4a": true, ".aac": true, ".ogg": true, ".opus": true, ".wav": true, ".flac": true}
+var linkAudioExt = map[string]bool{".mp3": true, ".m4a": true, ".aac": true, ".ogg": true, ".opus": true, ".wav": true, ".flac": true}
+
+// ytdlpPath prefers the copy the server keeps up to date itself (linkTools),
+// then one on PATH or next to the server.
+func ytdlpPath() string {
+	if p := linkToolPath(ytdlpAsset()); p != "" {
+		return p
+	}
+	ytdlpOnce.Do(func() {
+		for _, name := range []string{"yt-dlp", "yt-dlp.exe"} {
+			if p, err := exec.LookPath(name); err == nil {
+				ytdlpBin = p
+				return
+			}
+			for _, cand := range []string{name, filepath.Join("ffmpeg", "bin", name)} {
+				if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+					ytdlpBin, _ = filepath.Abs(cand)
+					return
+				}
+			}
+		}
+	})
+	return ytdlpBin
+}
+
+// ---- yt-dlp + Deno kept up to date by the server itself ----
+// YouTube changes often, so an old yt-dlp stops working, and new yt-dlp
+// needs a JavaScript runtime (Deno) for YouTube. Nobody has to log in to the
+// server: it downloads the official release builds from GitHub into
+// linkToolsDir at start and checks for updates every 12 hours.
+
+var linkToolsDir = "LinkTools"
+
+func ytdlpAsset() string {
+	switch runtime.GOOS + "/" + runtime.GOARCH {
+	case "windows/amd64", "windows/arm64":
+		return "yt-dlp.exe"
+	case "linux/amd64":
+		return "yt-dlp_linux"
+	case "linux/arm64":
+		return "yt-dlp_linux_aarch64"
+	case "darwin/amd64", "darwin/arm64":
+		return "yt-dlp_macos"
+	}
+	return ""
+}
+
+func denoAsset() string {
+	switch runtime.GOOS + "/" + runtime.GOARCH {
+	case "windows/amd64", "windows/arm64":
+		return "deno-x86_64-pc-windows-msvc.zip"
+	case "linux/amd64":
+		return "deno-x86_64-unknown-linux-gnu.zip"
+	case "linux/arm64":
+		return "deno-aarch64-unknown-linux-gnu.zip"
+	case "darwin/amd64":
+		return "deno-x86_64-apple-darwin.zip"
+	case "darwin/arm64":
+		return "deno-aarch64-apple-darwin.zip"
+	}
+	return ""
+}
+
+func denoName() string {
+	if runtime.GOOS == "windows" {
+		return "deno.exe"
+	}
+	return "deno"
+}
+
+// linkToolPath is the absolute path of a tool in linkToolsDir, "" if it isn't there.
+func linkToolPath(name string) string {
+	if name == "" {
+		return ""
+	}
+	p := filepath.Join(linkToolsDir, name)
+	if st, err := os.Stat(p); err == nil && !st.IsDir() && st.Size() > 0 {
+		abs, _ := filepath.Abs(p)
+		return abs
+	}
+	return ""
+}
+
+// denoPath: our Deno, else one on PATH.
+func denoPath() string {
+	if p := linkToolPath(denoName()); p != "" {
+		return p
+	}
+	p, _ := exec.LookPath("deno")
+	return p
+}
+
+var linkToolsMu sync.Mutex
+var linkToolsState = map[string]string{} // "ytdlp" / "deno" -> version or error text
+
+// downloadTo saves url into path (via a .new file, so a half download never replaces a working tool).
+func downloadTo(ctx context.Context, rawURL, path string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Geek4u-server")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("GitHub answered %s", res.Status)
+	}
+	tmp := path + ".new"
+	out, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, io.LimitReader(res.Body, 400<<20)); err != nil {
+		out.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	os.Chmod(tmp, 0755)
+	os.Remove(path)
+	return os.Rename(tmp, path)
+}
+
+func linkToolVersion(bin string, args ...string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, bin, args...).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+}
+
+func updateLinkTools() {
+	if os.Getenv("GEEK4U_TOOLS") == "off" {
+		return
+	}
+	os.MkdirAll(linkToolsDir, 0755)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer cancel()
+	set := func(k, v string) {
+		linkToolsMu.Lock()
+		linkToolsState[k] = v
+		linkToolsMu.Unlock()
+	}
+
+	if asset := ytdlpAsset(); asset != "" {
+		if have := linkToolPath(asset); have == "" {
+			fmt.Println("Link downloads: getting yt-dlp from GitHub…")
+			if err := downloadTo(ctx, "https://github.com/yt-dlp/yt-dlp/releases/latest/download/"+asset, filepath.Join(linkToolsDir, asset)); err != nil {
+				fmt.Println("Link downloads: couldn't get yt-dlp:", err)
+				set("ytdlp", "couldn't download: "+err.Error())
+			}
+		} else {
+			// The release build updates itself.
+			uctx, ucancel := context.WithTimeout(ctx, 5*time.Minute)
+			if out, err := exec.CommandContext(uctx, have, "-U").CombinedOutput(); err != nil {
+				fmt.Println("Link downloads: yt-dlp -U:", err, strings.TrimSpace(string(out)))
+			}
+			ucancel()
+		}
+		if p := linkToolPath(asset); p != "" {
+			set("ytdlp", linkToolVersion(p, "--version"))
+		}
+	}
+
+	if asset := denoAsset(); asset != "" {
+		zipPath := filepath.Join(linkToolsDir, asset)
+		have := linkToolPath(denoName())
+		var stamp time.Time
+		if st, err := os.Stat(zipPath + ".got"); err == nil {
+			stamp = st.ModTime()
+		}
+		// Deno is fetched once and then refreshed weekly.
+		if have == "" || time.Since(stamp) > 7*24*time.Hour {
+			fmt.Println("Link downloads: getting Deno from GitHub…")
+			err := downloadTo(ctx, "https://github.com/denoland/deno/releases/latest/download/"+asset, zipPath)
+			if err == nil {
+				err = unzipOne(zipPath, denoName(), filepath.Join(linkToolsDir, denoName()))
+				os.Remove(zipPath)
+			}
+			if err != nil {
+				fmt.Println("Link downloads: couldn't get Deno:", err)
+				if have == "" {
+					set("deno", "couldn't download: "+err.Error())
+				}
+			} else {
+				os.WriteFile(zipPath+".got", []byte(time.Now().Format(time.RFC3339)), 0644)
+			}
+		}
+		if p := linkToolPath(denoName()); p != "" {
+			set("deno", linkToolVersion(p, "--version"))
+		}
+	}
+}
+
+// unzipOne takes the file called name out of a zip into dest.
+func unzipOne(zipPath, name, dest string) error {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		if filepath.Base(f.Name) != name || f.FileInfo().IsDir() {
+			continue
+		}
+		in, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		tmp := dest + ".new"
+		out, err := os.Create(tmp)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(out, io.LimitReader(in, 1<<30)); err != nil {
+			out.Close()
+			os.Remove(tmp)
+			return err
+		}
+		out.Close()
+		os.Chmod(tmp, 0755)
+		os.Remove(dest)
+		return os.Rename(tmp, dest)
+	}
+	return fmt.Errorf("%s not found in %s", name, filepath.Base(zipPath))
+}
+
+func registerLinkDownloads() {
+	os.RemoveAll(linkTempDir) // leftovers from a run that was stopped
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS folder_icons (
+	path TEXT PRIMARY KEY,
+	emoji TEXT NOT NULL DEFAULT '',
+	image TEXT NOT NULL DEFAULT ''
+)`); err != nil {
+		fmt.Println("folder_icons:", err)
+	}
+	loadFolderIcons()
+	if !desktopMode {
+		go func() {
+			for {
+				updateLinkTools()
+				time.Sleep(12 * time.Hour)
+			}
+		}()
+	}
+	http.HandleFunc("/upload/link", requireFilesLogin(uploadLink))
+	http.HandleFunc("/files/folder-icon", requireAdminLogin(setFolderIcon))
+	http.HandleFunc("/folder-icon/", requireFilesLogin(serveFolderIcon))
+}
+
+// publicHost is true when every address of host is on the internet, so a
+// link can't make the server fetch from itself or the home network.
+func publicHost(host string) bool {
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return false
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return false
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsInterfaceLocalMulticast() {
+			return false
+		}
+		if v4 := ip.To4(); v4 != nil && (v4[0] == 0 || v4[0] == 100 && v4[1]&0xc0 == 64) {
+			return false
+		}
+	}
+	return true
+}
+
+// linkFileName makes a safe file name (without extension) from what the user typed or the link.
+func linkFileName(name string) string {
+	name = strings.Map(func(r rune) rune {
+		if r < 32 || strings.ContainsRune(`<>:"/\|?*`, r) {
+			return -1
+		}
+		return r
+	}, name)
+	name = strings.Trim(strings.TrimSpace(name), ". ")
+	for utf8.RuneCountInString(name) > 120 {
+		_, size := utf8.DecodeLastRuneInString(name)
+		name = name[:len(name)-size]
+	}
+	return name
+}
+
+// freeName is name+ext inside dir, or "name (2).ext" and so on when taken.
+func freeName(dir, name, ext string) string {
+	for i := 1; ; i++ {
+		n := name + ext
+		if i > 1 {
+			n = fmt.Sprintf("%s (%d)%s", name, i, ext)
+		}
+		if _, err := os.Stat(filepath.Join(dir, n)); os.IsNotExist(err) {
+			return n
+		}
+	}
+}
+
+func moveFile(from, to string) error {
+	if err := os.Rename(from, to); err == nil {
+		return nil
+	}
+	in, err := os.Open(from)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(to)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(to)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(to)
+		return err
+	}
+	in.Close()
+	return os.Remove(from)
+}
+
+func linkJobsOf(user int) []*linkJob {
+	linkJobsMu.Lock()
+	defer linkJobsMu.Unlock()
+	var list []*linkJob
+	cutoff := time.Now().Add(-6 * time.Hour).UnixMilli()
+	for id, j := range linkJobs {
+		if j.State != "running" && j.Ended < cutoff {
+			delete(linkJobs, id)
+			continue
+		}
+		if j.user == user {
+			c := *j
+			list = append(list, &c)
+		}
+	}
+	sort.Slice(list, func(a, b int) bool { return list[a].Started > list[b].Started })
+	if len(list) > 15 {
+		list = list[:15]
+	}
+	return list
+}
+
+// uploadLink: GET answers {jobs, ffmpeg, ytdlp}. POST {url, currentPath, name}
+// starts a download; POST {action:"cancel", id} stops one; POST {action:"clear"}
+// forgets finished ones.
+func uploadLink(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method == http.MethodGet {
+		linkToolsMu.Lock()
+		tools := map[string]string{"ytdlp": linkToolsState["ytdlp"], "deno": linkToolsState["deno"]}
+		linkToolsMu.Unlock()
+		writeJSON(w, map[string]any{"jobs": linkJobsOf(session.UserId), "ffmpeg": ffmpegPath() != "", "ytdlp": ytdlpPath() != "", "tools": tools})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		Action      string `json:"action"`
+		ID          string `json:"id"`
+		URL         string `json:"url"`
+		CurrentPath string `json:"currentPath"`
+		Name        string `json:"name"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&in); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	switch in.Action {
+	case "cancel":
+		linkJobsMu.Lock()
+		j := linkJobs[in.ID]
+		if j != nil && j.user == session.UserId && j.State == "running" {
+			j.cancel()
+		}
+		linkJobsMu.Unlock()
+		writeJSON(w, map[string]any{"jobs": linkJobsOf(session.UserId)})
+		return
+	case "clear":
+		linkJobsMu.Lock()
+		for id, j := range linkJobs {
+			if j.user == session.UserId && j.State != "running" {
+				delete(linkJobs, id)
+			}
+		}
+		linkJobsMu.Unlock()
+		writeJSON(w, map[string]any{"jobs": linkJobsOf(session.UserId)})
+		return
+	}
+
+	if ffmpegPath() == "" {
+		http.Error(w, "FFmpeg isn't installed on the server. Put ffmpeg.exe in an ffmpeg\\bin folder next to the server, or on PATH, and restart it.", http.StatusServiceUnavailable)
+		return
+	}
+	u, err := url.Parse(strings.TrimSpace(in.URL))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		http.Error(w, "Paste a link that starts with http:// or https://.", http.StatusBadRequest)
+		return
+	}
+	if !publicHost(u.Hostname()) {
+		http.Error(w, "That link points at this server or a home network, so it can't be downloaded.", http.StatusBadRequest)
+		return
+	}
+	cur := in.CurrentPath
+	if strings.HasPrefix(cur, "/") {
+		cur = "./" + cur[1:]
+	}
+	dir, ok := insideUploads(cur)
+	if !ok {
+		http.Error(w, "Not a valid folder", http.StatusBadRequest)
+		return
+	}
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		http.Error(w, "That folder doesn't exist anymore.", http.StatusBadRequest)
+		return
+	}
+	if !filesGrantOf(r).canChangeIn(uploadRel(dir)) {
+		http.Error(w, "You can't save to that folder.", http.StatusForbidden)
+		return
+	}
+
+	ext := strings.ToLower(path.Ext(u.Path))
+	tool := "ffmpeg"
+	if !linkMediaExt[ext] && ext != ".m3u8" && ext != ".mpd" && ytdlpPath() != "" {
+		tool = "yt-dlp"
+	}
+	name := linkFileName(in.Name)
+	if name == "" && tool == "ffmpeg" {
+		base, _ := url.PathUnescape(path.Base(u.Path))
+		name = linkFileName(strings.TrimSuffix(base, path.Ext(base)))
+		if name == "" || name == "." || strings.EqualFold(name, "index") || strings.EqualFold(name, "playlist") || strings.EqualFold(name, "master") {
+			name = "video " + time.Now().Format("2006-01-02 15.04")
+		}
+	}
+
+	linkJobsMu.Lock()
+	mine, all := 0, 0
+	for _, j := range linkJobs {
+		if j.State == "running" {
+			all++
+			if j.user == session.UserId {
+				mine++
+			}
+		}
+	}
+	if mine >= linkJobsPerUser || all >= linkJobsTotal {
+		linkJobsMu.Unlock()
+		http.Error(w, "Wait for a download to finish before starting another.", http.StatusTooManyRequests)
+		return
+	}
+	b := make([]byte, 8)
+	cryptorand.Read(b)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+	shown := uploadRel(dir)
+	j := &linkJob{ID: hex.EncodeToString(b), URL: u.String(), Folder: "/" + shown, Name: name, State: "running", Tool: tool, Started: time.Now().UnixMilli(), user: session.UserId, cancel: cancel}
+	linkJobs[j.ID] = j
+	linkJobsMu.Unlock()
+
+	fmt.Printf("[%s] LINK DOWNLOAD USER=%s TOOL=%s URL=%s TO=/%s\n", time.Now().Format("2006-01-02 15:04:05"), session.OriginalUsername, tool, u.String(), shown)
+	go runLinkJob(ctx, j, dir, ext)
+	writeJSON(w, map[string]any{"jobs": linkJobsOf(session.UserId)})
+}
+
+func linkUpdate(j *linkJob, f func(j *linkJob)) {
+	linkJobsMu.Lock()
+	f(j)
+	linkJobsMu.Unlock()
+}
+
+func runLinkJob(ctx context.Context, j *linkJob, dir, ext string) {
+	defer j.cancel()
+	tmp := filepath.Join(linkTempDir, j.ID)
+	defer os.RemoveAll(tmp)
+	finish := func(state, msg string) {
+		linkUpdate(j, func(j *linkJob) {
+			j.State, j.Error, j.Ended = state, msg, time.Now().UnixMilli()
+			if state == "done" {
+				j.Percent = 100
+			}
+		})
+	}
+	if err := os.MkdirAll(tmp, 0755); err != nil {
+		finish("error", "Couldn't make a temporary folder on the server.")
+		return
+	}
+	var err error
+	var files []string
+	if j.Tool == "yt-dlp" {
+		files, err = linkWithYtdlp(ctx, j, tmp)
+	} else {
+		files, err = linkWithFfmpeg(ctx, j, tmp, ext)
+	}
+	if ctx.Err() == context.Canceled {
+		finish("cancelled", "")
+		return
+	}
+	if ctx.Err() == context.DeadlineExceeded {
+		finish("error", "It took longer than 4 hours, so it was stopped.")
+		return
+	}
+	if err != nil {
+		finish("error", err.Error())
+		return
+	}
+	var saved []string
+	for _, f := range files {
+		e := filepath.Ext(f)
+		n := freeName(dir, strings.TrimSuffix(filepath.Base(f), e), e)
+		if err := moveFile(f, filepath.Join(dir, n)); err != nil {
+			fmt.Println("link download:", err)
+			finish("error", "Downloaded, but couldn't put it in the folder.")
+			return
+		}
+		saved = append(saved, n)
+	}
+	if len(saved) == 0 {
+		finish("error", "Nothing was downloaded from that link.")
+		return
+	}
+	linkUpdate(j, func(j *linkJob) { j.Name = strings.Join(saved, ", ") })
+	finish("done", "")
+}
+
+// lastLines keeps the end of a program's error output for the message.
+type lastLines struct{ buf []byte }
+
+func (l *lastLines) Write(p []byte) (int, error) {
+	l.buf = append(l.buf, p...)
+	if len(l.buf) > 4096 {
+		l.buf = l.buf[len(l.buf)-4096:]
+	}
+	return len(p), nil
+}
+
+// errorLine is yt-dlp's "ERROR: ..." line (without the prefix and the
+// "Please report this issue" advice), or the last line.
+func (l *lastLines) errorLine() string {
+	lines := strings.Split(strings.TrimSpace(string(l.buf)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(lines[i]), "ERROR: "); ok {
+			if j := strings.Index(rest, "; please report"); j > 0 {
+				rest = rest[:j]
+			}
+			return strings.TrimSpace(rest)
+		}
+	}
+	return l.last()
+}
+
+func (l *lastLines) last() string {
+	lines := strings.Split(strings.TrimSpace(string(l.buf)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+func linkWithFfmpeg(ctx context.Context, j *linkJob, tmp, ext string) ([]string, error) {
+	out := ".mp4"
+	audio := linkAudioExt[ext]
+	if audio || ext == ".webm" || ext == ".mkv" || ext == ".mov" {
+		out = ext
+	}
+	file := filepath.Join(tmp, j.Name+out)
+	if ffprobeBin != "" {
+		pctx, cancel := context.WithTimeout(ctx, 25*time.Second)
+		if b, err := exec.CommandContext(pctx, ffprobeBin, "-v", "error", "-protocol_whitelist", "http,https,tcp,tls,crypto,hls", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", j.URL).Output(); err == nil {
+			if d, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64); err == nil && d > 0 {
+				linkUpdate(j, func(j *linkJob) { j.Duration = d })
+			}
+		}
+		cancel()
+	}
+	run := func(codec []string) error {
+		args := []string{"-hide_banner", "-nostdin", "-y", "-v", "error", "-nostats", "-progress", "pipe:1",
+			"-protocol_whitelist", "http,https,tcp,tls,crypto,hls", "-user_agent", "Mozilla/5.0 (Geek4u downloader)",
+			"-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+			"-i", j.URL}
+		if audio {
+			args = append(args, "-vn")
+		} else {
+			args = append(args, "-map", "0:v:0?", "-map", "0:a:0?")
+		}
+		args = append(args, codec...)
+		if out == ".mp4" || out == ".m4a" || out == ".mov" {
+			args = append(args, "-movflags", "+faststart")
+		}
+		args = append(args, file)
+		cmd := exec.CommandContext(ctx, ffmpegBin, args...)
+		errs := &lastLines{}
+		cmd.Stderr = errs
+		pipe, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		if err := cmd.Start(); err != nil {
+			return errors.New("Couldn't start FFmpeg.")
+		}
+		buf := make([]byte, 0, 4096)
+		chunk := make([]byte, 2048)
+		for {
+			n, rerr := pipe.Read(chunk)
+			buf = append(buf, chunk[:n]...)
+			for {
+				i := bytes.IndexByte(buf, '\n')
+				if i < 0 {
+					break
+				}
+				line := strings.TrimSpace(string(buf[:i]))
+				buf = buf[i+1:]
+				k, v, _ := strings.Cut(line, "=")
+				switch k {
+				case "out_time_us", "out_time_ms": // both are microseconds in ffmpeg
+					if us, err := strconv.ParseFloat(v, 64); err == nil && us > 0 {
+						linkUpdate(j, func(j *linkJob) {
+							j.Seconds = us / 1e6
+							if j.Duration > 0 {
+								j.Percent = math.Min(99, j.Seconds/j.Duration*100)
+							}
+						})
+					}
+				case "total_size":
+					if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+						linkUpdate(j, func(j *linkJob) { j.Bytes = n })
+					}
+				}
+			}
+			if rerr != nil {
+				break
+			}
+		}
+		if err := cmd.Wait(); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			msg := errs.last()
+			if msg == "" {
+				msg = err.Error()
+			}
+			return errors.New(msg)
+		}
+		return nil
+	}
+	err := run([]string{"-c", "copy"})
+	if err != nil && ctx.Err() == nil {
+		// Some streams can't be copied into this kind of file; convert them instead.
+		os.Remove(file)
+		linkUpdate(j, func(j *linkJob) { j.Seconds, j.Bytes, j.Percent = 0, 0, 0 })
+		codec := []string{"-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-c:a", "aac", "-b:a", "192k"}
+		if audio {
+			codec = nil
+		} else if out == ".webm" {
+			codec = []string{"-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32", "-c:a", "libopus"}
+		}
+		err = run(codec)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		msg := err.Error()
+		if ytdlpPath() == "" && !linkMediaExt[ext] && ext != ".m3u8" && ext != ".mpd" {
+			msg = "FFmpeg couldn't read a video from that link (" + msg + "). Links to pages like YouTube need yt-dlp next to the server."
+		} else {
+			msg = "FFmpeg couldn't download it: " + strings.TrimPrefix(msg, "Error opening input files: ")
+		}
+		return nil, errors.New(msg)
+	}
+	return []string{file}, nil
+}
+
+var ytdlpProgress = regexp.MustCompile(`\[download\]\s+([\d.]+)%(?:\s+of\s+~?\s*([\d.]+)([KMG]i?B))?`)
+
+func linkWithYtdlp(ctx context.Context, j *linkJob, tmp string) ([]string, error) {
+	tpl := "%(title).120B [%(id)s].%(ext)s"
+	if j.Name != "" {
+		tpl = strings.ReplaceAll(j.Name, "%", "%%") + ".%(ext)s"
+	}
+	args := []string{"--no-playlist", "--newline", "--no-colors", "--no-mtime",
+		"--ffmpeg-location", ffmpegBin, "-S", "ext:mp4:m4a", "--merge-output-format", "mp4",
+		"-P", tmp, "-o", tpl, "--", j.URL}
+	// Only our own (current) yt-dlp knows --js-runtimes.
+	if deno := denoPath(); deno != "" && linkToolPath(ytdlpAsset()) != "" {
+		args = append([]string{"--js-runtimes", "deno:" + deno}, args...)
+	}
+	cmd := exec.CommandContext(ctx, ytdlpPath(), args...)
+	errs := &lastLines{}
+	cmd.Stderr = errs
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, errors.New("Couldn't start yt-dlp.")
+	}
+	unit := map[string]float64{"KiB": 1 << 10, "MiB": 1 << 20, "GiB": 1 << 30, "KB": 1e3, "MB": 1e6, "GB": 1e9}
+	buf := make([]byte, 0, 4096)
+	chunk := make([]byte, 2048)
+	for {
+		n, rerr := pipe.Read(chunk)
+		buf = append(buf, chunk[:n]...)
+		for {
+			i := bytes.IndexAny(buf, "\r\n")
+			if i < 0 {
+				break
+			}
+			line := string(buf[:i])
+			buf = buf[i+1:]
+			if m := ytdlpProgress.FindStringSubmatch(line); m != nil {
+				p, _ := strconv.ParseFloat(m[1], 64)
+				size, _ := strconv.ParseFloat(m[2], 64)
+				linkUpdate(j, func(j *linkJob) {
+					j.Percent = math.Min(99, p)
+					if size > 0 {
+						j.Bytes = int64(size * unit[m[3]] * p / 100)
+					}
+				})
+			}
+		}
+		if rerr != nil {
+			break
+		}
+	}
+	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		msg := errs.errorLine()
+		if msg == "" {
+			msg = err.Error()
+		}
+		low := strings.ToLower(msg)
+		switch {
+		case strings.Contains(low, "drm"):
+			return nil, errors.New("That link is DRM protected (Spotify, Apple Music, Netflix and similar lock their files), so it can't be downloaded. Spotify playlists can be imported on the Music page instead.")
+		case strings.Contains(low, "requested format is not available") || strings.Contains(low, "no video formats found"):
+			return nil, errors.New("YouTube didn't give yt-dlp any video to download. The server updates yt-dlp and Deno by itself every 12 hours (and at start), so try again after a restart. If it keeps happening, YouTube may be blocking the server for a while.")
+		case strings.Contains(low, "unsupported url"):
+			return nil, errors.New("yt-dlp doesn't know that site, so it can't be downloaded.")
+		}
+		return nil, errors.New("yt-dlp couldn't download it: " + msg + " (the server updates yt-dlp by itself; try again after a restart)")
+	}
+	entries, _ := os.ReadDir(tmp)
+	var files []string
+	for _, e := range entries {
+		n := e.Name()
+		if e.IsDir() || strings.HasSuffix(n, ".part") || strings.HasSuffix(n, ".ytdl") || strings.Contains(n, ".temp.") {
+			continue
+		}
+		files = append(files, filepath.Join(tmp, n))
+	}
+	return files, nil
+}
+
+// ---- Folder icons: admins can give a Files folder an emoji or a picture ----
+
+type folderIcon struct {
+	Emoji string `json:"emoji,omitempty"`
+	Image string `json:"image,omitempty"` // link
+}
+
+var (
+	folderIconsMu sync.RWMutex
+	folderIcons   = map[string]folderIcon{} // rel path -> icon
+	folderIconDir = filepath.Join(ProfilePicturesDirName, "folders")
+)
+
+func loadFolderIcons() {
+	rows, err := db.Query("SELECT path, emoji, image FROM folder_icons")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	folderIconsMu.Lock()
+	defer folderIconsMu.Unlock()
+	for rows.Next() {
+		var p, e, img string
+		if rows.Scan(&p, &e, &img) == nil {
+			folderIcons[p] = folderIconOf(e, img)
+		}
+	}
+}
+
+func folderIconOf(emoji, image string) folderIcon {
+	ic := folderIcon{Emoji: emoji}
+	if image != "" {
+		v := ""
+		if st, err := os.Stat(filepath.Join(folderIconDir, image)); err == nil {
+			v = "?v=" + strconv.FormatInt(st.ModTime().UnixMilli(), 36)
+		}
+		ic.Image = "/folder-icon/" + url.PathEscape(image) + v
+	}
+	return ic
+}
+
+func folderIconFor(rel string) folderIcon {
+	folderIconsMu.RLock()
+	defer folderIconsMu.RUnlock()
+	return folderIcons[rel]
+}
+
+// withFolderIcons fills in the icon of every folder in items (dir is their folder).
+func withFolderIcons(items []FileFolderInfo, dir string) []FileFolderInfo {
+	for i := range items {
+		if items[i].IsDir {
+			ic := folderIconFor(joinRel(dir, items[i].Name))
+			items[i].IconEmoji, items[i].IconImage = ic.Emoji, ic.Image
+		}
+	}
+	return items
+}
+
+// moveFolderIcons keeps icons when a folder is renamed (the folder and everything in it).
+func moveFolderIcons(from, to string) {
+	if from == "" || to == "" {
+		return
+	}
+	db.Exec("UPDATE folder_icons SET path = ? || substr(path, ?) WHERE path = ? OR path LIKE ? ESCAPE '\\'", to, len(from)+1, from, likeEscape(from)+"/%")
+	folderIconsMu.Lock()
+	for p, ic := range folderIcons {
+		if p == from || strings.HasPrefix(p, from+"/") {
+			delete(folderIcons, p)
+			folderIcons[to+strings.TrimPrefix(p, from)] = ic
+		}
+	}
+	folderIconsMu.Unlock()
+}
+
+func likeEscape(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+func forgetFolderIcon(rel string) {
+	var img string
+	db.QueryRow("SELECT image FROM folder_icons WHERE path = ?", rel).Scan(&img)
+	db.Exec("DELETE FROM folder_icons WHERE path = ?", rel)
+	if img != "" {
+		os.Remove(filepath.Join(folderIconDir, filepath.Base(img)))
+	}
+	folderIconsMu.Lock()
+	delete(folderIcons, rel)
+	folderIconsMu.Unlock()
+}
+
+// setFolderIcon: multipart POST path=<Files link of the folder> with emoji=<text>
+// and/or an "image", or remove=1. Admins only. Answers the folder's icon.
+func setFolderIcon(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPictureBytes+(64<<10))
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		http.Error(w, fmt.Sprintf("That picture is too big. Pick one under %d MB.", maxPictureMB), http.StatusRequestEntityTooLarge)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	p, ok := uploadPathFromURL(r.FormValue("path"))
+	if !ok {
+		http.Error(w, "Not a valid folder", http.StatusBadRequest)
+		return
+	}
+	if st, err := os.Stat(p); err != nil || !st.IsDir() {
+		http.Error(w, "That folder doesn't exist.", http.StatusBadRequest)
+		return
+	}
+	rel := uploadRel(p)
+	if r.FormValue("remove") == "1" {
+		forgetFolderIcon(rel)
+		writeJSON(w, folderIcon{})
+		return
+	}
+	emoji := strings.TrimSpace(r.FormValue("emoji"))
+	if utf8.RuneCountInString(emoji) > 8 || strings.ContainsAny(emoji, "<>&\"'") {
+		http.Error(w, "Use one emoji or a few characters.", http.StatusBadRequest)
+		return
+	}
+	var oldImg string
+	db.QueryRow("SELECT image FROM folder_icons WHERE path = ?", rel).Scan(&oldImg)
+	img := oldImg
+	if file, _, err := r.FormFile("image"); err == nil {
+		defer file.Close()
+		name, status, msg := saveImageIn(file, folderIconDir, "folder")
+		if status != 0 {
+			http.Error(w, msg, status)
+			return
+		}
+		img = name
+	} else if r.FormValue("emoji") != "" || r.FormValue("dropImage") == "1" {
+		img = "" // picking an emoji replaces the picture
+	}
+	if emoji == "" && img == "" {
+		forgetFolderIcon(rel)
+		writeJSON(w, folderIcon{})
+		return
+	}
+	if img != "" {
+		emoji = ""
+	}
+	if _, err := db.Exec("INSERT INTO folder_icons (path, emoji, image) VALUES (?, ?, ?) ON CONFLICT(path) DO UPDATE SET emoji = excluded.emoji, image = excluded.image", rel, emoji, img); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save the icon.", http.StatusInternalServerError)
+		return
+	}
+	if oldImg != "" && oldImg != img {
+		os.Remove(filepath.Join(folderIconDir, filepath.Base(oldImg)))
+	}
+	ic := folderIconOf(emoji, img)
+	folderIconsMu.Lock()
+	folderIcons[rel] = ic
+	folderIconsMu.Unlock()
+	writeJSON(w, ic)
+}
+
+func serveFolderIcon(w http.ResponseWriter, r *http.Request) {
+	name := filepath.Base(strings.TrimPrefix(r.URL.Path, "/folder-icon/"))
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".jpg", ".png", ".gif", ".webp":
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	http.ServeFile(w, r, filepath.Join(folderIconDir, name))
 }

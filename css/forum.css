@@ -44,10 +44,11 @@
 .xn-input.fm-text {
   flex: 1;
   min-width: 0;
-  min-height: 5.5rem;
-  padding: 10px 12px;
+  min-height: 11rem;
+  max-height: 70vh;
+  padding: 12px 14px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   resize: vertical;
 }
@@ -189,7 +190,7 @@
 .fm-comment-body { margin: 2px 6px 0 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fm-comment-note { padding: 4px 0; font-size: 12px; color: var(--oled-muted); }
 .fm-comment-form { display: flex; align-items: flex-end; gap: 8px; }
-.xn-input.fm-comment-text { flex: 1; min-width: 0; height: 40px; max-height: 160px; padding: 9px 12px; font-family: inherit; line-height: 1.5; resize: none; }
+.xn-input.fm-comment-text { flex: 1; min-width: 0; height: 48px; max-height: 240px; padding: 9px 12px; font-family: inherit; line-height: 1.5; resize: none; }
 .fm-comment-form .xn-btn { flex: none; }
 
 /* Friend requests and lists (friends.js) */
@@ -262,7 +263,8 @@
   .fm-delete.fm-delete-sm { min-height: 36px; margin-block: -9px; }
   .fm-comment-toggle { min-height: 44px; }
   .xn-btn.fr-small { min-height: 40px; }
-  .xn-input.fm-comment-text { height: 44px; padding: 10px 12px; }
+  .xn-input.fm-comment-text { height: 52px; padding: 10px 12px; }
+  .xn-input.fm-text { min-height: 9rem; }
   .fm-preview-x { width: 36px; height: 36px; }
 }
 

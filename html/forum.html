@@ -46,7 +46,7 @@
       <div class="fm-compose-row">
         <span class="fm-avatar" aria-hidden="true">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}{{.Initial}}{{end}}</span>
         <label class="xn-sr" for="postBody">Write a post</label>
-        <textarea class="xn-input fm-text" id="postBody" rows="3" maxlength="2000" placeholder="Write something, {{.Name}}…"></textarea>
+        <textarea class="xn-input fm-text" id="postBody" rows="7" maxlength="2000" placeholder="Write something, {{.Name}}…"></textarea>
       </div>
       <div class="fm-previews" id="postPreviews" hidden></div>
       <div class="fm-compose-bar">
@@ -104,6 +104,11 @@
   const addPics = document.getElementById("postAddPics");
   const fileInput = document.getElementById("postFiles");
   const previews = document.getElementById("postPreviews");
+  // The box grows with what you write (up to most of the screen).
+  text.addEventListener("input", function () {
+    text.style.height = "auto";
+    text.style.height = Math.min(text.scrollHeight + 2, window.innerHeight * 0.7) + "px";
+  });
   let pictures = []; // { file, url }
   let sending = false;
 

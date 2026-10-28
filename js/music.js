@@ -142,7 +142,7 @@ async function loadLibrary() {
   try {
     const data = await api("/music/library");
     state.library = data.tracks || [];
-    state.libraryInfo = { access: data.access, ffmpeg: data.ffmpeg, scanning: data.scanning };
+    state.libraryInfo = { access: data.access, ffmpeg: data.ffmpeg, scanning: data.scanning, icon: data.libraryIcon || "", admin: !!data.admin };
     clearTimeout(scanTimer);
     // A scan of new files is running: look again in a bit.
     if (data.scanning) scanTimer = setTimeout(loadLibrary, 4000);
@@ -195,7 +195,7 @@ function renderSide() {
     return b;
   };
   const libArt = el("span", "mu-art mu-art-xs mu-art-lib");
-  libArt.append(icon(ICONS.library));
+  libraryArt(libArt);
   item("Library", `${state.library.length} ${state.library.length === 1 ? "song" : "songs"}`, state.view.kind === "library", openLibrary, libArt);
 
   const coverOf = (p) => {
@@ -244,7 +244,18 @@ function renderLibrary() {
   view.append(backButton());
   const head = el("div", "mu-head");
   const art = el("span", "mu-art mu-art-lg mu-art-lib");
-  art.append(icon(ICONS.library));
+  libraryArt(art);
+  if (state.libraryInfo.admin) {
+    // Admins tap the picture to change the Library's icon for everyone.
+    const pick = el("button", "mu-art-edit");
+    pick.type = "button";
+    pick.title = "Change the Library picture";
+    pick.setAttribute("aria-label", "Change the Library picture");
+    pick.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.image}</svg>`;
+    pick.addEventListener("click", editLibraryIcon);
+    art.classList.add("is-editable");
+    art.append(pick);
+  }
   const text = el("div", "mu-head-text");
   text.append(el("p", "xn-eyebrow", "Library"), el("h2", "xn-h1 mu-title", "All songs"));
   const info = state.libraryInfo;
@@ -278,6 +289,78 @@ function renderLibrary() {
   const rows = el("ol", "mu-songs");
   view.append(rows);
   fillLibraryRows(rows);
+}
+
+// The Library's picture: the one an admin uploaded, or the built-in icon.
+function libraryArt(box) {
+  const src = state.libraryInfo.icon;
+  if (!src) return box.append(icon(ICONS.library));
+  const img = el("img");
+  img.alt = "";
+  img.src = src;
+  img.addEventListener("error", () => img.replaceWith(icon(ICONS.library)));
+  box.append(img);
+}
+
+function editLibraryIcon() {
+  let file = null;
+  let remove = false;
+  const preview = el("span", "mu-art mu-edit-art mu-art-lib");
+  const showPreview = () => {
+    preview.replaceChildren();
+    const src = file ? URL.createObjectURL(file) : remove ? "" : state.libraryInfo.icon;
+    if (src) {
+      const img = el("img");
+      img.alt = "";
+      img.src = src;
+      preview.append(img);
+    } else preview.append(icon(ICONS.library));
+    clear.hidden = !(file || (state.libraryInfo.icon && !remove));
+  };
+  const input = el("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/gif,image/webp";
+  input.hidden = true;
+  input.addEventListener("change", () => {
+    const chosen = input.files[0];
+    input.value = "";
+    if (!chosen) return;
+    file = chosen;
+    remove = false;
+    $("muModalError").hidden = true;
+    showPreview();
+  });
+  const choose = button("Choose picture", ICONS.image, () => input.click());
+  const clear = button("Use the normal icon", ICONS.trash, () => {
+    file = null;
+    remove = true;
+    showPreview();
+  }, "mu-btn-quiet");
+  const picBox = el("div", "mu-edit-pic");
+  const picButtons = el("div", "mu-edit-pic-btns");
+  picButtons.append(choose, clear, el("span", "mu-hint", "Everyone sees this picture for the Library. Square looks best."));
+  picBox.append(preview, picButtons, input);
+  showPreview();
+
+  const save = submitButton("Save");
+  openModal("Library picture", [picBox], [save, cancelButton()], () => busy(save, async () => {
+    if (!file && !remove) return closeModal();
+    const form = new FormData();
+    form.append("slot", "musicLibrary");
+    if (file) form.append("image", file);
+    else form.append("remove", "1");
+    let res;
+    try {
+      res = await fetch("/site/picture", { method: "POST", body: form });
+    } catch {
+      throw new Error(navigator.onLine === false ? "You're offline." : "Couldn't reach the server. Try again.");
+    }
+    if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save the picture. Try again.");
+    state.libraryInfo.icon = (await res.json()).url || "";
+    closeModal();
+    renderSide();
+    if (state.view.kind === "library") renderLibrary();
+  }));
 }
 
 function fillLibraryRows(rows) {

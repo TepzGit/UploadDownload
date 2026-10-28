@@ -198,3 +198,30 @@
   .up-head .xn-btn { width: 100%; }
   .xn-btn.backbut { align-self: stretch; }
 }
+
+/* Download from a link (js/linkdownload.js) */
+.up-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.up-link { display: flex; flex-direction: column; gap: 10px; }
+.up-link .xn-label { margin-top: 4px; }
+.up-opt { color: var(--oled-muted, #8a8a8a); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.up-link .xn-input { width: 100%; min-height: 44px; }
+.up-link-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--oled-muted, #9a9a9a); }
+.up-link-note.is-error { color: #ff8a8a; }
+.up-jobs-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.up-jobs-head[hidden] { display: none; }
+.up-clear { border: 0; background: none; color: var(--oled-accent); font: inherit; font-size: 13px; cursor: pointer; padding: 6px 0; }
+.up-clear[hidden] { display: none; }
+.up-jobs { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.up-job { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--oled-line); border-radius: 2px; background: var(--oled-surface-2, rgba(255,255,255,.03)); min-width: 0; }
+.up-job.is-error { border-color: rgba(255, 110, 110, .45); }
+.up-job.is-done { border-color: rgba(var(--xn-accent-rgb, 166,124,255), .45); }
+.up-job-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.up-job-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.up-job-x { flex: none; width: 32px; height: 32px; border: 1px solid var(--oled-line); border-radius: 2px; background: none; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.up-job-meta { margin: 0; font-size: 12.5px; color: var(--oled-muted, #9a9a9a); overflow-wrap: anywhere; }
+.up-job.is-error .up-job-meta { color: #ff9a9a; }
+.up-job-meta a { color: var(--oled-accent); }
+.up-job .progress-bar.is-unknown { opacity: .5; animation: up-pulse 1.4s ease-in-out infinite; }
+@keyframes up-pulse { 50% { opacity: .2; } }
+.UploadExplorerUploadItem .up-ficon { width: 24px; height: 24px; flex: none; object-fit: cover; border-radius: 4px; }
+.UploadExplorerUploadItem .up-femoji { width: 24px; flex: none; text-align: center; font-size: 19px; line-height: 1; }

@@ -159,6 +159,14 @@
         if (color !== cached) window.xnSiteColor.use(color);
         const next = { scene: data.siteBg || "", image: data.siteBgImage || "", dim: data.siteBgDim == null ? 40 : data.siteBgDim };
         if (JSON.stringify(next) !== JSON.stringify(scene)) window.xnScene.use(next);
+        // Graph style (Profile > Preferences), read by js/plot.js.
+        try {
+          const plotStyle = JSON.stringify(data.plotStyle || {});
+          if (plotStyle !== (localStorage.getItem("xn_plot_style") || "{}")) {
+            localStorage.setItem("xn_plot_style", plotStyle);
+            window.dispatchEvent(new CustomEvent("xn:plot-style"));
+          }
+        } catch (_) {}
       })
       .catch(() => {});
   }

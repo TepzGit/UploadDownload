@@ -123,9 +123,14 @@
 
       <fieldset class="si-section">
         <legend class="si-legend">Dosing</legend>
+        <div class="si-methods-head">
+          <span class="xn-label">Ingestion methods</span>
+          <span class="si-hint">Each one has its own doses and effect timeline.</span>
+        </div>
+        <div class="si-methods" id="siMethods" role="tablist" aria-label="Ingestion methods"></div>
         <div class="si-row">
           <div class="si-field">
-            <label class="xn-label" for="fRoute">Route</label>
+            <label class="xn-label" for="fRoute">Method</label>
             <select class="xn-input" id="fRoute">
               <option value="oral">Oral</option><option value="sublingual">Sublingual</option><option value="buccal">Buccal</option>
               <option value="insufflated">Insufflated</option><option value="smoked">Smoked</option><option value="vaporized">Vaporized</option>
@@ -134,7 +139,7 @@
             </select>
           </div>
           <div class="si-field">
-            <label class="xn-label" for="fUnits">Units</label>
+            <label class="xn-label" for="fUnits">Units <span class="si-hint">all methods</span></label>
             <select class="xn-input" id="fUnits"><option>mg</option><option>µg</option><option>g</option><option>mL</option><option>IU</option><option>drops</option></select>
           </div>
         </div>
@@ -148,7 +153,7 @@
       </fieldset>
 
       <fieldset class="si-section">
-        <legend class="si-legend">Effect timeline</legend>
+        <legend class="si-legend">Effect timeline <span class="si-hint" id="siTimeFor"></span></legend>
         <div class="si-unit" role="group" aria-label="Time unit">
           <button type="button" class="si-unit-btn" data-unit="min" aria-pressed="false">Minutes</button>
           <button type="button" class="si-unit-btn" data-unit="h" aria-pressed="true">Hours</button>
