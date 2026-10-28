@@ -227,7 +227,7 @@ body * {
   align-items: center;
   gap: 8px;
   min-height: 40px;
-  padding: 0 14px;
+  padding: 0 9px;
   border: 1px solid var(--oled-line);
   border-radius: 10px;
   background: transparent;
@@ -1181,8 +1181,8 @@ html[data-font="garamond"] { --oled-font: Garamond, "EB Garamond", "Cormorant Ga
 [data-font-sample="comic"], [data-font-sample="comic"] * { font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", "Comic Relief", cursive !important; }
 [data-font-sample="serif"], [data-font-sample="serif"] * { font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif !important; }
 [data-font-sample="garamond"], [data-font-sample="garamond"] * { font-family: Garamond, "EB Garamond", "Cormorant Garamond", "Palatino Linotype", Georgia, serif !important; }
-html.xn-nologo .xn > .xn-brand,
-html.xn-nologo .gp-title .gp-logo { display: none !important; }
+
+
 
 /* ------------------------------------------------------------
    Gentle motion everywhere (mommy 2026-10-28: "nothing too dramatic").
