@@ -309,7 +309,7 @@ body * {
     align-items: stretch;
     gap: 2px;
     margin: 0;
-    padding: 8px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+    padding: 8px maxl(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
     background: var(--oled-bg);
     border-bottom: 1px solid var(--oled-line);
     transform: translateY(-6px);
@@ -1277,3 +1277,12 @@ html.xn-has-tabs .xn-chat-btn { display: grid; margin-left: auto; }
 html.xn-has-tabs .xn.has-mail .xn-chat-btn { margin-left: 0; }
 html.xn-has-tabs .xn-chat-btn { display: none; }
 .is-pop.has-unread .xn-chat-count { animation: xn-mail-pop 0.6s cubic-bezier(0.2, 0.7, 0.2, 1.4); }
+
+
+.xn-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: center;
+}
