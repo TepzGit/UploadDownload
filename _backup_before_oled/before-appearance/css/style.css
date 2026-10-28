@@ -1,0 +1,200 @@
+/* Upload page (html/Uploader.html).
+   Cards, buttons, inputs and the background come from oled.css, which loads
+   after this file, so overrides of those classes use two class names. */
+
+.up-ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.up-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.up-card { display: flex; flex-direction: column; gap: 18px; }
+.up-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Drop zone */
+.up-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  padding: 24px 16px;
+  border: 1px dashed var(--oled-line-strong);
+  border-radius: 2px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(166, 124, 255, 0.08), transparent 70%),
+    #000;
+  color: var(--oled-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+@media (hover: hover) { .up-drop:hover { border-color: var(--oled-accent); } }
+.up-drop:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.up-drop.dragover { border-style: solid; border-color: var(--oled-accent); background-color: rgba(166, 124, 255, 0.08); }
+.up-drop #img { display: block; max-width: 160px; max-height: 96px; border-radius: 2px; object-fit: contain; }
+.up-drop-ico {
+  width: 40px;
+  height: 40px;
+  padding: 9px;
+  border: 1px solid rgba(166, 124, 255, 0.25);
+  border-radius: 2px;
+  background: var(--oled-accent-soft);
+  color: var(--oled-accent);
+}
+.up-drop-text { font-size: 14px; font-weight: 600; color: var(--oled-text); }
+.up-drop-hint { font-size: 11px; }
+.up-when-touch { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .up-when-mouse { display: none; }
+  .up-when-touch { display: inline; }
+}
+
+/* Picked files */
+.up-picked-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.up-picked-head .xn-label { margin: 0; }
+.up-count { font-size: 11px; color: var(--oled-muted); }
+.FileListings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  margin-top: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.FileListings .xn-empty { padding: 4px 0; }
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--oled-line);
+  border-left: 3px solid var(--oled-accent);
+  border-radius: 2px;
+  background: var(--oled-surface-2);
+  font-size: 13px;
+}
+.file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-size { flex: none; font-size: 11px; color: var(--oled-muted); }
+
+.up-dest { margin: 0; font-size: 12px; color: var(--oled-muted); overflow-wrap: anywhere; }
+.up-dest strong { color: var(--oled-text); font-weight: 600; }
+.up-change { margin-left: 4px; color: var(--oled-accent); text-underline-offset: 3px; }
+@media (min-width: 900px) { .up-change { display: none; } }
+
+/* Progress + success */
+.progress { display: flex; flex-direction: column; gap: 6px; }
+.up-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--oled-surface-2);
+  border: 1px solid var(--oled-line);
+}
+.progress-bar {
+  height: 100%;
+  background: var(--oled-accent);
+  box-shadow: 0 0 12px rgba(166, 124, 255, 0.6);
+  transition: width 0.2s ease;
+}
+.progress-number { font-size: 11px; color: var(--oled-muted); }
+
+#success {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px 10px 12px;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 2px;
+  background: rgba(74, 222, 128, 0.08);
+  color: #bbf7d0;
+  font-size: 13px;
+}
+#success[hidden] { display: none; }
+.success__title { flex: 1; }
+.success__close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.xn-btn.up-submit { width: 100%; min-height: 46px; font-size: 14px; }
+
+/* Destination folder picker */
+.UploadExplorer { display: flex; flex-direction: column; gap: 12px; }
+.UploadExplorer .xn-sub { margin-top: -6px; }
+.up-path {
+  padding: 8px 12px;
+  border: 1px solid var(--oled-line);
+  border-radius: 2px;
+  background: #000;
+  font-size: 13px;
+  color: var(--oled-text);
+  overflow-wrap: anywhere;
+}
+.UploadExplorerUploadItems {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.UploadExplorerUploadItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--oled-line);
+  border-radius: 2px;
+  background: var(--oled-surface-2);
+  color: var(--oled-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.UploadExplorerUploadItem .up-ico { color: var(--oled-accent); }
+.UploadExplorerUploadItem .filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .UploadExplorerUploadItem:hover { border-color: var(--oled-accent); } }
+.UploadExplorerUploadItem:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.xn-btn.backbut { align-self: flex-start; }
+
+@media (max-width: 899px) {
+  .up-grid { grid-template-columns: minmax(0, 1fr); }
+  .up-drop { min-height: 160px; }
+}
+@media (max-width: 640px) {
+  .up-head .xn-btn { width: 100%; }
+  .xn-btn.backbut { align-self: stretch; }
+}

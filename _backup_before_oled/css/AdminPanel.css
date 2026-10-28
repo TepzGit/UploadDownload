@@ -1,0 +1,46 @@
+body {
+	background: #000000
+}
+
+.AdminPanelOptions {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	width: fit-content;
+	margin: 100px auto;
+}
+
+.AdminPanelOption {
+	margin: 5px 0 5px 0;
+	width: 500px;
+	font-family: nerd, sans-serif;
+	display: inline-block;
+	position: relative;
+	padding: 10px 20px;
+	border-radius: 7px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-top-color: rgba(255, 255, 255, 0.12);
+	border-right-color: rgba(255, 255, 255, 0.12);
+	border-bottom-color: rgba(255, 255, 255, 0.12);
+	border-left-color: rgba(255, 255, 255, 0.12);
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 28px 80px rgba(0, 0, 0, 0.55);
+	font-size: 14px;
+	font-weight: 600;
+	background: rgba(10,10,10,0.98);
+	color: #ddd;
+	overflow: hidden;
+	-webkit-transition: all 0.2s ease-in;
+	-moz-transition: all 0.2s ease-in;
+	transition: all 0.2s ease-in;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.AdminPanelOption:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}

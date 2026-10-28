@@ -1,0 +1,15 @@
+UploadedFiles
+password.txt
+cert.pem
+key.pem
+loginData.json
+Database.db
+node_modules/
+UploadDownload
+replications/
+android/build/
+android/signing/
+ios/build/
+ios/sdk/
+*.apk
+*.ipa

@@ -1,0 +1,540 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Journal · Geek⁴u</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <style>
+    :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:var(--oled-accent); }
+    body{ color:var(--text); }
+    .jr-head{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; }
+    .jr-search{ position:relative; width:100%; max-width:340px; }
+    .jr-search svg{ position:absolute; left:11px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted); pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; }
+    .jr-search .xn-input{ padding-left:34px; }
+    .Drugs{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap:8px; margin-top:20px; }
+    .drug-item{ position:relative; }
+    .drug-item .drug-like{ position:absolute; top:50%; right:8px; transform:translateY(-50%); }
+    .Drug{ display:grid; grid-template-columns:56px minmax(0,1fr) 44px; align-items:center; gap:14px; min-height:76px; padding:10px 10px 10px 10px; border:1px solid var(--line); border-radius:2px; background:var(--surface-2); color:var(--text); text-decoration:none; transition:border-color .15s ease, background-color .15s ease; }
+    @media (hover:hover){ .Drug:hover{ border-color:var(--violet); background:#16161b; } }
+    .Drug:focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
+    .drug-thumb{ display:flex; align-items:center; justify-content:center; width:56px; height:56px; overflow:hidden; border:1px solid var(--line); border-radius:2px; background:#000; color:var(--violet); font-size:20px; font-weight:600; }
+    /* Wiki structure drawings are black on white/clear; inverting them suits the black theme. */
+    .drug-thumb img{ width:100%; height:100%; object-fit:contain; padding:4px; filter:invert(1) hue-rotate(180deg); }
+    .drug-text{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .drugname{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
+    .drugclass{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
+    .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
+    .jr-classes{ display:flex; gap:6px; margin-top:16px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
+    .jr-classes[hidden]{ display:none; }
+    .jr-chip{ flex:none; display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 12px; border:1px solid var(--line); border-radius:18px; background:transparent; color:var(--muted); font:inherit; font-size:12px; cursor:pointer; white-space:nowrap; transition:color .15s ease, border-color .15s ease, background-color .15s ease; -webkit-tap-highlight-color:transparent; }
+    .jr-chip .sc-icon{ width:14px; height:14px; margin:0; }
+    .jr-chip small{ font-size:10px; opacity:.75; font-variant-numeric:tabular-nums; }
+    .jr-chip[aria-pressed="true"]{ border-color:var(--oled-accent); background:var(--oled-accent-soft); color:var(--text); }
+    @media (hover:hover){ .jr-chip:hover{ color:var(--text); border-color:var(--oled-line-strong); } }
+    .jr-chip:focus-visible{ outline:2px solid var(--oled-accent); outline-offset:1px; }
+    .jr-count{ margin:12px 0 0; font-size:12px; color:var(--muted); }
+    .jr-count:empty{ display:none; }
+    .bottombar{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:20px; }
+    @media (max-width:640px){ .jr-search{ max-width:none; } .bottombar .xn-btn{ flex:1; } }
+  </style>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <link rel="stylesheet" href="/classicons.css" />
+  <script src="/classicons.js"></script>
+  <script src="/likes.js"></script>
+  <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+</head>
+<body class="min-h-screen xn-bg">
+  <header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u"><svg class="xn-logo" viewBox="-6 -166 358 191" width="56.2" height="30" aria-hidden="true" focusable="false"><defs><linearGradient id="xnNowGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity=".5"/><stop offset="1" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity="0"/></linearGradient></defs><path fill="url(#xnNowGlow)" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92Z"/><path fill="none" style="stroke:var(--logo-pill,#a67cff)" stroke-width="5" stroke-linecap="round" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92"/><path stroke="#fff" stroke-width="3" d="M196,-162V-92"/><circle cx="196" cy="-150" r="7" fill="#fff"/><path fill="currentColor" d="M5.79 -26.82V-25.79Q5.79 -20.05 7.28 -15.14Q8.76 -10.24 11.54 -6.66Q14.3 -3.09 18.22 -1.05Q22.15 0.98 27.06 0.98Q29.63 0.98 31.87 0.42Q34.11 -0.13 35.97 -1.14Q37.21 -1.83 38.3 -2.73Q39.39 -3.63 40.38 -4.72V-1.38Q40.38 1.46 39.57 3.71Q38.77 5.96 37.27 7.49Q35.65 9.14 33.27 9.99Q30.9 10.84 27.87 10.84Q26.02 10.84 24.27 10.48Q22.52 10.11 20.87 9.36Q19.18 8.6 17.62 7.41Q16.05 6.21 14.66 4.59L8.86 12.25Q10.58 14.53 13 16.15Q15.42 17.77 18.12 18.8Q20.8 19.83 23.52 20.32Q26.23 20.8 28.55 20.8Q33.99 20.8 38.5 19.32Q43.01 17.83 46.26 14.96Q49.46 12.09 51.25 7.92Q53.04 3.75 53.04 -1.59V-52.83H41.55L41.04 -47.65Q40.07 -48.86 38.92 -49.86Q37.78 -50.85 36.45 -51.58Q34.57 -52.69 32.26 -53.25Q29.95 -53.81 27.16 -53.81Q22.19 -53.81 18.24 -51.85Q14.3 -49.88 11.53 -46.32Q8.75 -42.75 7.27 -37.78Q5.79 -32.8 5.79 -26.82ZM18.45 -25.79V-26.82Q18.45 -30.25 19.16 -33.28Q19.87 -36.31 21.36 -38.61Q22.8 -40.86 25.03 -42.17Q27.25 -43.48 30.33 -43.48Q32.04 -43.48 33.49 -43.13Q34.94 -42.78 36.14 -42.15Q37.5 -41.44 38.56 -40.34Q39.61 -39.24 40.38 -37.81V-15.06Q39.65 -13.74 38.67 -12.67Q37.69 -11.6 36.42 -10.84Q35.18 -10.13 33.65 -9.74Q32.11 -9.35 30.23 -9.35Q27.17 -9.35 24.94 -10.64Q22.72 -11.93 21.28 -14.18Q19.83 -16.39 19.14 -19.37Q18.45 -22.36 18.45 -25.79Z M90.38 0.98Q98.05 0.98 103.59 -2.03Q109.13 -5.03 111.73 -8.77L105.21 -15.45Q102.83 -12.39 99.07 -10.78Q95.31 -9.17 91.13 -9.17Q88.13 -9.17 85.6 -10.16Q83.08 -11.14 81.16 -12.91Q79.29 -14.62 78.19 -16.76Q77.09 -18.9 76.48 -22.21V-22.4H112.72V-27.8Q112.72 -33.55 111.15 -38.35Q109.59 -43.14 106.56 -46.58Q103.5 -50.01 99.07 -51.91Q94.65 -53.81 88.93 -53.81Q83.62 -53.81 79.01 -51.84Q74.4 -49.87 70.99 -46.28Q67.57 -42.69 65.64 -37.68Q63.7 -32.66 63.7 -26.53V-24.56Q63.7 -19.2 65.62 -14.53Q67.53 -9.86 71.04 -6.44Q74.56 -2.99 79.47 -1Q84.39 0.98 90.38 0.98ZM88.86 -43.57Q91.63 -43.57 93.72 -42.67Q95.81 -41.76 97.24 -40.25Q98.67 -38.7 99.48 -36.61Q100.29 -34.52 100.29 -32.31V-31.37H76.73Q77.23 -34.18 78.29 -36.43Q79.34 -38.68 80.91 -40.28Q82.44 -41.88 84.45 -42.72Q86.47 -43.57 88.86 -43.57Z M148.38 0.98Q156.05 0.98 161.59 -2.03Q167.13 -5.03 169.73 -8.77L163.21 -15.45Q160.83 -12.39 157.07 -10.78Q153.31 -9.17 149.13 -9.17Q146.13 -9.17 143.6 -10.16Q141.08 -11.14 139.16 -12.91Q137.29 -14.62 136.19 -16.76Q135.09 -18.9 134.48 -22.21V-22.4H170.72V-27.8Q170.72 -33.55 169.15 -38.35Q167.59 -43.14 164.56 -46.58Q161.5 -50.01 157.07 -51.91Q152.65 -53.81 146.93 -53.81Q141.62 -53.81 137.01 -51.84Q132.4 -49.87 128.99 -46.28Q125.57 -42.69 123.64 -37.68Q121.7 -32.66 121.7 -26.53V-24.56Q121.7 -19.2 123.62 -14.53Q125.53 -9.86 129.04 -6.44Q132.56 -2.99 137.47 -1Q142.39 0.98 148.38 0.98ZM146.86 -43.57Q149.63 -43.57 151.72 -42.67Q153.81 -41.76 155.24 -40.25Q156.67 -38.7 157.48 -36.61Q158.29 -34.52 158.29 -32.31V-31.37H134.73Q135.23 -34.18 136.29 -36.43Q137.34 -38.68 138.91 -40.28Q140.44 -41.88 142.45 -42.72Q144.47 -43.57 146.86 -43.57Z M200.25 -22.42 216.16 0H231.72L208.61 -30.81L228.84 -52.83H213.64L198.47 -36.53L193.99 -31.49V-75H181.36V0H193.99V-16.56Z M303.77 0H315.21V-52.83H302.54V-15.6Q301.89 -14.24 300.96 -13.12Q300.04 -12.01 298.84 -11.22Q297.43 -10.29 295.56 -9.8Q293.69 -9.3 291.35 -9.3Q288.92 -9.3 287.19 -9.91Q285.47 -10.52 284.37 -11.95Q283.27 -13.34 282.76 -15.67Q282.25 -18.01 282.25 -21.45V-52.83H269.63V-21.55Q269.63 -15.57 270.96 -11.3Q272.3 -7.04 274.73 -4.31Q277.16 -1.53 280.57 -0.26Q283.97 1.02 288.09 1.02Q292.72 1.02 296.54 -1.22Q300.36 -3.45 303.04 -7.39Z"/><path style="fill:var(--logo-pill,#a67cff)" d="M256.2 -65.74V-88.97H249.04L233.5 -64.44L233.78 -60.02H249.14V-52H256.2V-60.02H260.49V-65.74ZM240.43 -65.74 248.45 -78.25 249.14 -79.47V-65.74Z"/></svg></a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Utility">Utility</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+
+  <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+  <div class="xn-hatch" aria-hidden="true"></div>
+
+  <main class="xn-page">
+    <section class="xn-card">
+      <div class="jr-head">
+        <div>
+          <p class="xn-eyebrow">Journal</p>
+          <h1 class="xn-h1">Browse substances</h1>
+          <p class="xn-sub">Search and explore substances from the PsychonautWiki catalog.</p>
+        </div>
+        <label class="jr-search">
+          <span class="xn-sr">Search substances</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="input" type="search" placeholder="Search substances..." class="xn-input" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+        </label>
+      </div>
+
+      <div id="sug" class="mt-3 hidden">
+        <div id="sugC" class="rounded-sm border border-[#23202b] bg-[#121216] p-2"></div>
+      </div>
+
+      <div class="jr-classes" id="classChips" role="group" aria-label="Filter by class" hidden></div>
+      <p class="jr-count" id="classCount" aria-live="polite"></p>
+
+      <div class="Drugs" aria-live="polite"><p class="jr-status">Loading substances…</p></div>
+
+      <div class="bottombar">
+        <button type="button" class="xn-btn" id="backBtn" onclick="previousPage()" disabled>← Back</button>
+        <button type="button" class="xn-btn" id="nextBtn" onclick="nextPage()" disabled>Forward →</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+            const PAGE = 10;
+            let currentOffset = 0;
+            let currentSearchQuery = "";
+            let currentClass = "";
+            let catalog = null; // every substance, once loaded; null = use the API page by page
+
+            async function getSubstances(offset, query = "") {
+                let gql;
+                if (query) {
+                    gql = `{
+                      substances(query: "${query}") {
+                        name
+                        class{
+                            chemical
+                        }
+                        images{thumb}
+                      }
+                    }`;
+                } else {
+                    gql = `{
+                      substances(limit: 10 offset: ${offset}) {
+                        name
+                        class{
+                            chemical
+                        }
+                        images{
+                            thumb
+                        }
+                      }
+                    }`;
+                }
+                return fetchGraphQL(gql);
+            }
+
+            // The class filter needs the whole catalog, so it's fetched once
+            // (a few big pages) and kept for this browser tab.
+            const CATALOG_KEY = "xn_pw_catalog_v1";
+            async function loadCatalog() {
+                try {
+                    const saved = JSON.parse(sessionStorage.getItem(CATALOG_KEY) || "null");
+                    if (saved && saved.length) return saved;
+                } catch (_) {}
+                const all = [];
+                for (let offset = 0; offset < 4000; offset += 250) {
+                    const result = await fetchGraphQL(`{
+                      substances(limit: 250 offset: ${offset}) {
+                        name
+                        commonNames
+                        class{ chemical psychoactive }
+                        images{ thumb }
+                      }
+                    }`);
+                    const page = result?.data?.substances;
+                    if (!Array.isArray(page)) throw new Error("catalog page failed");
+                    all.push(...page);
+                    if (page.length < 250) break;
+                }
+                if (!all.length) throw new Error("empty catalog");
+                try { sessionStorage.setItem(CATALOG_KEY, JSON.stringify(all)); } catch (_) {}
+                return all;
+            }
+
+            // "Stimulants" and "stimulant" are the same class.
+            const classKey = (name) => String(name || "").trim().toLowerCase().replace(/s$/, "");
+            const classesOf = (substance) => [].concat(substance?.class?.psychoactive || []).filter(Boolean);
+
+            function buildChips() {
+                const counts = new Map();
+                catalog.forEach((substance) => {
+                    new Set(classesOf(substance).map(classKey)).forEach((key) => {
+                        const label = classesOf(substance).find((c) => classKey(c) === key).trim();
+                        const entry = counts.get(key) || { key, count: 0, labels: new Map() };
+                        entry.count++;
+                        entry.labels.set(label, (entry.labels.get(label) || 0) + 1);
+                        counts.set(key, entry);
+                    });
+                });
+                const list = [...counts.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+                const box = document.getElementById("classChips");
+                box.innerHTML = "";
+                const chip = (key, label, count) => {
+                    const b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "jr-chip";
+                    b.dataset.class = key;
+                    b.setAttribute("aria-pressed", String(key === currentClass));
+                    const iconKey = window.xnClass.keyForClass(key);
+                    if (iconKey) b.append(window.xnClass.icon(iconKey, "jr-chip-icon"));
+                    b.append(label);
+                    if (count != null) {
+                        const small = document.createElement("small");
+                        small.textContent = count;
+                        b.append(small);
+                    }
+                    b.addEventListener("click", () => {
+                        currentClass = key;
+                        box.querySelectorAll(".jr-chip").forEach((c) => c.setAttribute("aria-pressed", String(c === b)));
+                        displaySubstances(0, currentSearchQuery);
+                    });
+                    return b;
+                };
+                box.append(chip("", "All", catalog.length));
+                list.forEach((entry) => {
+                    const label = [...entry.labels.entries()].sort((a, b) => b[1] - a[1])[0][0];
+                    box.append(chip(entry.key, label.charAt(0).toUpperCase() + label.slice(1), entry.count));
+                });
+                box.hidden = list.length === 0;
+            }
+
+            function filtered(query) {
+                const q = query.toLowerCase();
+                return catalog.filter((substance) => {
+                    if (currentClass && !classesOf(substance).some((c) => classKey(c) === currentClass)) return false;
+                    if (!q) return true;
+                    return (substance.name || "").toLowerCase().includes(q) ||
+                        [].concat(substance.commonNames || []).some((n) => String(n).toLowerCase().includes(q));
+                }).sort((a, b) => {
+                    if (!q) return 0;
+                    // Names starting with the search come first.
+                    const sa = (a.name || "").toLowerCase().startsWith(q) ? 0 : 1;
+                    const sb = (b.name || "").toLowerCase().startsWith(q) ? 0 : 1;
+                    return sa - sb;
+                });
+            }
+
+            let displaySeq = 0;
+
+            async function displaySubstances(offset, query = "") {
+                const seq = ++displaySeq;
+                const drugsDiv = document.querySelector(".Drugs");
+                try {
+                    let substances, more;
+                    const likesLoad = window.xnLikes.load();
+                    if (catalog) {
+                        const matches = filtered(query);
+                        if (offset >= matches.length) offset = Math.max(0, Math.floor((matches.length - 1) / PAGE) * PAGE);
+                        substances = matches.slice(offset, offset + PAGE);
+                        more = offset + PAGE < matches.length;
+                        const pages = Math.max(1, Math.ceil(matches.length / PAGE));
+                        const chip = document.querySelector(`.jr-chip[data-class="${CSS.escape(currentClass)}"]`);
+                        const what = currentClass && chip ? [...chip.childNodes].find((n) => n.nodeType === 3)?.textContent || "" : "";
+                        document.getElementById("classCount").textContent = (currentClass || query)
+                            ? `${matches.length} ${matches.length === 1 ? "substance" : "substances"}${what ? " in " + what : ""}${query ? ` matching “${query}”` : ""} · page ${Math.floor(offset / PAGE) + 1} of ${pages}`
+                            : "";
+                    } else {
+                        const result = await getSubstances(offset, query);
+                        substances = result?.data?.substances || [];
+                        more = !query && substances.length >= PAGE;
+                    }
+                    const liked = await likesLoad;
+                    if (seq !== displaySeq) return; // a newer search is on its way
+
+                    drugsDiv.innerHTML = "";
+
+                    substances.forEach(substance => {
+                        const drugDiv = document.createElement("a");
+                        const imgUrl = substance?.images?.[0]?.thumb || '';
+
+                        const DrugName = substance?.name ?? "";
+                        const DrugClass = [].concat(substance?.class?.chemical || []).join(", ");
+                        const Psycho = classesOf(substance).join(", ");
+
+                        drugDiv.className = "Drug";
+                        drugDiv.href = "/journal/Drug?drug=" + encodeURIComponent(DrugName);
+                        drugDiv.dataset.drugname = DrugName;
+                        drugDiv.dataset.drugclass = DrugClass;
+                        drugDiv.dataset.drugimage = imgUrl;
+                        drugDiv.innerHTML = `
+                            <span class="drug-thumb"></span>
+                            <span class="drug-text"><span class="drugname"></span><span class="drugclass"></span></span>
+                        `;
+                        drugDiv.querySelector(".drugname").append(window.xnClass.icon(window.xnClass.keyFor(substance)), DrugName);
+                        drugDiv.querySelector(".drugclass").textContent = [Psycho, DrugClass].filter(Boolean).join(" · ") || "Substance";
+                        const thumb = drugDiv.querySelector(".drug-thumb");
+                        if (imgUrl) {
+                            const img = document.createElement("img");
+                            img.src = imgUrl;
+                            img.alt = "";
+                            img.loading = "lazy";
+                            img.onerror = () => { thumb.textContent = DrugName.charAt(0).toUpperCase(); };
+                            thumb.appendChild(img);
+                        } else {
+                            thumb.textContent = DrugName.charAt(0).toUpperCase();
+                        }
+                        // The heart sits beside the link (not inside it) so tapping it doesn't open the page.
+                        const item = document.createElement("div");
+                        item.className = "drug-item";
+                        const like = document.createElement("button");
+                        like.type = "button";
+                        like.className = "xn-like drug-like";
+                        window.xnLikes.bind(like, { name: DrugName, image: imgUrl, class: DrugClass }, liked.has(window.xnLikes.key(DrugName)));
+                        item.append(drugDiv, like);
+                        drugsDiv.appendChild(item);
+                    });
+                    if (!substances.length) {
+                        drugsDiv.innerHTML = `<p class="jr-status"></p>`;
+                        drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”${currentClass ? " in this class" : ""}.` : currentClass ? "No substances in this class." : "No substances on this page.";
+                    }
+                    currentOffset = offset;
+                    currentSearchQuery = query;
+                    document.getElementById("backBtn").disabled = offset === 0 || (!catalog && !!query);
+                    document.getElementById("nextBtn").disabled = !more;
+                } catch (error) {
+                    console.error("Error fetching substances:", error);
+                    if (seq !== displaySeq) return;
+                    drugsDiv.innerHTML = `<p class="jr-status">Couldn't reach PsychonautWiki. Check your connection and try again.</p>`;
+                }
+            }
+
+            function nextPage() {
+                displaySubstances(currentOffset + PAGE, currentSearchQuery);
+            }
+
+            function previousPage() {
+                if (currentOffset >= PAGE) {
+                    displaySubstances(currentOffset - PAGE, currentSearchQuery);
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                displaySubstances(0);
+                loadCatalog().then((all) => {
+                    catalog = all;
+                    buildChips();
+                    displaySubstances(currentSearchQuery ? 0 : currentOffset, currentSearchQuery);
+                }).catch((error) => console.warn("Class filter unavailable:", error));
+
+                const inputField = document.getElementById("input");
+                let searchTimeout;
+                
+                inputField.addEventListener("input", (e) => {
+                    clearTimeout(searchTimeout);
+                    const value = e.target.value.trim();
+                    
+                    if (value.length === 0) {
+                        searchTimeout = setTimeout(() => {
+                            displaySubstances(0);
+                        }, 300);
+                    } else if (value.length >= (catalog ? 1 : 2)) {
+                        searchTimeout = setTimeout(() => {
+                            displaySubstances(0, value);
+                        }, catalog ? 120 : 300);
+                    }
+                });
+            });
+            </script>
+            </div>
+        
+            <script>
+
+        let timeout;
+        document.querySelector("#input").addEventListener("input", (e) => {
+            const value = e.target.value.trim();
+
+            if (value.length < 2) {
+                document.getElementById("sug").style.visibility = "collapse";
+                return;
+            }
+
+            clearTimeout(timeout);
+
+            timeout = setTimeout(() => {
+                searchSuggestions();
+            }, 500);
+        });
+
+        function searchSuggestions() {
+			value = document.querySelector("#input").value
+            if (value.length < 2) {
+                document.getElementById("sug").style.visibility = "collapse";
+                return;
+            }
+
+            const gql = `
+            {
+                substances(query: "${value}") {
+                    name
+                    class
+                }
+            }`;
+
+            fetchGraphQL(gql).then(res => {
+                document.getElementById("sug").style.visibility = "visible";
+
+                showSuggestions(res.data.substances);
+            });
+        }
+
+        function showSuggestions(substances) {
+            const datalist = document.getElementById("sugC");
+            datalist.innerHTML = ""; 
+
+            substances.forEach(sub => {
+                const option = document.createElement("p");
+                option.textContent = sub.name;
+                option.id = "sug1";
+                datalist.appendChild(option);
+                
+                option.addEventListener("click", (e) => {
+                    const value = option.textContent;
+                    document.getElementById("input").value = value;
+                    search();
+                });
+            });
+
+			let index = -1
+			children = datalist.children
+			document.getElementById("input").addEventListener("keydown", (e) => {
+				for (let i=0;i<children.length;i++) {
+					if (children[i].classList.contains("Selected")) {
+						children[i].classList.remove("Selected")
+					}
+				}
+
+                if (event.key == "ArrowDown") {
+					index += 1
+					if (index > children.length - 1) {
+						index = 0
+					}
+					children[index].classList.add("Selected")
+				}
+
+				if (event.key == "ArrowUp") {
+					index -= 1
+					if (index < 0) {
+						index = children.length - 1
+					}
+					children[index].classList.add("Selected")
+				}
+
+				if (event.key == "Enter") {
+                    document.getElementById("input").value = children[index].textContent;
+                    search();
+				}
+			})
+        }
+
+
+
+         function fetchGraphQL(query) {
+            const url = "https://api.psychonautwiki.org";
+            return fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query })
+            }).then(r => r.json());
+        }
+
+        async function getData(substanceName) {
+            const query = `
+            {
+                substances(query: "${substanceName}") {
+                    name
+                    images{thumb}
+                    summary
+                    addictionPotential
+                    uncertainInteractions{name}
+				    unsafeInteractions{name}
+				    dangerousInteractions{name}
+
+                    roas {
+                        name
+                        duration {
+                            onset { min max units }
+                            comeup { min max units }
+                            peak { min max units }
+                            offset { min max units }
+                        }
+                        dose {
+                                units
+                                common {
+                                    min
+                                }
+                        }
+                    }
+                }
+            }`;
+            return fetchGraphQL(query);
+        }
+
+        var units = ""
+
+		let onset = 0
+		let comeup = 0
+		let peak = 0
+		let offset = 0
+
+        async function search() {
+            const substanceName = document.getElementById("input").value.trim();
+            
+
+            if (!substanceName) return;
+
+            document.getElementById("sug").style.visibility = "collapse";
+
+        
+            status.textContent = "Loading...";
+            const result = await getData(substanceName);
+            console.log("RAW RESPONSE:", result);
+
+            const substance = result?.data?.substances?.[0];
+            if (!substance) {
+                status.textContent = "No data found.";
+                return;
+            }
+
+            const duration = substance.roas?.[0]?.duration;
+            const dosage = substance.roas?.[0]?.dose;
+            units = dosage.units
+            
+            if (!duration) {
+                status.textContent = "No duration data.";
+                return;
+            }
+
+            const commonDose = dosage?.common?.min;
+            if (!commonDose) {
+                status.textContent = "No common dose data found for this substance.";
+                return;
+            }
+
+            currentSubstance = substance;
+            currentCommonDose = commonDose;
+            addedDoses = [];
+
+            onset = DurationsIntoHour(duration.onset)
+            comeup = DurationsIntoHour(duration.comeup)
+            peak = DurationsIntoHour(duration.peak)
+            offset = DurationsIntoHour(duration.offset)
+
+
+        }
+        </script>
+</body>
+</html>

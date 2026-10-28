@@ -1,0 +1,323 @@
+body {
+	background: #000000;
+	font-family: nerd, sans-serif !important;
+	margin: 0;
+	padding: 0;
+}
+@font-face {
+    font-family: 'nerd';
+    src: url('/JetBrainsMono-Regular.ttf') format('truetype');
+}
+.cont {
+  width: 50%;
+  margin: auto;
+  padding: 15px;
+  height: 100%;
+  min-height: 10rem;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+}
+#title {
+  color: white;
+}
+.Sub{
+    color: white;
+    font-size: 18px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 20px;
+    height: 1.5rem;
+    background-color: rgba(10, 10, 10, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border-radius: 5px;
+    -webkit-transition: all 0.2s ease-out;
+    -moz-transition: all 0.2s ease-out;
+    transition: all 0.2s ease-out;
+}
+
+.sub:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+
+#input {
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+  color: white;
+  margin: 5px 0px 15px;
+  height: 3rem;
+  padding: 0.7rem;
+  font-size: larger;
+  text-align: center;
+  width: 25%;
+  align-self: end;
+}
+
+#sug {
+  visibility: collapse;
+
+  margin: 5px;
+  min-height: 5rem;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+  border-radius: 8px;
+  display: grid;
+  padding: 5px;
+  display: flex;
+  position: absolute;
+  width: 30rem;
+  justify-self: center;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  top: 140;
+}
+
+.Drugs {
+  display: flex;
+  height: 80%;
+  min-height: 0;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+  overflow-y: scroll;
+  box-sizing: border-box;
+  padding: 10px;
+  flex-direction: column;
+  gap: 3%;
+}
+
+.drugimg{
+
+  
+}
+
+
+
+.drugname {
+  margin-left: 15px;
+}
+
+.Drug {
+    display: flex;
+    justify-content: space-between;
+	color: white;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+	height: 3rem;
+	border-radius: 5px;
+	width: 100%;
+  min-width: 100%;
+
+}
+
+.Drug:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+
+.Header {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px;
+}
+.nick {
+  margin-right: 15px;
+  
+}
+
+#lucy{  
+    color: #8ebbff;
+
+}
+#prrprr{  
+    color: #ee3515;
+    
+}
+#dol{  
+    color: #5f0000;
+    
+}
+#lisa{  
+    color: #368dff;
+    
+}
+
+.btn{
+	font-family: nerd, sans-serif ;
+	padding:10px;
+	border-radius:8px;
+    width: 4rem;
+    height: 1.1rem;
+	border:none;
+	outline:none;
+	background-color: rgba(10, 10, 10, 0.98);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	color:white;
+    font-size: 14px;
+    text-align: center;
+    text-decoration: none;
+    -webkit-transition: all 0.2s ease-out;
+    -moz-transition: all 0.2s ease-out;
+    transition: all 0.2s ease-out;
+}
+.btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+
+.bottombar{
+    margin-top: 25px;
+    
+	display: flex;
+     
+
+}
+#sidebar {
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  border-radius: 5px;
+  width: 40%;
+  height: 100% !important;
+}
+
+#icon{
+
+  width: 50%;
+}
+
+
+
+.pagebtn:hover {
+  background-color: rgba(17, 17, 17, 0.98);
+  box-shadow: 0px 0px 22px 0px #8b47c0;
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+}
+.pagebtn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid #8b47c0;
+  box-shadow: 0px 0px 19px -6px #8b47c0;
+  color: white;
+  cursor: pointer;
+}
+
+#subicon {
+  height: 2rem;
+  align-self: center;
+}
+
+
+
+
+
+
+
+
+
+#sideheader {
+  display: flex;
+  justify-content: space-between;
+  color: white;
+  align-items: center;
+  margin-right: 0.5rem;
+  margin-top: 0.5rem;
+}
+#xentara {
+  color: white;
+  font-size: inherit;
+  margin-left: 0.7rem;
+}
+#butcont {
+  display: flex;
+  gap: 0.4rem;
+}
+#but {
+  background-color: rgba(10, 10, 10, 0.98);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  width: 1.5rem;
+  height: 1.5rem;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  border-radius: 5px;
+}
+svg {
+  transition: all 0.2s ease-out;
+}
+svg {
+  color: #ffffff;
+}
+svg:hover {
+  color: #959595;
+  transition: all 0.2s ease-out;
+}
+
+#cont, .main {
+  display:grid;
+  height: 100vh;  
+  width: 100%;
+  grid-template-columns: 0.15fr 1fr;
+  overflow: hidden;
+}
+.option:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 16px 3px rgba(255, 255, 255, 0.18);
+  -webkit-transition: all 0.2s ease-out;
+  -moz-transition: all 0.2s ease-out;
+  transition: all 0.2s ease-out;
+  border-color: rgba(255, 255, 255, 0.623);
+}
+.option {
+  background-color: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  width: 80%;
+  height: 4.2rem;
+  border-radius: 0.5rem;
+  color: white;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#contt {
+  width: 90%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  gap: 0.7rem;
+  align-items: center;
+  margin-top: 1rem;
+}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Substance timeline · Xentara</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0f1117; --surface:#171a24; --surface-2:#1f2330; --line:#2d3343; --text:#f7f7fb; --muted:#9aa3b2; --violet:#a67cff; }
+  body{ background:radial-gradient(circle at top left, rgba(166,124,255,.18), transparent 30%), var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
+  .font-display{ font-family:'Space Grotesk',sans-serif; }
+  .font-mono{ font-family:'JetBrains Mono',monospace; }
+  .glass{ background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03)); border:1px solid var(--line); backdrop-filter: blur(10px); }
+  .check-card{ cursor:pointer; }
+  .check-card.selected{ border-color:var(--violet); background:rgba(166,124,255,.12); }
+  .suggestion{ display:block; width:100%; text-align:left; padding:.5rem .75rem; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
+  .suggestion:hover{ background:rgba(255,255,255,.08); }
+  .dose-card{ display:flex; align-items:center; gap:.75rem; background:var(--surface-2); border:1px solid var(--line); border-radius:.75rem; padding:.7rem .8rem; }
+  .dose-list-empty{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding:.5rem 0; }
+  .toast{ position:fixed; left:50%; bottom:1.5rem; transform:translate(-50%,20px); background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:.6rem 1rem; border-radius:.7rem; opacity:0; pointer-events:none; transition:.25s ease; z-index:60; }
+  .toast.visible{ opacity:1; transform:translate(-50%,0); }
+  .toast.error{ border-color:#f8717155; color:#fca5a5; }
+  .chart-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; height:360px; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center; }
+</style>
+</head>
+<body class="min-h-screen bg-[#05030a] text-[#f8f4ff]">
+<header class="navbar border-b border-[#2a1638] bg-black/70 shadow-[0_0_40px_rgba(168,85,247,0.12)] backdrop-blur">
+  <div class="flex-1">
+    <a class="btn btn-ghost text-xl font-semibold text-[#f8f4ff]" href="/Main">Xentara</a>
+  </div>
+  <div class="flex-none gap-2">
+    <a class="btn btn-ghost text-[#f8f4ff]" href="/journal">Journal</a>
+    <a class="btn btn-ghost text-[#f8f4ff]" href="/sub">Graph</a>
+    <a class="btn btn-ghost text-[#f8f4ff]" href="/Files">Files</a>
+    <a class="btn btn-ghost text-[#f8f4ff]" href="/Profile">Profile</a>
+  </div>
+</header>
+
+<div class="mx-auto max-w-[1400px] px-4 sm:px-6 py-8 grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5">
+  <div class="flex flex-col gap-5 min-w-0">
+    <div>
+      <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--muted)] mb-1">Dose planner</p>
+      <h1 class="font-display text-2xl font-semibold tracking-tight">Substance timeline</h1>
+      <p class="text-sm text-[var(--muted)] mt-1">Compare dose timing and release profiles in one view.</p>
+    </div>
+
+    <section class="glass rounded-2xl p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Combined profile</h2>
+        <span class="font-mono text-[11px] text-[var(--muted)]">Relative intensity</span>
+      </div>
+      <div id="chartEmpty" class="chart-empty">
+        <span class="text-xl">↗</span>
+        <strong class="text-[var(--text)]">Your timeline will appear here</strong>
+        <span>Find a substance, choose its formulation, and add a dose.</span>
+      </div>
+      <div id="myPlot" style="height:360px;"></div>
+    </section>
+
+    <section class="glass rounded-2xl p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Added doses <span id="doseCount" class="text-[var(--muted)] font-mono text-xs">0</span></h2>
+      </div>
+      <div id="doses" class="flex flex-col gap-2">
+        <p class="dose-list-empty">No doses added yet.</p>
+      </div>
+    </section>
+  </div>
+
+  <aside class="flex flex-col gap-5">
+    <section class="glass rounded-2xl p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-display text-sm font-semibold">Add a dose</h2>
+        <button id="resetButton" type="button" class="btn btn-xs btn-ghost font-mono" aria-label="Reset timeline">reset</button>
+      </div>
+
+      <label class="font-mono text-[11px] text-[var(--muted)] block mb-1" for="input">Substance</label>
+      <div class="join w-full mb-1 relative">
+        <input id="input" autocomplete="off" placeholder="Search, e.g. caffeine" class="input input-sm join-item bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+        <button id="searchButton" type="button" class="btn btn-sm join-item bg-[var(--surface-2)] border-[var(--line)]" aria-label="Search">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <div id="sug" class="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--surface-2)] border border-[var(--line)] rounded-lg overflow-hidden" hidden>
+          <div id="sugC" role="listbox"></div>
+        </div>
+      </div>
+      <p id="status" class="font-mono text-[11px] text-[var(--muted)] mb-3">Search for a substance to begin.</p>
+
+      <section id="dosePanel" class="flex flex-col gap-3" hidden>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="block">
+            <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Dose <span id="doseUnit"></span></span>
+            <input id="doseInput" type="number" inputmode="decimal" min="0" step="any" placeholder="300" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+          </label>
+          <label class="block">
+            <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Time</span>
+            <input id="doseStartHour" type="time" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+          </label>
+        </div>
+
+        <fieldset>
+          <legend class="font-mono text-[11px] text-[var(--muted)] mb-1.5">Medication release</legend>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="check-card selected border border-[var(--line)] rounded-lg p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="immediate" data-label="Immediate release" data-hours="0" checked class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Immediate</strong><small class="font-mono text-[10px] text-[var(--muted)]">Standard</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-lg p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="retard" data-label="Retard / extended release" data-hours="12" class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Retard / XR</strong><small class="font-mono text-[10px] text-[var(--muted)]">Extended</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-lg p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="depot" data-label="Depot / long-acting" data-hours="168" class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Depot</strong><small class="font-mono text-[10px] text-[var(--muted)]">Long-acting</small></span>
+            </label>
+            <label class="check-card border border-[var(--line)] rounded-lg p-2 flex items-start gap-2">
+              <input type="checkbox" name="formulation" value="modified" data-label="Other modified release" data-hours="24" class="checkbox checkbox-xs mt-0.5" />
+              <span class="flex flex-col"><strong class="text-xs">Other MR</strong><small class="font-mono text-[10px] text-[var(--muted)]">Modified</small></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <label id="releaseWindowField" class="block" hidden>
+          <span class="font-mono text-[11px] text-[var(--muted)] block mb-1">Release window (hours)</span>
+          <input id="releaseWindow" type="number" min="0.5" max="8760" step="0.5" value="12" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
+        </label>
+
+        <p class="font-mono text-[10px] text-[var(--muted)] leading-relaxed border-t border-[var(--line)] pt-2">Visual estimate, not dosing guidance. Modified-release behavior varies by product and route.</p>
+        <button id="addDoseButton" type="button" class="btn btn-sm bg-[var(--violet)] hover:bg-[var(--violet)]/90 border-none text-[#160f24] font-mono font-medium">+ Add dose to timeline</button>
+      </section>
+    </section>
+
+    <section id="substanceInfo" class="glass rounded-2xl border border-[#2a1638] bg-[#0d0714]/90 p-4 sm:p-5 shadow-[0_0_30px_rgba(168,85,247,0.12)]" hidden>
+      <div class="flex gap-3 mb-3">
+        <img id="substanceImage" alt="" hidden class="w-10 h-10 rounded-md object-cover" />
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">Selected substance</p>
+          <h3 id="substanceName" class="font-display text-sm font-semibold"></h3>
+        </div>
+      </div>
+      <p id="substanceSummary" class="text-[var(--muted)] text-xs leading-relaxed mb-2"></p>
+      <p class="font-mono text-[11px] text-[var(--muted)] mb-3">Addiction potential: <strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>
+      <div class="space-y-2">
+        <div><p class="font-mono text-[10px] text-amber-300 mb-1">Caution</p><div data-interaction="caution"></div></div>
+        <div><p class="font-mono text-[10px] text-orange-400 mb-1">Dangerous</p><div data-interaction="danger"></div></div>
+        <div><p class="font-mono text-[10px] text-red-400 mb-1">Severe / do not combine</p><div data-interaction="severe"></div></div>
+      </div>
+    </section>
+
+    <button id="saveButton" type="button" disabled class="btn btn-sm bg-[var(--surface-2)] border-[var(--line)] font-mono disabled:opacity-40">Save data</button>
+  </aside>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="./ui.js"></script>
+</body>
+</html>

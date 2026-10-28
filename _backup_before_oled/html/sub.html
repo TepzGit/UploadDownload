@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Build and save a substance dose timeline.">
+    <title>Substance timeline · Xentara</title>
+    <link rel="stylesheet" href="/sub.css">
+    <script src="/Substance_files/plotly-latest.min.js"></script>
+</head>
+<body>
+<div class="page-shell">
+    <nav class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="/" aria-label="Xentara home">
+            <span class="brand-mark" aria-hidden="true">X</span>
+            <span class="brand-name">Xentara</span>
+        </a>
+
+        <div class="nav-links">
+            <a href="/journal" class="nav-link active" aria-label="Journal" aria-current="page">
+                <img src="/icons/journal.png" alt="">
+                <span>Journal</span>
+            </a>
+            <a href="/Files" class="nav-link" aria-label="Files">
+                <img src="/icons/files.png" alt="">
+                <span>Files</span>
+            </a>
+            <a href="/" class="nav-link" aria-label="Home">
+                <img src="/icons/home.png" alt="">
+                <span>Home</span>
+            </a>
+        </div>
+
+        <a href="/Profile" class="profile-link" aria-label="Profile">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M16 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm-2 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" fill="currentColor"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M12 1a11 11 0 1 0 0 22 11 11 0 0 0 0-22ZM3 12a9 9 0 1 1 16.16 5.46A8.95 8.95 0 0 0 12.06 14a9.02 9.02 0 0 0-7.15 3.54A8.96 8.96 0 0 1 3 12Zm3.33 6.99A7.02 7.02 0 0 1 12.06 16a6.99 6.99 0 0 1 5.69 2.92A8.96 8.96 0 0 1 12 21a8.96 8.96 0 0 1-5.67-2.01Z" fill="currentColor"/>
+            </svg>
+            <span>Profile</span>
+        </a>
+    </nav>
+
+    <main class="timeline-workspace">
+        <header class="workspace-header">
+            <div>
+                <p class="eyebrow">Dose planner</p>
+                <h1>Substance timeline</h1>
+                <p class="workspace-copy">Compare dose timing and medication release profiles in one view.</p>
+            </div>
+            <span class="estimate-badge">Planning estimate</span>
+        </header>
+
+        <section class="chart-card" aria-labelledby="chart-title">
+            <div class="card-heading">
+                <div>
+                    <p class="section-kicker">Combined profile</p>
+                    <h2 id="chart-title">Timeline</h2>
+                </div>
+                <div class="chart-key"><span></span>Relative intensity</div>
+            </div>
+            <div id="chartEmpty" class="chart-empty">
+                <span class="empty-icon" aria-hidden="true">↗</span>
+                <strong>Your timeline will appear here</strong>
+                <span>Find a substance, choose its formulation, and add a dose.</span>
+            </div>
+            <div id="myPlot" aria-label="Combined substance timeline chart"></div>
+        </section>
+
+        <section class="dose-list-card" aria-labelledby="dose-list-title">
+            <div class="card-heading compact">
+                <div>
+                    <p class="section-kicker">Current plan</p>
+                    <h2 id="dose-list-title">Added doses <span id="doseCount">0</span></h2>
+                </div>
+            </div>
+            <div id="doses" class="dose-list">
+                <p class="dose-list-empty">No doses added yet.</p>
+            </div>
+        </section>
+    </main>
+
+    <aside class="control-panel" aria-label="Timeline controls">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Configure</p>
+                <h2>Add a dose</h2>
+            </div>
+            <button class="icon-button" type="button" onclick="resetGraph()" title="Reset timeline" aria-label="Reset timeline">
+                <img src="/icons/reset.png" alt="">
+            </button>
+        </div>
+
+        <section class="search-section" aria-labelledby="search-label">
+            <label id="search-label" for="input">Substance</label>
+            <div class="search-row">
+                <input id="input" autocomplete="off" placeholder="Search, e.g. pregabalin">
+                <button class="search-button" type="button" onclick="search()" aria-label="Search">
+                    <img src="/icons/search.png" alt="">
+                </button>
+            </div>
+            <div id="sug" class="suggestions" hidden>
+                <div id="sugC" role="listbox" aria-label="Substance suggestions"></div>
+            </div>
+            <p id="status" class="status" role="status">Search for a substance to begin.</p>
+        </section>
+
+        <section id="dosePanel" class="dose-panel" hidden>
+            <div class="field-grid">
+                <label class="field">
+                    <span>Dose <span id="doseUnit" class="unit-label"></span></span>
+                    <input id="doseInput" type="number" inputmode="decimal" min="0" step="any" placeholder="300">
+                </label>
+                <label class="field">
+                    <span>Time</span>
+                    <input id="doseStartHour" type="time">
+                </label>
+            </div>
+
+            <fieldset class="formulation-fieldset">
+                <legend>Medication release</legend>
+                <p class="field-help">Choose the formulation printed on the medication label.</p>
+                <div class="formulation-grid">
+                    <label class="check-card selected">
+                        <input type="checkbox" name="formulation" value="immediate" data-label="Immediate release" data-hours="0" checked>
+                        <span class="custom-check" aria-hidden="true"></span>
+                        <span><strong>Immediate</strong><small>Standard release</small></span>
+                    </label>
+                    <label class="check-card">
+                        <input type="checkbox" name="formulation" value="retard" data-label="Retard / extended release" data-hours="12">
+                        <span class="custom-check" aria-hidden="true"></span>
+                        <span><strong>Retard / XR</strong><small>Extended release</small></span>
+                    </label>
+                    <label class="check-card">
+                        <input type="checkbox" name="formulation" value="depot" data-label="Depot / long-acting" data-hours="168">
+                        <span class="custom-check" aria-hidden="true"></span>
+                        <span><strong>Depot</strong><small>Long-acting</small></span>
+                    </label>
+                    <label class="check-card">
+                        <input type="checkbox" name="formulation" value="modified" data-label="Other modified release" data-hours="24">
+                        <span class="custom-check" aria-hidden="true"></span>
+                        <span><strong>Other MR</strong><small>Modified release</small></span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <label id="releaseWindowField" class="field release-window" hidden>
+                <span>Release window <span class="unit-label">hours</span></span>
+                <input id="releaseWindow" type="number" min="0.5" max="8760" step="0.5" value="12">
+                <small>Use the duration stated for the specific product when available.</small>
+            </label>
+
+            <div class="estimate-note">
+                <span aria-hidden="true">i</span>
+                <p>This is a visual estimate, not dosing guidance. Modified-release behavior varies by product and route.</p>
+            </div>
+
+            <button class="primary-button" type="button" onclick="addDose()">
+                <span aria-hidden="true">＋</span> Add dose to timeline
+            </button>
+        </section>
+
+        <section id="substanceInfo" class="substance-info" hidden>
+            <div class="info-card">
+                <img id="substanceImage" alt="" hidden>
+                <div>
+                    <p class="section-kicker">Selected substance</p>
+                    <h3 id="substanceName"></h3>
+                    <p id="substanceSummary"></p>
+                    <p class="addiction">Addiction potential: <strong id="addictionPotential">Unknown</strong></p>
+                </div>
+            </div>
+
+            <div id="interactions" class="interaction-list">
+                <div class="interaction-card caution">
+                    <div class="interaction-title"><span aria-hidden="true">!</span> Caution</div>
+                    <div class="pills" data-interaction="caution"></div>
+                </div>
+                <div class="interaction-card danger">
+                    <div class="interaction-title"><span aria-hidden="true">●</span> Dangerous</div>
+                    <div class="pills" data-interaction="danger"></div>
+                </div>
+                <div class="interaction-card severe">
+                    <div class="interaction-title"><span aria-hidden="true">×</span> Severe / do not combine</div>
+                    <div class="pills" data-interaction="severe"></div>
+                </div>
+            </div>
+        </section>
+
+        <div class="panel-actions">
+            <button id="saveButton" class="secondary-button" type="button" onclick="saveChart()" disabled>Save data</button>
+            <a class="text-button" href="/journal">Back to journal</a>
+        </div>
+    </aside>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+    let suggestionTimer;
+    let currentSubstance = null;
+    let currentCommonDose = null;
+    let units = "";
+    let doseSequence = 0;
+    let hasPlot = false;
+    let addedDoses = [];
+    let baseDurations = { onset: 0, comeup: 0, peak: 0, offset: 0 };
+
+    const input = document.getElementById("input");
+    const suggestions = document.getElementById("sug");
+    const suggestionList = document.getElementById("sugC");
+    const status = document.getElementById("status");
+    const formulationInputs = Array.from(document.querySelectorAll('input[name="formulation"]'));
+
+    input.addEventListener("input", () => {
+        clearTimeout(suggestionTimer);
+        const value = input.value.trim();
+        if (value.length < 2) {
+            suggestions.hidden = true;
+            return;
+        }
+        suggestionTimer = setTimeout(searchSuggestions, 350);
+    });
+
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            search();
+        }
+    });
+
+    formulationInputs.forEach((checkbox) => {
+        checkbox.addEventListener("change", () => selectFormulation(checkbox));
+    });
+
+    window.addEventListener("resize", () => {
+        if (hasPlot) Plotly.Plots.resize("myPlot");
+    });
+
+    function selectFormulation(selected) {
+        if (!selected.checked) selected.checked = true;
+        formulationInputs.forEach((checkbox) => {
+            if (checkbox !== selected) checkbox.checked = false;
+            checkbox.closest(".check-card").classList.toggle("selected", checkbox.checked);
+        });
+
+        const releaseField = document.getElementById("releaseWindowField");
+        const isImmediate = selected.value === "immediate";
+        releaseField.hidden = isImmediate;
+        if (!isImmediate) document.getElementById("releaseWindow").value = selected.dataset.hours;
+    }
+
+    function selectedFormulation() {
+        const selected = formulationInputs.find((checkbox) => checkbox.checked) || formulationInputs[0];
+        return {
+            key: selected.value,
+            label: selected.dataset.label,
+            releaseHours: selected.value === "immediate" ? 0 : Number(document.getElementById("releaseWindow").value)
+        };
+    }
+
+    function fetchGraphQL(query, variables = {}) {
+        return fetch("https://api.psychonautwiki.org", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, variables })
+        }).then((response) => {
+            if (!response.ok) throw new Error("Substance service unavailable");
+            return response.json();
+        });
+    }
+
+    async function searchSuggestions() {
+        const value = input.value.trim();
+        if (value.length < 2) return;
+
+        const query = `query Suggestions($name: String!) {
+            substances(query: $name) { name }
+        }`;
+
+        try {
+            const result = await fetchGraphQL(query, { name: value });
+            showSuggestions(result?.data?.substances || []);
+        } catch (_) {
+            suggestions.hidden = true;
+        }
+    }
+
+    function showSuggestions(substances) {
+        suggestionList.replaceChildren();
+        substances.slice(0, 8).forEach((substance) => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.className = "suggestion";
+            option.setAttribute("role", "option");
+            option.textContent = substance.name;
+            option.addEventListener("click", () => {
+                input.value = substance.name;
+                suggestions.hidden = true;
+                search();
+            });
+            suggestionList.appendChild(option);
+        });
+        suggestions.hidden = substances.length === 0;
+    }
+
+    async function getData(substanceName) {
+        const query = `query Substance($name: String!) {
+            substances(query: $name) {
+                name
+                images { thumb }
+                summary
+                addictionPotential
+                uncertainInteractions { name }
+                unsafeInteractions { name }
+                dangerousInteractions { name }
+                roas {
+                    name
+                    duration {
+                        onset { min max units }
+                        comeup { min max units }
+                        peak { min max units }
+                        offset { min max units }
+                    }
+                    dose { units common { min } }
+                }
+            }
+        }`;
+        return fetchGraphQL(query, { name: substanceName });
+    }
+
+    function averageHours(duration) {
+        if (!duration) return 0;
+        const average = (Number(duration.min || 0) + Number(duration.max || duration.min || 0)) / 2;
+        if (duration.units === "minutes") return average / 60;
+        if (duration.units === "seconds") return average / 3600;
+        if (duration.units === "days") return average * 24;
+        return average;
+    }
+
+    async function search() {
+        const substanceName = input.value.trim();
+        if (!substanceName) return;
+
+        clearTimeout(suggestionTimer);
+        suggestions.hidden = true;
+        setLoading(true);
+        status.textContent = "Loading substance data…";
+
+        try {
+            const result = await getData(substanceName);
+            const substance = result?.data?.substances?.[0];
+            const roa = substance?.roas?.find((item) => item.duration && item.dose?.common?.min) || substance?.roas?.[0];
+
+            if (!substance || !roa?.duration || !roa?.dose?.common?.min) {
+                throw new Error("No usable dose and duration data was found for this substance.");
+            }
+
+            currentSubstance = substance;
+            currentCommonDose = Number(roa.dose.common.min);
+            units = roa.dose.units || "";
+            baseDurations = {
+                onset: averageHours(roa.duration.onset),
+                comeup: averageHours(roa.duration.comeup),
+                peak: averageHours(roa.duration.peak),
+                offset: averageHours(roa.duration.offset)
+            };
+
+            document.getElementById("doseInput").value = currentCommonDose;
+            document.getElementById("doseUnit").textContent = units;
+            document.getElementById("doseStartHour").value = currentTimeValue();
+            document.getElementById("dosePanel").hidden = false;
+            status.textContent = `${substance.name} loaded · common dose ${currentCommonDose} ${units}`;
+            renderSubstanceInfo(substance);
+        } catch (error) {
+            currentSubstance = null;
+            document.getElementById("dosePanel").hidden = true;
+            document.getElementById("substanceInfo").hidden = true;
+            status.textContent = error.message || "Unable to load substance data.";
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function setLoading(loading) {
+        document.querySelector(".search-button").classList.toggle("loading", loading);
+        document.querySelector(".search-button").disabled = loading;
+    }
+
+    function renderSubstanceInfo(substance) {
+        const image = document.getElementById("substanceImage");
+        const imageUrl = substance?.images?.[0]?.thumb;
+        image.hidden = !imageUrl;
+        if (imageUrl) {
+            image.src = imageUrl;
+            image.alt = `${substance.name} reference`;
+        }
+
+        document.getElementById("substanceName").textContent = substance.name;
+        document.getElementById("substanceSummary").textContent = substance.summary || "No summary available.";
+        document.getElementById("addictionPotential").textContent = substance.addictionPotential || "Unknown";
+        setPills("caution", substance.uncertainInteractions);
+        setPills("danger", substance.unsafeInteractions);
+        setPills("severe", substance.dangerousInteractions);
+        document.getElementById("substanceInfo").hidden = false;
+    }
+
+    function setPills(type, items) {
+        const container = document.querySelector(`[data-interaction="${type}"]`);
+        container.replaceChildren();
+        if (!items?.length) {
+            const empty = document.createElement("span");
+            empty.className = "pill empty";
+            empty.textContent = "None listed";
+            container.appendChild(empty);
+            return;
+        }
+        items.forEach((item) => {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            pill.textContent = item.name || item;
+            container.appendChild(pill);
+        });
+    }
+
+    function timeToHours(value) {
+        if (!value) {
+            const now = new Date();
+            return now.getHours() + now.getMinutes() / 60;
+        }
+        const [hours, minutes] = value.split(":").map(Number);
+        return hours + minutes / 60;
+    }
+
+    function currentTimeValue() {
+        const now = new Date();
+        return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    }
+
+    function buildDoseCurve(startHour, doseAmount, releaseHours) {
+        const intensity = doseAmount / currentCommonDose;
+        const adjusted = {
+            onset: baseDurations.onset + releaseHours * 0.15,
+            comeup: baseDurations.comeup + releaseHours * 0.25,
+            peak: baseDurations.peak + releaseHours * 0.45,
+            offset: baseDurations.offset + releaseHours * 0.15
+        };
+        const total = Object.values(adjusted).reduce((sum, value) => sum + value, 0);
+        const step = Math.max(0.05, total / 650);
+        const x = [startHour];
+        const y = [0];
+        let cursor = startHour;
+
+        appendSegment(adjusted.onset, () => 0);
+        appendSegment(adjusted.comeup, (progress) => progress * 100 * intensity);
+        appendSegment(adjusted.peak, () => 100 * intensity);
+        appendSegment(adjusted.offset, (progress) => (1 - progress) * 100 * intensity);
+
+        function appendSegment(duration, valueAt) {
+            if (duration <= 0) return;
+            const count = Math.max(1, Math.ceil(duration / step));
+            for (let index = 1; index <= count; index += 1) {
+                const progress = index / count;
+                x.push(cursor + duration * progress);
+                y.push(Math.max(0, valueAt(progress)));
+            }
+            cursor += duration;
+        }
+
+        return { x, y };
+    }
+
+    function addDose() {
+        if (!currentSubstance) return;
+        const amount = Number(document.getElementById("doseInput").value);
+        const time = document.getElementById("doseStartHour").value || currentTimeValue();
+        const formulation = selectedFormulation();
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            showToast("Enter a dose greater than zero.", true);
+            return;
+        }
+        if (!Number.isFinite(formulation.releaseHours) || formulation.releaseHours < 0) {
+            showToast("Enter a valid release window.", true);
+            return;
+        }
+
+        const curve = buildDoseCurve(timeToHours(time), amount, formulation.releaseHours);
+        addedDoses.push({
+            id: ++doseSequence,
+            x: curve.x,
+            y: curve.y,
+            time,
+            amount,
+            unit: units,
+            formulation: formulation.label,
+            releaseHours: formulation.releaseHours,
+            substance: currentSubstance.name
+        });
+
+        renderDoses();
+        drawChart();
+        showToast(`${formulation.label} dose added.`);
+    }
+
+    function renderDoses() {
+        const container = document.getElementById("doses");
+        container.replaceChildren();
+        document.getElementById("doseCount").textContent = addedDoses.length;
+        document.getElementById("saveButton").disabled = addedDoses.length === 0;
+
+        if (!addedDoses.length) {
+            const empty = document.createElement("p");
+            empty.className = "dose-list-empty";
+            empty.textContent = "No doses added yet.";
+            container.appendChild(empty);
+            return;
+        }
+
+        addedDoses.forEach((dose) => {
+            const card = document.createElement("article");
+            card.className = "dose-card";
+
+            const time = document.createElement("time");
+            time.textContent = dose.time;
+
+            const details = document.createElement("div");
+            const name = document.createElement("strong");
+            name.textContent = dose.substance;
+            const meta = document.createElement("span");
+            meta.textContent = `${dose.amount} ${dose.unit} · ${dose.formulation}`;
+            details.append(name, meta);
+
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "remove-dose";
+            remove.setAttribute("aria-label", `Remove ${dose.substance} dose at ${dose.time}`);
+            remove.textContent = "×";
+            remove.addEventListener("click", () => deleteDose(dose.id));
+            card.append(time, details, remove);
+            container.appendChild(card);
+        });
+    }
+
+    function deleteDose(id) {
+        addedDoses = addedDoses.filter((dose) => dose.id !== id);
+        renderDoses();
+        if (addedDoses.length) drawChart();
+        else clearChart();
+    }
+
+    function resetGraph() {
+        addedDoses = [];
+        renderDoses();
+        clearChart();
+        showToast("Timeline reset.");
+    }
+
+    function clearChart() {
+        if (hasPlot) Plotly.purge("myPlot");
+        hasPlot = false;
+        document.getElementById("chartEmpty").hidden = false;
+    }
+
+    function interpolateDose(dose, point) {
+        if (point < dose.x[0] || point > dose.x[dose.x.length - 1]) return 0;
+        let low = 0;
+        let high = dose.x.length - 1;
+        while (low <= high) {
+            const middle = Math.floor((low + high) / 2);
+            if (dose.x[middle] === point) return dose.y[middle];
+            if (dose.x[middle] < point) low = middle + 1;
+            else high = middle - 1;
+        }
+        const right = Math.min(low, dose.x.length - 1);
+        const left = Math.max(0, right - 1);
+        const span = dose.x[right] - dose.x[left];
+        if (!span) return dose.y[left];
+        const progress = (point - dose.x[left]) / span;
+        return dose.y[left] + (dose.y[right] - dose.y[left]) * progress;
+    }
+
+    function drawChart() {
+        const allX = Array.from(new Set(addedDoses.flatMap((dose) => dose.x.map((value) => Number(value.toFixed(4)))))).sort((a, b) => a - b);
+        const combinedY = allX.map((point) => addedDoses.reduce((sum, dose) => sum + interpolateDose(dose, point), 0));
+        const hoverTimes = allX.map(formatChartTime);
+        const minimum = Math.floor(Math.min(...allX));
+        const maximum = Math.ceil(Math.max(...allX));
+        const tickStep = Math.max(1, Math.ceil((maximum - minimum) / 12));
+        const tickValues = [];
+        for (let hour = minimum; hour <= maximum; hour += tickStep) tickValues.push(hour);
+
+        const trace = {
+            x: allX,
+            y: combinedY,
+            mode: "lines",
+            type: "scatter",
+            hovertext: hoverTimes,
+            hovertemplate: "Time: %{hovertext}<br>Relative intensity: %{y:.0f}%<extra></extra>",
+            line: { color: "#a67cff", width: 3, shape: "spline", smoothing: 0.65 },
+            fill: "tozeroy",
+            fillcolor: "rgba(139, 92, 246, 0.18)"
+        };
+
+        const layout = {
+            margin: { t: 16, r: 18, b: 48, l: 52 },
+            autosize: true,
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)",
+            font: { family: "nerd, monospace", size: 12, color: "#9894a4" },
+            hoverlabel: { bgcolor: "#1a1720", bordercolor: "#3a3345", font: { color: "#f6f2ff" } },
+            xaxis: {
+                tickmode: "array",
+                tickvals: tickValues,
+                ticktext: tickValues.map(formatChartTime),
+                gridcolor: "rgba(255,255,255,0.055)",
+                zeroline: false,
+                fixedrange: true
+            },
+            yaxis: {
+                title: { text: "Relative intensity", font: { size: 11 } },
+                rangemode: "tozero",
+                gridcolor: "rgba(255,255,255,0.055)",
+                zeroline: false,
+                fixedrange: true
+            },
+            showlegend: false
+        };
+
+        document.getElementById("chartEmpty").hidden = true;
+        Plotly.react("myPlot", [trace], layout, { displayModeBar: false, responsive: true });
+        hasPlot = true;
+    }
+
+    function formatChartTime(value) {
+        const totalMinutes = Math.round(value * 60);
+        const dayOffset = Math.floor(totalMinutes / 1440);
+        const minutesInDay = ((totalMinutes % 1440) + 1440) % 1440;
+        const hours = Math.floor(minutesInDay / 60);
+        const minutes = minutesInDay % 60;
+        const suffix = dayOffset > 0 ? ` +${dayOffset}d` : "";
+        return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}${suffix}`;
+    }
+
+    async function saveChart() {
+        if (!currentSubstance || !addedDoses.length) return;
+        const now = new Date();
+        const data = {
+            DrugName: currentSubstance.name,
+            Unit: units,
+            Doses: addedDoses.map((dose) => {
+                const [hours, minutes] = dose.time.split(":").map(Number);
+                const takenAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+                return {
+                    Time: takenAt.toISOString(),
+                    DoseAmount: String(dose.amount),
+                    Unit: dose.unit,
+                    Method: dose.formulation
+                };
+            })
+        };
+
+        const button = document.getElementById("saveButton");
+        button.disabled = true;
+        button.textContent = "Saving…";
+        try {
+            const response = await fetch("/sub/saveData", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error("Save failed");
+            showToast("Timeline saved to your journal.");
+        } catch (_) {
+            showToast("The timeline could not be saved. Please try again.", true);
+        } finally {
+            button.disabled = false;
+            button.textContent = "Save data";
+        }
+    }
+
+    function showToast(message, isError = false) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+        toast.classList.add("visible");
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => toast.classList.remove("visible"), 2800);
+    }
+</script>
+</body>
+</html>

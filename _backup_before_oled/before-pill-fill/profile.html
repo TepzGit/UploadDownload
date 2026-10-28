@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Profile · Geek⁴u</title>
+  <meta name="description" content="User profile page with medication intake summary and totals.">
+  <link rel="stylesheet" href="/profile.css">
+  <link rel="stylesheet" href="/forum.css">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <script src="/likes.js"></script>
+  <script src="/media.js"></script>
+  <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+</head>
+<body class="xn-bg">
+<header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u"><svg class="xn-logo" viewBox="0 -100 300 106" width="74" height="26" aria-hidden="true" focusable="false"><path fill="currentColor" d="M55.11 -8.52 55.04 -36.13H30.1V-26.43H42.43L42.38 -12.9Q41.72 -12.06 40.54 -11.4Q39.36 -10.75 37.88 -10.28Q36.4 -9.81 34.74 -9.57Q33.08 -9.34 31.42 -9.35Q28.66 -9.4 26.48 -10.27Q24.31 -11.13 22.68 -12.76Q21.53 -13.88 20.65 -15.34Q19.76 -16.8 19.12 -18.49Q18.2 -20.99 17.71 -24.1Q17.22 -27.21 17.21 -30.82V-40.29Q17.21 -43.27 17.57 -45.95Q17.93 -48.63 18.63 -50.9Q19.49 -53.67 20.81 -55.81Q22.12 -57.95 23.83 -59.34Q25.22 -60.46 26.9 -61.08Q28.58 -61.69 30.49 -61.69Q33.47 -61.69 35.65 -60.88Q37.82 -60.06 39.29 -58.47Q40.63 -57 41.43 -54.87Q42.22 -52.74 42.6 -50.05H55.05Q54.53 -55.15 52.76 -59.23Q51 -63.32 47.91 -66.2Q44.82 -69.03 40.41 -70.55Q36 -72.07 30.21 -72.07Q26.18 -72.07 22.64 -70.94Q19.11 -69.82 16.16 -67.69Q13.55 -65.74 11.44 -63.08Q9.33 -60.43 7.77 -57.16Q6.13 -53.59 5.26 -49.31Q4.39 -45.03 4.38 -40.19V-30.82Q4.39 -25.77 5.3 -21.36Q6.21 -16.95 8 -13.34Q9.58 -10 11.87 -7.35Q14.17 -4.7 17.02 -2.84Q19.91 -1 23.4 -0.02Q26.9 0.97 30.91 0.98Q35.37 0.99 39.28 0.12Q43.2 -0.75 46.42 -2.26Q49.31 -3.54 51.52 -5.19Q53.72 -6.83 55.11 -8.52Z M89.38 0.98Q97.05 0.98 102.59 -2.03Q108.13 -5.03 110.73 -8.77L104.21 -15.45Q101.83 -12.39 98.07 -10.78Q94.31 -9.17 90.13 -9.17Q87.13 -9.17 84.6 -10.16Q82.08 -11.14 80.16 -12.91Q78.29 -14.62 77.19 -16.76Q76.09 -18.9 75.48 -22.21V-22.4H111.72V-27.8Q111.72 -33.55 110.15 -38.35Q108.59 -43.14 105.56 -46.58Q102.5 -50.01 98.07 -51.91Q93.65 -53.81 87.93 -53.81Q82.62 -53.81 78.01 -51.84Q73.4 -49.87 69.99 -46.28Q66.57 -42.69 64.64 -37.68Q62.7 -32.66 62.7 -26.53V-24.56Q62.7 -19.2 64.62 -14.53Q66.53 -9.86 70.04 -6.44Q73.56 -2.99 78.47 -1Q83.39 0.98 89.38 0.98ZM87.86 -43.57Q90.63 -43.57 92.72 -42.67Q94.81 -41.76 96.24 -40.25Q97.67 -38.7 98.48 -36.61Q99.29 -34.52 99.29 -32.31V-31.37H75.73Q76.23 -34.18 77.29 -36.43Q78.34 -38.68 79.91 -40.28Q81.44 -41.88 83.45 -42.72Q85.47 -43.57 87.86 -43.57Z M146.38 0.98Q154.05 0.98 159.59 -2.03Q165.13 -5.03 167.73 -8.77L161.21 -15.45Q158.83 -12.39 155.07 -10.78Q151.31 -9.17 147.13 -9.17Q144.13 -9.17 141.6 -10.16Q139.08 -11.14 137.16 -12.91Q135.29 -14.62 134.19 -16.76Q133.09 -18.9 132.48 -22.21V-22.4H168.72V-27.8Q168.72 -33.55 167.15 -38.35Q165.59 -43.14 162.56 -46.58Q159.5 -50.01 155.07 -51.91Q150.65 -53.81 144.93 -53.81Q139.62 -53.81 135.01 -51.84Q130.4 -49.87 126.99 -46.28Q123.57 -42.69 121.64 -37.68Q119.7 -32.66 119.7 -26.53V-24.56Q119.7 -19.2 121.62 -14.53Q123.53 -9.86 127.04 -6.44Q130.56 -2.99 135.47 -1Q140.39 0.98 146.38 0.98ZM144.86 -43.57Q147.63 -43.57 149.72 -42.67Q151.81 -41.76 153.24 -40.25Q154.67 -38.7 155.48 -36.61Q156.29 -34.52 156.29 -32.31V-31.37H132.73Q133.23 -34.18 134.29 -36.43Q135.34 -38.68 136.91 -40.28Q138.44 -41.88 140.45 -42.72Q142.47 -43.57 144.86 -43.57Z M197.25 -22.42 213.16 0H228.72L205.61 -30.81L225.84 -52.83H210.64L195.47 -36.53L190.99 -31.49V-75H178.36V0H190.99V-16.56Z M277.77 0H289.21V-52.83H276.54V-15.6Q275.89 -14.24 274.96 -13.12Q274.04 -12.01 272.84 -11.22Q271.43 -10.29 269.56 -9.8Q267.69 -9.3 265.35 -9.3Q262.92 -9.3 261.19 -9.91Q259.47 -10.52 258.37 -11.95Q257.27 -13.34 256.76 -15.67Q256.25 -18.01 256.25 -21.45V-52.83H243.63V-21.55Q243.63 -15.57 244.96 -11.3Q246.3 -7.04 248.73 -4.31Q251.16 -1.53 254.57 -0.26Q257.97 1.02 262.09 1.02Q266.72 1.02 270.54 -1.22Q274.36 -3.45 277.04 -7.39Z"/><g transform="translate(254 -62) scale(1.1) translate(-254 62)"><path fill="var(--logo-pill,#a67cff)" d="M239,-92h15v30h-15a15,15 0 0 1 0,-30z"/><path fill="none" stroke="currentColor" stroke-width="3.5" d="M254,-90.25h15a13.25,13.25 0 0 1 0,26.5h-15z"/><path fill="#0b0a10" d="M247.97 -74.84V-85.56H244.66L237.49 -74.24L237.62 -72.2H244.71V-68.5H247.97V-72.2H249.95V-74.84ZM240.69 -74.84 244.39 -80.62 244.71 -81.18V-74.84Z"/></g></svg></a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Forum">Forum</a>
+    <a href="/Profile">Profile</a>
+  </nav>
+</header>
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-camera" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 7.5h3l1.6-2.5h6.8L17 7.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-pill" viewBox="0 0 16 16"><path fill="currentColor" d="M11.02 5.364a3 3 0 0 0-4.242-4.243L1.121 6.778a3 3 0 1 0 4.243 4.243l5.657-5.657Zm-6.413-.657 2.878-2.879a2 2 0 1 1 2.829 2.829L7.435 7.536zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-.5 1.042a3 3 0 0 0 0 5.917zm1 5.917a3 3 0 0 0 0-5.917z"/></symbol>
+</svg>
+
+<main class="xn-page pf" id="container">
+  <section class="xn-card pf-head" id="header">
+    <div class="pf-banner" id="pfBanner">
+      <img id="bannerImg" alt="" {{if .Banner}}src="{{.Banner}}"{{else}}hidden{{end}}>
+      <button type="button" class="xn-btn pf-banner-btn" data-pick="banner"><svg aria-hidden="true"><use href="#i-camera"/></svg><span>Change banner</span></button>
+    </div>
+    <div class="pf-head-row">
+      <button type="button" id="profile-pic" class="profile-avatar" data-pick="avatar" aria-label="Change profile picture">
+        <img id="avatarImg" alt="" {{if .Avatar}}src="{{.Avatar}}"{{else}}hidden{{end}}>
+        <span class="pf-initial" id="avatarInitial" aria-hidden="true" {{if .Avatar}}hidden{{end}}>{{.Initial}}</span>
+        <span class="avatar-overlay"><svg aria-hidden="true"><use href="#i-camera"/></svg></span>
+      </button>
+      <div class="pf-who">
+        <p class="xn-eyebrow">Profile</p>
+        <h1 class="xn-h1" id="username">{{.Username}}</h1>
+      </div>
+      <div class="pf-actions" id="options">
+        <button type="button" class="xn-btn option" id="APB">Appearance</button>
+        <button type="button" class="xn-btn option" id="DTB">Data</button>
+        <button type="button" class="xn-btn option" id="PRB">Preferences</button>
+        <a class="xn-btn option" href="/u/{{.Username}}">Public view</a>
+        <form method="post" action="/logout" class="pf-signout"><button type="submit" class="xn-btn">Sign out</button></form>
+      </div>
+    </div>
+    <input type="file" class="pf-file" id="avatarFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
+    <input type="file" class="pf-file" id="bannerFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
+  </section>
+
+  <div class="pf-grid">
+    <section class="xn-card pf-box pf-cal" aria-labelledby="calTitle">
+      <div class="pf-box-head">
+        <h2 class="xn-h2" id="calTitle">Dose calendar</h2>
+        <div class="cal-nav">
+          <button type="button" class="cal-step" id="calPrev" aria-label="Previous month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+          <span class="cal-month" id="calMonth" aria-live="polite"></span>
+          <button type="button" class="cal-step" id="calNext" aria-label="Next month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="cal-grid" id="calGrid" aria-busy="true"></div>
+      <div class="cal-foot">
+        <span class="pf-note" id="calNote">Loading your doses…</span>
+        <button type="button" class="xn-btn cal-jump" id="calJump" hidden></button>
+      </div>
+    </section>
+
+    <div class="pf-col">
+      <section class="xn-card pf-box" aria-labelledby="likedTitle">
+        <div class="pf-box-head">
+          <h2 class="xn-h2" id="likedTitle">Liked substances</h2>
+          <span class="pf-note" id="likedCount">{{len .Liked}} liked</span>
+        </div>
+        <div class="pf-liked" id="liked">
+          {{range .Liked}}
+          <div class="pf-like" data-name="{{.Name}}" data-image="{{.Image}}" data-class="{{.Class}}">
+            <a class="pf-like-link" href="/journal/Drug?drug={{.Name}}">
+              <span class="pf-like-thumb" data-initial="{{.Initial}}">{{if .Image}}<img src="{{.Image}}" alt="" loading="lazy">{{else}}{{.Initial}}{{end}}</span>
+              <span class="pf-main"><strong>{{.Name}}</strong><span>{{if .Class}}{{.Class}}{{else}}Substance{{end}}</span></span>
+            </a>
+            <button type="button" class="xn-like"></button>
+          </div>
+          {{end}}
+          <p class="xn-empty" id="likedEmpty" {{if .Liked}}hidden{{end}}>Tap the heart on a substance in the <a href="/journal">Journal</a> and it shows up here.</p>
+        </div>
+      </section>
+
+      <section class="xn-card pf-box" id="friendsBox" aria-labelledby="friendsTitle">
+        <div class="pf-box-head">
+          <h2 class="xn-h2" id="friendsTitle">Friends</h2>
+          <span class="pf-note" id="friendsCount"></span>
+        </div>
+        <div class="fr-list" id="friends" aria-live="polite"><p class="xn-empty">Loading your friends…</p></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="pf-grid pf-data" id="profile-data">
+    <section class="xn-card pf-box" aria-labelledby="intakeTitle">
+      <div class="pf-box-head">
+        <h2 class="xn-h2" id="intakeTitle">Recent intake</h2>
+        <span class="pf-note">Last 10 doses</span>
+      </div>
+      <div class="pf-rows" id="intake" aria-busy="true">
+        <p class="xn-empty">Loading your doses…</p>
+      </div>
+    </section>
+
+    <section class="xn-card pf-box" aria-labelledby="totalsTitle">
+      <div class="pf-box-head">
+        <h2 class="xn-h2" id="totalsTitle">Totals</h2>
+        <div class="pf-range" role="tablist" aria-label="Totals for">
+          <button type="button" role="tab" data-range="week" aria-selected="false">7 days</button>
+          <button type="button" role="tab" data-range="month" aria-selected="true">30 days</button>
+          <button type="button" role="tab" data-range="all" aria-selected="false">All</button>
+        </div>
+      </div>
+      <div class="pf-rows" id="totals" role="tabpanel" aria-labelledby="totalsTitle" aria-busy="true">
+        <p class="xn-empty">Loading your totals…</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="pf-add-row">
+    <button type="button" class="pf-add" id="addBox" aria-label="Add a box" title="Add a box" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <div class="pf-add-menu" id="addMenu" role="menu" aria-label="Add to your profile" hidden>
+      <button type="button" role="menuitem" data-kind="pictures">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><circle cx="9" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg>
+        <span><strong>Pictures</strong><small>Up to 4 pictures</small></span>
+      </button>
+      <button type="button" role="menuitem" data-kind="experience">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19.5h18"/><path d="M4 18c2.5 0 3-11 6.5-11S14 18 20 18"/></svg>
+        <span><strong>Experience</strong><small>One of your Graph sessions</small></span>
+      </button>
+      <button type="button" role="menuitem" data-kind="note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/></svg>
+        <span><strong>Note</strong><small>A few lines of text</small></span>
+      </button>
+      <p class="pf-add-hint">Everyone who opens your profile sees these boxes.</p>
+    </div>
+  </div>
+</main>
+
+<div class="popup" id="AP" role="dialog" aria-modal="true" aria-labelledby="APtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="APtitle">Appearance</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="APcontent">
+      <span class="xn-label">Pictures</span>
+      <div class="pf-pic-row">
+        <span>Profile picture</span>
+        <span class="pf-pic-btns"><button type="button" class="xn-btn" data-pick="avatar">Change</button><button type="button" class="xn-btn xn-btn-danger" data-remove="avatar" {{if not .Avatar}}disabled{{end}}>Remove</button></span>
+      </div>
+      <div class="pf-pic-row">
+        <span>Banner</span>
+        <span class="pf-pic-btns"><button type="button" class="xn-btn" data-pick="banner">Change</button><button type="button" class="xn-btn xn-btn-danger" data-remove="banner" {{if not .Banner}}disabled{{end}}>Remove</button></span>
+      </div>
+    </div>
+    <p class="pf-note">Graph colors for each substance are under Preferences.</p>
+    <button type="button" id="CSA" class="xn-btn xn-btn-primary pop-done">Close</button>
+  </div>
+</div>
+
+<div class="popup" id="DT" role="dialog" aria-modal="true" aria-labelledby="DTtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="DTtitle">Data settings</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="content">
+      <button type="button" class="xn-btn">Import data</button>
+      <button type="button" class="xn-btn xn-btn-danger">Clear</button>
+    </div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSD">Done</button>
+  </div>
+</div>
+
+<div class="popup" id="PR" role="dialog" aria-modal="true" aria-labelledby="PRtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <h2 class="xn-h2" id="PRtitle">Preferences</h2>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="APcontent">
+      <span class="xn-label" id="gcLabel">Graph colors</span>
+      <p class="pf-note">Pick the line color a substance gets on the Graph page.</p>
+      <div class="gc-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" class="xn-input" id="gcSearch" placeholder="Search a substance…" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="gcSug" aria-labelledby="gcLabel">
+        <div class="gc-sug" id="gcSug" role="listbox" aria-label="Substances" hidden></div>
+      </div>
+      <p class="pf-note gc-status" id="gcStatus" aria-live="polite"></p>
+      <div class="gc-list" id="gcList"></div>
+      <p class="xn-empty" id="gcEmpty" hidden>No custom colors yet. Search for a substance to add one.</p>
+    </div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSP">Done</button>
+  </div>
+</div>
+
+<div class="popup" id="DAY" role="dialog" aria-modal="true" aria-labelledby="DAYtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <div>
+        <p class="xn-eyebrow" id="DAYsub"></p>
+        <h2 class="xn-h2" id="DAYtitle"></h2>
+      </div>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="pf-rows" id="DAYlist"></div>
+    <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSDay">Close</button>
+  </div>
+</div>
+
+<div class="popup" id="EXP" role="dialog" aria-modal="true" aria-labelledby="EXPtitle">
+  <div class="popcase">
+    <div class="pop-head">
+      <div>
+        <p class="xn-eyebrow">Add to your profile</p>
+        <h2 class="xn-h2" id="EXPtitle">Pick a Graph session</h2>
+      </div>
+      <button type="button" class="pop-x" data-close aria-label="Close">×</button>
+    </div>
+    <div class="pf-exp-pick" id="EXPlist" aria-busy="true"><p class="xn-empty">Loading your sessions…</p></div>
+    <button type="button" class="xn-btn pop-done" id="CSExp">Cancel</button>
+  </div>
+</div>
+
+<script>
+  const AP = document.getElementById("AP");
+  const DT = document.getElementById("DT");
+  const PR = document.getElementById("PR");
+
+  const openAP = document.getElementById("APB");
+  const openDT = document.getElementById("DTB");
+  const openPR = document.getElementById("PRB");
+
+  const closeBtnA = document.getElementById("CSA");
+  const closeBtnD = document.getElementById("CSD");
+  const closeBtnP = document.getElementById("CSP");
+
+  const popupTransitionMs = 240;
+  let openPopup = null;
+  let opener = null;
+
+  function showPopup(popup) {
+    opener = document.activeElement;
+    openPopup = popup;
+    popup.style.display = "flex";
+    document.documentElement.classList.add("xn-modal-open");
+    requestAnimationFrame(() => {
+      popup.classList.add("active");
+      popup.querySelector(".pop-done").focus({ preventScroll: true });
+    });
+  }
+
+  function hidePopup(popup) {
+    popup.classList.remove("active");
+    openPopup = null;
+    document.documentElement.classList.remove("xn-modal-open");
+    setTimeout(() => {
+      if (!popup.classList.contains("active")) popup.style.display = "none";
+    }, popupTransitionMs);
+    if (opener) opener.focus({ preventScroll: true });
+  }
+
+  openAP.onclick = () => showPopup(AP);
+  openDT.onclick = () => showPopup(DT);
+  openPR.onclick = () => { showPopup(PR); window.gcOpen && window.gcOpen(); };
+
+  closeBtnA.onclick = () => hidePopup(AP);
+  closeBtnD.onclick = () => hidePopup(DT);
+  closeBtnP.onclick = () => hidePopup(PR);
+
+  const DAY = document.getElementById("DAY");
+  document.getElementById("CSDay").onclick = () => hidePopup(DAY);
+  const EXP = document.getElementById("EXP");
+  document.getElementById("CSExp").onclick = () => hidePopup(EXP);
+
+  [AP, DT, PR, DAY, EXP].forEach((popup) => {
+    popup.addEventListener("click", (e) => {
+      if (e.target === popup || e.target.closest("[data-close]")) hidePopup(popup);
+    });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && openPopup) hidePopup(openPopup);
+  });
+
+  // Phone photos are big and carry location data, so they are shrunk and
+  // re-saved as JPEG first (media.js).
+  const shrinkPicture = (file, size) => window.xnShrinkPicture(file, size);
+
+  // ---------------- Dose calendar ----------------
+  (function calendar() {
+    const grid = document.getElementById("calGrid");
+    const monthLabel = document.getElementById("calMonth");
+    const note = document.getElementById("calNote");
+    const jump = document.getElementById("calJump");
+    const prev = document.getElementById("calPrev");
+    const next = document.getElementById("calNext");
+    const zone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (_) { return ""; } })();
+    // 0 = Sunday. Follows the browser's locale where it says, else Monday.
+    const weekStart = (() => {
+      try {
+        const loc = new Intl.Locale(navigator.language);
+        const info = loc.getWeekInfo ? loc.getWeekInfo() : loc.weekInfo;
+        if (info && info.firstDay) return info.firstDay % 7;
+      } catch (_) {}
+      return 1;
+    })();
+    const cache = new Map();
+    const today = new Date();
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let shown = thisMonth;
+    let loadSeq = 0;
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const monthKey = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1);
+    const dayKey = (d) => monthKey(d) + "-" + pad(d.getDate());
+    const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
+
+    function weekdayNames() {
+      const fmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+      const sunday = new Date(2024, 0, 7);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(sunday);
+        d.setDate(sunday.getDate() + ((weekStart + i) % 7));
+        return fmt.format(d);
+      });
+    }
+    const WEEKDAYS = weekdayNames();
+
+    async function fetchMonth(first) {
+      const key = monthKey(first);
+      if (!cache.has(key)) {
+        const params = new URLSearchParams({ month: key, zone, tz: String(new Date(first.getFullYear(), first.getMonth(), 15).getTimezoneOffset()) });
+        cache.set(key, fetch("/profile/doses?" + params, { headers: { Accept: "application/json" } }).then((res) => {
+          const json = (res.headers.get("content-type") || "").includes("json");
+          if (!res.ok || !json) throw new Error(res.redirected || res.status === 401 ? "signed-out" : "failed");
+          return res.json();
+        }).catch((error) => { cache.delete(key); throw error; }));
+      }
+      return cache.get(key);
+    }
+
+    function render(first, data) {
+      grid.innerHTML = "";
+      WEEKDAYS.forEach((name) => {
+        const head = document.createElement("span");
+        head.className = "cal-wd";
+        head.textContent = name;
+        grid.append(head);
+      });
+      const lead = (first.getDay() - weekStart + 7) % 7;
+      for (let i = 0; i < lead; i++) {
+        const blank = document.createElement("span");
+        blank.className = "cal-day is-blank";
+        grid.append(blank);
+      }
+      const days = (data && data.days) || {};
+      const total = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+      const longDate = new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" });
+      let doseDays = 0;
+      let doseCount = 0;
+      for (let n = 1; n <= total; n++) {
+        const date = new Date(first.getFullYear(), first.getMonth(), n);
+        const key = dayKey(date);
+        const doses = days[key] || [];
+        const cell = document.createElement(doses.length ? "button" : "span");
+        cell.className = "cal-day";
+        const num = document.createElement("span");
+        num.className = "cal-num";
+        num.textContent = n;
+        cell.append(num);
+        if (key === dayKey(today)) cell.classList.add("is-today");
+        if (date > today) cell.classList.add("is-future");
+        if (doses.length) {
+          doseDays++;
+          doseCount += doses.length;
+          cell.type = "button";
+          cell.classList.add("has-dose");
+          cell.setAttribute("aria-label", longDate.format(date) + ", " + plural(doses.length, "dose"));
+          const dots = document.createElement("span");
+          dots.className = "cal-dots";
+          dots.setAttribute("aria-hidden", "true");
+          for (let i = 0; i < Math.min(doses.length, 3); i++) dots.append(document.createElement("i"));
+          cell.append(dots);
+          cell.addEventListener("click", () => openDay(date, doses));
+        }
+        grid.append(cell);
+      }
+      grid.setAttribute("aria-busy", "false");
+
+      jump.hidden = true;
+      if (doseDays) {
+        note.textContent = plural(doseDays, "day") + " with doses, " + plural(doseCount, "dose") + " in all. Tap a marked day to see it.";
+      } else {
+        note.textContent = "No doses this month.";
+        if (data && data.latest && data.latest.slice(0, 7) !== monthKey(first)) {
+          const [y, m] = data.latest.split("-").map(Number);
+          const target = new Date(y, m - 1, 1);
+          jump.textContent = "Go to " + target.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+          jump.onclick = () => show(target);
+          jump.hidden = false;
+        }
+      }
+    }
+
+    async function show(first) {
+      shown = first;
+      const seq = ++loadSeq;
+      monthLabel.textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      next.disabled = first >= thisMonth;
+      grid.setAttribute("aria-busy", "true");
+      try {
+        const data = await fetchMonth(first);
+        if (seq === loadSeq) render(first, data);
+      } catch (error) {
+        if (seq !== loadSeq) return;
+        render(first, null);
+        note.textContent = error.message === "signed-out" ? "Log in again to see your doses." : "Couldn't load your doses. Try again in a moment.";
+      }
+    }
+
+    prev.addEventListener("click", () => show(new Date(shown.getFullYear(), shown.getMonth() - 1, 1)));
+    next.addEventListener("click", () => { if (shown < thisMonth) show(new Date(shown.getFullYear(), shown.getMonth() + 1, 1)); });
+
+    function openDay(date, doses) {
+      document.getElementById("DAYtitle").textContent = date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      const names = new Set(doses.map((d) => d.name.toLowerCase()));
+      document.getElementById("DAYsub").textContent = plural(doses.length, "dose") + " · " + plural(names.size, "substance");
+      const list = document.getElementById("DAYlist");
+      list.innerHTML = "";
+      doses.forEach((dose) => {
+        const row = document.createElement("div");
+        row.className = "pf-row";
+        row.innerHTML = '<span class="pf-ico"><svg aria-hidden="true"><use href="#i-pill"/></svg></span><span class="pf-main"><strong></strong><span></span></span><span class="pf-when"></span>';
+        row.querySelector("strong").textContent = dose.name;
+        row.querySelector(".pf-main span").textContent = dose.amount + " " + dose.unit + (dose.method ? " · " + dose.method : "");
+        row.querySelector(".pf-when").textContent = dose.time;
+        list.append(row);
+      });
+      showPopup(DAY);
+    }
+
+    show(thisMonth);
+  })();
+
+  // ---------------- Recent intake + totals ----------------
+  // Doses saved to the journal and doses added on the Graph, from /profile/intake.
+  (function intake() {
+    const recentBox = document.getElementById("intake");
+    const totalsBox = document.getElementById("totals");
+    const tabs = [...document.querySelectorAll(".pf-range [data-range]")];
+    const zone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (_) { return ""; } })();
+    const RANGE_WORDS = { week: "in the last 7 days", month: "in the last 30 days", all: "yet" };
+    let range = "month";
+    let data = null;
+
+    function row(name, detail, end, endClass) {
+      const item = document.createElement("div");
+      item.className = "pf-row";
+      item.innerHTML = '<span class="pf-ico"><svg aria-hidden="true"><use href="#i-pill"/></svg></span><span class="pf-main"><strong></strong><span></span></span><span></span>';
+      item.querySelector("strong").textContent = name;
+      item.querySelector(".pf-main span").textContent = detail;
+      const last = item.lastElementChild;
+      last.className = endClass;
+      last.textContent = end;
+      return item;
+    }
+
+    function empty(box, html) {
+      const p = document.createElement("p");
+      p.className = "xn-empty";
+      p.innerHTML = html;
+      box.replaceChildren(p);
+    }
+
+    function renderRecent() {
+      recentBox.setAttribute("aria-busy", "false");
+      if (!data.recent.length) {
+        empty(recentBox, 'No doses yet. Add some on the <a href="/">Graph</a> page and they show up here.');
+        return;
+      }
+      const when = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      recentBox.replaceChildren(...data.recent.map((dose) => {
+        const item = row(dose.name, dose.amount + " " + dose.unit + (dose.method ? " · " + dose.method : ""), dose.ago, "pf-when");
+        const at = new Date(dose.at);
+        if (!isNaN(at)) item.querySelector(".pf-when").title = when.format(at);
+        return item;
+      }));
+    }
+
+    function renderTotals() {
+      tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.range === range)));
+      totalsBox.setAttribute("aria-busy", "false");
+      const list = (data.totals && data.totals[range]) || [];
+      if (!list.length) {
+        empty(totalsBox, "No doses " + RANGE_WORDS[range] + ".");
+        return;
+      }
+      totalsBox.replaceChildren(...list.map((t) => row(t.name, t.doses + (t.doses === 1 ? " dose" : " doses"), t.amount + " " + t.unit, "pf-total")));
+    }
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => {
+        range = tab.dataset.range;
+        if (data) renderTotals();
+        else tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+      });
+      tab.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        next.focus();
+        next.click();
+      });
+    });
+
+    const params = new URLSearchParams({ zone, tz: String(new Date().getTimezoneOffset()) });
+    fetch("/profile/intake?" + params, { headers: { Accept: "application/json" } })
+      .then((res) => {
+        if (!res.ok || !(res.headers.get("content-type") || "").includes("json")) throw new Error(res.redirected || res.status === 401 ? "signed-out" : "failed");
+        return res.json();
+      })
+      .then((json) => {
+        data = { recent: json.recent || [], totals: json.totals || {} };
+        renderRecent();
+        renderTotals();
+      })
+      .catch((error) => {
+        const text = error.message === "signed-out" ? "Log in again to see your doses." : "Couldn't load your doses. Try again in a moment.";
+        recentBox.setAttribute("aria-busy", "false");
+        totalsBox.setAttribute("aria-busy", "false");
+        empty(recentBox, text);
+        empty(totalsBox, text);
+      });
+  })();
+
+  // ---------------- Liked substances ----------------
+  (function liked() {
+    const box = document.getElementById("liked");
+    const empty = document.getElementById("likedEmpty");
+    const count = document.getElementById("likedCount");
+    function refresh() {
+      const n = box.querySelectorAll(".pf-like").length;
+      count.textContent = n + " liked";
+      empty.hidden = n > 0;
+    }
+    box.querySelectorAll(".pf-like").forEach((card) => {
+      const sub = { name: card.dataset.name, image: card.dataset.image, class: card.dataset.class };
+      const img = card.querySelector("img");
+      if (img) img.addEventListener("error", () => { const t = card.querySelector(".pf-like-thumb"); t.textContent = t.dataset.initial; });
+      window.xnLikes.bind(card.querySelector(".xn-like"), sub, true, (isLiked) => {
+        if (isLiked) return;
+        card.classList.add("is-leaving");
+        setTimeout(() => { card.remove(); refresh(); }, 200);
+      });
+    });
+  })();
+
+  // ---------------- Graph colors (Preferences) ----------------
+  (function graphColors() {
+    // Same order the Graph page hands colors out in.
+    const PALETTE = ["#a67cff", "#2dd4bf", "#fbbf24", "#f472b6", "#60a5fa", "#a3e635", "#fb923c", "#e879f9"];
+    const search = document.getElementById("gcSearch");
+    const sug = document.getElementById("gcSug");
+    const list = document.getElementById("gcList");
+    const empty = document.getElementById("gcEmpty");
+    const status = document.getElementById("gcStatus");
+    const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+    let loaded = false;
+    let timer;
+    let seq = 0;
+    let active = -1;
+
+    const keyOf = (name) => String(name).trim().toLowerCase();
+    const rowFor = (name) => [...list.querySelectorAll(".gc-row")].find((r) => keyOf(r.dataset.name) === keyOf(name));
+
+    async function save(name, color) {
+      const res = await fetch("/graphColors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color }),
+      });
+      if (res.status === 401) throw new Error("Log in again to save colors.");
+      if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save that color.");
+      return res.json();
+    }
+
+    function refresh() {
+      empty.hidden = list.children.length > 0;
+    }
+
+    function addRow(name, color, prepend) {
+      const row = document.createElement("div");
+      row.className = "drugcolor gc-row";
+      row.dataset.name = name;
+      row.innerHTML = '<span class="gc-name"><i class="gc-dot"></i><span></span></span><span class="gc-ctl"><input type="color"><button type="button" class="pop-x gc-reset">×</button></span>';
+      row.querySelector(".gc-name span").textContent = name;
+      const input = row.querySelector("input");
+      const dot = row.querySelector(".gc-dot");
+      input.value = color;
+      dot.style.background = color;
+      input.setAttribute("aria-label", "Graph color for " + name);
+      const reset = row.querySelector(".gc-reset");
+      reset.setAttribute("aria-label", "Remove the custom color for " + name);
+
+      let saveTimer;
+      let saved = color;
+      const commit = async () => {
+        clearTimeout(saveTimer);
+        if (input.value === saved) return;
+        const value = input.value;
+        try {
+          await save(name, value);
+          saved = value;
+          status.textContent = name + " saved.";
+        } catch (error) {
+          toast(error.message, true);
+        }
+      };
+      input.addEventListener("input", () => {
+        dot.style.background = input.value;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(commit, 500);
+      });
+      input.addEventListener("change", commit);
+      reset.addEventListener("click", async () => {
+        try {
+          await save(name, "");
+          row.remove();
+          refresh();
+          status.textContent = name + " uses the default color again.";
+          search.focus();
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+      if (prepend) list.prepend(row); else list.append(row);
+      refresh();
+      return row;
+    }
+
+    async function load() {
+      status.textContent = "Loading your colors…";
+      try {
+        const res = await fetch("/graphColors", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error();
+        const items = await res.json();
+        list.innerHTML = "";
+        items.forEach((item) => addRow(item.name, item.color));
+        refresh();
+        loaded = true;
+        status.textContent = "";
+      } catch (_) {
+        status.textContent = "Couldn't load your colors. Close this and try again.";
+      }
+    }
+
+    window.gcOpen = () => {
+      if (!loaded) load();
+      search.value = "";
+      closeSug();
+    };
+
+    function closeSug() {
+      sug.hidden = true;
+      sug.innerHTML = "";
+      active = -1;
+      search.setAttribute("aria-expanded", "false");
+      search.removeAttribute("aria-activedescendant");
+    }
+
+    function setActive(index) {
+      const items = [...sug.querySelectorAll(".gc-opt")];
+      if (!items.length) return;
+      active = (index + items.length) % items.length;
+      items.forEach((item, i) => item.setAttribute("aria-selected", String(i === active)));
+      search.setAttribute("aria-activedescendant", items[active].id);
+      items[active].scrollIntoView({ block: "nearest" });
+    }
+
+    async function pick(name) {
+      closeSug();
+      search.value = "";
+      const existing = rowFor(name);
+      if (existing) {
+        existing.querySelector("input").focus();
+        status.textContent = name + " is already in your list.";
+        return;
+      }
+      const used = new Set([...list.querySelectorAll("input[type=color]")].map((i) => i.value.toLowerCase()));
+      const color = PALETTE.find((c) => !used.has(c)) || PALETTE[list.children.length % PALETTE.length];
+      try {
+        await save(name, color);
+        const row = addRow(name, color, true);
+        row.querySelector("input").focus();
+        status.textContent = name + " added. Tap its swatch to change the color.";
+      } catch (error) {
+        toast(error.message, true);
+      }
+    }
+
+    async function suggest() {
+      const value = search.value.trim();
+      const mine = ++seq;
+      if (value.length < 2) return closeSug();
+      try {
+        const res = await fetch("https://api.psychonautwiki.org", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "query S($name: String!) { substances(query: $name) { name } }", variables: { name: value } }),
+        });
+        const data = await res.json();
+        if (mine !== seq) return;
+        const names = (data?.data?.substances || []).map((s) => s.name).filter(Boolean).slice(0, 8);
+        sug.innerHTML = "";
+        active = -1;
+        if (!names.length) {
+          const none = document.createElement("p");
+          none.className = "gc-none";
+          none.textContent = "No substance matches “" + value + "”.";
+          sug.append(none);
+        }
+        names.forEach((name, i) => {
+          const opt = document.createElement("button");
+          opt.type = "button";
+          opt.className = "gc-opt";
+          opt.id = "gcOpt" + i;
+          opt.setAttribute("role", "option");
+          opt.setAttribute("aria-selected", "false");
+          opt.tabIndex = -1;
+          opt.textContent = name;
+          if (rowFor(name)) opt.classList.add("is-added");
+          opt.addEventListener("click", () => pick(name));
+          sug.append(opt);
+        });
+        sug.hidden = false;
+        search.setAttribute("aria-expanded", "true");
+      } catch (_) {
+        if (mine !== seq) return;
+        sug.innerHTML = '<p class="gc-none">Couldn\'t reach PsychonautWiki. Check your connection.</p>';
+        sug.hidden = false;
+      }
+    }
+
+    search.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(suggest, 300);
+    });
+    search.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") { event.preventDefault(); setActive(active + 1); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); setActive(active - 1); }
+      else if (event.key === "Enter") {
+        event.preventDefault();
+        const items = [...sug.querySelectorAll(".gc-opt")];
+        const chosen = items[active] || (items.length === 1 ? items[0] : null);
+        if (chosen) pick(chosen.textContent);
+      } else if (event.key === "Escape" && !sug.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeSug();
+      }
+    });
+  })();
+
+  // ---------------- Profile picture and banner ----------------
+  (function pictures() {
+    const LIMITS = { avatar: [640, 640], banner: [2000, 800] };
+    const files = { avatar: document.getElementById("avatarFile"), banner: document.getElementById("bannerFile") };
+    const holders = { avatar: document.getElementById("profile-pic"), banner: document.getElementById("pfBanner") };
+    const avatarImg = document.getElementById("avatarImg");
+    const bannerImg = document.getElementById("bannerImg");
+    const initial = document.getElementById("avatarInitial");
+    const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+
+    function showPicture(kind, url) {
+      if (kind === "avatar") {
+        avatarImg.hidden = !url;
+        initial.hidden = !!url;
+        if (url) avatarImg.src = url; else avatarImg.removeAttribute("src");
+      } else {
+        bannerImg.hidden = !url;
+        if (url) bannerImg.src = url; else bannerImg.removeAttribute("src");
+      }
+      document.querySelectorAll('[data-remove="' + kind + '"]').forEach((b) => { b.disabled = !url; });
+    }
+
+    const shrink = shrinkPicture;
+
+    async function send(kind, form) {
+      holders[kind].classList.add("is-busy");
+      try {
+        const res = await fetch("/profile/picture", { method: "POST", body: form });
+        if (!res.ok) throw new Error(res.status === 401 ? "Log in again to change pictures." : (await res.text()).trim() || "Couldn't save the picture.");
+        const data = await res.json();
+        showPicture(kind, data.url);
+        return data.url;
+      } finally {
+        holders[kind].classList.remove("is-busy");
+      }
+    }
+
+    Object.entries(files).forEach(([kind, input]) => {
+      input.addEventListener("change", async () => {
+        const file = input.files && input.files[0];
+        input.value = "";
+        if (!file) return;
+        const form = new FormData();
+        form.append("kind", kind);
+        const picture = await shrink(file, LIMITS[kind]);
+        form.append("image", picture, picture === file ? file.name : kind + ".jpg");
+        try {
+          await send(kind, form);
+          toast(kind === "avatar" ? "Profile picture saved." : "Banner saved.");
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-pick]").forEach((button) => {
+      button.addEventListener("click", () => files[button.dataset.pick].click());
+    });
+    document.querySelectorAll("[data-remove]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const kind = button.dataset.remove;
+        const form = new FormData();
+        form.append("kind", kind);
+        form.append("remove", "1");
+        try {
+          await send(kind, form);
+          toast(kind === "avatar" ? "Profile picture removed." : "Banner removed.");
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+    });
+    avatarImg.addEventListener("error", () => showPicture("avatar", ""));
+    bannerImg.addEventListener("error", () => showPicture("banner", ""));
+  })();
+</script>
+<script type="module">
+  // ---------------- Boxes from the + button ----------------
+  import { mountBoxes, MAX_BOXES, sessionChart, dayLabel } from "/boxes.js";
+  import { mountFriendsBox } from "/friends.js";
+
+  mountFriendsBox(document.getElementById("friends"), document.getElementById("friendsCount"));
+
+  const grid = document.getElementById("profile-data");
+  const addBtn = document.getElementById("addBox");
+  const menu = document.getElementById("addMenu");
+  const items = [...menu.querySelectorAll("[role=menuitem]")];
+  const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+
+  const boxes = await mountBoxes({ grid, editable: true });
+  function sync() {
+    const full = boxes.count >= MAX_BOXES;
+    addBtn.disabled = full;
+    addBtn.title = full ? "You can have up to 12 boxes" : "Add a box";
+  }
+  boxes.onChange(sync);
+
+  function setMenu(open) {
+    menu.hidden = !open;
+    addBtn.setAttribute("aria-expanded", String(open));
+    if (!open) return;
+    items[0].focus({ preventScroll: true });
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    menu.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+  }
+  addBtn.addEventListener("click", () => setMenu(menu.hidden));
+  document.addEventListener("click", (e) => {
+    if (!menu.hidden && !e.target.closest(".pf-add-row")) setMenu(false);
+  });
+  menu.addEventListener("focusout", (e) => {
+    if (!menu.contains(e.relatedTarget) && e.relatedTarget !== addBtn && e.relatedTarget) setMenu(false);
+  });
+  menu.addEventListener("keydown", (e) => {
+    const at = items.indexOf(document.activeElement);
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      setMenu(false);
+      addBtn.focus({ preventScroll: true });
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      items[(at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+    }
+  });
+
+  async function add(kind, extra) {
+    setMenu(false);
+    addBtn.disabled = true;
+    try {
+      await boxes.add(kind, extra);
+    } catch (error) {
+      toast(error.message, true);
+    } finally {
+      sync();
+    }
+  }
+
+  items.forEach((item) => item.addEventListener("click", () => {
+    if (item.dataset.kind === "experience") pickExperience();
+    else add(item.dataset.kind);
+  }));
+
+  // Experience: pick one of the account's saved Graph sessions.
+  const EXP = document.getElementById("EXP");
+  const expList = document.getElementById("EXPlist");
+
+  function sessionRow(item) {
+    const chart = sessionChart(item.doses, "pf-exp-spark");
+    if (!chart) return null;
+    const names = [...new Set(item.doses.map((dose) => dose.substance))];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pf-exp-option";
+    const text = document.createElement("span");
+    text.className = "pf-exp-when";
+    const day = document.createElement("strong");
+    day.textContent = dayLabel(item.startedAt);
+    const detail = document.createElement("small");
+    detail.textContent = chart.start + " to " + chart.end + " · " + (item.doses.length === 1 ? "1 dose" : item.doses.length + " doses");
+    const what = document.createElement("small");
+    what.className = "pf-exp-names";
+    what.textContent = names.join(", ");
+    text.append(day, detail, what);
+    button.append(text, chart.svg);
+    button.addEventListener("click", () => {
+      hidePopup(EXP);
+      add("experience", { experience: item.id });
+    });
+    return button;
+  }
+
+  async function pickExperience() {
+    setMenu(false);
+    addBtn.focus({ preventScroll: true });
+    expList.setAttribute("aria-busy", "true");
+    expList.innerHTML = '<p class="xn-empty">Loading your sessions…</p>';
+    showPopup(EXP);
+    let list = null;
+    try {
+      const res = await fetch("/experiences", { headers: { Accept: "application/json" } });
+      if (res.ok && (res.headers.get("content-type") || "").includes("json")) list = (await res.json()).items || [];
+    } catch (_) {}
+    expList.removeAttribute("aria-busy");
+    if (!list) {
+      expList.innerHTML = '<p class="xn-empty">Couldn\'t load your Graph sessions. Try again in a moment.</p>';
+      return;
+    }
+    const rows = list.map(sessionRow).filter(Boolean);
+    if (!rows.length) {
+      expList.innerHTML = '<p class="xn-empty">No Graph sessions yet. Add a dose on the <a href="/">Graph</a> and the session shows up here.</p>';
+      return;
+    }
+    expList.replaceChildren(...rows);
+    rows[0].focus({ preventScroll: true });
+  }
+</script>
+</body>
+</html>

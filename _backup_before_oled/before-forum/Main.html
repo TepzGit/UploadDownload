@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Home · Geek⁴u</title>
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <style>
+    .gp {
+      --gp-card: #0a0a0c;
+      --gp-tile: #111115;
+      --gp-line: #23202b;
+      --gp-line-hi: #3a3150;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: clamp(20px, 4vw, 40px) max(16px, env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      color: var(--oled-text);
+    }
+    .gp *, .gp *::before, .gp *::after { box-sizing: border-box; }
+
+    /* Hero: name + live clock. It sticks under the nav while the panel
+       scrolls up over it; the scroll script shrinks the clock as it goes. */
+    .gp-hero {
+      position: sticky;
+      top: calc(var(--oled-nav-h) + env(safe-area-inset-top));
+      z-index: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(80vh - var(--oled-nav-h));
+      min-height: calc(80svh - var(--oled-nav-h));
+      text-align: center;
+    }
+    .gp-hero-inner { transform-origin: 50% 50%; will-change: transform; }
+    .gp-hint {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      width: 28px;
+      height: 28px;
+      margin-left: -14px;
+      color: var(--oled-muted);
+      animation: gp-bob 2.4s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes gp-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 6px; } }
+    .gp-title {
+      margin: 0;
+      font-size: clamp(1rem, 2.4vw, 1.25rem);
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--oled-accent);
+    }
+    .gp-clock {
+      margin: 6px 0 0;
+      font-size: clamp(3.4rem, 16vw, 9.5rem);
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .gp-clock .gp-sec { color: var(--oled-muted); }
+    .gp-date { margin: 10px 0 0; font-size: 0.95rem; color: var(--oled-muted); }
+
+    .gp-panel {
+      position: relative;
+      z-index: 1;
+      will-change: opacity, transform;
+      box-shadow: 0 -30px 80px -40px rgba(166, 124, 255, var(--gp-glow, 0));
+      margin-top: clamp(24px, 4vw, 40px);
+      padding: clamp(18px, 4.5vw, 48px);
+      border: 1px solid var(--gp-line);
+      border-radius: 20px;
+      background: var(--gp-card);
+    }
+
+    .gp-kicker {
+      margin: 0 0 18px;
+      font-size: 0.75rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--oled-muted);
+      text-align: center;
+    }
+
+    /* Team */
+    .gp-team {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 284px));
+      justify-content: center;
+      gap: clamp(16px, 8vw, 120px);
+    }
+    .gp-member {
+      margin: 0;
+      padding: 14px 14px 18px;
+      border: 1px solid var(--gp-line);
+      border-radius: 14px;
+      background: var(--gp-tile);
+      text-align: center;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    @media (hover: hover) {
+      .gp-member:hover { transform: translateY(-3px); border-color: var(--gp-line-hi); }
+    }
+    .gp-photo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #000;
+    }
+    .gp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gp-photo span { font-size: 5rem; font-weight: 600; color: var(--oled-accent); }
+    .gp-member figcaption { margin-top: 14px; }
+    .gp-name { display: block; font-size: 1.1rem; font-weight: 600; }
+    .gp-role {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px;
+      border: 1px solid var(--gp-line-hi);
+      border-radius: 999px;
+      background: var(--oled-accent-soft);
+      font-size: 0.78rem;
+      color: #cdb8ff;
+    }
+
+    /* Sign in + weather */
+    .gp-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+      gap: 16px;
+      margin-top: clamp(28px, 5vw, 56px);
+    }
+    .gp-tile {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 26px 22px;
+      border: 1px solid var(--gp-line);
+      border-radius: 16px;
+      background: var(--gp-tile);
+      text-align: center;
+    }
+    .gp-label { font-size: 0.75rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--oled-muted); }
+    .gp-place { margin-top: 8px; font-size: 1.35rem; font-weight: 600; }
+    .gp-temp { margin: 18px 0 12px; font-size: clamp(3rem, 8vw, 4.25rem); font-weight: 300; line-height: 1; }
+    .gp-cond { font-size: 1rem; color: #d4d0de; }
+    .gp-wind { margin-top: 6px; font-size: 0.85rem; color: var(--oled-muted); }
+
+    .gp-login { display: grid; gap: 10px; width: 100%; max-width: 360px; margin: 16px auto 0; text-align: left; }
+    .gp-login input {
+      width: 100%;
+      height: 48px;
+      padding: 0 14px;
+      border: 1px solid var(--gp-line);
+      border-radius: 10px;
+      background: #000;
+      color: var(--oled-text);
+      font: inherit;
+    }
+    .gp-login input:focus { outline: 2px solid var(--oled-accent); outline-offset: 1px; border-color: transparent; }
+    .gp-login button {
+      height: 48px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--oled-accent);
+      color: #160f24;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+    .gp-login button:hover { filter: brightness(1.1); }
+    .gp-login button:disabled { opacity: 0.6; cursor: wait; }
+    .gp-error { min-height: 1.2em; font-size: 0.85rem; color: #ff8b8b; text-align: center; }
+    .gp-error.is-ok { color: #bbf7d0; }
+
+    /* Log in / Sign up switch and the signed-in tile */
+    .gp-tabs {
+      display: flex;
+      width: 100%;
+      max-width: 360px;
+      margin: 0 auto;
+      padding: 3px;
+      border: 1px solid var(--gp-line);
+      border-radius: 12px;
+      background: #000;
+    }
+    .gp-tabs button {
+      flex: 1;
+      height: 38px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--oled-muted);
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .gp-tabs button[aria-selected="true"] { background: var(--gp-tile); color: var(--oled-text); box-shadow: inset 0 0 0 1px var(--gp-line-hi); }
+    .gp-tabs button:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+    .gp-hint-text { margin: 0; font-size: 0.75rem; line-height: 1.5; color: var(--oled-muted); }
+    .gp-note { margin: 0 auto 12px; max-width: 360px; font-size: 0.85rem; color: #cdb8ff; }
+    .gp-who { margin-top: 10px; font-size: 1.6rem; font-weight: 600; overflow-wrap: anywhere; }
+    .gp-role-line { margin-top: 6px; font-size: 0.85rem; color: var(--oled-muted); }
+    .gp-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+    .gp-actions form { display: contents; }
+    .gp-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+      height: 44px;
+      padding: 0 18px;
+      border: 1px solid var(--gp-line);
+      border-radius: 10px;
+      background: #000;
+      color: var(--oled-text);
+      font: inherit;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s ease, filter 0.15s ease;
+    }
+    .gp-btn-primary { border-color: transparent; background: var(--oled-accent); color: #160f24; }
+    @media (hover: hover) {
+      .gp-btn:hover { border-color: var(--gp-line-hi); }
+      .gp-btn-primary:hover { filter: brightness(1.1); border-color: transparent; }
+    }
+
+    @media (max-width: 560px) {
+      .gp-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .gp-member { padding: 10px 10px 14px; }
+      .gp-name { font-size: 0.95rem; }
+      .gp-role { font-size: 0.7rem; padding: 2px 8px; }
+    }
+
+    .gp { position: relative; z-index: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gp-member, .gp-member:hover { transition: none; transform: none; }
+      .gp-hint { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="xn">
+  <a class="xn-brand" href="/Main" aria-label="Geek⁴u">Geek<sup>4</sup>u</a>
+  <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <nav class="xn-links" id="xn-links" aria-label="Main">
+    <a href="/journal">Journal</a>
+    <a href="/">Graph</a>
+    <a href="/Files/">Files</a>
+    <a href="/Profile">Profile</a>
+    {{if eq .SessionInfo.Authority "admin"}}<a class="xn-admin" href="/admin">Admin</a>{{end}}
+  </nav>
+</header>
+
+  <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+  <main class="gp">
+    <section class="gp-hero" id="gpHero">
+      <div class="gp-hero-inner" id="gpHeroInner">
+        <h1 class="gp-title">Geek⁴u</h1>
+        <p class="gp-clock" aria-label="Current time"><span id="timeDisplay">--:--</span><span class="gp-sec" id="secDisplay">:--</span></p>
+        <p class="gp-date" id="dateDisplay">&nbsp;</p>
+      </div>
+      <svg class="gp-hint" id="gpHint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </section>
+
+    <section class="gp-panel" id="gpPanel">
+      
+      <div class="gp-team">
+        <figure class="gp-member">
+          <div class="gp-photo"><img src="/hookey.jpg" alt="Hookey" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
+          <figcaption><span class="gp-name">Hookey</span><span class="gp-role">Frontend</span></figcaption>
+        </figure>
+        <figure class="gp-member">
+          <div class="gp-photo"><img src="/tepz.jpg" alt="Tepz" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))"></div>
+          <figcaption><span class="gp-name">Tepz</span><span class="gp-role">Backend</span></figcaption>
+        </figure>
+      </div>
+
+      <div class="gp-row">
+        {{if not .Login}}
+        <div class="gp-tile" id="gpAuth">
+          <p class="gp-note" id="gpNextNote" hidden>Log in or sign up to open that page.</p>
+          <div class="gp-tabs" role="tablist" aria-label="Account">
+            <button type="button" role="tab" id="tabLogin" aria-selected="true" aria-controls="passwordEntry">Log in</button>
+            <button type="button" role="tab" id="tabSignup" aria-selected="false" aria-controls="signupForm" tabindex="-1">Sign up</button>
+          </div>
+
+          <form class="gp-login" id="passwordEntry" role="tabpanel" aria-labelledby="tabLogin">
+            <input id="usernameInput" type="text" placeholder="Username" aria-label="Username" autocomplete="username" autocapitalize="off" spellcheck="false" />
+            <input id="passwordInput" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password" />
+            <button type="submit" id="loginButton">Log in</button>
+            <div class="gp-error" id="passwordError" role="alert"></div>
+          </form>
+
+          <form class="gp-login" id="signupForm" role="tabpanel" aria-labelledby="tabSignup" hidden>
+            <input id="signupUser" type="text" placeholder="Username" aria-label="Username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="24" />
+            <input id="signupPass" type="password" placeholder="Password (8+ characters)" aria-label="Password" autocomplete="new-password" maxlength="72" />
+            <input id="signupPass2" type="password" placeholder="Repeat password" aria-label="Repeat password" autocomplete="new-password" maxlength="72" />
+            <p class="gp-hint-text">3 to 24 letters, numbers, dots, dashes or underscores.</p>
+            <button type="submit" id="signupButton">Create account</button>
+            <div class="gp-error" id="signupError" role="alert"></div>
+          </form>
+        </div>
+        {{else}}
+        <div class="gp-tile">
+          <p class="gp-note" id="gpNeedAdmin" hidden>That page is only open to admin accounts.</p>
+          <div class="gp-label">Signed in as</div>
+          <div class="gp-who">{{.SessionInfo.OriginalUsername}}</div>
+          <div class="gp-role-line">{{if eq .SessionInfo.Authority "admin"}}Admin account{{else}}Member{{end}}</div>
+          <div class="gp-actions">
+            <a class="gp-btn gp-btn-primary" href="/Profile">Profile</a>
+            <form method="post" action="/logout"><button type="submit" class="gp-btn">Sign out</button></form>
+          </div>
+        </div>
+        {{end}}
+
+        <div class="gp-tile">
+          
+          <div class="gp-place" id="weatherLocation">Copenhagen, DK</div>
+          <div class="gp-temp" id="weatherTemp">--°</div>
+          <div class="gp-cond" id="weatherCondition">Loading weather…</div>
+          <div class="gp-wind" id="weatherWind">Wind: -- m/s</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const timeDisplay = document.getElementById('timeDisplay')
+    const secDisplay = document.getElementById('secDisplay')
+    const dateDisplay = document.getElementById('dateDisplay')
+    const passwordEntry = document.getElementById('passwordEntry')
+    const usernameInput = document.getElementById('usernameInput')
+    const passwordInput = document.getElementById('passwordInput')
+    const loginButton = document.getElementById('loginButton')
+    const passwordError = document.getElementById('passwordError')
+    const weatherLocation = document.getElementById('weatherLocation')
+    const weatherTemp = document.getElementById('weatherTemp')
+    const weatherCondition = document.getElementById('weatherCondition')
+    const weatherWind = document.getElementById('weatherWind')
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2,'0');
+      const minutes = String(now.getMinutes()).padStart(2,'0');
+      const seconds = String(now.getSeconds()).padStart(2,'0');
+      timeDisplay.textContent = `${hours}:${minutes}`;
+      secDisplay.textContent = `:${seconds}`;
+      dateDisplay.textContent = now.toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    }
+
+    // Where to go after signing in: the page that sent us here (?next=), if it's on this site.
+    const nextPath = (() => {
+      const next = new URLSearchParams(window.location.search).get('next') || '';
+      return next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '';
+    })();
+
+    function signedIn() {
+      if (nextPath) window.location.href = nextPath;
+      else window.location.reload();
+    }
+
+    async function submitLogin() {
+      passwordError.textContent = '';
+      const password = passwordInput?.value || '';
+      const username = usernameInput?.value.trim() || '';
+      if (!password || !username) {
+        passwordError.textContent = 'Username or password cannot be empty.';
+        return;
+      }
+      loginButton.disabled = true;
+      try {
+        const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password })});
+        if (!res.ok) {
+          passwordError.textContent = res.status === 401 ? 'Wrong username or password.' : 'Could not log in right now. Try again.';
+        } else {
+          signedIn();
+          return;
+        }
+      } catch (_) {
+        passwordError.textContent = 'Could not reach the server.';
+      }
+      loginButton.disabled = false;
+    }
+
+    const USERNAME_RULE = /^[A-Za-z0-9_.-]{3,24}$/;
+
+    async function submitSignup() {
+      const signupError = document.getElementById('signupError');
+      const signupButton = document.getElementById('signupButton');
+      const username = document.getElementById('signupUser').value.trim();
+      const password = document.getElementById('signupPass').value;
+      const repeat = document.getElementById('signupPass2').value;
+      signupError.textContent = '';
+      if (!USERNAME_RULE.test(username)) {
+        signupError.textContent = 'Usernames are 3 to 24 letters, numbers, dots, dashes or underscores.';
+        return;
+      }
+      if (password.length < 8) {
+        signupError.textContent = 'Passwords need at least 8 characters.';
+        return;
+      }
+      if (password !== repeat) {
+        signupError.textContent = "The passwords don't match.";
+        return;
+      }
+      signupButton.disabled = true;
+      try {
+        const res = await fetch('/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password })});
+        if (res.ok) {
+          signupError.classList.add('is-ok');
+          signupError.textContent = 'Account created. Signing you in…';
+          signedIn();
+          return;
+        }
+        signupError.textContent = (await res.text()).trim() || 'Could not create the account. Try again.';
+      } catch (_) {
+        signupError.textContent = 'Could not reach the server.';
+      }
+      signupButton.disabled = false;
+    }
+
+    if (new URLSearchParams(window.location.search).get('need') === 'admin') {
+      const note = document.getElementById('gpNeedAdmin');
+      if (note) note.hidden = false;
+    }
+
+    (function authTabs() {
+      const tabLogin = document.getElementById('tabLogin');
+      const tabSignup = document.getElementById('tabSignup');
+      const signupForm = document.getElementById('signupForm');
+      if (!tabLogin || !tabSignup || !signupForm) return;
+      const tabs = [tabLogin, tabSignup];
+      const panels = [passwordEntry, signupForm];
+      function select(index, focus) {
+        tabs.forEach((tab, i) => {
+          tab.setAttribute('aria-selected', String(i === index));
+          tab.tabIndex = i === index ? 0 : -1;
+          panels[i].hidden = i !== index;
+        });
+        if (focus) panels[index].querySelector('input').focus();
+      }
+      tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => select(i, true));
+        tab.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const to = (i + 1) % 2;
+            select(to, false);
+            tabs[to].focus();
+          }
+        });
+      });
+      signupForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitSignup();
+      });
+      if (window.location.hash === '#signup') select(1, false);
+
+      // Sent here from a page that needs an account: bring the box into view.
+      if (nextPath) {
+        document.getElementById('gpNextNote').hidden = false;
+        requestAnimationFrame(() => {
+          document.getElementById('gpAuth').scrollIntoView({ block: 'center' });
+          if (!window.matchMedia('(hover: none)').matches) usernameInput?.focus({ preventScroll: true });
+        });
+      }
+    })();
+
+    // WMO weather codes used by open-meteo
+    function describeWeather(code) {
+      if (code === 0) return 'Clear sky';
+      if (code <= 2) return 'Partly cloudy';
+      if (code === 3) return 'Overcast';
+      if (code === 45 || code === 48) return 'Fog';
+      if (code >= 51 && code <= 57) return 'Drizzle';
+      if (code >= 61 && code <= 67) return 'Rain';
+      if (code >= 71 && code <= 77) return 'Snow';
+      if (code >= 80 && code <= 82) return 'Rain showers';
+      if (code === 85 || code === 86) return 'Snow showers';
+      if (code >= 95) return 'Thunderstorm';
+      return 'Cloudy';
+    }
+
+    async function fetchWeather(latitude, longitude) {
+      try {
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&temperature_unit=celsius&windspeed_unit=ms`);
+        if (!response.ok) throw new Error('Weather API error');
+        const data = await response.json();
+        const weather = data.current_weather;
+        if (!weather) throw new Error('No weather data');
+        weatherTemp.textContent = `${Math.round(weather.temperature)}°C`;
+        weatherCondition.textContent = describeWeather(weather.weathercode);
+        weatherWind.textContent = `Wind: ${weather.windspeed.toFixed(1)} m/s`;
+      } catch (_) {
+        weatherLocation.textContent = 'Unable to load weather';
+        weatherTemp.textContent = '--°';
+        weatherCondition.textContent = 'Unavailable';
+        weatherWind.textContent = 'Wind: -- m/s';
+      }
+    }
+
+    if (passwordEntry) {
+      passwordEntry.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitLogin();
+      });
+    }
+
+    // Scroll: the clock shrinks and drifts up into the space left above the
+    // panel, while the panel fades up from 40% to full strength.
+    (function heroScroll() {
+      const hero = document.getElementById('gpHero');
+      const inner = document.getElementById('gpHeroInner');
+      const panel = document.getElementById('gpPanel');
+      const hint = document.getElementById('gpHint');
+      if (!hero || !inner || !panel) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let range = 1, ticking = false;
+      const measure = () => { range = Math.max(1, hero.offsetHeight * 0.65); };
+      const paint = () => {
+        ticking = false;
+        const y = Math.max(window.scrollY, 0);
+        const s = Math.min(y, range);
+        const p = s / range;
+        const eased = 1 - Math.pow(1 - p, 2);
+        // Past the range the clock scrolls away with the page, so the panel never covers it.
+        const shift = s / 2 + Math.max(0, y - range);
+        inner.style.transform = `translateY(${-shift}px) scale(${1 - 0.55 * eased})`;
+        panel.style.opacity = String(0.4 + 0.6 * eased);
+        panel.style.transform = `translateY(${(1 - eased) * 28}px)`;
+        panel.style.setProperty('--gp-glow', (0.35 * eased).toFixed(3));
+        if (hint) hint.style.opacity = String(Math.max(0, 1 - p * 4));
+      };
+      const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(paint); } };
+      measure(); paint();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', () => { measure(); onScroll(); });
+    })();
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    fetchWeather(55.6761, 12.5683);
+    setInterval(() => fetchWeather(55.6761, 12.5683), 10 * 60 * 1000);
+  </script>
+</body>
+</html>
