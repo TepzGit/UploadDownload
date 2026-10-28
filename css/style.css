@@ -225,3 +225,19 @@
 @keyframes up-pulse { 50% { opacity: .2; } }
 .UploadExplorerUploadItem .up-ficon { width: 24px; height: 24px; flex: none; object-fit: cover; border-radius: 4px; }
 .UploadExplorerUploadItem .up-femoji { width: 24px; flex: none; text-align: center; font-size: 19px; line-height: 1; }
+
+/* MP3 / MP4 choice in "Download from a link" */
+.up-fmt { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.up-fmt label { position: relative; display: block; cursor: pointer; }
+.up-fmt input { position: absolute; opacity: 0; pointer-events: none; }
+.up-fmt span { display: flex; flex-direction: column; gap: 2px; min-height: 52px; justify-content: center; padding: 8px 12px; border: 1px solid var(--oled-line); border-radius: 2px; background: var(--oled-surface-2); color: var(--oled-muted); font-size: 12px; transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease; }
+.up-fmt strong { color: var(--oled-text); font-size: 14px; }
+.up-fmt input:checked + span { border-color: var(--oled-accent); background: var(--oled-accent-soft); color: var(--oled-text); }
+.up-fmt input:focus-visible + span { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.up-fmt input:disabled + span { opacity: 0.4; cursor: not-allowed; }
+.up-mode { margin-bottom: 4px; }
+.up-one-box, .up-list-box { display: grid; gap: 8px; }
+.up-one-box[hidden], .up-list-box[hidden] { display: none; }
+.up-list { min-height: 170px; max-height: 50vh; resize: vertical; font-family: var(--oled-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.5; white-space: pre; }
+.up-list-meta { margin: 0; color: var(--oled-muted); font-size: 12px; }
+.up-list-file { color: var(--oled-accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

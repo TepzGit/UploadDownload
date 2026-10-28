@@ -51,6 +51,13 @@
     </div>
   </section>
 
+  <section class="xn-card adm-card adm-wide" aria-labelledby="svTitle">
+    <p class="xn-eyebrow">Server</p>
+    <h2 class="xn-h1 adm-h2" id="svTitle">Server right now</h2>
+    <div class="st-tiles sv-tiles" id="svTiles"><p class="fa-empty">Loading…</p></div>
+    <p class="sv-foot" id="svFoot"></p>
+  </section>
+
   <section class="xn-card adm-card adm-wide" aria-labelledby="stTitle">
     <p class="xn-eyebrow">Stats</p>
     <h2 class="xn-h1 adm-h2" id="stTitle">Site views</h2>
@@ -408,6 +415,48 @@
       const q = find.value.trim().toLowerCase();
       list.querySelectorAll(".fa-user").forEach((item) => { item.hidden = !!q && !item.dataset.name.includes(q); });
     });
+    load();
+  })();
+</script>
+<script>
+  // Admin: live CPU, temperature and RAM of the machine the site runs on (GET /admin/server every 3 s while visible).
+  (function () {
+    const box = document.getElementById("svTiles");
+    if (!box) return;
+    const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    const gb = (n) => (n >= 1 << 30 ? (n / (1 << 30)).toFixed(1) + " GB" : Math.round(n / (1 << 20)) + " MB");
+    const ago = (s) => {
+      const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+      return d ? d + " d " + h + " h" : h ? h + " h " + m + " m" : m + " min";
+    };
+    const level = (p, warn, hot) => (p >= hot ? " is-hot" : p >= warn ? " is-warn" : "");
+    const tile = (label, value, sub, pct, cls) =>
+      '<div class="st-tile sv-tile' + (cls || "") + '"><span class="st-tile-label">' + esc(label) + '</span><strong class="st-tile-value">' + esc(value) + '</strong>' +
+      (pct == null ? "" : '<span class="sv-meter"><i style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i></span>') +
+      '<span class="st-tile-sub">' + esc(sub) + "</span></div>";
+    let timer = 0;
+    async function load() {
+      clearTimeout(timer);
+      try {
+        const res = await fetch("/admin/server", { cache: "no-store" });
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        const t = [];
+        t.push(d.cpu != null ? tile("CPU", Math.round(d.cpu) + "%", d.cores + (d.cores === 1 ? " core" : " cores") + (d.load ? " · load " + d.load[0] : ""), d.cpu, level(d.cpu, 70, 90)) : tile("CPU", "–", d.cores + " cores · usage only on Linux"));
+        t.push(d.temp != null ? tile("Temperature", Math.round(d.temp) + " °C", d.tempSensor || "CPU sensor", d.temp, level(d.temp, 70, 85)) : tile("Temperature", "–", "No sensor the server can read"));
+        if (d.memTotal) {
+          const p = (100 * d.memUsed) / d.memTotal;
+          t.push(tile("RAM", Math.round(p) + "%", gb(d.memUsed) + " of " + gb(d.memTotal) + (d.swapUsed > 1 << 26 ? " · swap " + gb(d.swapUsed) : ""), p, level(p, 80, 92)));
+        } else t.push(tile("RAM", "–", "Only on Linux"));
+        t.push(tile("Uptime", d.uptime != null ? ago(d.uptime) : "–", "Site itself uses " + gb(d.siteMemory)));
+        box.innerHTML = t.join("");
+        document.getElementById("svFoot").textContent = (d.host ? d.host + " · " : "") + d.os + " · updates every 3 seconds";
+      } catch (e) {
+        box.innerHTML = '<p class="fa-empty">Couldn\'t read the server right now.</p>';
+      }
+      if (!document.hidden) timer = setTimeout(load, 3000);
+    }
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
     load();
   })();
 </script>

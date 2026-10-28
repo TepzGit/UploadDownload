@@ -116,7 +116,20 @@ async function start() {
   const nav = () => send("nav", { back: wc.navigationHistory.canGoBack(), forward: wc.navigationHistory.canGoForward() });
   wc.on("page-title-updated", (_e, title) => { send("title", title); win?.setTitle(title); });
   // The title bar already has the logo, so the site's own nav logo is hidden here.
-  wc.on("dom-ready", () => wc.insertCSS(".xn > .xn-brand { display: none !important; }").catch(() => {}));
+  // The "Show the Geek4u logo" setting (html.xn-nologo) hides the title bar logo too.
+  wc.on("dom-ready", () => {
+    wc.insertCSS(".xn > .xn-brand { display: none !important; }").catch(() => {});
+    wc.executeJavaScript(`(() => {
+      const root = document.documentElement;
+      const tell = () => console.log("__geek4u_logo:" + (root.classList.contains("xn-nologo") ? 0 : 1));
+      new MutationObserver(tell).observe(root, { attributes: true, attributeFilter: ["class"] });
+      tell();
+    })()`).catch(() => {});
+  });
+  wc.on("console-message", (e, _level, text) => {
+    const m = /^__geek4u_logo:([01])$/.exec(String((e && e.message) || text || ""));
+    if (m) send("logo", m[1] === "1");
+  });
   wc.on("did-navigate", nav);
   wc.on("did-navigate-in-page", nav);
   wc.on("did-start-loading", () => send("loading", true));

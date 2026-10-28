@@ -13,6 +13,8 @@
   .brand { width: auto; height: 100%; border-radius: 0; color: var(--text); border: 0; background: none; cursor: pointer; -webkit-app-region: no-drag; transition: filter 0.2s ease, transform 0.12s ease; }
   .brand:hover { filter: drop-shadow(0 2px 8px rgba(166, 124, 255, 0.6)); }
   .brand:active { transform: scale(0.96); }
+  .brand svg.xn-logo { width: auto; height: 26px; fill: initial; stroke: none; }
+  .brand.off { display: none; }
   .brand:focus-visible { outline: 2px solid #a67cff; outline-offset: -2px; }
   .nav { display: flex; gap: 2px; -webkit-app-region: no-drag; }
   .title { flex: 1; min-width: 0; padding: 0 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .02em; }
@@ -60,6 +62,7 @@
     else if (kind === "nav") { $("back").disabled = !v.back; $("forward").disabled = !v.forward; }
     else if (kind === "loading") document.body.classList.toggle("loading", v);
     else if (kind === "max") { $("max").innerHTML = v ? RESTORE : MAX; $("max").title = v ? "Restore" : "Maximize"; }
+    else if (kind === "logo") $("brand").classList.toggle("off", !v);
     else if (kind === "error") { $("err").textContent = v; $("err").classList.add("show"); }
   });
 </script>

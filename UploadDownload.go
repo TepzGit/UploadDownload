@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -369,6 +370,7 @@ func main() {
 	http.HandleFunc("/music/cover/", requireLogin(musicCover))
 	http.HandleFunc("/music/offline", requireLogin(musicOffline))
 	http.HandleFunc("/admin/stats", requireAdminLogin(adminStats))
+	http.HandleFunc("/admin/server", requireAdminLogin(adminServer))
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
 	http.HandleFunc("/sitepic/", sitePicture)
 	http.HandleFunc("/notifications", requireLogin(notifications))
@@ -5139,6 +5141,135 @@ func countViews(next http.Handler) http.Handler {
 
 // adminStats: views per day (last 30 days), the most opened pages, site totals
 // and every account with its numbers and geek rank.
+// adminServer answers the Admin page's Server card: CPU use, temperature,
+// RAM and uptime of the machine the site runs on. These come from /proc and
+// /sys, so on Windows only the server's own numbers are filled in.
+func adminServer(w http.ResponseWriter, r *http.Request) {
+	out := map[string]any{"os": runtime.GOOS, "cores": runtime.NumCPU()}
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	out["siteMemory"] = ms.Sys
+	if host, err := os.Hostname(); err == nil {
+		out["host"] = host
+	}
+	if a, err := cpuSample(); err == nil {
+		time.Sleep(400 * time.Millisecond)
+		if b, err := cpuSample(); err == nil && b[1] > a[1] {
+			out["cpu"] = math.Round(1000*(1-float64(b[0]-a[0])/float64(b[1]-a[1]))) / 10
+		}
+	}
+	if b, err := os.ReadFile("/proc/meminfo"); err == nil {
+		mem := map[string]uint64{}
+		for _, line := range strings.Split(string(b), "\n") {
+			f := strings.Fields(line)
+			if len(f) >= 2 {
+				n, _ := strconv.ParseUint(f[1], 10, 64)
+				mem[strings.TrimSuffix(f[0], ":")] = n * 1024
+			}
+		}
+		if mem["MemTotal"] > 0 {
+			out["memTotal"] = mem["MemTotal"]
+			out["memUsed"] = mem["MemTotal"] - mem["MemAvailable"]
+			out["swapTotal"] = mem["SwapTotal"]
+			out["swapUsed"] = mem["SwapTotal"] - mem["SwapFree"]
+		}
+	}
+	if b, err := os.ReadFile("/proc/loadavg"); err == nil {
+		if f := strings.Fields(string(b)); len(f) >= 3 {
+			out["load"] = f[:3]
+		}
+	}
+	if b, err := os.ReadFile("/proc/uptime"); err == nil {
+		if f := strings.Fields(string(b)); len(f) > 0 {
+			up, _ := strconv.ParseFloat(f[0], 64)
+			out["uptime"] = int64(up)
+		}
+	}
+	if t, name := cpuTemp(); t > 0 {
+		out["temp"] = math.Round(t*10) / 10
+		out["tempSensor"] = name
+	}
+	writeJSON(w, out)
+}
+
+// cpuSample returns idle and total CPU time from /proc/stat.
+func cpuSample() ([2]uint64, error) {
+	b, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return [2]uint64{}, err
+	}
+	line, _, _ := strings.Cut(string(b), "\n")
+	f := strings.Fields(line)
+	if len(f) < 5 || f[0] != "cpu" {
+		return [2]uint64{}, errors.New("no cpu line")
+	}
+	var idle, total uint64
+	for i, v := range f[1:] {
+		n, _ := strconv.ParseUint(v, 10, 64)
+		total += n
+		if i == 3 || i == 4 { // idle, iowait
+			idle += n
+		}
+	}
+	return [2]uint64{idle, total}, nil
+}
+
+// cpuTemp finds the CPU temperature in °C: a CPU sensor under
+// /sys/class/hwmon first, then the thermal zones.
+func cpuTemp() (float64, string) {
+	read := func(p string) float64 {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return 0
+		}
+		n, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
+		if err != nil || n <= 0 {
+			return 0
+		}
+		return n / 1000
+	}
+	cpuNames := map[string]bool{"coretemp": true, "k10temp": true, "zenpower": true, "cpu_thermal": true, "soc_thermal": true, "cpu-thermal": true}
+	mons, _ := filepath.Glob("/sys/class/hwmon/hwmon*")
+	for _, m := range mons {
+		b, _ := os.ReadFile(filepath.Join(m, "name"))
+		name := strings.TrimSpace(string(b))
+		if !cpuNames[name] {
+			continue
+		}
+		best := 0.0
+		inputs, _ := filepath.Glob(filepath.Join(m, "temp*_input"))
+		for _, in := range inputs {
+			label, _ := os.ReadFile(strings.TrimSuffix(in, "_input") + "_label")
+			l := strings.ToLower(string(label))
+			t := read(in)
+			if strings.HasPrefix(l, "package") || strings.HasPrefix(l, "tctl") || strings.HasPrefix(l, "tdie") {
+				return t, name
+			}
+			best = math.Max(best, t)
+		}
+		if best > 0 {
+			return best, name
+		}
+	}
+	zones, _ := filepath.Glob("/sys/class/thermal/thermal_zone*")
+	best, bestName := 0.0, ""
+	for _, z := range zones {
+		b, _ := os.ReadFile(filepath.Join(z, "type"))
+		kind := strings.TrimSpace(string(b))
+		t := read(filepath.Join(z, "temp"))
+		if t <= 0 || t > 150 {
+			continue
+		}
+		if kind == "x86_pkg_temp" || strings.Contains(kind, "cpu") || strings.Contains(kind, "soc") {
+			return t, kind
+		}
+		if t > best {
+			best, bestName = t, kind
+		}
+	}
+	return best, bestName
+}
+
 func adminStats(w http.ResponseWriter, r *http.Request) {
 	type dayRow struct {
 		Day      string `json:"day"`
@@ -7871,7 +8002,7 @@ func spotifyPlaylistID(s string) string {
 	return ""
 }
 
-func spotifyPlaylist(id string) (spotifyList, error) {
+func spotifyPlaylistAPI(id string) (spotifyList, error) {
 	var head struct {
 		Name   string `json:"name"`
 		Images []struct {
@@ -7936,6 +8067,181 @@ func spotifyPlaylist(id string) (spotifyList, error) {
 			break
 		}
 		next = page.Next
+	}
+	return out, nil
+}
+
+// spotifyPlaylist reads a public playlist: through Spotify's API when the
+// server has an app key (spotify.json), otherwise from Spotify's public
+// embed page, and as a last try with spotDL.
+func spotifyPlaylist(id string) (spotifyList, error) {
+	if cid, _ := spotifyCredentials(); cid != "" {
+		if pl, err := spotifyPlaylistAPI(id); err == nil {
+			return pl, nil
+		} else if err != errNoSpotify {
+			fmt.Println("Spotify API:", err)
+		}
+	}
+	pl, err := spotifyPlaylistEmbed(id)
+	if err == nil && len(pl.Songs) > 0 {
+		return pl, nil
+	}
+	if err != nil {
+		fmt.Println("Spotify embed page:", err)
+	}
+	if spotdlPath() != "" {
+		if pl2, err2 := spotifyPlaylistSpotdl(id); err2 == nil && len(pl2.Songs) > 0 {
+			if pl2.Name == "" {
+				pl2.Name = pl.Name
+			}
+			return pl2, nil
+		} else if err2 != nil {
+			fmt.Println("spotDL save:", err2)
+		}
+	}
+	return spotifyList{}, errors.New("Couldn't read that playlist from Spotify. Check that it's public (Share › Copy link to playlist) and try again, or paste the song list instead.")
+}
+
+var nextDataPattern = regexp.MustCompile(`(?s)<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>`)
+
+// spotifyPlaylistEmbed reads the song list from the public embed page
+// (the player Spotify lets any website show), which needs no key.
+func spotifyPlaylistEmbed(id string) (spotifyList, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://open.spotify.com/embed/playlist/"+url.PathEscape(id), nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36")
+	req.Header.Set("Accept-Language", "en")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return spotifyList{}, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return spotifyList{}, fmt.Errorf("Spotify answered %s", res.Status)
+	}
+	body, _ := io.ReadAll(io.LimitReader(res.Body, 20<<20))
+	return spotifyEmbedParse(body)
+}
+
+// spotifyEmbedParse takes the songs out of an embed page's __NEXT_DATA__.
+func spotifyEmbedParse(body []byte) (spotifyList, error) {
+	m := nextDataPattern.FindSubmatch(body)
+	if m == nil {
+		return spotifyList{}, errors.New("no playlist data on the embed page")
+	}
+	var data any
+	if err := json.Unmarshal(m[1], &data); err != nil {
+		return spotifyList{}, err
+	}
+	// Find the object holding "trackList", wherever Spotify puts it.
+	var entity map[string]any
+	var walk func(v any)
+	walk = func(v any) {
+		if entity != nil {
+			return
+		}
+		switch t := v.(type) {
+		case map[string]any:
+			if list, ok := t["trackList"].([]any); ok && len(list) > 0 {
+				entity = t
+				return
+			}
+			for _, x := range t {
+				walk(x)
+			}
+		case []any:
+			for _, x := range t {
+				walk(x)
+			}
+		}
+	}
+	walk(data)
+	if entity == nil {
+		return spotifyList{}, errors.New("no songs on the embed page")
+	}
+	str := func(m map[string]any, k string) string { s, _ := m[k].(string); return s }
+	out := spotifyList{Name: cleanText(str(entity, "name"), 100)}
+	if out.Name == "" {
+		out.Name = cleanText(str(entity, "title"), 100)
+	}
+	if art, ok := entity["coverArt"].(map[string]any); ok {
+		if srcs, ok := art["sources"].([]any); ok {
+			for _, s := range srcs {
+				if sm, ok := s.(map[string]any); ok && str(sm, "url") != "" {
+					out.Image = str(sm, "url")
+					break
+				}
+			}
+		}
+	}
+	for _, it := range entity["trackList"].([]any) {
+		t, ok := it.(map[string]any)
+		if !ok || str(t, "title") == "" {
+			continue
+		}
+		artist := strings.ReplaceAll(str(t, "subtitle"), "\u00a0", " ")
+		trackID := ""
+		if u := str(t, "uri"); strings.HasPrefix(u, "spotify:track:") {
+			trackID = strings.TrimPrefix(u, "spotify:track:")
+		}
+		dur, _ := t["duration"].(float64)
+		out.Songs = append(out.Songs, spotifySong{Title: cleanText(str(t, "title"), 200), Artist: cleanText(artist, 200), ID: trackID, DurationMs: int64(dur)})
+		if len(out.Songs) >= maxPlaylistTracks {
+			break
+		}
+	}
+	return out, nil
+}
+
+// spotifyPlaylistSpotdl asks spotDL (which has its own Spotify key) for the song list.
+func spotifyPlaylistSpotdl(id string) (spotifyList, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	dir, err := os.MkdirTemp("", "geek4u-spotdl")
+	if err != nil {
+		return spotifyList{}, err
+	}
+	defer os.RemoveAll(dir)
+	file := filepath.Join(dir, "list.spotdl")
+	cmd := exec.CommandContext(ctx, spotdlPath(), "save", "https://open.spotify.com/playlist/"+id, "--save-file", file)
+	home, _ := filepath.Abs(filepath.Join(linkToolsDir, "spotdl-home"))
+	os.MkdirAll(home, 0755)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home, "PYTHONIOENCODING=utf-8", "NO_COLOR=1", "TERM=dumb")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return spotifyList{}, fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return spotifyList{}, err
+	}
+	var songs []struct {
+		Name     string   `json:"name"`
+		Artists  []string `json:"artists"`
+		Album    string   `json:"album_name"`
+		Duration float64  `json:"duration"`
+		ID       string   `json:"song_id"`
+		ISRC     string   `json:"isrc"`
+		Cover    string   `json:"cover_url"`
+		ListName string   `json:"list_name"`
+	}
+	if err := json.Unmarshal(b, &songs); err != nil {
+		return spotifyList{}, err
+	}
+	out := spotifyList{}
+	for _, s := range songs {
+		if s.Name == "" {
+			continue
+		}
+		if out.Name == "" && s.ListName != "" {
+			out.Name = cleanText(s.ListName, 100)
+		}
+		out.Songs = append(out.Songs, spotifySong{Title: cleanText(s.Name, 200), Artist: cleanText(strings.Join(s.Artists, ", "), 200), Album: cleanText(s.Album, 200),
+			ISRC: s.ISRC, ID: s.ID, Image: s.Cover, DurationMs: int64(s.Duration * 1000)})
+		if len(out.Songs) >= maxPlaylistTracks {
+			break
+		}
 	}
 	return out, nil
 }
@@ -9193,6 +9499,12 @@ type linkJob struct {
 	State    string  `json:"state"` // running | done | error | cancelled
 	Error    string  `json:"error,omitempty"`
 	Tool     string  `json:"tool"`
+	Format   string  `json:"format"`            // mp3 (sound only) or mp4 (video)
+	Total    int     `json:"total,omitempty"`   // songs/links in a list download
+	Done     int     `json:"done,omitempty"`    // of those, tried so far
+	Saved    int     `json:"saved,omitempty"`   // files put in the folder
+	Skipped  int     `json:"skipped,omitempty"` // already in the folder
+	Failed   int     `json:"failed,omitempty"`
 	Bytes    int64   `json:"bytes"`
 	Seconds  float64 `json:"seconds"`
 	Duration float64 `json:"duration"`
@@ -9201,6 +9513,7 @@ type linkJob struct {
 	Ended    int64   `json:"ended,omitempty"`
 	user     int
 	cancel   context.CancelFunc
+	list     []string // a list download's lines
 }
 
 var (
@@ -9415,6 +9728,372 @@ func updateLinkTools() {
 			set("deno", linkToolVersion(p, "--version"))
 		}
 	}
+
+	updateSpotdl(ctx, set)
+}
+
+// ---- spotDL (Spotify links): the release build from GitHub, refreshed weekly ----
+
+func spotdlName() string {
+	if runtime.GOOS == "windows" {
+		return "spotdl.exe"
+	}
+	return "spotdl"
+}
+
+// spotdlAssetSuffix: spotDL only publishes builds for these.
+func spotdlAssetSuffix() string {
+	switch runtime.GOOS + "/" + runtime.GOARCH {
+	case "windows/amd64":
+		return "-win32.exe"
+	case "linux/amd64":
+		return "-linux"
+	case "darwin/amd64", "darwin/arm64":
+		return "-darwin"
+	}
+	return ""
+}
+
+// spotdlPath: our spotDL, else one on PATH.
+func spotdlPath() string {
+	if p := linkToolPath(spotdlName()); p != "" {
+		return p
+	}
+	p, _ := exec.LookPath("spotdl")
+	return p
+}
+
+func updateSpotdl(ctx context.Context, set func(k, v string)) {
+	suffix := spotdlAssetSuffix()
+	if suffix == "" {
+		return
+	}
+	dest := filepath.Join(linkToolsDir, spotdlName())
+	have := linkToolPath(spotdlName())
+	var stamp time.Time
+	if st, err := os.Stat(dest + ".got"); err == nil {
+		stamp = st.ModTime()
+	}
+	if have == "" || time.Since(stamp) > 7*24*time.Hour {
+		err := func() error {
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/spotDL/spotify-downloader/releases/latest", nil)
+			req.Header.Set("User-Agent", "Geek4u-server")
+			req.Header.Set("Accept", "application/vnd.github+json")
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return err
+			}
+			defer res.Body.Close()
+			if res.StatusCode != http.StatusOK {
+				return fmt.Errorf("GitHub answered %s", res.Status)
+			}
+			var rel struct {
+				Tag    string `json:"tag_name"`
+				Assets []struct {
+					Name string `json:"name"`
+					URL  string `json:"browser_download_url"`
+				} `json:"assets"`
+			}
+			if err := json.NewDecoder(io.LimitReader(res.Body, 4<<20)).Decode(&rel); err != nil {
+				return err
+			}
+			if b, err := os.ReadFile(dest + ".got"); err == nil && have != "" && strings.TrimSpace(string(b)) == rel.Tag {
+				return nil // already the newest
+			}
+			for _, a := range rel.Assets {
+				if strings.HasPrefix(a.Name, "spotdl-") && strings.HasSuffix(a.Name, suffix) {
+					fmt.Println("Link downloads: getting spotDL", rel.Tag, "from GitHub…")
+					if err := downloadTo(ctx, a.URL, dest); err != nil {
+						return err
+					}
+					os.WriteFile(dest+".got", []byte(rel.Tag), 0644)
+					return nil
+				}
+			}
+			return fmt.Errorf("no spotDL build for this computer in %s", rel.Tag)
+		}()
+		if err != nil {
+			fmt.Println("Link downloads: couldn't get spotDL:", err)
+			if have == "" {
+				set("spotdl", "couldn't download: "+err.Error())
+			}
+		} else {
+			os.Chtimes(dest+".got", time.Now(), time.Now())
+		}
+	}
+	if p := linkToolPath(spotdlName()); p != "" {
+		if b, err := os.ReadFile(dest + ".got"); err == nil {
+			set("spotdl", strings.TrimSpace(string(b)))
+		} else {
+			set("spotdl", "ready")
+		}
+	}
+}
+
+var spotdlFound = regexp.MustCompile(`(?i)found (\d+) songs?`)
+
+const linkListLimit = 72 * time.Hour
+
+// linkSweep moves finished files from tmp into dir while a long download
+// runs (only files untouched for minAge, so nothing half-written moves).
+// With skipSame a file whose name is already in the folder is dropped, so
+// running the same list again only fetches what's missing.
+func linkSweep(j *linkJob, tmp, dir string, skipSame bool, minAge time.Duration) {
+	filepath.WalkDir(tmp, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		n := d.Name()
+		e := strings.ToLower(filepath.Ext(n))
+		if !linkMediaExt[e] && e != ".mp3" {
+			return nil
+		}
+		if strings.HasSuffix(n, ".part") || strings.Contains(n, ".temp.") || strings.Contains(n, ".f") && strings.Count(n, ".") > 1 && regexp.MustCompile(`\.f\d+\.`).MatchString(n) {
+			return nil
+		}
+		if info, err := d.Info(); err != nil || time.Since(info.ModTime()) < minAge {
+			return nil
+		}
+		if skipSame {
+			if _, err := os.Stat(filepath.Join(dir, n)); err == nil {
+				os.Remove(p)
+				linkUpdate(j, func(j *linkJob) { j.Skipped++ })
+				return nil
+			}
+		}
+		base := strings.TrimSuffix(n, filepath.Ext(n))
+		name := freeName(dir, base, filepath.Ext(n))
+		if err := moveFile(p, filepath.Join(dir, name)); err != nil {
+			fmt.Println("link download:", err)
+			return nil
+		}
+		linkUpdate(j, func(j *linkJob) { j.Saved++ })
+		return nil
+	})
+}
+
+// linkSpotdl downloads Spotify links and "Artist - Title" searches as MP3s
+// with spotDL (it reads the songs from Spotify and gets each one from
+// YouTube; Spotify's own audio is locked and never touched). Finished songs
+// are moved into the folder as it goes.
+func linkSpotdl(ctx context.Context, j *linkJob, tmp, dir string, queries []string) error {
+	abs, _ := filepath.Abs(tmp)
+	args := append([]string{"download"}, queries...)
+	args = append(args, "--output", filepath.Join(abs, "{artists} - {title}.{output-ext}"), "--format", "mp3", "--print-errors", "--log-level", "INFO", "--overwrite", "skip")
+	if ff := ffmpegPath(); ff != "" {
+		args = append(args, "--ffmpeg", ff)
+	}
+	cmd := exec.CommandContext(ctx, spotdlPath(), args...)
+	cmd.Dir = abs
+	// spotDL keeps its settings and cache in its home folder; keep them with the server.
+	home, _ := filepath.Abs(filepath.Join(linkToolsDir, "spotdl-home"))
+	os.MkdirAll(home, 0755)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home, "PYTHONIOENCODING=utf-8", "NO_COLOR=1", "TERM=dumb")
+	errs := &lastLines{}
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = errs
+	if err := cmd.Start(); err != nil {
+		return errors.New("Couldn't start spotDL.")
+	}
+	single := j.Tool == "spotdl"
+	total, done := 0, 0
+	outLines := &lastLines{}
+	sc := bufio.NewScanner(pipe)
+	sc.Buffer(make([]byte, 64<<10), 1<<20)
+	last := time.Now()
+	for sc.Scan() {
+		line := sc.Text()
+		outLines.Write([]byte(line + "\n"))
+		if m := spotdlFound.FindStringSubmatch(line); m != nil && single {
+			total, _ = strconv.Atoi(m[1])
+			linkUpdate(j, func(j *linkJob) { j.Total = total })
+		}
+		low := strings.ToLower(line)
+		if strings.Contains(line, "Downloaded \"") || strings.Contains(line, "Skipping ") || strings.Contains(low, "error") && strings.Contains(low, "lookuperror") {
+			done++
+			if single {
+				d := done
+				linkUpdate(j, func(j *linkJob) {
+					j.Done = d
+					if j.Total > 0 {
+						j.Percent = math.Min(99, float64(d)*100/float64(j.Total))
+					}
+				})
+			}
+		}
+		if time.Since(last) > 5*time.Second {
+			linkSweep(j, tmp, dir, true, 3*time.Second)
+			last = time.Now()
+		}
+	}
+	waitErr := cmd.Wait()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	linkSweep(j, tmp, dir, true, 0)
+	if waitErr != nil && j.Saved+j.Skipped == 0 {
+		msg := errs.last()
+		if msg == "" {
+			msg = outLines.last()
+		}
+		if msg == "" {
+			msg = waitErr.Error()
+		}
+		return errors.New("spotDL couldn't download it: " + msg + " (the server updates spotDL by itself every week; try again later)")
+	}
+	return nil
+}
+
+var linkListSpotify = regexp.MustCompile(`(?i)^https?://(open\.)?spotify\.(com|link)/`)
+
+// startLinkList starts one download for a whole list: Spotify links and
+// "Artist - Title" lines go through spotDL, other links through yt-dlp.
+func startLinkList(w http.ResponseWriter, r *http.Request, session cookiesStruct, list, cur, format string) {
+	var lines []string
+	seen := map[string]bool{}
+	for _, l := range strings.Split(strings.ReplaceAll(list, "\r", ""), "\n") {
+		l = strings.TrimSpace(strings.TrimPrefix(l, "\ufeff"))
+		if l == "" || strings.HasPrefix(l, "#") || seen[strings.ToLower(l)] || len(l) > 500 {
+			continue
+		}
+		seen[strings.ToLower(l)] = true
+		lines = append(lines, l)
+	}
+	if len(lines) == 0 {
+		http.Error(w, "Paste one song or link per line.", http.StatusBadRequest)
+		return
+	}
+	if len(lines) > 10000 {
+		http.Error(w, "That's more than 10,000 lines. Split it into smaller lists.", http.StatusBadRequest)
+		return
+	}
+	needSpotdl, needYtdlp := false, false
+	for _, l := range lines {
+		if strings.HasPrefix(strings.ToLower(l), "http") && !linkListSpotify.MatchString(l) {
+			u, err := url.Parse(l)
+			if err != nil || u.Host == "" || !publicHost(u.Hostname()) {
+				http.Error(w, "This line isn't a link that can be downloaded: "+l, http.StatusBadRequest)
+				return
+			}
+			needYtdlp = true
+		} else {
+			needSpotdl = true
+		}
+	}
+	if needSpotdl && spotdlPath() == "" {
+		http.Error(w, "The server is still getting spotDL, which finds songs by name and reads Spotify links. Try again in a few minutes.", http.StatusServiceUnavailable)
+		return
+	}
+	if needYtdlp && ytdlpPath() == "" {
+		http.Error(w, "The server is still getting yt-dlp for those links. Try again in a few minutes.", http.StatusServiceUnavailable)
+		return
+	}
+	if strings.HasPrefix(cur, "/") {
+		cur = "./" + cur[1:]
+	}
+	dir, ok := insideUploads(cur)
+	if !ok {
+		http.Error(w, "Not a valid folder", http.StatusBadRequest)
+		return
+	}
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		http.Error(w, "That folder doesn't exist anymore.", http.StatusBadRequest)
+		return
+	}
+	if !filesGrantOf(r).canChangeIn(uploadRel(dir)) {
+		http.Error(w, "You can't save to that folder.", http.StatusForbidden)
+		return
+	}
+	if format != "mp4" {
+		format = "mp3"
+	}
+	linkJobsMu.Lock()
+	mine, all := 0, 0
+	for _, j := range linkJobs {
+		if j.State == "running" {
+			all++
+			if j.user == session.UserId {
+				mine++
+			}
+		}
+	}
+	if mine >= linkJobsPerUser || all >= linkJobsTotal {
+		linkJobsMu.Unlock()
+		http.Error(w, "Wait for a download to finish before starting another.", http.StatusTooManyRequests)
+		return
+	}
+	b := make([]byte, 8)
+	cryptorand.Read(b)
+	ctx, cancel := context.WithTimeout(context.Background(), linkListLimit)
+	shown := uploadRel(dir)
+	label := fmt.Sprintf("List of %d", len(lines))
+	j := &linkJob{ID: hex.EncodeToString(b), URL: label, Folder: "/" + shown, State: "running", Tool: "list", Format: format, Total: len(lines), Started: time.Now().UnixMilli(), user: session.UserId, cancel: cancel, list: lines}
+	linkJobs[j.ID] = j
+	linkJobsMu.Unlock()
+	fmt.Printf("[%s] LINK LIST USER=%s LINES=%d TO=/%s\n", time.Now().Format("2006-01-02 15:04:05"), session.OriginalUsername, len(lines), shown)
+	go runLinkJob(ctx, j, dir, "")
+	writeJSON(w, map[string]any{"jobs": linkJobsOf(session.UserId)})
+}
+
+// linkRunList works through a list: names and Spotify links in groups of 20
+// for spotDL, other links one at a time with yt-dlp. A line that fails is
+// counted and skipped, so one bad song never stops the rest.
+func linkRunList(ctx context.Context, j *linkJob, tmp, dir string) error {
+	var batch []string
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		before := j.Saved + j.Skipped
+		if err := linkSpotdl(ctx, j, tmp, dir, batch); err != nil && ctx.Err() == nil {
+			fmt.Println("link list:", err)
+		}
+		got := j.Saved + j.Skipped - before
+		n := len(batch)
+		linkUpdate(j, func(j *linkJob) {
+			j.Done += n
+			if got < n {
+				j.Failed += n - got
+			}
+			j.Percent = math.Min(99, float64(j.Done)*100/float64(max(j.Total, 1)))
+		})
+		batch = nil
+	}
+	for _, line := range j.list {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		isLink := strings.HasPrefix(strings.ToLower(line), "http")
+		if !isLink || linkListSpotify.MatchString(line) {
+			batch = append(batch, line)
+			if len(batch) >= 20 {
+				flush()
+			}
+			continue
+		}
+		flush()
+		one := &linkJob{URL: line, Format: j.Format}
+		files, err := linkWithYtdlp(ctx, one, tmp)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err != nil || len(files) == 0 {
+			linkUpdate(j, func(j *linkJob) { j.Failed++ })
+		}
+		linkSweep(j, tmp, dir, true, 0)
+		linkUpdate(j, func(j *linkJob) {
+			j.Done++
+			j.Percent = math.Min(99, float64(j.Done)*100/float64(max(j.Total, 1)))
+		})
+	}
+	flush()
+	if j.Saved+j.Skipped == 0 {
+		return errors.New("None of the songs in the list could be downloaded.")
+	}
+	return nil
 }
 
 // unzipOne takes the file called name out of a zip into dest.
@@ -9581,7 +10260,7 @@ func uploadLink(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if r.Method == http.MethodGet {
 		linkToolsMu.Lock()
-		tools := map[string]string{"ytdlp": linkToolsState["ytdlp"], "deno": linkToolsState["deno"]}
+		tools := map[string]string{"ytdlp": linkToolsState["ytdlp"], "deno": linkToolsState["deno"], "spotdl": linkToolsState["spotdl"]}
 		linkToolsMu.Unlock()
 		writeJSON(w, map[string]any{"jobs": linkJobsOf(session.UserId), "ffmpeg": ffmpegPath() != "", "ytdlp": ytdlpPath() != "", "tools": tools})
 		return
@@ -9596,8 +10275,10 @@ func uploadLink(w http.ResponseWriter, r *http.Request) {
 		URL         string `json:"url"`
 		CurrentPath string `json:"currentPath"`
 		Name        string `json:"name"`
+		Format      string `json:"format"`
+		List        string `json:"list"` // many songs/links, one per line
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&in); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<20)).Decode(&in); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
@@ -9625,6 +10306,10 @@ func uploadLink(w http.ResponseWriter, r *http.Request) {
 
 	if ffmpegPath() == "" {
 		http.Error(w, "The server can't find FFmpeg. Install it (on Linux: sudo apt install ffmpeg), or put the ffmpeg program in an ffmpeg/bin folder next to the server. It's picked up within a minute, no restart needed.", http.StatusServiceUnavailable)
+		return
+	}
+	if strings.TrimSpace(in.List) != "" {
+		startLinkList(w, r, session, in.List, in.CurrentPath, in.Format)
 		return
 	}
 	u, err := url.Parse(strings.TrimSpace(in.URL))
@@ -9659,6 +10344,19 @@ func uploadLink(w http.ResponseWriter, r *http.Request) {
 	if !linkMediaExt[ext] && ext != ".m3u8" && ext != ".mpd" && ytdlpPath() != "" {
 		tool = "yt-dlp"
 	}
+	// Spotify links: spotDL reads the songs from Spotify and downloads each
+	// one from YouTube (Spotify's own audio is locked and never touched).
+	if host := strings.ToLower(u.Hostname()); host == "open.spotify.com" || host == "spotify.link" || host == "spotify.com" {
+		if spotdlPath() == "" {
+			http.Error(w, "The server is still getting spotDL for Spotify links. It tries at start and every 12 hours; try again in a few minutes.", http.StatusServiceUnavailable)
+			return
+		}
+		tool = "spotdl"
+	}
+	format := "mp3"
+	if in.Format == "mp4" && tool != "spotdl" {
+		format = "mp4"
+	}
 	name := linkFileName(in.Name)
 	if name == "" && tool == "ffmpeg" {
 		base, _ := url.PathUnescape(path.Base(u.Path))
@@ -9685,9 +10383,13 @@ func uploadLink(w http.ResponseWriter, r *http.Request) {
 	}
 	b := make([]byte, 8)
 	cryptorand.Read(b)
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+	limit := 4 * time.Hour
+	if tool == "spotdl" {
+		limit = linkListLimit // a playlist can have thousands of songs
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
 	shown := uploadRel(dir)
-	j := &linkJob{ID: hex.EncodeToString(b), URL: u.String(), Folder: "/" + shown, Name: name, State: "running", Tool: tool, Started: time.Now().UnixMilli(), user: session.UserId, cancel: cancel}
+	j := &linkJob{ID: hex.EncodeToString(b), URL: u.String(), Folder: "/" + shown, Name: name, State: "running", Tool: tool, Format: format, Started: time.Now().UnixMilli(), user: session.UserId, cancel: cancel}
 	linkJobs[j.ID] = j
 	linkJobsMu.Unlock()
 
@@ -9720,7 +10422,14 @@ func runLinkJob(ctx context.Context, j *linkJob, dir, ext string) {
 	}
 	var err error
 	var files []string
-	if j.Tool == "yt-dlp" {
+	if j.Tool == "list" {
+		err = linkRunList(ctx, j, tmp, dir)
+	} else if j.Tool == "spotdl" {
+		err = linkSpotdl(ctx, j, tmp, dir, []string{j.URL})
+		if err == nil && j.Saved+j.Skipped == 0 {
+			err = errors.New("spotDL didn't find any songs at that link.")
+		}
+	} else if j.Tool == "yt-dlp" {
 		files, err = linkWithYtdlp(ctx, j, tmp)
 	} else {
 		files, err = linkWithFfmpeg(ctx, j, tmp, ext)
@@ -9730,11 +10439,16 @@ func runLinkJob(ctx context.Context, j *linkJob, dir, ext string) {
 		return
 	}
 	if ctx.Err() == context.DeadlineExceeded {
-		finish("error", "It took longer than 4 hours, so it was stopped.")
+		finish("error", "It ran too long, so it was stopped. Songs already saved stay in the folder.")
 		return
 	}
 	if err != nil {
 		finish("error", err.Error())
+		return
+	}
+	if j.Tool == "list" || j.Tool == "spotdl" {
+		linkSweep(j, tmp, dir, true, 0) // anything left
+		finish("done", "")
 		return
 	}
 	var saved []string
@@ -9792,6 +10506,10 @@ func linkWithFfmpeg(ctx context.Context, j *linkJob, tmp, ext string) ([]string,
 	audio := linkAudioExt[ext]
 	if audio || ext == ".webm" || ext == ".mkv" || ext == ".mov" {
 		out = ext
+	}
+	mp3 := j.Format == "mp3"
+	if mp3 {
+		out, audio = ".mp3", true
 	}
 	file := filepath.Join(tmp, j.Name+out)
 	if ffprobeBin != "" {
@@ -9873,8 +10591,12 @@ func linkWithFfmpeg(ctx context.Context, j *linkJob, tmp, ext string) ([]string,
 		}
 		return nil
 	}
-	err := run([]string{"-c", "copy"})
-	if err != nil && ctx.Err() == nil {
+	first := []string{"-c", "copy"}
+	if mp3 {
+		first = []string{"-c:a", "libmp3lame", "-q:a", "2"}
+	}
+	err := run(first)
+	if err != nil && ctx.Err() == nil && !mp3 {
 		// Some streams can't be copied into this kind of file; convert them instead.
 		os.Remove(file)
 		linkUpdate(j, func(j *linkJob) { j.Seconds, j.Bytes, j.Percent = 0, 0, 0 })
@@ -9909,8 +10631,13 @@ func linkWithYtdlp(ctx context.Context, j *linkJob, tmp string) ([]string, error
 		tpl = strings.ReplaceAll(j.Name, "%", "%%") + ".%(ext)s"
 	}
 	args := []string{"--no-playlist", "--newline", "--no-colors", "--no-mtime",
-		"--ffmpeg-location", ffmpegBin, "-S", "ext:mp4:m4a", "--merge-output-format", "mp4",
-		"-P", tmp, "-o", tpl, "--", j.URL}
+		"--ffmpeg-location", ffmpegBin}
+	if j.Format == "mp3" {
+		args = append(args, "-x", "--audio-format", "mp3", "--audio-quality", "0", "--embed-metadata")
+	} else {
+		args = append(args, "-S", "ext:mp4:m4a", "--merge-output-format", "mp4")
+	}
+	args = append(args, "-P", tmp, "-o", tpl, "--", j.URL)
 	// Only our own (current) yt-dlp knows --js-runtimes.
 	if deno := denoPath(); deno != "" && linkToolPath(ytdlpAsset()) != "" {
 		args = append([]string{"--js-runtimes", "deno:" + deno}, args...)

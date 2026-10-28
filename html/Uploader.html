@@ -88,13 +88,29 @@
     <form id="linkBox" class="xn-card up-card up-link" novalidate>
       <div>
         <p class="xn-eyebrow">From a link</p>
-        <h2 class="xn-h2">Download a video</h2>
-        <p class="xn-sub">Paste a link to a video or song. The server downloads it with FFmpeg and puts it straight into <strong class="up-link-dest">/</strong>.</p>
+        <h2 class="xn-h2">Download from a link</h2>
+        <p class="xn-sub">Paste a link to a video, song or Spotify playlist. The server downloads it and puts it straight into <strong class="up-link-dest">/</strong>.</p>
       </div>
+      <div class="up-fmt up-mode" role="radiogroup" aria-label="What to download" id="linkMode">
+        <label><input type="radio" name="linkMode" value="one" checked><span><strong>One link</strong> a song, video or playlist</span></label>
+        <label><input type="radio" name="linkMode" value="list"><span><strong>A list</strong> hundreds or thousands of songs</span></label>
+      </div>
+      <div class="up-list-box" id="linkListBox" hidden>
+        <label class="xn-label" for="linkList">Songs <span class="up-opt">(one per line)</span></label>
+        <textarea id="linkList" class="xn-input up-list" rows="8" spellcheck="false" autocomplete="off" placeholder="Artist - Song title&#10;https://open.spotify.com/playlist/...&#10;https://www.youtube.com/watch?v=..."></textarea>
+        <p class="up-list-meta"><span id="linkListCount">0 songs</span> · <label class="up-list-file">Load a .txt or .csv file<input type="file" id="linkListFile" accept=".txt,.csv,text/plain,text/csv" hidden></label></p>
+      </div>
+      <div class="up-one-box" id="linkOneBox">
       <label class="xn-label" for="linkUrl">Link</label>
-      <input type="url" id="linkUrl" class="xn-input" placeholder="https://…/video.mp4 or .m3u8" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      <input type="url" id="linkUrl" class="xn-input" placeholder="YouTube, SoundCloud, Spotify or a video link" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required>
       <label class="xn-label" for="linkName">File name <span class="up-opt">(optional)</span></label>
       <input type="text" id="linkName" class="xn-input" placeholder="Taken from the link" maxlength="120" autocomplete="off">
+      </div>
+      <span class="xn-label" id="linkFmtLabel">Save as</span>
+      <div class="up-fmt" role="radiogroup" aria-labelledby="linkFmtLabel" id="linkFmt">
+        <label><input type="radio" name="linkFmt" value="mp3" checked><span><strong>MP3</strong> sound only</span></label>
+        <label><input type="radio" name="linkFmt" value="mp4"><span><strong>MP4</strong> video</span></label>
+      </div>
       <p class="up-link-note" id="linkNote" hidden></p>
       <button id="linkGo" type="submit" class="xn-btn xn-btn-primary up-submit">
         <svg viewBox="0 0 24 24" class="up-ico" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
