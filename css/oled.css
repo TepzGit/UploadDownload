@@ -326,6 +326,12 @@ body * {
 /* The Chat link is in the bar here, so the phone chat bubble is not needed. */
 @media (min-width: 768px) { html .xn > .xn-chat-btn, html.xn-has-tabs .xn > .xn-chat-btn { display: none; } }
 }
+.Drugs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 20px;
+}
 
 /* ------------------------------------------------------------
    Motion: page-to-page transitions + entry animations.
@@ -411,6 +417,15 @@ html { scroll-padding-top: calc(var(--oled-nav-h) + env(safe-area-inset-top) + 1
   .xn-links a { transition: color 0.15s ease, background-color 0.15s ease, transform 0.1s ease; }
   .xn-links a:active { transform: scale(0.97); }
 }
+
+.bottombar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 74px;
+}
+
 
 /* ------------------------------------------------------------
    Shared animated background (Main + Graph pages)
@@ -534,8 +549,14 @@ html body.xn-bg { background: transparent !important; }
   background: var(--oled-surface);
   border: 1px solid var(--oled-line);
   border-radius: 2px;
-  padding: clamp(16px, 2.5vw, 24px);
+  padding: 50px;
+  height: 110vh;
+  min-width: 850px;
+  align-self: flex-end;
+  margin-right: 4rem;
+  margin-left: 3rem;
 }
+
 .xn-eyebrow {
   margin: 0;
   font-size: 11px;

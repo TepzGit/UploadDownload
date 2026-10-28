@@ -126,6 +126,16 @@ body {
     text-decoration: none;
     transition: border-color .15s ease, background-color .15s ease;
 }
+.xn-card {
+    background: var(--oled-surface);
+    border: 1px solid var(--oled-line);
+    border-radius: 2px;
+    padding: 20px;
+    height: 110vh;
+}
+
+
+
 
 
 .Drug:hover {

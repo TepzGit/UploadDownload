@@ -1,7 +1,16 @@
 /* Admin pages (html/AdminPanel.html, html/AdminPanelCreateUser.html).
    Cards, buttons, inputs and the background come from oled.css. */
 
-.xn-page.adm { max-width: 960px; }
+.xn-page.adm {
+  max-width: 960px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 0 !important;
+  margin-right: 8rem;
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-left: 0;
+}
 
 .AdminPanelOptions { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
 .AdminPanelOption {
