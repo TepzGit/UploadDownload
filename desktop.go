@@ -280,7 +280,8 @@ func desktopLog() {
 		return
 	}
 	var out io.Writer = f
-	if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
+	// A terminal, or the Electron window reading the address from a pipe.
+	if fi, err := os.Stdout.Stat(); err == nil && fi.Mode()&(os.ModeCharDevice|os.ModeNamedPipe|os.ModeSocket) != 0 {
 		if null, err := os.Stat(os.DevNull); err != nil || !os.SameFile(fi, null) {
 			out = io.MultiWriter(f, os.Stdout)
 		}
