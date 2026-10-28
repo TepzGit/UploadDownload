@@ -538,6 +538,7 @@
     { href: "/journal", label: "Journal", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
     { href: "/Notes", label: "Notes", icon: '<path d="M6 2.5h8.6L19.5 7.4V19a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 19V5A2.5 2.5 0 0 1 6 2.5zm8 .9V7a1 1 0 0 0 1 1h3.6zM7.5 11.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 3.8a.9.9 0 0 0 0 1.8h5.5a.9.9 0 0 0 0-1.8z" fill-rule="evenodd"/>' },
     { href: "/Forum", label: "Forum", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
+    { href: "/Chat", label: "Chat", icon: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' },
     { href: "/Music", label: "Music", icon: '<path d="M20 3.2v12.3a3.5 3.5 0 1 1-2-3.2V7.6l-8 2v8.9a3.5 3.5 0 1 1-2-3.2V6.4a1.5 1.5 0 0 1 1.1-1.5l9-2.3A1.5 1.5 0 0 1 20 3.2z"/>' },
     { href: "/Files/", label: "Files", files: true, icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
     { href: "/Utility", label: "Utility", icon: '<path d="M14.7 3.2a5.5 5.5 0 0 0-5.9 7.3L3.3 16a2.3 2.3 0 0 0 3.3 3.3l5.5-5.5a5.5 5.5 0 0 0 7.3-5.9l-3 3a1.6 1.6 0 0 1-2.3 0l-1.1-1.1a1.6 1.6 0 0 1 0-2.3z"/>' },
@@ -568,7 +569,7 @@
     bar.setAttribute("aria-label", "Main");
     const rootClass = document.documentElement.classList;
     const canFiles = rootClass.contains("xn-admin") || rootClass.contains("xn-files");
-    const tabs = TABS.filter((tab) => !tab.files || canFiles);
+    const tabs = TABS.filter((tab) => (!tab.files || canFiles) && (tab.href !== "/Chat" || signedIn));
     bar.classList.toggle("has-6", tabs.length > 5);
     bar.classList.toggle("has-7", tabs.length > 6);
     bar.classList.toggle("has-8", tabs.length > 7);
