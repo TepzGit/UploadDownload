@@ -1105,3 +1105,74 @@ html.xn-desk :is(.pf-grid, .pf-rows) > *,
 html.xn-desk :is(.gp-member, .gp-tile, .Drugs > *, .res-link, .glass, .card, .fm-feed > article) { animation: none; }
 html.xn-desk::view-transition-old(root) { animation-duration: 0.08s; }
 html.xn-desk::view-transition-new(root) { animation-duration: 0.12s; }
+
+/* ------------------------------------------------------------
+   Site look (Profile > Preferences, nav.js window.xnLook):
+   html[data-font] swaps the site font, html.xn-nologo hides the
+   logo in the menu. Text size is html zoom, set by nav.js.
+   ------------------------------------------------------------ */
+@font-face{font-family:'Space Grotesk';font-style:normal;font-display:swap;font-weight:400;src:url(/vendor/space-grotesk-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Space Grotesk';font-style:normal;font-display:swap;font-weight:500;src:url(/vendor/space-grotesk-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Space Grotesk';font-style:normal;font-display:swap;font-weight:600;src:url(/vendor/space-grotesk-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Space Grotesk';font-style:normal;font-display:swap;font-weight:700;src:url(/vendor/space-grotesk-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Inter';font-style:normal;font-display:swap;font-weight:400;src:url(/vendor/inter-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Inter';font-style:normal;font-display:swap;font-weight:500;src:url(/vendor/inter-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Inter';font-style:normal;font-display:swap;font-weight:600;src:url(/vendor/inter-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-display:swap;font-weight:400;src:url(/vendor/jetbrains-mono-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-display:swap;font-weight:500;src:url(/vendor/jetbrains-mono-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-display:swap;font-weight:600;src:url(/vendor/jetbrains-mono-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+html[data-font="jetbrains"] { --oled-font: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; }
+html[data-font="inter"] { --oled-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+html[data-font="grotesk"] { --oled-font: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif; }
+html[data-font="system"] { --oled-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+html[data-font="serif"] { --oled-font: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif; }
+html[data-font="rounded"] { --oled-font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Varela Round", "Nunito", system-ui, sans-serif; }
+html.xn-nologo .xn > .xn-brand { display: none !important; }
+
+/* ------------------------------------------------------------
+   Gentle motion everywhere (mommy 2026-10-28: "nothing too dramatic").
+   Short, small movements; all off for "reduce motion".
+   ------------------------------------------------------------ */
+@keyframes xn-pop-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes xn-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  /* Buttons lift a hair on hover and dip when pressed. */
+  .xn-btn, .btn, .pf-menu-item, .plot-tool, .fx-more, .xn-brand { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease, opacity 0.2s ease; }
+  @media (hover: hover) {
+    .xn-btn:not(:disabled):hover, .plot-tool:hover { transform: translateY(-1px); }
+    .xn-btn-primary:not(:disabled):hover { box-shadow: 0 6px 18px -8px rgba(var(--xn-accent-rgb), 0.7); }
+    .xn-brand:hover { transform: translateY(-1px); filter: drop-shadow(0 4px 10px rgba(var(--xn-accent-rgb), 0.45)); }
+  }
+  .xn-btn:not(:disabled):active, .plot-tool:active, .fx-more:active, .xn-brand:active { transform: scale(0.97); }
+
+  /* Fields glow softly when focused. */
+  .xn-input, input.input, textarea, select { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+  .xn-input:focus, input.input:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(var(--xn-accent-rgb), 0.18); }
+
+  /* Popups and dialogs ease in. */
+  dialog[open] { animation: xn-pop-in 0.22s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  dialog[open]::backdrop { animation: xn-fade-in 0.22s ease-out; }
+
+  /* List rows (Files, Music, Notes) drift in one after another. */
+  .fx-list > .item, .mu-songs > li, .nt-report, .sy-list > *, .mv-list > .mv-row {
+    animation: xn-row-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  :is(.fx-list > .item, .mu-songs > li, .mv-list > .mv-row):nth-child(2) { animation-delay: 25ms; }
+  :is(.fx-list > .item, .mu-songs > li, .mv-list > .mv-row):nth-child(3) { animation-delay: 50ms; }
+  :is(.fx-list > .item, .mu-songs > li, .mv-list > .mv-row):nth-child(4) { animation-delay: 75ms; }
+  :is(.fx-list > .item, .mu-songs > li, .mv-list > .mv-row):nth-child(5) { animation-delay: 100ms; }
+  :is(.fx-list > .item, .mu-songs > li, .mv-list > .mv-row):nth-child(6) { animation-delay: 125ms; }
+  :is(.fx-list > .item, .mu-songs > li, .mv-list > .mv-row):nth-child(n+7) { animation-delay: 150ms; }
+
+  /* Rows answer the pointer. */
+  .fx-list > .item, .mu-song, .nt-report, .dose-card { transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease; }
+  @media (hover: hover) {
+    .fx-list > .item:hover, .nt-report:hover { transform: translateX(2px); }
+  }
+
+  /* Pictures fade in as they arrive instead of popping. */
+  img { transition: opacity 0.3s ease; }
+
+  /* The font, text size and colors change smoothly from Preferences. */
+  html { transition: background-color 0.3s ease; }
+}
