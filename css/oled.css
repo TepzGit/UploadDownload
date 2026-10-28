@@ -258,14 +258,19 @@ body * {
   .xn.open .xn-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 }
 
-/* Wide screens: logo on the left, links in the middle, Log out on the right. */
+/* Wide screens: logo on the left, links in the middle, Log out on the right.
+   nav.js (fitNav) checks the room the bar really has (font, text size,
+   number of links) and steps down when they would touch:
+   .xn-flow      links between the logo and Log out instead of the exact middle
+   .xn-tight     links closer together, Log out as just its icon
+   .xn-collapse  links in the drop-down menu, like on phones */
 .xn-out { display: none; margin: 0; }
 @media (min-width: 768px) {
   .xn-brand,
   .xn.has-mail .xn-brand,
   .xn.has-mail .xn-mail { margin-right: 0; }
-  .xn-links { margin: 0 auto; }
-  .xn-out { display: flex; flex: none; }
+  .xn-links { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + var(--oled-nav-h) / 2); transform: translate(-50%, -50%); white-space: nowrap; }
+  .xn-out { display: flex; flex: none; margin-left: auto; }
   .xn-out button {
     display: inline-flex;
     align-items: center;
@@ -278,26 +283,48 @@ body * {
     color: var(--oled-muted);
     font: inherit;
     font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
     transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
   }
-  .xn-out svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .xn-out svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .xn-out button:hover,
   .xn-out button:focus-visible { color: #ff8b8b; border-color: rgba(255, 139, 139, 0.45); background: rgba(255, 139, 139, 0.08); outline: none; }
   .xn-out button:active { transform: scale(0.97); }
+
+  .xn.xn-flow .xn-links { position: static; transform: none; margin: 0 auto; }
+  .xn.xn-flow .xn-out { margin-left: 0; }
+  .xn.xn-tight .xn-links a { padding: 0 9px; }
+  .xn.xn-tight .xn-out button { padding: 0 11px; }
+  .xn.xn-tight .xn-out span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .xn.xn-collapse .xn-toggle { display: inline-flex; margin: 0 0 0 auto; }
+  .xn.xn-collapse .xn-out { margin-left: 4px; }
+  .xn.xn-collapse .xn-links {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    margin: 0;
+    padding: 8px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+    background: var(--oled-bg);
+    border-bottom: 1px solid var(--oled-line);
+    transform: translateY(-6px);
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+  }
+  .xn.xn-collapse.open .xn-links { visibility: visible; opacity: 1; transform: none; transition: opacity 0.15s ease, transform 0.15s ease; }
+  .xn.xn-collapse .xn-links a { min-height: 46px; padding: 0 14px; }
+  .xn.xn-collapse.open .xn-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .xn.xn-collapse.open .xn-toggle span:nth-child(2) { opacity: 0; }
+  .xn.xn-collapse.open .xn-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 }
 /* The Chat link is in the bar here, so the phone chat bubble is not needed. */
 @media (min-width: 768px) { html .xn > .xn-chat-btn, html.xn-has-tabs .xn > .xn-chat-btn { display: none; } }
-/* Narrower screens: Log out shrinks to its icon and the links pack closer. */
-@media (min-width: 768px) and (max-width: 1099px) {
-  .xn-links a { padding: 0 9px; }
-  .xn-out button { padding: 0 11px; }
-  .xn-out span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-}
-/* With room to spare the links sit in the exact middle of the bar. */
-@media (min-width: 1280px) {
-  .xn-links { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + var(--oled-nav-h) / 2); transform: translate(-50%, -50%); margin: 0; }
-  .xn-out { margin-left: auto; }
 }
 
 /* ------------------------------------------------------------

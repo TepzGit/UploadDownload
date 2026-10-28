@@ -333,6 +333,45 @@
     nav.append(form);
   }
 
+  // Wide screens: the links sit in the middle of the bar. When they would run
+  // into the logo or Log out (big text size, wide font, many links), step
+  // down: links between the two, then closer together, then the menu button.
+  function fitNav(nav) {
+    const links = nav.querySelector(".xn-links");
+    if (!links) return;
+    const steps = ["xn-flow", "xn-tight", "xn-collapse"];
+    const wide = window.matchMedia("(min-width: 768px)");
+    const left = () => {
+      let right = 0;
+      nav.querySelectorAll(".xn-brand, .xn-mail, .xn-chat-btn").forEach((el) => {
+        if (el.offsetParent) right = Math.max(right, el.getBoundingClientRect().right);
+      });
+      return right;
+    };
+    const fits = () => {
+      const box = links.getBoundingClientRect();
+      const bar = nav.getBoundingClientRect();
+      const out = nav.querySelector(".xn-out");
+      const outBox = out && out.offsetParent ? out.getBoundingClientRect() : null;
+      const end = outBox ? outBox.left : bar.right;
+      return links.scrollWidth <= links.clientWidth + 1 && box.left >= left() + 8 && box.right <= end - 8 && (!outBox || outBox.right <= bar.right);
+    };
+    function fit() {
+      nav.classList.remove(...steps);
+      if (!wide.matches) return;
+      for (let i = 0; i < steps.length - 1 && !fits(); i++) nav.classList.add(steps[i]);
+      if (!fits()) nav.classList.add(steps[steps.length - 1]);
+      if (!nav.classList.contains("xn-collapse")) nav.classList.remove("open");
+    }
+    let frame = 0;
+    const later = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fit); };
+    fit();
+    window.addEventListener("resize", later);
+    if (document.fonts) document.fonts.ready.then(later);
+    new MutationObserver(later).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-font", "class"] });
+    window.xnFitNav = later;
+  }
+
   function initMail(nav) {
     if (!signedIn) return;
     const brand = nav.querySelector(".xn-brand");
@@ -351,6 +390,7 @@
       const wasHidden = button.hidden;
       button.hidden = n <= 0;
       nav.classList.toggle("has-mail", n > 0);
+      if (window.xnFitNav) window.xnFitNav();
       count.textContent = n > 9 ? "9+" : String(n);
       button.setAttribute("aria-label", n === 1 ? "1 new comment on your posts" : n + " new comments on your posts");
       if (n > 0 && (wasHidden || n > shown)) {
@@ -453,6 +493,7 @@
     initMail(nav);
     initChat(nav);
     initLogout(nav);
+    fitNav(nav);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
 
