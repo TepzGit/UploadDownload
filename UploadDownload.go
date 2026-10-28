@@ -8443,6 +8443,9 @@ CREATE TABLE IF NOT EXISTS portable_apps (
 	user_id INTEGER PRIMARY KEY,
 	folder TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS apps_shared (
+	folder TEXT PRIMARY KEY
+);
 `
 
 const maxReports = 500
@@ -8465,6 +8468,7 @@ func registerNotes() {
 	http.HandleFunc("/notes/pad", notepad)
 	http.HandleFunc("/apps", portableApps)
 	http.HandleFunc("/apps/run", portableAppRun)
+	http.HandleFunc("/apps/file", portableAppFile)
 }
 
 type tripReport struct {
@@ -8827,26 +8831,75 @@ func portableCanRun(kind string) bool {
 	return false
 }
 
+// appsShared is the folders an admin shared for Portable apps: every
+// account sees the programs in them, even without Files access.
+func appsShared() []string {
+	out := []string{}
+	rows, err := db.Query("SELECT folder FROM apps_shared ORDER BY folder")
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var f string
+		if rows.Scan(&f) == nil && f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// appsGrant is what an account may see in Portable apps: its Files access
+// plus the shared apps folders (download only, nothing else in Files).
+func appsGrant(session cookiesStruct) filesGrant {
+	grant, _ := filesGrantFor(session)
+	if grant.All {
+		return grant
+	}
+	g := filesGrant{All: false, CanEdit: false}
+	g.Folders = append(append([]string{}, grant.Folders...), appsShared()...)
+	return g
+}
+
 // portableApps: GET answers the account's apps folder and the programs in it;
-// POST {folder} picks the folder. Needs Files access.
+// POST {folder} picks the folder, POST {share, on} (admins) shares a folder's
+// programs with every account.
 func portableApps(w http.ResponseWriter, r *http.Request) {
 	session, ok := sessionFromRequest(r)
 	if !ok {
 		notSignedIn(w, r)
 		return
 	}
-	grant, ok := filesGrantFor(session)
-	if !ok {
-		http.Error(w, "You don't have access to Files.", http.StatusForbidden)
-		return
-	}
+	admin := session.Authority == "admin"
+	grant := appsGrant(session)
 	if r.Method == http.MethodPost {
 		var in struct {
-			Folder string `json:"folder"`
+			Folder string  `json:"folder"`
+			Share  *string `json:"share"`
+			On     bool    `json:"on"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
 			http.Error(w, "Couldn't read that folder.", http.StatusBadRequest)
 			return
+		}
+		if in.Share != nil {
+			if !admin {
+				http.Error(w, "Only admins can share apps folders.", http.StatusForbidden)
+				return
+			}
+			share := strings.Trim(path.Clean("/"+strings.ReplaceAll(*in.Share, "\\", "/")), "/")
+			p, inside := insideUploads(strings.Split(share, "/")...)
+			if fi, err := os.Stat(p); share == "" || !inside || err != nil || !fi.IsDir() {
+				http.Error(w, "Pick one folder to share, not all of Files.", http.StatusBadRequest)
+				return
+			}
+			if in.On {
+				db.Exec("INSERT OR IGNORE INTO apps_shared (folder) VALUES (?)", share)
+			} else {
+				db.Exec("DELETE FROM apps_shared WHERE folder = ?", share)
+			}
+			grant = appsGrant(session)
+			goto answer
 		}
 		folder := strings.Trim(path.Clean("/"+strings.ReplaceAll(in.Folder, "\\", "/")), "/")
 		p, inside := insideUploads(strings.Split(folder, "/")...)
@@ -8865,6 +8918,7 @@ func portableApps(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+answer:
 	var folder string
 	set := db.QueryRow("SELECT folder FROM portable_apps WHERE user_id = ?", session.UserId).Scan(&folder) == nil
 	// Every folder the account can see, for the picker (three levels deep).
@@ -8888,7 +8942,26 @@ func portableApps(w http.ResponseWriter, r *http.Request) {
 		items = portableAppList(folder, grant)
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, map[string]any{"folder": folder, "set": set, "folders": folders, "items": items, "desktop": desktopMode})
+	writeJSON(w, map[string]any{"folder": folder, "set": set, "folders": folders, "items": items, "desktop": desktopMode, "admin": admin, "shared": appsShared(), "full": grant.All})
+}
+
+// portableAppFile downloads one program the account may see in Portable
+// apps (shared folders included, which /Files/ links don't allow).
+func portableAppFile(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	rel := strings.Trim(path.Clean("/"+r.URL.Query().Get("path")), "/")
+	p, inside := insideUploads(strings.Split(rel, "/")...)
+	fi, err := os.Stat(p)
+	if rel == "" || !inside || err != nil || fi.IsDir() || portableAppKind(p) == "" || !appsGrant(session).allows(rel) {
+		http.Error(w, "That program isn't available.", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(filepath.Base(p)))
+	http.ServeFile(w, r, p)
 }
 
 // portableAppRun starts a program from Files on this computer. Only the
@@ -8908,11 +8981,7 @@ func portableAppRun(w http.ResponseWriter, r *http.Request) {
 		notSignedIn(w, r)
 		return
 	}
-	grant, ok := filesGrantFor(session)
-	if !ok {
-		http.Error(w, "You don't have access to Files.", http.StatusForbidden)
-		return
-	}
+	grant := appsGrant(session)
 	// Only the app's own pages may start programs, never another website.
 	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
 		http.Error(w, "Forbidden", http.StatusForbidden)

@@ -46,6 +46,10 @@
     .ut-apps[hidden] { display: none; }
     .pa-folder { display: flex; gap: 8px; align-items: center; }
     .pa-folder .xn-input { flex: 1; min-width: 0; }
+    .pa-share { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--oled-line); border-radius: 2px; font-size: 13px; cursor: pointer; }
+    .pa-share input { width: 16px; height: 16px; margin: 0; accent-color: var(--oled-accent); }
+    .pa-share:has(input:checked) { border-color: rgba(var(--xn-accent-rgb), 0.5); background: var(--oled-accent-soft); }
+    .pa-share[hidden] { display: none; }
     .pa-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
     .pa-app { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--oled-line); border-radius: 12px; background: var(--oled-surface-2); }
     .pa-ico { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--oled-accent-soft); color: var(--oled-accent); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
@@ -90,6 +94,7 @@
       <h2 class="xn-h2" id="paTitle">Portable apps</h2>
       <p class="ut-hint" id="paHint">The programs (.exe, .msi, .AppImage) in a Files folder you pick, ready to download.</p>
       <label class="pa-folder"><span class="xn-sr">Apps folder</span><select class="xn-input" id="paFolder"></select></label>
+      <label class="pa-share" id="paShareRow" hidden><input type="checkbox" id="paShare"><span>Share this folder's apps with everyone</span></label>
       <ul class="pa-list" id="paList"></ul>
     </section>
     <section class="xn-card ut-card" aria-labelledby="volTitle">
@@ -218,19 +223,30 @@
   // start them on this computer; the website offers downloads.
   const pa = { folder: "", desktop: false };
   const sizeText = (b) => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1e3)) + " KB";
-  const fileUrl = (p) => "/Files/" + p.split("/").map(encodeURIComponent).join("/");
   function paRender(data) {
     pa.folder = data.folder;
     pa.desktop = !!data.desktop;
     const sel = $("paFolder");
-    sel.replaceChildren(new Option(data.set ? "All of Files" : "Pick a folder…", ""));
-    data.folders.forEach((f) => sel.append(new Option(f.replace(/\//g, " › "), f)));
+    const shared = data.shared || [];
+    sel.replaceChildren(new Option(data.set ? (data.full ? "All of Files" : "Everything you can see") : "Pick a folder…", ""));
+    data.folders.forEach((f) => sel.append(new Option(f.replace(/\//g, " › ") + (data.admin && shared.includes(f) ? "  · shared" : ""), f)));
     sel.value = data.set ? data.folder : "";
-    $("paHint").textContent = pa.desktop
+    // Admins share one folder's programs with every account.
+    $("paShareRow").hidden = !data.admin || !data.set || !data.folder;
+    $("paShare").checked = shared.includes(data.folder);
+    $("paHint").textContent = !data.full
+      ? "Programs an admin shared with you, plus any Files folders you have. You can download them, nothing else in Files."
+      : pa.desktop
       ? "The programs (.exe, .msi, .AppImage) in a Files folder you pick. Open starts one on this computer."
       : "The programs (.exe, .msi, .AppImage) in a Files folder you pick, ready to download.";
     const ul = $("paList");
     ul.replaceChildren();
+    if (!data.folders.length && !data.full) {
+      ul.innerHTML = '<li class="pa-empty">No apps have been shared with you yet.</li>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
     if (!data.set) {
       ul.innerHTML = '<li class="pa-empty">Pick the Files folder where you keep your portable programs.</li>';
       return;
@@ -278,7 +294,7 @@
       }
       const dl = document.createElement("a");
       dl.className = "pa-btn";
-      dl.href = fileUrl(app.path);
+      dl.href = "/apps/file?path=" + encodeURIComponent(app.path);
       dl.setAttribute("download", "");
       dl.setAttribute("aria-label", "Download " + app.name);
       dl.title = "Download";
@@ -300,6 +316,10 @@
     }
   }
   $("paFolder").addEventListener("change", (event) => paLoad({ folder: event.target.value }));
+  $("paShare").addEventListener("change", (event) => {
+    const on = event.target.checked;
+    paLoad({ share: pa.folder, on }).then(() => window.xnToast && window.xnToast(on ? "Everyone can now see the apps in this folder." : "This folder is private again."));
+  });
   if (document.documentElement.classList.contains("xn-admin") || document.documentElement.classList.contains("xn-files") || /(?:^|;\s*)xn_role=/.test(document.cookie)) paLoad();
 })();
 </script>
