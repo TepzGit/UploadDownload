@@ -26,7 +26,8 @@ func desktopShortcut() {
 	if shell := os.Getenv("GEEK4U_SHELL"); shell != "" {
 		exe = shell
 	}
-	if err != nil || os.Getenv("APPDATA") == "" {
+	// Portable (Electron with Geek4u-data next to it): leave nothing on the PC.
+	if err != nil || os.Getenv("APPDATA") == "" || os.Getenv("GEEK4U_PORTABLE") == "1" {
 		return
 	}
 	done := filepath.Join(desktopDataDir, "shortcut.txt")

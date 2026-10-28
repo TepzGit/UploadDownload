@@ -153,13 +153,15 @@
   // Site look (Profile > Preferences): font, text size and the menu logo.
   // { font: "" | "jetbrains" | "inter" | "grotesk" | "system" | "serif" | "rounded", size: 80-130, logo: true }
   const LOOK_KEY = "xn_site_look";
-  const LOOK_FONTS = ["", "jetbrains", "inter", "grotesk", "system", "serif", "rounded"];
+  const LOOK_FONTS = ["", "jetbrains", "consolas", "courier", "inter", "grotesk", "system", "verdana", "trebuchet", "rounded", "comic", "serif", "garamond"];
+  const LOOK_AURAS = ["", "glow", "pulse", "rainbow", "fire"];
   const cleanLook = (raw) => {
-    const look = { font: "", size: 100, logo: true };
+    const look = { font: "", size: 100, logo: true, aura: "" };
     if (raw && LOOK_FONTS.includes(raw.font)) look.font = raw.font;
     const size = Number(raw && raw.size);
     if (size >= 80 && size <= 130) look.size = Math.round(size / 5) * 5;
     if (raw && raw.logo === false) look.logo = false;
+    if (raw && LOOK_AURAS.includes(raw.aura)) look.aura = raw.aura;
     return look;
   };
   let look = cleanLook(null);
@@ -218,6 +220,10 @@
   // Admin name colors: elements marked data-name-color get painted in it.
   function paintNames(root) {
     (root || document).querySelectorAll("[data-name-color]").forEach((el) => {
+      if (el.dataset.nameColor === "rainbow") {
+        el.classList.add("xn-named", "xn-rainbow");
+        return;
+      }
       const color = window.xnSiteColor.preview(el.dataset.nameColor);
       if (!color) return;
       el.style.color = color;
@@ -264,6 +270,56 @@
     if (s < 86400) return Math.floor(s / 3600) + " h ago";
     if (s < 86400 * 7) return Math.floor(s / 86400) + " d ago";
     return new Date(ms).toLocaleDateString();
+  }
+
+  // Chat: unread messages as a badge on the Chat link, and on phones a chat
+  // bubble next to the logo (the tab bar has no room for another tab).
+  function initChat(nav) {
+    if (!signedIn) return;
+    const onChat = /^\/Chat\b/.test(location.pathname);
+    const link = nav.querySelector('.xn-links a[href="/Chat"]');
+    const brand = nav.querySelector(".xn-brand");
+    let bubble = null;
+    if (brand && !onChat) {
+      bubble = document.createElement("a");
+      bubble.href = "/Chat";
+      bubble.className = "xn-chat-btn";
+      bubble.setAttribute("aria-label", "Chat");
+      bubble.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="xn-chat-count"></span>';
+      (nav.querySelector(".xn-mail") || brand).after(bubble);
+    }
+    let shown = 0;
+    function set(n) {
+      [link, bubble].forEach((el) => {
+        if (!el) return;
+        let badge = el.querySelector(".xn-chat-count");
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "xn-chat-count";
+          el.append(badge);
+        }
+        badge.textContent = n > 99 ? "99+" : n > 0 ? String(n) : "";
+        el.classList.toggle("has-unread", n > 0);
+        if (n > shown) {
+          el.classList.remove("is-pop");
+          void el.offsetWidth;
+          el.classList.add("is-pop");
+        }
+      });
+      if (bubble) bubble.setAttribute("aria-label", n ? "Chat, " + n + " unread" : "Chat");
+      shown = n;
+    }
+    if (onChat) return;
+    async function check() {
+      if (document.hidden) return;
+      try {
+        const res = await fetch("/chat/updates?count=1", { headers: { Accept: "application/json" } });
+        if (res.ok) set((await res.json()).unread || 0);
+      } catch (_) {}
+    }
+    check();
+    setInterval(check, 20000);
+    document.addEventListener("visibilitychange", check);
   }
 
   function initMail(nav) {
@@ -321,7 +377,9 @@
       const face = who.avatar
         ? '<img class="xn-inbox-face" src="' + esc(who.avatar) + '" alt="" loading="lazy">'
         : '<span class="xn-inbox-face" aria-hidden="true">' + esc(who.initial || (who.name || "?").charAt(0).toUpperCase()) + "</span>";
-      const name = who.color
+      const name = who.color === "rainbow"
+        ? '<b class="xn-named xn-rainbow">' + esc(who.name) + "</b>"
+        : who.color
         ? '<b class="xn-named" style="color:' + esc(window.xnSiteColor.preview(who.color)) + '">' + esc(who.name) + "</b>"
         : "<b>" + esc(who.name) + "</b>";
       const post = (n.postText || "").trim();
@@ -379,8 +437,10 @@
     };
     addLink("/Music", "Music", "/Forum");
     if (signedIn) addLink("/Notes", "Notes", "/journal");
+    if (signedIn) addLink("/Chat", "Chat", "/Forum");
     const links = nav.querySelectorAll(".xn-links a");
     initMail(nav);
+    initChat(nav);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
 
@@ -423,6 +483,7 @@
   const TABS = [
     { href: "/", label: "Graph", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
     { href: "/journal", label: "Journal", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
+    { href: "/Notes", label: "Notes", icon: '<path d="M6 2.5h8.6L19.5 7.4V19a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 19V5A2.5 2.5 0 0 1 6 2.5zm8 .9V7a1 1 0 0 0 1 1h3.6zM7.5 11.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 3.8a.9.9 0 0 0 0 1.8h5.5a.9.9 0 0 0 0-1.8z" fill-rule="evenodd"/>' },
     { href: "/Forum", label: "Forum", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
     { href: "/Music", label: "Music", icon: '<path d="M20 3.2v12.3a3.5 3.5 0 1 1-2-3.2V7.6l-8 2v8.9a3.5 3.5 0 1 1-2-3.2V6.4a1.5 1.5 0 0 1 1.1-1.5l9-2.3A1.5 1.5 0 0 1 20 3.2z"/>' },
     { href: "/Files/", label: "Files", files: true, icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
@@ -474,6 +535,7 @@
     const tabs = TABS.filter((tab) => !tab.files || canFiles);
     bar.classList.toggle("has-6", tabs.length > 5);
     bar.classList.toggle("has-7", tabs.length > 6);
+    bar.classList.toggle("has-8", tabs.length > 7);
     tabs.forEach((tab) => {
       const link = Array.from(links).find((a) => (a.getAttribute("href") || "") === tab.href);
       const a = document.createElement("a");

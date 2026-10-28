@@ -407,6 +407,9 @@
     .gp-fab:active{ transform:scale(.92); }
     .gp-fab svg{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:3; stroke-linecap:round; }
     html.gp-sheet .gp-fab{ opacity:0; pointer-events:none; }
+    /* The note/dose editor on phones: keep the + button out of its way. */
+    html.gp-phone body:has(.dose-edit) .gp-fab{ opacity:0; pointer-events:none; }
+    html.gp-phone .gp-doses .dose-edit{ border-left:5px solid var(--violet); }
 
     /* Graph view header */
     .gp-bar{ position:relative; z-index:2; padding:.35rem max(.5rem, env(safe-area-inset-right)) 0 max(.5rem, env(safe-area-inset-left)); }
@@ -433,12 +436,12 @@
     html.gp-phone .gp-doses > .flex:first-child{ display:none; }
     html.gp-phone .gp-doses #doses{ gap:.2rem; }
     html.gp-phone .gp-doses .dose-list-empty{ display:none; }
-    html.gp-phone .gp-doses .dose-card{ display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; grid-template-rows:auto auto; align-items:center; align-content:center; column-gap:.15rem; padding:.45rem 0 .45rem .9rem; background:none; border:0; border-left:5px solid; border-radius:3px 0 0 3px; }
+    html.gp-phone .gp-doses .dose-card:not(.dose-edit){ display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; grid-template-rows:auto auto; align-items:center; align-content:center; column-gap:.15rem; padding:.45rem 0 .45rem .9rem; background:none; border:0; border-left:5px solid; border-radius:3px 0 0 3px; }
     html.gp-phone .gp-doses .dose-card + .dose-card{ margin-top:.35rem; }
-    html.gp-phone .gp-doses .dose-card time{ grid-column:1; grid-row:1; align-self:end; color:var(--text) !important; font-size:12.5px; }
-    html.gp-phone .gp-doses .dose-card > div{ grid-column:1; grid-row:2; align-self:start; }
-    html.gp-phone .gp-doses .dose-card strong{ font-size:18px; font-weight:700; line-height:1.3; }
-    html.gp-phone .gp-doses .dose-card span{ font-size:14px; color:var(--text); }
+    html.gp-phone .gp-doses .dose-card:not(.dose-edit) time{ grid-column:1; grid-row:1; align-self:end; color:var(--text) !important; font-size:12.5px; }
+    html.gp-phone .gp-doses .dose-card:not(.dose-edit) > div{ grid-column:1; grid-row:2; align-self:start; }
+    html.gp-phone .gp-doses .dose-card:not(.dose-edit) strong{ font-size:18px; font-weight:700; line-height:1.3; }
+    html.gp-phone .gp-doses .dose-card:not(.dose-edit) span{ font-size:14px; color:var(--text); }
     html.gp-phone .gp-doses .dose-card .remove-dose{ grid-row:1 / span 2; }
     html.gp-phone .gp-doses .dose-edit{ border-left-width:5px; }
     html.gp-phone #trackerOpen{ order:2; margin-top:0; border:0; border-radius:14px; background:#151518; padding:.9rem 1rem; }

@@ -43,7 +43,7 @@
   <section class="xn-card pf-head">
     <div class="pf-banner">{{if .Banner}}<img src="{{.Banner}}" alt="">{{end}}</div>
     <div class="pf-head-row">
-      <div class="profile-avatar pf-avatar-static">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}<span class="pf-initial" aria-hidden="true">{{.Initial}}</span>{{end}}</div>
+      <div class="profile-avatar pf-avatar-static"{{if .Aura}} data-aura="{{.Aura}}"{{end}}{{if .AuraColor}} style="--aura: {{.AuraColor}}"{{end}}>{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}<span class="pf-initial" aria-hidden="true">{{.Initial}}</span>{{end}}</div>
       <div class="pf-who">
         <p class="xn-eyebrow">{{if .Admin}}Admin{{else}}Member{{end}}</p>
         <h1 class="xn-h1" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Name}}</h1>
@@ -52,9 +52,10 @@
           <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}}</small>
         </div>
         <p class="xn-sub">{{if eq .Posts 1}}1 post{{else}}{{.Posts}} posts{{end}} · {{len .Liked}} liked substances</p>
+        {{if .Bio}}<p class="pf-bio-text">{{.Bio}}</p>{{end}}
       </div>
       <div class="pf-actions">
-        {{if .IsSelf}}<a class="xn-btn xn-btn-primary" href="/Profile">Edit your profile</a>{{else}}<div class="pf-friend" id="friendButton" data-state="{{.Friend}}"></div>{{end}}
+        {{if .IsSelf}}<a class="xn-btn xn-btn-primary" href="/Profile">Edit your profile</a>{{else}}<div class="pf-friend" id="friendButton" data-state="{{.Friend}}"></div><a class="xn-btn" href="/Chat?to={{.Name}}">Message</a>{{end}}
         <a class="xn-btn" href="/Forum">Forum</a>
       </div>
     </div>

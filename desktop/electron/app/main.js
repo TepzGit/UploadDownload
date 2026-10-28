@@ -15,6 +15,57 @@ let siteURL = "";
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 Menu.setApplicationMenu(null);
 
+// Portable: everything (the window's logins and cache, the engine's database,
+// offline copy and updates) lives in Geek4u-data next to Geek4u.exe, so the
+// folder can be copied to a USB stick or another PC. Only when that folder
+// can't be written (for example under Program Files) the usual per-user
+// places are used instead.
+function portableDir() {
+  if (!app.isPackaged) return "";
+  const dir = path.join(path.dirname(process.execPath), "Geek4u-data");
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+    return dir;
+  } catch {
+    return "";
+  }
+}
+const DATA = portableDir();
+if (DATA) {
+  const old = app.getPath("userData");
+  const winDir = path.join(DATA, "electron");
+  bringOldData(old, winDir);
+  app.setPath("userData", winDir);
+  app.setPath("sessionData", winDir);
+  app.setPath("crashDumps", path.join(winDir, "Crashpad"));
+  app.setPath("logs", path.join(winDir, "logs"));
+}
+
+// First portable start on a PC that ran the old (installed) way: copy the
+// window's logins and the engine's data into Geek4u-data, so nothing is lost.
+// The old folders are left as they were.
+function bringOldData(oldWin, winDir) {
+  const skip = new Set(["Cache", "Code Cache", "GPUCache", "DawnCache", "DawnGraphiteCache", "DawnWebGPUCache", "GrShaderCache", "ShaderCache", "Crashpad", "logs", "SingletonLock", "SingletonCookie", "SingletonSocket", "lockfile"]);
+  const copy = (from, to, skipNames) => {
+    try {
+      if (!fs.existsSync(from) || fs.existsSync(to)) return;
+      fs.cpSync(from, to, { recursive: true, filter: (src) => !skipNames.has(path.basename(src)) });
+    } catch {}
+  };
+  copy(oldWin, winDir, skip);
+  // The engine's old place: %LOCALAPPDATA%\Geek4u on Windows, ~/.local/share/geek4u on Linux.
+  const local = process.platform === "win32" ? path.join(process.env.LOCALAPPDATA || path.join(app.getPath("home"), "AppData", "Local"), "Geek4u")
+    : process.platform === "darwin" ? path.join(app.getPath("home"), "Library", "Application Support", "Geek4u")
+    : path.join(process.env.XDG_DATA_HOME || path.join(app.getPath("home"), ".local", "share"), "geek4u");
+  if (fs.existsSync(path.join(DATA, "site-version.txt"))) return; // already has its own data
+  try {
+    if (!fs.existsSync(local)) return;
+    // The offline copy (mirror) can be gigabytes; it fills again by itself.
+    fs.cpSync(local, DATA, { recursive: true, force: false, filter: (src) => !["mirror", "window", "geek4u.log"].includes(path.basename(src)) || path.dirname(src) !== local });
+  } catch {}
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -31,20 +82,17 @@ function enginePath() {
   return app.isPackaged ? path.join(process.resourcesPath, "engine", name) : path.join(__dirname, "..", "engine", name);
 }
 
-// The same data folder the old app used: Geek4u-data next to the program
-// when it exists (portable), otherwise the engine's normal place.
 function dataArgs() {
-  const portable = path.join(path.dirname(process.execPath), "Geek4u-data");
-  return fs.existsSync(portable) ? ["--data", portable] : [];
+  return DATA ? ["--data", DATA] : [];
 }
 
 function startEngine() {
   return new Promise((resolve, reject) => {
     const args = ["--no-window", ...dataArgs(), ...process.argv.slice(app.isPackaged ? 1 : 2).filter((a) => a.startsWith("--") && a !== "--no-window")];
     // The engine writes its address to this file (and prints it too).
-    const addrFile = path.join(app.getPath("temp"), "geek4u-addr-" + process.pid + ".txt");
+    const addrFile = path.join(DATA || app.getPath("temp"), "geek4u-addr-" + process.pid + ".txt");
     try { fs.unlinkSync(addrFile); } catch {}
-    engine = spawn(enginePath(), args, { cwd: path.dirname(enginePath()), windowsHide: true, env: { ...process.env, GEEK4U_SHELL: process.execPath, GEEK4U_ADDR_FILE: addrFile } });
+    engine = spawn(enginePath(), args, { cwd: path.dirname(enginePath()), windowsHide: true, env: { ...process.env, GEEK4U_SHELL: process.execPath, GEEK4U_ADDR_FILE: addrFile, GEEK4U_PORTABLE: DATA ? "1" : "" } });
     let out = "";
     let done = false;
     const found = (url) => {

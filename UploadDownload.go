@@ -380,6 +380,7 @@ func main() {
 	http.HandleFunc("/profile/boxes", requireLogin(profileBoxes))
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
 	http.HandleFunc("/profile/appearance", requireLogin(profileAppearance))
+	http.HandleFunc("/profile/bio", requireLogin(profileBio))
 	http.HandleFunc("/profiles/", requireLogin(profileImage))
 	http.HandleFunc("/u/", requireLogin(publicProfile))
 	http.HandleFunc("/Forum", requireLogin(Forum))
@@ -496,7 +497,7 @@ func main() {
 	// createdAt and lastSeen (ms) feed the Admin page's account list.
 	// graphsMade and postsMade count every Graph session and Forum post ever made
 	// (for the geek rank), so deleting or the session limit doesn't lower it.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0"} {
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0", "bio TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
@@ -513,6 +514,7 @@ func main() {
 	registerNotes()
 	registerAppUpdates()
 	registerLinkDownloads()
+	registerChat()
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE profile_boxes ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -606,6 +608,7 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		Liked         []likedSubstance
 		RecentIntakes []dose
 		Totals        map[string]Totals
+		Bio           string
 	}{
 		Totals: make(map[string]Totals),
 	}
@@ -623,7 +626,7 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var avatar, banner, background, layout string
-	db.QueryRow("SELECT pathToProfilePic, pathToBanner, pathToBackground, profileLayout, siteColor, widgetClear, nameColor FROM users WHERE id = ?", userId).Scan(&avatar, &banner, &background, &layout, &d.SiteColor, &d.WidgetClear, &d.NameColor)
+	db.QueryRow("SELECT pathToProfilePic, pathToBanner, pathToBackground, profileLayout, siteColor, widgetClear, nameColor, bio FROM users WHERE id = ?", userId).Scan(&avatar, &banner, &background, &layout, &d.SiteColor, &d.WidgetClear, &d.NameColor, &d.Bio)
 	d.ClearAlpha = makeClearAlpha(d.WidgetClear)
 	d.IsAdmin = session.Authority == "admin"
 	d.Rank = rankOf(d.Username)
@@ -3506,6 +3509,47 @@ func profileBoxes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// profileBio saves the account's description (POST {bio}), shown under the
+// name on its Profile and public profile. Up to 500 characters.
+func profileBio(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		http.Error(w, "Sign in first.", http.StatusUnauthorized)
+		return
+	}
+	var in struct {
+		Bio string `json:"bio"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<14)).Decode(&in); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	bio := strings.Map(func(c rune) rune {
+		if c == '\n' {
+			return c
+		}
+		if unicode.IsControl(c) {
+			return -1
+		}
+		return c
+	}, strings.ReplaceAll(in.Bio, "\r\n", "\n"))
+	bio = strings.TrimSpace(regexp.MustCompile(`\n{3,}`).ReplaceAllString(bio, "\n\n"))
+	if utf8.RuneCountInString(bio) > 500 {
+		http.Error(w, "Keep it under 500 characters.", http.StatusBadRequest)
+		return
+	}
+	if _, err := db.Exec("UPDATE users SET bio = ? WHERE id = ?", bio, session.UserId); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save it.", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"bio": bio})
+}
+
 // publicProfile serves /u/<name>: what an account shows other members (its
 // pictures, boxes, liked substances and Forum posts). The dose calendar,
 // recent intake and totals stay on the owner's own Profile page.
@@ -3529,11 +3573,23 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		Posts      int
 		Friend     string
 		Liked      []likedSubstance
+		Aura       string
+		AuraColor  string
+		Bio        string
 	}{Name: name}
 
 	var id int
-	var avatar, banner, background, authority string
-	err := db.QueryRow("SELECT id, originalUsername, pathToProfilePic, pathToBanner, pathToBackground, widgetClear, authority FROM users WHERE username = ?", strings.ToLower(name)).Scan(&id, &d.Name, &avatar, &banner, &background, &d.Clear, &authority)
+	var avatar, banner, background, authority, look string
+	err := db.QueryRow("SELECT id, originalUsername, pathToProfilePic, pathToBanner, pathToBackground, widgetClear, authority, siteLook, siteColor, bio FROM users WHERE username = ?", strings.ToLower(name)).Scan(&id, &d.Name, &avatar, &banner, &background, &d.Clear, &authority, &look, &d.AuraColor, &d.Bio)
+	if look != "" {
+		var l siteLook
+		if json.Unmarshal([]byte(look), &l) == nil {
+			d.Aura = l.clean().Aura
+		}
+	}
+	if !regexp.MustCompile(`^#[0-9a-fA-F]{6}$`).MatchString(d.AuraColor) {
+		d.AuraColor = "" // the owner's site color, or the visitor's when unset
+	}
 	d.ClearAlpha = makeClearAlpha(d.Clear)
 	if err == nil {
 		d.Found = true
@@ -3877,7 +3933,7 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 		}
 		if in.SiteColor != nil {
 			color := strings.ToLower(strings.TrimSpace(*in.SiteColor))
-			if color != "" && !hexColor.MatchString(color) {
+			if color != "" && color != "rainbow" && !hexColor.MatchString(color) {
 				http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
 				return
 			}
@@ -3893,7 +3949,7 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Only admins can color their name.", http.StatusForbidden)
 				return
 			}
-			if color != "" && !hexColor.MatchString(color) {
+			if color != "" && color != "rainbow" && !hexColor.MatchString(color) {
 				http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
 				return
 			}
@@ -3985,13 +4041,19 @@ type siteLook struct {
 	Font string `json:"font"`
 	Size int    `json:"size"`
 	Logo bool   `json:"logo"`
+	Aura string `json:"aura"` // glow around the profile picture: "", glow, pulse, rainbow, fire
 }
 
-var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "inter": true, "grotesk": true, "system": true, "serif": true, "rounded": true}
+var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "consolas": true, "courier": true, "inter": true, "grotesk": true, "system": true, "verdana": true, "trebuchet": true, "rounded": true, "comic": true, "serif": true, "garamond": true}
 
 func (l siteLook) clean() siteLook {
 	if !siteLookFonts[l.Font] {
 		l.Font = ""
+	}
+	switch l.Aura {
+	case "", "glow", "pulse", "rainbow", "fire":
+	default:
+		l.Aura = ""
 	}
 	if l.Size < 80 || l.Size > 130 {
 		l.Size = 100
@@ -4767,7 +4829,7 @@ func loadNameColors() {
 	if rows, err := db.Query("SELECT originalUsername, nameColor FROM users WHERE authority = 'admin' AND nameColor != ''"); err == nil {
 		for rows.Next() {
 			var name, color string
-			if rows.Scan(&name, &color) == nil && hexColor.MatchString(color) {
+			if rows.Scan(&name, &color) == nil && (color == "rainbow" || hexColor.MatchString(color)) {
 				m[strings.ToLower(name)] = color
 			}
 		}
@@ -10959,4 +11021,611 @@ func serveFolderIcon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	http.ServeFile(w, r, filepath.Join(folderIconDir, name))
+}
+
+// ---- Chat: private messages and group chats (/Chat) ----
+//
+// Any two members can message each other; anyone can start a group with
+// people they pick. Pictures live in ChatFiles/<chat id>/ and are only served
+// to that chat's members. New messages reach open pages through a long poll
+// (/chat/updates waits until something changes for that account).
+
+const chatSchema = `
+CREATE TABLE IF NOT EXISTS chats (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	kind TEXT NOT NULL DEFAULT 'dm',
+	name TEXT NOT NULL DEFAULT '',
+	dm_key TEXT UNIQUE,
+	created_by INTEGER NOT NULL,
+	created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chat_members (
+	chat_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	last_read INTEGER NOT NULL DEFAULT 0,
+	joined_at INTEGER NOT NULL,
+	PRIMARY KEY(chat_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS chat_members_by_user ON chat_members(user_id);
+CREATE TABLE IF NOT EXISTS chat_messages (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	chat_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	body TEXT NOT NULL DEFAULT '',
+	image TEXT NOT NULL DEFAULT '',
+	reply_to INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL,
+	edited_at INTEGER NOT NULL DEFAULT 0,
+	deleted INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS chat_messages_by_chat ON chat_messages(chat_id, id);
+`
+
+const chatFilesDir = "ChatFiles"
+
+// chatHub wakes the long polls of the accounts a change concerns.
+var chatHub = struct {
+	sync.Mutex
+	version map[int]int64
+	waiters map[int][]chan struct{}
+	typing  map[int64]map[int]time.Time // chat -> user -> when they last typed
+}{version: map[int]int64{}, waiters: map[int][]chan struct{}{}, typing: map[int64]map[int]time.Time{}}
+
+func chatNotify(users ...int) {
+	chatHub.Lock()
+	defer chatHub.Unlock()
+	for _, u := range users {
+		chatHub.version[u]++
+		for _, c := range chatHub.waiters[u] {
+			close(c)
+		}
+		delete(chatHub.waiters, u)
+	}
+}
+
+func chatMemberIDs(chat int64) []int {
+	ids := []int{}
+	rows, err := db.Query("SELECT user_id FROM chat_members WHERE chat_id = ?", chat)
+	if err != nil {
+		return ids
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func chatIsMember(chat int64, user int) bool {
+	var one int
+	return db.QueryRow("SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?", chat, user).Scan(&one) == nil
+}
+
+type chatPerson struct {
+	postAuthor
+	ID int `json:"id"`
+}
+
+func chatPersonOf(id int) chatPerson {
+	var name, avatar, authority string
+	db.QueryRow("SELECT originalUsername, pathToProfilePic, authority FROM users WHERE id = ?", id).Scan(&name, &avatar, &authority)
+	if name == "" {
+		name = "Deleted account"
+	}
+	return chatPerson{person(name, avatar, authority), id}
+}
+
+type chatMessage struct {
+	ID      int64  `json:"id"`
+	Chat    int64  `json:"chat"`
+	User    int    `json:"user"`
+	Body    string `json:"body"`
+	Image   string `json:"image,omitempty"`
+	ReplyTo int64  `json:"replyTo,omitempty"`
+	At      int64  `json:"at"`
+	Edited  int64  `json:"edited,omitempty"`
+	Deleted bool   `json:"deleted,omitempty"`
+}
+
+func chatMessages(query string, args ...any) []chatMessage {
+	out := []chatMessage{}
+	rows, err := db.Query("SELECT id, chat_id, user_id, body, image, reply_to, created_at, edited_at, deleted FROM chat_messages "+query, args...)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var m chatMessage
+		var img string
+		var del int
+		if rows.Scan(&m.ID, &m.Chat, &m.User, &m.Body, &img, &m.ReplyTo, &m.At, &m.Edited, &del) != nil {
+			continue
+		}
+		m.Deleted = del != 0
+		if m.Deleted {
+			m.Body = ""
+		} else if img != "" {
+			m.Image = "/chat/file/" + strconv.FormatInt(m.Chat, 10) + "/" + img
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+type chatSummary struct {
+	ID       int64            `json:"id"`
+	Kind     string           `json:"kind"`
+	Name     string           `json:"name"`
+	Members  []chatPerson     `json:"members"`
+	Last     *chatMessage     `json:"last,omitempty"`
+	Unread   int              `json:"unread"`
+	Typing   []string         `json:"typing,omitempty"`
+	Reads    map[string]int64 `json:"reads"` // member id -> last message they read
+	Activity int64            `json:"activity"`
+}
+
+// chatList is every chat the account is in, newest activity first.
+func chatList(me int) []chatSummary {
+	out := []chatSummary{}
+	rows, err := db.Query(`SELECT c.id, c.kind, c.name, c.created_at, m.last_read FROM chats c JOIN chat_members m ON m.chat_id = c.id WHERE m.user_id = ?`, me)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	type row struct {
+		chatSummary
+		lastRead int64
+	}
+	list := []row{}
+	for rows.Next() {
+		var r row
+		if rows.Scan(&r.ID, &r.Kind, &r.Name, &r.Activity, &r.lastRead) == nil {
+			list = append(list, r)
+		}
+	}
+	rows.Close()
+	now := time.Now()
+	chatHub.Lock()
+	typing := map[int64][]int{}
+	for chat, who := range chatHub.typing {
+		for u, at := range who {
+			if u != me && now.Sub(at) < 6*time.Second {
+				typing[chat] = append(typing[chat], u)
+			}
+		}
+	}
+	chatHub.Unlock()
+	for _, r := range list {
+		s := r.chatSummary
+		s.Reads = map[string]int64{}
+		mrows, err := db.Query("SELECT user_id, last_read FROM chat_members WHERE chat_id = ? ORDER BY joined_at", s.ID)
+		if err == nil {
+			for mrows.Next() {
+				var id int
+				var read int64
+				if mrows.Scan(&id, &read) == nil {
+					s.Members = append(s.Members, chatPersonOf(id))
+					s.Reads[strconv.Itoa(id)] = read
+				}
+			}
+			mrows.Close()
+		}
+		if last := chatMessages("WHERE chat_id = ? ORDER BY id DESC LIMIT 1", s.ID); len(last) > 0 {
+			s.Last = &last[0]
+			s.Activity = last[0].At
+		}
+		db.QueryRow("SELECT COUNT(*) FROM chat_messages WHERE chat_id = ? AND id > ? AND user_id != ? AND deleted = 0", s.ID, r.lastRead, me).Scan(&s.Unread)
+		for _, u := range typing[s.ID] {
+			s.Typing = append(s.Typing, chatPersonOf(u).Name)
+		}
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Activity > out[j].Activity })
+	return out
+}
+
+func chatUnread(me int) int {
+	n := 0
+	db.QueryRow(`SELECT COUNT(*) FROM chat_messages x JOIN chat_members m ON m.chat_id = x.chat_id AND m.user_id = ? WHERE x.id > m.last_read AND x.user_id != ? AND x.deleted = 0`, me, me).Scan(&n)
+	return n
+}
+
+func chatUserByName(name string) (int, bool) {
+	var id int
+	err := db.QueryRow("SELECT id FROM users WHERE username = ?", strings.ToLower(strings.TrimSpace(name))).Scan(&id)
+	return id, err == nil
+}
+
+func cleanChatText(s string, max int) (string, bool) {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.Map(func(c rune) rune {
+		if c == '\n' || c == '\t' {
+			return c
+		}
+		if unicode.IsControl(c) {
+			return -1
+		}
+		return c
+	}, s)
+	s = strings.TrimSpace(s)
+	return s, utf8.RuneCountInString(s) <= max
+}
+
+func registerChat() {
+	if _, err := db.Exec(chatSchema); err != nil {
+		panic("cannot create the chat tables: " + err.Error())
+	}
+	http.HandleFunc("/Chat", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFile(w, r, "html/chat.html")
+	}))
+	http.HandleFunc("/chat/updates", requireLogin(chatUpdates))
+	http.HandleFunc("/chat/people", requireLogin(chatPeople))
+	http.HandleFunc("/chat/action", requireLogin(chatAction))
+	http.HandleFunc("/chat/send", requireLogin(chatSend))
+	http.HandleFunc("/chat/file/", requireLogin(chatFile))
+}
+
+// chatUpdates: GET ?chat=<open chat>&after=<last message id seen>&v=<version>.
+// With v it waits (up to 25 s) until something changes for this account.
+// Answers the chat list, new messages in the open chat and the unread total.
+func chatUpdates(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	q := r.URL.Query()
+	if v := q.Get("v"); v != "" {
+		have, _ := strconv.ParseInt(v, 10, 64)
+		chatHub.Lock()
+		cur := chatHub.version[me]
+		var wake chan struct{}
+		if cur == have {
+			wake = make(chan struct{})
+			chatHub.waiters[me] = append(chatHub.waiters[me], wake)
+		}
+		chatHub.Unlock()
+		if wake != nil {
+			select {
+			case <-wake:
+			case <-time.After(25 * time.Second):
+			case <-r.Context().Done():
+				return
+			}
+		}
+	}
+	chatHub.Lock()
+	version := chatHub.version[me]
+	chatHub.Unlock()
+	out := map[string]any{"v": version, "me": me, "unread": chatUnread(me)}
+	if q.Get("count") == "1" {
+		writeJSON(w, out)
+		return
+	}
+	out["chats"] = chatList(me)
+	if chat, _ := strconv.ParseInt(q.Get("chat"), 10, 64); chat > 0 && chatIsMember(chat, me) {
+		after, _ := strconv.ParseInt(q.Get("after"), 10, 64)
+		before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
+		var msgs []chatMessage
+		switch {
+		case before > 0:
+			msgs = chatMessages("WHERE chat_id = ? AND id < ? ORDER BY id DESC LIMIT 60", chat, before)
+		case after > 0:
+			msgs = chatMessages("WHERE chat_id = ? AND id > ? ORDER BY id DESC LIMIT 500", chat, after)
+		default:
+			msgs = chatMessages("WHERE chat_id = ? ORDER BY id DESC LIMIT 60", chat)
+		}
+		for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+			msgs[i], msgs[j] = msgs[j], msgs[i]
+		}
+		out["messages"] = msgs
+		// Edits and deletions of messages already on screen.
+		if since, _ := strconv.ParseInt(q.Get("changed"), 10, 64); since > 0 {
+			out["changed"] = chatMessages("WHERE chat_id = ? AND (edited_at > ? OR (deleted = 1 AND edited_at > ?)) ORDER BY id", chat, since, since)
+		}
+	}
+	out["now"] = time.Now().UnixMilli()
+	writeJSON(w, out)
+}
+
+// chatPeople: GET ?q= members to start a chat with (not yourself).
+func chatPeople(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	q := "%" + strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q"))) + "%"
+	rows, err := db.Query("SELECT id FROM users WHERE id != ? AND username LIKE ? ORDER BY lastSeen DESC LIMIT 30", session.UserId, q)
+	out := []chatPerson{}
+	if err == nil {
+		ids := []int{}
+		for rows.Next() {
+			var id int
+			if rows.Scan(&id) == nil {
+				ids = append(ids, id)
+			}
+		}
+		rows.Close()
+		for _, id := range ids {
+			out = append(out, chatPersonOf(id))
+		}
+	}
+	writeJSON(w, out)
+}
+
+// chatAction: POST JSON {action, ...}:
+//
+//	open {user}            start (or find) a private chat with a member by name
+//	group {name, members}  start a group chat
+//	rename {chat, name}    rename a group
+//	add {chat, members}    add people to a group
+//	leave {chat}           leave a group
+//	read {chat, upto}      mark messages as read
+//	typing {chat}          you are typing
+//	edit {id, body}        change your own message
+//	delete {id}            delete your own message
+func chatAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	var in struct {
+		Action  string   `json:"action"`
+		User    string   `json:"user"`
+		Name    string   `json:"name"`
+		Members []string `json:"members"`
+		Chat    int64    `json:"chat"`
+		Upto    int64    `json:"upto"`
+		ID      int64    `json:"id"`
+		Body    string   `json:"body"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&in); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	now := time.Now().UnixMilli()
+	needMember := func() bool {
+		if in.Chat <= 0 || !chatIsMember(in.Chat, me) {
+			http.Error(w, "That chat doesn't exist or you're not in it.", http.StatusNotFound)
+			return false
+		}
+		return true
+	}
+	addPeople := func(chat int64, names []string) []int {
+		added := []int{}
+		for _, n := range names {
+			id, ok := chatUserByName(n)
+			if !ok || id == me {
+				continue
+			}
+			if res, err := db.Exec("INSERT OR IGNORE INTO chat_members (chat_id, user_id, last_read, joined_at) VALUES (?, ?, 0, ?)", chat, id, now); err == nil {
+				if n, _ := res.RowsAffected(); n > 0 {
+					added = append(added, id)
+				}
+			}
+		}
+		return added
+	}
+	switch in.Action {
+	case "open":
+		other, ok := chatUserByName(in.User)
+		if !ok || other == me {
+			http.Error(w, "There's no member with that name.", http.StatusNotFound)
+			return
+		}
+		a, b := me, other
+		if a > b {
+			a, b = b, a
+		}
+		key := fmt.Sprintf("%d:%d", a, b)
+		var chat int64
+		if db.QueryRow("SELECT id FROM chats WHERE dm_key = ?", key).Scan(&chat) != nil {
+			res, err := db.Exec("INSERT INTO chats (kind, name, dm_key, created_by, created_at) VALUES ('dm', '', ?, ?, ?)", key, me, now)
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't start the chat.", http.StatusInternalServerError)
+				return
+			}
+			chat, _ = res.LastInsertId()
+		}
+		db.Exec("INSERT OR IGNORE INTO chat_members (chat_id, user_id, last_read, joined_at) VALUES (?, ?, 0, ?), (?, ?, 0, ?)", chat, me, now, chat, other, now)
+		chatNotify(me)
+		writeJSON(w, map[string]any{"chat": chat})
+		return
+	case "group":
+		name, ok := cleanChatText(in.Name, 60)
+		if !ok || name == "" {
+			http.Error(w, "Give the group a name (up to 60 characters).", http.StatusBadRequest)
+			return
+		}
+		if len(in.Members) == 0 || len(in.Members) > 100 {
+			http.Error(w, "Pick between 1 and 100 people.", http.StatusBadRequest)
+			return
+		}
+		res, err := db.Exec("INSERT INTO chats (kind, name, created_by, created_at) VALUES ('group', ?, ?, ?)", name, me, now)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't make the group.", http.StatusInternalServerError)
+			return
+		}
+		chat, _ := res.LastInsertId()
+		db.Exec("INSERT INTO chat_members (chat_id, user_id, last_read, joined_at) VALUES (?, ?, 0, ?)", chat, me, now)
+		added := addPeople(chat, in.Members)
+		chatNotify(append(added, me)...)
+		writeJSON(w, map[string]any{"chat": chat})
+		return
+	case "rename", "add", "leave":
+		if !needMember() {
+			return
+		}
+		var kind string
+		db.QueryRow("SELECT kind FROM chats WHERE id = ?", in.Chat).Scan(&kind)
+		if kind != "group" {
+			http.Error(w, "Only group chats can do that.", http.StatusBadRequest)
+			return
+		}
+		members := chatMemberIDs(in.Chat)
+		switch in.Action {
+		case "rename":
+			name, ok := cleanChatText(in.Name, 60)
+			if !ok || name == "" {
+				http.Error(w, "Give the group a name (up to 60 characters).", http.StatusBadRequest)
+				return
+			}
+			db.Exec("UPDATE chats SET name = ? WHERE id = ?", name, in.Chat)
+		case "add":
+			members = append(members, addPeople(in.Chat, in.Members)...)
+		case "leave":
+			db.Exec("DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?", in.Chat, me)
+		}
+		chatNotify(members...)
+	case "read":
+		if !needMember() {
+			return
+		}
+		db.Exec("UPDATE chat_members SET last_read = MAX(last_read, ?) WHERE chat_id = ? AND user_id = ?", in.Upto, in.Chat, me)
+		chatNotify(chatMemberIDs(in.Chat)...)
+	case "typing":
+		if !needMember() {
+			return
+		}
+		chatHub.Lock()
+		if chatHub.typing[in.Chat] == nil {
+			chatHub.typing[in.Chat] = map[int]time.Time{}
+		}
+		chatHub.typing[in.Chat][me] = time.Now()
+		chatHub.Unlock()
+		others := []int{}
+		for _, id := range chatMemberIDs(in.Chat) {
+			if id != me {
+				others = append(others, id)
+			}
+		}
+		chatNotify(others...)
+	case "edit", "delete":
+		var chat int64
+		var owner int
+		if db.QueryRow("SELECT chat_id, user_id FROM chat_messages WHERE id = ? AND deleted = 0", in.ID).Scan(&chat, &owner) != nil || owner != me {
+			http.Error(w, "You can only change your own messages.", http.StatusForbidden)
+			return
+		}
+		if in.Action == "edit" {
+			body, ok := cleanChatText(in.Body, 4000)
+			if !ok || body == "" {
+				http.Error(w, "A message can be up to 4000 characters.", http.StatusBadRequest)
+				return
+			}
+			db.Exec("UPDATE chat_messages SET body = ?, edited_at = ? WHERE id = ?", body, now, in.ID)
+		} else {
+			var img string
+			db.QueryRow("SELECT image FROM chat_messages WHERE id = ?", in.ID).Scan(&img)
+			if img != "" {
+				os.Remove(filepath.Join(chatFilesDir, strconv.FormatInt(chat, 10), filepath.Base(img)))
+			}
+			db.Exec("UPDATE chat_messages SET deleted = 1, body = '', image = '', edited_at = ? WHERE id = ?", now, in.ID)
+		}
+		chatNotify(chatMemberIDs(chat)...)
+	default:
+		http.Error(w, "Unknown action.", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+// chatSend: POST multipart (chat, body, replyTo, picture) or JSON {chat, body, replyTo}.
+func chatSend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	var chat, replyTo int64
+	var body, image string
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
+		r.Body = http.MaxBytesReader(w, r.Body, maxPictureBytes+(1<<20))
+		if err := r.ParseMultipartForm(8 << 20); err != nil {
+			http.Error(w, fmt.Sprintf("Pictures have to be under %d MB.", maxPictureMB), http.StatusRequestEntityTooLarge)
+			return
+		}
+		chat, _ = strconv.ParseInt(r.FormValue("chat"), 10, 64)
+		replyTo, _ = strconv.ParseInt(r.FormValue("replyTo"), 10, 64)
+		body = r.FormValue("body")
+		if !chatIsMember(chat, me) {
+			http.Error(w, "That chat doesn't exist or you're not in it.", http.StatusNotFound)
+			return
+		}
+		if file, _, err := r.FormFile("picture"); err == nil {
+			name, status, msg := saveImageIn(file, filepath.Join(chatFilesDir, strconv.FormatInt(chat, 10)), "img")
+			file.Close()
+			if status != 0 {
+				http.Error(w, msg, status)
+				return
+			}
+			image = name
+		}
+	} else {
+		var in struct {
+			Chat    int64  `json:"chat"`
+			Body    string `json:"body"`
+			ReplyTo int64  `json:"replyTo"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&in); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		chat, body, replyTo = in.Chat, in.Body, in.ReplyTo
+		if !chatIsMember(chat, me) {
+			http.Error(w, "That chat doesn't exist or you're not in it.", http.StatusNotFound)
+			return
+		}
+	}
+	body, ok := cleanChatText(body, 4000)
+	if !ok {
+		http.Error(w, "A message can be up to 4000 characters.", http.StatusBadRequest)
+		return
+	}
+	if body == "" && image == "" {
+		http.Error(w, "Write something first.", http.StatusBadRequest)
+		return
+	}
+	now := time.Now().UnixMilli()
+	res, err := db.Exec("INSERT INTO chat_messages (chat_id, user_id, body, image, reply_to, created_at) VALUES (?, ?, ?, ?, ?, ?)", chat, me, body, image, replyTo, now)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't send it.", http.StatusInternalServerError)
+		return
+	}
+	id, _ := res.LastInsertId()
+	db.Exec("UPDATE chat_members SET last_read = ? WHERE chat_id = ? AND user_id = ?", id, chat, me)
+	chatHub.Lock()
+	delete(chatHub.typing[chat], me)
+	chatHub.Unlock()
+	chatNotify(chatMemberIDs(chat)...)
+	msgs := chatMessages("WHERE id = ?", id)
+	if len(msgs) == 0 {
+		http.Error(w, "Couldn't send it.", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, msgs[0])
+}
+
+// chatFile serves /chat/file/<chat>/<name> to that chat's members only.
+func chatFile(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/chat/file/"), "/")
+	if len(parts) != 2 {
+		http.NotFound(w, r)
+		return
+	}
+	chat, err := strconv.ParseInt(parts[0], 10, 64)
+	name := filepath.Base(parts[1])
+	if err != nil || name != parts[1] || strings.HasPrefix(name, ".") || !chatIsMember(chat, session.UserId) {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeFile(w, r, filepath.Join(chatFilesDir, parts[0], name))
 }
