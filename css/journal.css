@@ -14,6 +14,7 @@ body {
   padding: 15px;
   height: 100%;
   min-height: 10rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px)));
   background-color: rgba(10, 10, 10, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -112,18 +113,20 @@ body {
 }
 
 .Drug {
-    display: flex;
-    justify-content: space-between;
-	color: white;
-	background-color: rgba(10, 10, 10, 0.98);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-	height: 3rem;
-	border-radius: 5px;
-	width: 100%;
-  min-width: 100%;
-
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 14px;
+    min-height: 176px;
+    padding: 10px 10px 10px 10px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    background: var(--surface-2);
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color .15s ease, background-color .15s ease;
 }
+
 
 .Drug:hover {
   background: rgba(255, 255, 255, 0.15);
