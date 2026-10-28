@@ -175,31 +175,33 @@ body * {
   color: #ff8b8b;
 }
 
+/* The menu button (html.xn-menu, see "Menu button" below): four squares,
+   drawn with a mask so it looks right before nav.js runs. */
 .xn-toggle {
   display: none;
+  position: relative;
+  flex: none;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 5px;
-  width: 44px;
-  height: 44px;
-  margin-right: -8px;
+  width: 42px;
+  height: 42px;
+  margin: 0;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--oled-line);
   border-radius: 10px;
   background: transparent;
-  color: var(--oled-text);
+  color: var(--oled-muted);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-
-.xn-toggle span {
-  display: block;
-  font-size: 0;
+.xn-toggle > span:not(.xn-chat-count) { display: none; }
+.xn-toggle::before {
+  content: "";
   width: 20px;
-  height: 2px;
-  border-radius: 2px;
+  height: 20px;
   background: currentColor;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='3' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='3' width='7.5' height='7.5' rx='2'/%3E%3Crect x='3' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3Crect x='13.5' y='13.5' width='7.5' height='7.5' rx='2'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .xn-toggle:focus-visible {
@@ -208,62 +210,17 @@ body * {
 }
 
 @media (max-width: 767px) {
-  .xn-toggle {
-    display: inline-flex;
-  }
-
   /* Before nav.js runs, show the links as a scrollable row so they still work. */
   .xn-links {
     overflow-x: auto;
     scrollbar-width: none;
   }
 
-  .xn-js .xn-links {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
-    padding: 8px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
-    background: var(--oled-bg);
-    border-bottom: 1px solid var(--oled-line);
-    overflow: visible;
-    visibility: hidden;
-    opacity: 0;
-    transform: translateY(-6px);
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
-  }
-
-  .xn-js .xn.open .xn-links {
-    visibility: visible;
-    opacity: 1;
-    transform: none;
-    transition: opacity 0.15s ease, transform 0.15s ease;
-  }
-
-  .xn-js .xn-links a {
-    min-height: 48px;
-    padding: 0 14px;
-    font-size: 17px;
-  }
-
-  html:not(.xn-js) .xn-toggle {
-    display: none;
-  }
-
-  .xn.open .xn-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-  .xn.open .xn-toggle span:nth-child(2) { opacity: 0; }
-  .xn.open .xn-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  /* With nav.js, phones get the tab bar; the links stay hidden until it's built. */
+  html.xn-js:not(.xn-menu):not(.xn-has-tabs) .xn-links a { display: none; }
 }
 
-/* Wide screens: logo on the left, links in the middle, Log out on the right.
-   nav.js (fitNav) checks the room the bar really has (font, text size,
-   number of links) and steps down when they would touch:
-   .xn-flow      links between the logo and Log out instead of the exact middle
-   .xn-tight     links closer together, Log out as just its icon
-   .xn-collapse  links in the drop-down menu, like on phones */
+/* Log out button at the right end of the bar. */
 .xn-out { display: flex; flex: none; margin: 0; }
 .xn-out button {
   display: inline-flex;
@@ -285,44 +242,78 @@ body * {
 .xn-out button:hover,
 .xn-out button:focus-visible { color: #ff8b8b; border-color: rgba(255, 139, 139, 0.45); background: rgba(255, 139, 139, 0.08); outline: none; }
 .xn-out button:active { transform: scale(0.97); }
+/* Wide screens without nav.js: logo on the left, links in the middle, Log out on the right. */
 @media (min-width: 768px) {
   .xn-brand,
   .xn.has-mail .xn-brand,
   .xn.has-mail .xn-mail { margin-right: 0; }
   .xn-links { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + var(--oled-nav-h) / 2); transform: translate(-50%, -50%); white-space: nowrap; }
   .xn-out { display: flex; flex: none; margin-left: auto; }
-
-  .xn.xn-flow .xn-links { position: static; transform: none; margin: 0 auto; }
-  .xn.xn-flow .xn-out { margin-left: 0; }
-  .xn.xn-tight .xn-links a { padding: 0 9px; }
-  .xn.xn-tight .xn-out button { padding: 0 11px; }
-  .xn.xn-tight .xn-out span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-  .xn.xn-collapse .xn-toggle { display: inline-flex; margin: 0 0 0 auto; }
-  .xn.xn-collapse .xn-out { margin-left: 4px; }
-  .xn.xn-collapse .xn-links {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
-    margin: 0;
-    padding: 8px maxl(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
-    background: var(--oled-bg);
-    border-bottom: 1px solid var(--oled-line);
-    transform: translateY(-6px);
-    visibility: hidden;
-    opacity: 0;
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
-  }
-  .xn.xn-collapse.open .xn-links { visibility: visible; opacity: 1; transform: none; transition: opacity 0.15s ease, transform 0.15s ease; }
-  .xn.xn-collapse .xn-links a { min-height: 46px; padding: 0 14px; }
-  .xn.xn-collapse.open .xn-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-  .xn.xn-collapse.open .xn-toggle span:nth-child(2) { opacity: 0; }
-  .xn.xn-collapse.open .xn-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 }
+
+/* ------------------------------------------------------------
+   Menu button (mommy 2026-10-28: style D from the nav styles page, just
+   the icon). Wide screens and the desktop app (nav.js adds html.xn-menu)
+   keep every page behind one button beside the logo. It opens the pages
+   as tiles with an icon, the name and a line on what the page is for
+   (nav.js addIcons), under the button (nav.js sets --xn-menu-x).
+   ------------------------------------------------------------ */
+html.xn-menu .xn-brand,
+html.xn-menu .xn.has-mail .xn-mail { margin-right: 0; }
+html.xn-menu .xn-out { margin-left: auto; }
+html.xn-menu .xn-toggle { display: inline-flex; }
+@media (hover: hover) { html.xn-menu .xn-toggle:hover { color: var(--oled-text); border-color: var(--oled-line-strong); background: var(--oled-surface-2); } }
+html.xn-menu .xn.open .xn-toggle { color: var(--oled-accent); border-color: rgba(var(--xn-accent-rgb), 0.45); background: var(--oled-accent-soft); }
+html.xn-menu .xn-toggle.has-unread { color: var(--oled-text); }
+html.xn-menu .xn-toggle .xn-chat-count { position: absolute; top: -7px; right: -7px; box-shadow: 0 0 0 2px var(--oled-bg); }
+
+html.xn-menu .xn .xn-links {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: var(--xn-menu-x, 12px);
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  align-items: stretch;
+  gap: 4px;
+  width: min(880px, calc(100% - var(--xn-menu-x, 12px) - 12px));
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--oled-line-strong);
+  border-radius: 14px;
+  background: var(--oled-surface);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(var(--xn-accent-rgb), 0.06);
+  white-space: normal;
+  overflow: visible;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  transform-origin: top left;
+  transition: opacity 0.18s ease, transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.25s;
+}
+html.xn-menu .xn.open .xn-links { visibility: visible; opacity: 1; transform: none; transition: opacity 0.18s ease, transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1); }
+html.xn-menu .xn .xn-links a {
+  gap: 12px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px 12px;
+  color: var(--oled-text);
+  font-size: 14px;
+  line-height: 1.25;
+}
+html.xn-menu .xn .xn-links a:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
+html.xn-menu .xn .xn-links a.xn-admin { color: #ff8b8b; }
+html.xn-menu .xn .xn-links .xn-chat-count { margin-left: auto; }
+.xn-link-ic { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border: 1px solid rgba(var(--xn-accent-rgb), 0.25); border-radius: 10px; background: var(--oled-accent-soft); color: var(--oled-accent); }
+.xn-links a.xn-admin .xn-link-ic { border-color: rgba(255, 139, 139, 0.3); background: rgba(255, 139, 139, 0.1); color: #ff8b8b; }
+.xn-link-text { display: grid; gap: 2px; min-width: 0; }
+.xn-link-desc { overflow: hidden; color: var(--oled-muted); font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.xn-link-desc:empty { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  html.xn-menu .xn .xn-links,
+  html.xn-menu .xn.open .xn-links { transition: none; }
+}
+
 /* The Chat link is in the bar here, so the phone chat bubble is not needed. */
 @media (min-width: 768px) { html .xn > .xn-chat-btn, html.xn-has-tabs .xn > .xn-chat-btn { display: none; } }
 }
@@ -534,10 +525,10 @@ html body.xn-bg { background: transparent !important; }
 @media (prefers-reduced-motion: reduce) { .xn-hatch { animation: none; } }
 
 .xn-page {
+  margin-left: 10rem;
+  margin-right: 10rem !important;
   box-sizing: border-box;
-  width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
+  width: 85%;
   padding: clamp(16px, 3vw, 32px) max(16px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   color: var(--oled-text);
 }
@@ -549,12 +540,7 @@ html body.xn-bg { background: transparent !important; }
   background: var(--oled-surface);
   border: 1px solid var(--oled-line);
   border-radius: 2px;
-  padding: 50px;
-  height: 110vh;
-  min-width: 850px;
-  align-self: flex-end;
-  margin-right: 4rem;
-  margin-left: 3rem;
+  padding: clamp(16px, 2.5vw, 24px);
 }
 
 .xn-eyebrow {
@@ -1254,12 +1240,16 @@ html.xn-nologo .gp-title .gp-logo { display: none !important; }
   .xn-page > :is(.xn-card, section):nth-child(4) { animation-delay: 170ms; }
   .xn-page > :is(.xn-card, section):nth-child(n+5) { animation-delay: 210ms; }
 
-  /* Menu links: a little bar slides in under the one you point at. */
-  .xn-links a { position: relative; }
-  .xn-links a::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 6px; height: 2px; border-radius: 2px; background: var(--oled-accent); transform: scaleX(0); transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1); }
-  @media (hover: hover) { .xn-links a:hover::after { transform: scaleX(1); } }
-  .xn-links a[aria-current="page"]::after { transform: scaleX(1); opacity: 0.8; }
-  html.xn-desk .xn-links a::after { display: none; }
+  /* Menu button: the squares turn a quarter as it opens, the tiles drop in
+     one after another and a tile's icon lifts when pointed at. */
+  .xn-toggle { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
+  .xn-toggle:active { transform: scale(0.94); }
+  .xn-toggle::before { transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  html.xn-menu .xn.open .xn-toggle::before { transform: rotate(90deg); }
+  @keyframes xn-tile-in { from { opacity: 0; transform: translateY(-6px); } }
+  html.xn-menu .xn.open .xn-links a { animation: xn-tile-in 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 30ms + 40ms); }
+  .xn-link-ic { transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s ease; }
+  @media (hover: hover) { html.xn-menu .xn .xn-links a:hover .xn-link-ic { transform: translateY(-1px) scale(1.06); box-shadow: 0 6px 16px -8px rgba(var(--xn-accent-rgb), 0.8); } }
 
   /* Phone tab bar: the current tab's icon hops once. */
   @keyframes xn-hop { 0% { transform: translateY(0); } 40% { transform: translateY(-4px) scale(1.08); } 100% { transform: none; } }
@@ -1307,3 +1297,14 @@ html.xn-has-tabs .xn-chat-btn { display: none; }
   width: 100%;
   justify-content: center;
 }
+
+/* Menu links: the phone tab's icon in front of each name (nav.js addIcons). */
+.xn-links .xn-ico { flex: none; width: 18px; height: 18px; fill: currentColor; opacity: 0.8; transition: opacity 0.15s ease, color 0.15s ease; }
+.xn-links .xn-link-ic .xn-ico { width: 20px; height: 20px; opacity: 1; }
+.xn-links a[aria-current="page"] .xn-ico { color: var(--oled-accent); opacity: 1; }
+@media (hover: hover) { .xn-links a:hover .xn-ico { opacity: 1; } }
+/* Phones (tab bar): the top bar only shows the Admin pill, as icon and name. */
+html:not(.xn-menu) .xn-links :is(.xn-link-ic, .xn-link-text) { display: contents; }
+html:not(.xn-menu) .xn-links .xn-link-desc { display: none; }
+html.xn-has-tabs:not(.xn-menu) .xn-links a.xn-admin { gap: 6px; }
+html.xn-has-tabs:not(.xn-menu) .xn-links a.xn-admin .xn-ico { width: 15px; height: 15px; }

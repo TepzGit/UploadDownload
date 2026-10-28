@@ -2451,8 +2451,13 @@ func likes(w http.ResponseWriter, r *http.Request) {
 
 // profileDoses answers GET ?month=2026-10&zone=Europe/Amsterdam (or &tz=<minutes, as JS
 // getTimezoneOffset gives it>) with that month's doses grouped by day in the visitor's time zone.
+// POST {delete: ids, name, amount, time} removes one of those doses (see deleteCalendarDose).
 func profileDoses(w http.ResponseWriter, r *http.Request) {
 	session, _ := sessionFromRequest(r)
+	if r.Method == http.MethodPost {
+		deleteCalendarDose(w, r, session.UserId)
+		return
+	}
 	q := r.URL.Query()
 
 	month, err := time.Parse("2006-01", q.Get("month"))
@@ -2465,11 +2470,12 @@ func profileDoses(w http.ResponseWriter, r *http.Request) {
 	end := start.AddDate(0, 1, 0)
 
 	type entry struct {
-		Name   string `json:"name"`
-		Amount string `json:"amount"`
-		Unit   string `json:"unit"`
-		Method string `json:"method"`
-		Time   string `json:"time"`
+		Name   string   `json:"name"`
+		Amount string   `json:"amount"`
+		Unit   string   `json:"unit"`
+		Method string   `json:"method"`
+		Time   string   `json:"time"`
+		IDs    []string `json:"ids"`
 	}
 	out := struct {
 		Month  string             `json:"month"`
@@ -2494,12 +2500,132 @@ func profileDoses(w http.ResponseWriter, r *http.Request) {
 			Unit:   displayUnit(d.Unit),
 			Method: d.Method,
 			Time:   d.At.Format("15:04"),
+			IDs:    d.Refs,
 		})
 	}
 	if len(all) > 0 {
 		out.Latest = all[len(all)-1].At.Format("2006-01-02")
 	}
 	writeJSON(w, out)
+}
+
+// deleteCalendarDose removes one dose of the Profile calendar from everywhere it was
+// logged. ids are the entry's refs from accountDoses: "j<doses row>" for the journal and
+// "g<graph session>:<index>" for a Graph session. A Graph dose only goes while it still has
+// that name, amount and clock time, and a session left without doses is deleted.
+func deleteCalendarDose(w http.ResponseWriter, r *http.Request, userID int) {
+	var in struct {
+		Delete []string `json:"delete"`
+		Name   string   `json:"name"`
+		Amount string   `json:"amount"`
+		Time   string   `json:"time"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil || len(in.Delete) == 0 || len(in.Delete) > 50 {
+		http.Error(w, "Couldn't tell which dose to delete.", http.StatusBadRequest)
+		return
+	}
+	deleted := 0
+	sessions := map[int64][]int{}
+	for _, ref := range in.Delete {
+		var id int64
+		var i int
+		if _, err := fmt.Sscanf(ref, "g%d:%d", &id, &i); err == nil {
+			sessions[id] = append(sessions[id], i)
+			continue
+		}
+		if _, err := fmt.Sscanf(ref, "j%d", &id); err != nil {
+			continue
+		}
+		res, err := db.Exec("DELETE FROM doses WHERE id = ? AND user_id = ?", id, userID)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't delete that dose.", http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		deleted += int(n)
+	}
+	for id, indexes := range sessions {
+		n, err := removeGraphDoses(userID, id, indexes, in.Name, in.Amount, in.Time)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't delete that dose.", http.StatusInternalServerError)
+			return
+		}
+		deleted += n
+	}
+	writeJSON(w, map[string]int{"deleted": deleted})
+}
+
+// removeGraphDoses takes the doses at indexes out of one of the account's Graph sessions.
+// If the session was edited since the calendar loaded, it looks for the dose by name,
+// amount and clock time instead. It reports how many doses went.
+func removeGraphDoses(userID int, id int64, indexes []int, name, amount, clock string) (int, error) {
+	matches := func(d experienceDose) bool {
+		var h, m int
+		if _, err := fmt.Sscanf(d.Time, "%d:%d", &h, &m); err != nil {
+			return false
+		}
+		return strings.EqualFold(d.Substance, name) && formatAmount(d.Amount) == amount && fmt.Sprintf("%02d:%02d", h, m) == clock
+	}
+	for try := 0; try < 3; try++ {
+		var raw string
+		err := db.QueryRow("SELECT doses FROM graph_experiences WHERE id = ? AND user_id = ?", id, userID).Scan(&raw)
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		var doses []experienceDose
+		if err := json.Unmarshal([]byte(raw), &doses); err != nil {
+			return 0, err
+		}
+		drop := map[int]bool{}
+		for _, i := range indexes {
+			if i < 0 || i >= len(doses) || drop[i] || !matches(doses[i]) {
+				i = -1
+				for j, d := range doses {
+					if !drop[j] && matches(d) {
+						i = j
+						break
+					}
+				}
+			}
+			if i >= 0 {
+				drop[i] = true
+			}
+		}
+		if len(drop) == 0 {
+			return 0, nil
+		}
+		keep := []experienceDose{}
+		for j, d := range doses {
+			if !drop[j] {
+				keep = append(keep, d)
+			}
+		}
+
+		// "AND doses = ?" so a save from the Graph page in between isn't overwritten; then read it again.
+		var res sql.Result
+		if len(keep) == 0 {
+			res, err = db.Exec("DELETE FROM graph_experiences WHERE id = ? AND user_id = ? AND doses = ?", id, userID, raw)
+		} else {
+			body, _ := json.Marshal(keep)
+			res, err = db.Exec("UPDATE graph_experiences SET doses = ?, updated_at = ? WHERE id = ? AND user_id = ? AND doses = ?",
+				string(body), time.Now().UnixMilli(), id, userID, raw)
+		}
+		if err != nil {
+			return 0, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			if len(keep) == 0 {
+				db.Exec("DELETE FROM experience_people WHERE experience_id = ?", id)
+			}
+			return len(drop), nil
+		}
+	}
+	return 0, nil
 }
 
 // visitorZone reads the browser's time zone from ?zone=<IANA name>&tz=<minutes,
@@ -2526,6 +2652,7 @@ type loggedDose struct {
 	Unit   string
 	Method string
 	At     time.Time
+	Refs   []string // where it is stored, for deleteCalendarDose
 }
 
 // accountDoses lists the account's doses taken in [from, to), oldest first; a
@@ -2534,20 +2661,22 @@ type loggedDose struct {
 // also saved to the journal (same substance, amount and minute) is listed once.
 func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedDose, error) {
 	out := []loggedDose{}
-	seen := map[string]bool{}
+	seen := map[string]int{} // key -> index in out
 	add := func(d loggedDose) {
 		if (!from.IsZero() && d.At.Before(from)) || (!to.IsZero() && !d.At.Before(to)) {
 			return
 		}
 		key := strings.ToLower(d.Name) + "|" + strconv.FormatFloat(d.Amount, 'f', -1, 64) + "|" + strconv.FormatInt(d.At.Unix()/60, 10)
-		if !seen[key] {
-			seen[key] = true
-			out = append(out, d)
+		if i, ok := seen[key]; ok {
+			out[i].Refs = append(out[i].Refs, d.Refs...)
+			return
 		}
+		seen[key] = len(out)
+		out = append(out, d)
 	}
 
 	// taken_at is text with its own UTC offset, so filter by date a day wider here and exactly in add.
-	query := `SELECT drug.name, dose.amount, dose.unit, dose.method_way, dose.taken_at
+	query := `SELECT dose.id, drug.name, dose.amount, dose.unit, dose.method_way, dose.taken_at
 		FROM doses dose JOIN drugs drug ON dose.drug_id = drug.id WHERE dose.user_id = ?`
 	args := []any{userID}
 	if !from.IsZero() {
@@ -2564,11 +2693,13 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 	}
 	for rows.Next() {
 		var d loggedDose
-		if err := rows.Scan(&d.Name, &d.Amount, &d.Unit, &d.Method, &d.At); err != nil {
+		var id int64
+		if err := rows.Scan(&id, &d.Name, &d.Amount, &d.Unit, &d.Method, &d.At); err != nil {
 			fmt.Println(err)
 			continue
 		}
 		d.At = d.At.In(loc)
+		d.Refs = []string{"j" + strconv.FormatInt(id, 10)}
 		add(d)
 	}
 	rows.Close()
@@ -2583,15 +2714,15 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 	if !to.IsZero() {
 		hi = to.AddDate(0, 0, 2).UnixMilli()
 	}
-	rows, err = db.Query("SELECT started_at, doses FROM graph_experiences WHERE user_id = ? AND started_at >= ? AND started_at < ?", userID, lo, hi)
+	rows, err = db.Query("SELECT id, started_at, doses FROM graph_experiences WHERE user_id = ? AND started_at >= ? AND started_at < ?", userID, lo, hi)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var started int64
+		var id, started int64
 		var raw string
-		if err := rows.Scan(&started, &raw); err != nil {
+		if err := rows.Scan(&id, &started, &raw); err != nil {
 			continue
 		}
 		var doses []experienceDose
@@ -2599,7 +2730,7 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 			continue
 		}
 		day := time.UnixMilli(started).In(loc)
-		for _, g := range doses {
+		for i, g := range doses {
 			var h, m int
 			if _, err := fmt.Sscanf(g.Time, "%d:%d", &h, &m); err != nil {
 				continue
@@ -2610,6 +2741,7 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 				Unit:   g.Unit,
 				Method: strings.Trim(strings.Join([]string{g.Route, g.Formulation}, ", "), ", "),
 				At:     time.Date(day.Year(), day.Month(), day.Day(), h, m, 0, 0, loc),
+				Refs:   []string{fmt.Sprintf("g%d:%d", id, i)},
 			})
 		}
 	}

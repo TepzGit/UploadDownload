@@ -1,7 +1,8 @@
 // ============================================================
 // nav.js
 // Shared nav bar: highlights the current page and drives the
-// phone menu (tap to open, tap outside / Esc / pick a link to close).
+// menu button (click to open the pages as tiles; click outside, Esc or
+// pick a page to close).
 // ============================================================
 
 (function () {
@@ -11,6 +12,13 @@
   // The app has the same top bar as the website, without the phone tab bar.
   const LOCAL_SERVER = /(?:^|;\s*)xn_local=1(?:;|$)/.test(document.cookie);
   if (LOCAL_SERVER) document.documentElement.classList.add("xn-desk");
+
+  // Wide screens and the desktop app keep every page behind the menu button
+  // next to the logo (html.xn-menu in oled.css). Phones use the tab bar.
+  const WIDE = window.matchMedia("(min-width: 768px)");
+  const syncMenu = () => document.documentElement.classList.toggle("xn-menu", LOCAL_SERVER || WIDE.matches);
+  syncMenu();
+  WIDE.addEventListener("change", syncMenu);
 
   // Inside the Music page's frame (js/musicshell.js) the song keeps playing in
   // the page around us, so the Music link just closes the frame.
@@ -278,6 +286,8 @@
     if (!signedIn) return;
     const onChat = /^\/Chat\b/.test(location.pathname);
     const link = nav.querySelector('.xn-links a[href="/Chat"]');
+    // The menu button shows the count too, as the Chat link is in its tiles.
+    const toggle = nav.querySelector(".xn-toggle");
     const brand = nav.querySelector(".xn-brand");
     let bubble = null;
     if (brand && !onChat) {
@@ -290,12 +300,13 @@
     }
     let shown = 0;
     function set(n) {
-      [link, bubble].forEach((el) => {
+      [link, bubble, toggle].forEach((el) => {
         if (!el) return;
         let badge = el.querySelector(".xn-chat-count");
         if (!badge) {
           badge = document.createElement("span");
           badge.className = "xn-chat-count";
+          if (el === toggle) badge.setAttribute("aria-hidden", "true");
           el.append(badge);
         }
         badge.textContent = n > 99 ? "99+" : n > 0 ? String(n) : "";
@@ -333,45 +344,6 @@
     nav.append(form);
   }
 
-  // Wide screens: the links sit in the middle of the bar. When they would run
-  // into the logo or Log out (big text size, wide font, many links), step
-  // down: links between the two, then closer together, then the menu button.
-  function fitNav(nav) {
-    const links = nav.querySelector(".xn-links");
-    if (!links) return;
-    const steps = ["xn-flow", "xn-tight", "xn-collapse"];
-    const wide = window.matchMedia("(min-width: 768px)");
-    const left = () => {
-      let right = 0;
-      nav.querySelectorAll(".xn-brand, .xn-mail, .xn-chat-btn").forEach((el) => {
-        if (el.offsetParent) right = Math.max(right, el.getBoundingClientRect().right);
-      });
-      return right;
-    };
-    const fits = () => {
-      const box = links.getBoundingClientRect();
-      const bar = nav.getBoundingClientRect();
-      const out = nav.querySelector(".xn-out");
-      const outBox = out && out.offsetParent ? out.getBoundingClientRect() : null;
-      const end = outBox ? outBox.left : bar.right;
-      return links.scrollWidth <= links.clientWidth + 1 && box.left >= left() + 8 && box.right <= end - 8 && (!outBox || outBox.right <= bar.right);
-    };
-    function fit() {
-      nav.classList.remove(...steps);
-      if (!wide.matches) return;
-      for (let i = 0; i < steps.length - 1 && !fits(); i++) nav.classList.add(steps[i]);
-      if (!fits()) nav.classList.add(steps[steps.length - 1]);
-      if (!nav.classList.contains("xn-collapse")) nav.classList.remove("open");
-    }
-    let frame = 0;
-    const later = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(fit); };
-    fit();
-    window.addEventListener("resize", later);
-    if (document.fonts) document.fonts.ready.then(later);
-    new MutationObserver(later).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-font", "class"] });
-    window.xnFitNav = later;
-  }
-
   function initMail(nav) {
     if (!signedIn) return;
     const brand = nav.querySelector(".xn-brand");
@@ -381,7 +353,8 @@
     button.className = "xn-mail";
     button.hidden = true;
     button.innerHTML = MAIL_ICON + '<span class="xn-mail-count"></span>';
-    brand.after(button);
+    // After the menu button, so the button stays right beside the logo.
+    (nav.querySelector(".xn-toggle") || brand).after(button);
     const count = button.querySelector(".xn-mail-count");
 
     let dialog = null;
@@ -390,7 +363,6 @@
       const wasHidden = button.hidden;
       button.hidden = n <= 0;
       nav.classList.toggle("has-mail", n > 0);
-      if (window.xnFitNav) window.xnFitNav();
       count.textContent = n > 9 ? "9+" : String(n);
       button.setAttribute("aria-label", n === 1 ? "1 new comment on your posts" : n + " new comments on your posts");
       if (n > 0 && (wasHidden || n > shown)) {
@@ -474,8 +446,9 @@
     const nav = document.querySelector(".xn");
     if (!nav) return;
     const toggle = nav.querySelector(".xn-toggle");
-    // Music sits after the Forum and Notes after the Journal on every page
-    // (added here, not in each page's HTML).
+    // Chat and Music sit after the Forum and Notes after the Journal on every
+    // page (added here, not in each page's HTML), in the same order on every
+    // page so the menu tiles keep their places.
     const linkBox = nav.querySelector(".xn-links");
     const addLink = (href, label, after) => {
       if (!linkBox || linkBox.querySelector(`a[href="${href}"]`)) return;
@@ -486,14 +459,14 @@
       if (prev) prev.after(a);
       else linkBox.append(a);
     };
-    addLink("/Music", "Music", "/Forum");
-    if (signedIn) addLink("/Notes", "Notes", "/journal");
     if (signedIn) addLink("/Chat", "Chat", "/Forum");
+    addLink("/Music", "Music", signedIn ? "/Chat" : "/Forum");
+    if (signedIn) addLink("/Notes", "Notes", "/journal");
+    addIcons(linkBox);
     const links = nav.querySelectorAll(".xn-links a");
     initMail(nav);
     initChat(nav);
     initLogout(nav);
-    fitNav(nav);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
 
@@ -508,42 +481,83 @@
     else initTabs(nav, links);
     if (!toggle) return;
 
+    // The tiles open under the menu button, each one dropping in after the
+    // one before (--i, counting only the links this account can see).
+    function place() {
+      nav.style.setProperty("--xn-menu-x", Math.max(0, toggle.offsetLeft - 8) + "px");
+    }
     function setOpen(open) {
+      if (open) {
+        place();
+        let i = 0;
+        links.forEach((link) => {
+          if (getComputedStyle(link).display !== "none") link.style.setProperty("--i", i++);
+        });
+      }
       nav.classList.toggle("open", open);
       toggle.setAttribute("aria-expanded", String(open));
       toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
     }
+    const isOpen = () => nav.classList.contains("open");
 
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
-      setOpen(!nav.classList.contains("open"));
+      setOpen(!isOpen());
     });
     links.forEach((link) => link.addEventListener("click", () => setOpen(false)));
-    document.addEventListener("click", (event) => {
+    // pointerdown, as iPads don't send clicks from plain parts of the page.
+    document.addEventListener("pointerdown", (event) => {
       if (!nav.contains(event.target)) setOpen(false);
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape" || !isOpen()) return;
+      setOpen(false);
+      toggle.focus();
     });
-    window.addEventListener("resize", () => {
-      if (window.innerWidth >= 768) setOpen(false);
+    // Focus moving on from the button and its tiles (Tab past the last
+    // tile) closes the menu.
+    nav.addEventListener("focusout", (event) => {
+      const to = event.relatedTarget;
+      if (isOpen() && to && to !== toggle && !(linkBox && linkBox.contains(to))) setOpen(false);
     });
+    window.addEventListener("resize", () => { if (isOpen()) place(); });
+    WIDE.addEventListener("change", () => setOpen(false));
   }
 
   // Phones: the main pages sit in a tab bar along the bottom of the screen,
   // like an iPhone app, and the top bar keeps only the logo (oled.css).
-  // Files is a tab only for accounts that can open it.
+  // Files is a tab only for accounts that can open it. desc is the line
+  // under the name on the menu button's tiles.
   const TABS = [
-    { href: "/", label: "Graph", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-    { href: "/journal", label: "Journal", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
-    { href: "/Notes", label: "Notes", icon: '<path d="M6 2.5h8.6L19.5 7.4V19a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 19V5A2.5 2.5 0 0 1 6 2.5zm8 .9V7a1 1 0 0 0 1 1h3.6zM7.5 11.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 3.8a.9.9 0 0 0 0 1.8h5.5a.9.9 0 0 0 0-1.8z" fill-rule="evenodd"/>' },
-    { href: "/Forum", label: "Forum", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
-    { href: "/Chat", label: "Chat", icon: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' },
-    { href: "/Music", label: "Music", icon: '<path d="M20 3.2v12.3a3.5 3.5 0 1 1-2-3.2V7.6l-8 2v8.9a3.5 3.5 0 1 1-2-3.2V6.4a1.5 1.5 0 0 1 1.1-1.5l9-2.3A1.5 1.5 0 0 1 20 3.2z"/>' },
-    { href: "/Files/", label: "Files", files: true, icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
-    { href: "/Utility", label: "Utility", icon: '<path d="M14.7 3.2a5.5 5.5 0 0 0-5.9 7.3L3.3 16a2.3 2.3 0 0 0 3.3 3.3l5.5-5.5a5.5 5.5 0 0 0 7.3-5.9l-3 3a1.6 1.6 0 0 1-2.3 0l-1.1-1.1a1.6 1.6 0 0 1 0-2.3z"/>' },
-    { href: "/Profile", label: "Profile", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
+    { href: "/", label: "Graph", desc: "Dose curves over time", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
+    { href: "/journal", label: "Journal", desc: "Substances and saved doses", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
+    { href: "/Notes", label: "Notes", desc: "Trip reports and notepad", icon: '<path d="M6 2.5h8.6L19.5 7.4V19a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 19V5A2.5 2.5 0 0 1 6 2.5zm8 .9V7a1 1 0 0 0 1 1h3.6zM7.5 11.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 3.8a.9.9 0 0 0 0 1.8h5.5a.9.9 0 0 0 0-1.8z" fill-rule="evenodd"/>' },
+    { href: "/Forum", label: "Forum", desc: "Posts and comments", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
+    { href: "/Chat", label: "Chat", desc: "Messages and groups", icon: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' },
+    { href: "/Music", label: "Music", desc: "Songs and playlists", icon: '<path d="M20 3.2v12.3a3.5 3.5 0 1 1-2-3.2V7.6l-8 2v8.9a3.5 3.5 0 1 1-2-3.2V6.4a1.5 1.5 0 0 1 1.1-1.5l9-2.3A1.5 1.5 0 0 1 20 3.2z"/>' },
+    { href: "/Files/", label: "Files", files: true, desc: "Uploads and folders", icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
+    { href: "/Utility", label: "Utility", desc: "Tools and portable apps", icon: '<path d="M14.7 3.2a5.5 5.5 0 0 0-5.9 7.3L3.3 16a2.3 2.3 0 0 0 3.3 3.3l5.5-5.5a5.5 5.5 0 0 0 7.3-5.9l-3 3a1.6 1.6 0 0 1-2.3 0l-1.1-1.1a1.6 1.6 0 0 1 0-2.3z"/>' },
+    { href: "/Profile", label: "Profile", desc: "Calendar, likes, settings", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
   ];
+
+  // Every menu link becomes a tile: its phone tab's icon in a small box, the
+  // name, and a line on what the page is for. Links that already hold a
+  // picture are left as they are.
+  const ADMIN = { icon: '<path d="M12 2.2 4.2 5.3v5.9c0 4.9 3.3 9.3 7.8 10.6 4.5-1.3 7.8-5.7 7.8-10.6V5.3z"/>', desc: "Accounts and site stats" };
+  const OTHER_ICON = '<circle cx="12" cy="12" r="5"/>';
+  function addIcons(box) {
+    if (!box) return;
+    const pages = { "/admin": ADMIN };
+    TABS.forEach((tab) => { pages[tab.href] = tab; });
+    box.querySelectorAll("a").forEach((a) => {
+      if (a.querySelector("svg")) return;
+      const page = pages[a.getAttribute("href")] || { icon: OTHER_ICON, desc: "" };
+      const name = a.textContent.trim();
+      a.innerHTML = '<span class="xn-link-ic"><svg class="xn-ico" viewBox="0 0 24 24" aria-hidden="true">' + page.icon + '</svg></span><span class="xn-link-text"><span class="xn-link-name"></span><span class="xn-link-desc"></span></span>';
+      a.querySelector(".xn-link-name").textContent = name;
+      a.querySelector(".xn-link-desc").textContent = page.desc;
+    });
+  }
 
   // Desktop app: pages load ahead of the click.
   function initPrerender() {
