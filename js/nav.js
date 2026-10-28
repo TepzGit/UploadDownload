@@ -8,7 +8,7 @@
   document.documentElement.classList.add("xn-js");
 
   // The desktop app's server runs on this computer (it sets this cookie).
-  // There the nav is a rail down the left side instead of a top bar.
+  // The app has the same top bar as the website, without the phone tab bar.
   const LOCAL_SERVER = /(?:^|;\s*)xn_local=1(?:;|$)/.test(document.cookie);
   if (LOCAL_SERVER) document.documentElement.classList.add("xn-desk");
 
@@ -322,6 +322,17 @@
     document.addEventListener("visibilitychange", check);
   }
 
+  // Log out button at the right end of the bar (phones use Profile > Sign out).
+  function initLogout(nav) {
+    if (!signedIn || nav.querySelector(".xn-out")) return;
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = "/logout";
+    form.className = "xn-out";
+    form.innerHTML = '<button type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></svg><span>Log out</span></button>';
+    nav.append(form);
+  }
+
   function initMail(nav) {
     if (!signedIn) return;
     const brand = nav.querySelector(".xn-brand");
@@ -441,6 +452,7 @@
     const links = nav.querySelectorAll(".xn-links a");
     initMail(nav);
     initChat(nav);
+    initLogout(nav);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
 
@@ -451,7 +463,7 @@
       if (match) link.setAttribute("aria-current", "page");
     });
 
-    if (LOCAL_SERVER) initRail(links);
+    if (LOCAL_SERVER) initPrerender();
     else initTabs(nav, links);
     if (!toggle) return;
 
@@ -491,25 +503,8 @@
     { href: "/Profile", label: "Profile", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
   ];
 
-  // Desktop app: every link in the rail gets the tab bar's icon.
-  const RAIL_ICONS = {
-    "/Notes": '<path d="M6 2.5h9.2L20 7.3V20a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 5 20V4a1.5 1.5 0 0 1 1-1.5z"/><path d="M15 2.6V7.5h5" fill="none" stroke="#000" stroke-width="1.2"/><path d="M8.5 12h7M8.5 15.5h7M8.5 19h4.5" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"/>',
-    "/admin": '<path d="M12 2.2 4 5.3v6.1c0 4.9 3.4 9.1 8 10.4 4.6-1.3 8-5.5 8-10.4V5.3z"/>',
-  };
-  function initRail(links) {
-    const icons = Object.fromEntries(TABS.map((tab) => [tab.href, tab.icon]));
-    Object.assign(icons, RAIL_ICONS);
-    links.forEach((link) => {
-      if (link.querySelector(".xn-rail-ico")) return;
-      const href = link.getAttribute("href") || "";
-      const icon = icons[href] || icons[href.replace(/\/+$/, "")] || '<circle cx="12" cy="12" r="4"/>';
-      const label = document.createElement("span");
-      label.className = "xn-rail-label";
-      label.append(...link.childNodes);
-      link.innerHTML = '<svg class="xn-rail-ico" viewBox="0 0 24 24" aria-hidden="true">' + icon + "</svg>";
-      link.append(label);
-      link.title = label.textContent.trim();
-    });
+  // Desktop app: pages load ahead of the click.
+  function initPrerender() {
     // Pages open at once: Chrome and Edge load a page while the pointer
     // rests on its link (speculation rules), so the click just shows it.
     if (HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules")) {

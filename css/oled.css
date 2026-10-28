@@ -258,6 +258,48 @@ body * {
   .xn.open .xn-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 }
 
+/* Wide screens: logo on the left, links in the middle, Log out on the right. */
+.xn-out { display: none; margin: 0; }
+@media (min-width: 768px) {
+  .xn-brand,
+  .xn.has-mail .xn-brand,
+  .xn.has-mail .xn-mail { margin-right: 0; }
+  .xn-links { margin: 0 auto; }
+  .xn-out { display: flex; flex: none; }
+  .xn-out button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--oled-line);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--oled-muted);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  }
+  .xn-out svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .xn-out button:hover,
+  .xn-out button:focus-visible { color: #ff8b8b; border-color: rgba(255, 139, 139, 0.45); background: rgba(255, 139, 139, 0.08); outline: none; }
+  .xn-out button:active { transform: scale(0.97); }
+}
+/* The Chat link is in the bar here, so the phone chat bubble is not needed. */
+@media (min-width: 768px) { html .xn > .xn-chat-btn, html.xn-has-tabs .xn > .xn-chat-btn { display: none; } }
+/* Narrower screens: Log out shrinks to its icon and the links pack closer. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .xn-links a { padding: 0 9px; }
+  .xn-out button { padding: 0 11px; }
+  .xn-out span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* With room to spare the links sit in the exact middle of the bar. */
+@media (min-width: 1280px) {
+  .xn-links { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + var(--oled-nav-h) / 2); transform: translate(-50%, -50%); margin: 0; }
+  .xn-out { margin-left: auto; }
+}
+
 /* ------------------------------------------------------------
    Motion: page-to-page transitions + entry animations.
    Everything here is skipped for "reduce motion" users.
@@ -1049,67 +1091,11 @@ html[data-scene] .crosshatch { display: none; }
 .xn-offline-card .xn-btn { width: 100%; }
 
 /* ------------------------------------------------------------
-   Desktop app (nav.js adds html.xn-desk): no top bar. The nav is a
-   slim rail down the left side with an icon over each name, and
-   pages skip the slow entrance animations.
+   Desktop app (nav.js adds html.xn-desk): the same top bar as the
+   website, no phone tab bar, and pages skip the slow entrance
+   animations.
    ------------------------------------------------------------ */
-html.xn-desk { --oled-nav-h: 0px; --xn-rail-w: 80px; scroll-padding-top: 12px; }
-html.xn-desk body { padding-left: var(--xn-rail-w); }
-html.xn-desk .xn {
-  position: fixed;
-  inset: 0 auto 0 0;
-  width: var(--xn-rail-w);
-  min-height: 0;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  padding: 12px 8px;
-  border-bottom: 0;
-  border-right: 1px solid var(--oled-line);
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-html.xn-desk .xn::-webkit-scrollbar { display: none; }
-html.xn-desk .xn-brand,
-html.xn-desk .xn.has-mail .xn-brand { margin: 0 auto 8px; padding: 4px 0; }
-html.xn-desk .xn-brand .xn-logo { height: 26px; }
-html.xn-desk .xn-mail,
-html.xn-desk .xn.has-mail .xn-mail { margin: 0 auto 4px; }
-html.xn-desk .xn-toggle { display: none; }
-html.xn-desk .xn-links,
-html.xn-desk.xn-js .xn-links {
-  position: static;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  overflow: visible;
-  visibility: visible;
-  opacity: 1;
-  transform: none;
-  transition: none;
-}
-html.xn-desk .xn-links a,
-html.xn-desk.xn-js .xn-links a {
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  min-height: 58px;
-  padding: 6px 2px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  text-align: center;
-}
-html.xn-desk .xn-links a.xn-admin { border: 0; height: auto; align-self: stretch; }
-html.xn-desk .xn-rail-ico { width: 24px; height: 24px; fill: currentColor; flex: none; transition: transform 0.12s ease; }
-html.xn-desk .xn-links a:active .xn-rail-ico { transform: scale(0.9); }
-html.xn-desk .xn-links a[aria-current="page"] .xn-rail-ico { color: var(--oled-accent); }
-html.xn-desk .xn-rail-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html.xn-desk .xn-tabs { display: none; }
-html.xn-desk .mu-player { left: var(--xn-rail-w); }
 
 /* Quicker page changes: no rising content, a short crossfade. */
 html.xn-desk .xn ~ main,
@@ -1161,7 +1147,8 @@ html[data-font="garamond"] { --oled-font: Garamond, "EB Garamond", "Cormorant Ga
 [data-font-sample="comic"], [data-font-sample="comic"] * { font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", "Comic Relief", cursive !important; }
 [data-font-sample="serif"], [data-font-sample="serif"] * { font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif !important; }
 [data-font-sample="garamond"], [data-font-sample="garamond"] * { font-family: Garamond, "EB Garamond", "Cormorant Garamond", "Palatino Linotype", Georgia, serif !important; }
-html.xn-nologo .xn > .xn-brand { display: none !important; }
+html.xn-nologo .xn > .xn-brand,
+html.xn-nologo .gp-title .gp-logo { display: none !important; }
 
 /* ------------------------------------------------------------
    Gentle motion everywhere (mommy 2026-10-28: "nothing too dramatic").
