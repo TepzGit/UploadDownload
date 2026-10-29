@@ -21,7 +21,7 @@
       --gp-line-hi: #3a3150;
       box-sizing: border-box;
       width: 100%;
-      max-width: 1120px;
+      max-width: 1480px;
       margin: 0 auto;
       padding: clamp(20px, 4vw, 40px) max(16px, env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
       color: var(--oled-text);
@@ -269,6 +269,176 @@
 
     .gp { position: relative; z-index: 1; }
 
+    /* ------------------------------------------------------------
+       Container layout (mommy 2026-10-29): a much bigger container, the
+       two team pictures small in the top left, Log in and Weather next
+       to them along the top.
+       ------------------------------------------------------------ */
+    .gp-panel { min-height: min(78vh, 860px); padding: clamp(14px, 2.4vw, 28px); isolation: isolate; }
+    .gp-panel > .gp-top { position: relative; z-index: 1; }
+    .gp-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: stretch; }
+    .gp-top .gp-team { grid-template-columns: repeat(2, 124px); justify-content: start; align-content: start; gap: 10px; }
+    .gp-top .gp-member { padding: 8px 8px 10px; border-radius: 12px; }
+    .gp-top .gp-photo { border-radius: 8px; }
+    .gp-top .gp-photo > span { font-size: 2.6rem; }
+    .gp-top .gp-member figcaption { margin-top: 8px; }
+    .gp-top .gp-name { font-size: 0.9rem; }
+    .gp-top .gp-role { margin-top: 5px; padding: 2px 8px; font-size: 0.68rem; }
+    .gp-top .gp-row { margin-top: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+    .gp-top .gp-pic-tools { right: 5px; bottom: 5px; gap: 4px; }
+    .gp-top .gp-pic-tools button { min-height: 28px; width: 28px; padding: 0; border-radius: 14px; }
+    .gp-top .gp-pic-tools button span { display: none; }
+    @media (hover: hover) {
+      .gp-top .gp-pic-tools { opacity: 0; transition: opacity 0.15s; }
+      .gp-top .gp-photo:hover .gp-pic-tools, .gp-top .gp-photo:focus-within .gp-pic-tools { opacity: 1; }
+    }
+    @media (max-width: 860px) {
+      .gp-top { grid-template-columns: minmax(0, 1fr); }
+      .gp-top .gp-team { grid-template-columns: repeat(2, 104px); }
+    }
+
+    /* Admins: Customize button and panel (walls, boxes, edges, fire). */
+    .gp-custom-btn {
+      position: absolute; right: 12px; bottom: 12px; z-index: 4;
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px;
+      border: 1px solid var(--gp-line-hi); border-radius: 18px; background: rgba(0, 0, 0, 0.6);
+      color: var(--oled-muted); font: inherit; font-size: 12px; cursor: pointer;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .gp-custom-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+    .gp-custom-btn[aria-expanded="true"], .gp-custom-btn:hover { color: var(--oled-text); border-color: var(--oled-accent); }
+    .gp-custom {
+      position: absolute; right: 12px; bottom: 58px; z-index: 5;
+      display: grid; gap: 12px; width: min(380px, calc(100% - 24px)); padding: 16px;
+      border: 1px solid var(--gp-line-hi); border-radius: 14px; background: rgba(8, 8, 10, 0.96);
+      box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.9); font-size: 13px;
+    }
+    .gp-custom[hidden] { display: none; }
+    .gp-custom-head { display: grid; gap: 2px; }
+    .gp-custom-note, .gp-custom-status { color: var(--oled-muted); font-size: 12px; }
+    .gp-c-row { display: grid; grid-template-columns: 56px auto minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
+    .gp-c-row > span { color: var(--oled-muted); }
+    .gp-c-row input[type="color"] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--gp-line); border-radius: 6px; background: none; cursor: pointer; }
+    .gp-c-row input[type="range"] { width: 100%; accent-color: var(--oled-accent); }
+    .gp-c-row output { font-variant-numeric: tabular-nums; color: var(--oled-muted); text-align: right; }
+    .gp-c-seg { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+    .gp-c-seg button { height: 30px; padding: 0 10px; border: 1px solid var(--gp-line); border-radius: 8px; background: #000; color: var(--oled-muted); font: inherit; font-size: 12px; cursor: pointer; }
+    .gp-c-seg button[aria-pressed="true"] { border-color: var(--oled-accent); color: var(--oled-text); background: var(--oled-accent-soft); }
+    .gp-c-seg .is-orange::before, .gp-c-seg .is-blue::before, .gp-c-seg .is-purple::before, .gp-c-seg .is-green::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #ff7a1a; }
+    .gp-c-seg .is-blue::before { background: #3ab4ff; }
+    .gp-c-seg .is-purple::before { background: #b06bff; }
+    .gp-c-seg .is-green::before { background: #4bff7a; }
+    .gp-custom-foot { display: flex; align-items: center; gap: 10px; }
+    .gp-custom-foot .gp-btn { min-width: 0; height: 36px; padding: 0 14px; }
+    .gp-custom-status { margin-right: auto; }
+
+    /* Fire (data-fire on the panel): flames lick up from the top edge and
+       the walls glow; Inferno burns all the way around with rising embers. */
+    .gp-fire { position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; display: none; }
+    .gp-panel[data-fire="flames"] .gp-fire, .gp-panel[data-fire="inferno"] .gp-fire { display: block; }
+    .gp-panel { --f1: #ffd24a; --f2: #ff7a1a; --f3: #e2260e; }
+    .gp-panel[data-fire-color="blue"] { --f1: #d6f3ff; --f2: #3ab4ff; --f3: #1048e0; }
+    .gp-panel[data-fire-color="purple"] { --f1: #f0d8ff; --f2: #b06bff; --f3: #5a14d8; }
+    .gp-panel[data-fire-color="green"] { --f1: #e4ffd0; --f2: #4bff7a; --f3: #0e9a3a; }
+    .gp-panel[data-fire="flames"], .gp-panel[data-fire="inferno"] {
+      border-color: color-mix(in srgb, var(--f2) 60%, transparent);
+      animation: gp-burn 2.6s ease-in-out infinite;
+    }
+    @keyframes gp-burn {
+      0%, 100% { box-shadow: 0 -10px 40px -6px color-mix(in srgb, var(--f2) 55%, transparent), inset 0 0 40px -10px color-mix(in srgb, var(--f3) 50%, transparent); }
+      35% { box-shadow: 0 -18px 60px -4px color-mix(in srgb, var(--f1) 45%, transparent), inset 0 0 60px -8px color-mix(in srgb, var(--f2) 45%, transparent); }
+      70% { box-shadow: 0 -8px 34px -8px color-mix(in srgb, var(--f3) 60%, transparent), inset 0 0 34px -12px color-mix(in srgb, var(--f3) 55%, transparent); }
+    }
+    .gp-fire i {
+      position: absolute; top: 0; left: calc(var(--x) * 1%); width: var(--w, 90px); height: var(--h, 110px);
+      margin-left: calc(var(--w, 90px) / -2);
+      mix-blend-mode: screen;
+      opacity: 0.9;
+      transform-origin: 50% 100%;
+      translate: 0 -70%;
+      scale: 1 1.45;
+      animation: gp-flame var(--d, 1.6s) ease-in-out infinite alternate;
+      animation-delay: var(--dl, 0s);
+    }
+    /* Each flame: a teardrop with the point up (a square with one sharp
+       corner, turned), hot in the middle, plus a brighter inner core. */
+    .gp-fire i::before, .gp-fire i::after {
+      content: ""; position: absolute; left: 50%; bottom: 0;
+      width: 70%; aspect-ratio: 1; margin-left: -35%;
+      border-radius: 50% 0 50% 50%;
+      transform: rotate(-45deg) scaleX(0.9);
+      transform-origin: 50% 50%;
+      background: radial-gradient(circle at 62% 38%, var(--f1) 0%, var(--f2) 38%, var(--f3) 70%, transparent 82%);
+      filter: blur(5px);
+    }
+    .gp-fire i::after { width: 36%; margin-left: -18%; bottom: 4%; background: radial-gradient(circle at 60% 40%, #fff 0%, var(--f1) 45%, transparent 75%); filter: blur(3px); opacity: 0.85; }
+    @keyframes gp-flame {
+      0% { transform: scale(0.85, 0.8) skewX(-4deg); opacity: 0.6; }
+      50% { transform: scale(1.05, 1.15) skewX(3deg); opacity: 0.95; }
+      100% { transform: scale(0.95, 1.35) skewX(-2deg); opacity: 0.7; }
+    }
+    .gp-fire i:nth-child(1) { --x: 4; --w: 116px; --d: 1.3s; }
+    .gp-fire i:nth-child(2) { --x: 13; --w: 159px; --h: 140px; --d: 1.7s; --dl: -0.4s; }
+    .gp-fire i:nth-child(3) { --x: 22; --w: 130px; --d: 1.5s; --dl: -0.9s; }
+    .gp-fire i:nth-child(4) { --x: 31; --w: 174px; --h: 150px; --d: 1.9s; --dl: -0.2s; }
+    .gp-fire i:nth-child(5) { --x: 40; --w: 123px; --d: 1.4s; --dl: -0.7s; }
+    .gp-fire i:nth-child(6) { --x: 49; --w: 188px; --h: 160px; --d: 2s; --dl: -1.1s; }
+    .gp-fire i:nth-child(7) { --x: 58; --w: 137px; --d: 1.6s; --dl: -0.3s; }
+    .gp-fire i:nth-child(8) { --x: 67; --w: 166px; --h: 145px; --d: 1.8s; --dl: -0.8s; }
+    .gp-fire i:nth-child(9) { --x: 76; --w: 127px; --d: 1.45s; --dl: -0.5s; }
+    .gp-fire i:nth-child(10) { --x: 85; --w: 174px; --h: 150px; --d: 1.75s; --dl: -1.2s; }
+    .gp-fire i:nth-child(11) { --x: 94; --w: 118px; --d: 1.35s; --dl: -0.6s; }
+    .gp-fire i:nth-child(12) { --x: 99; --w: 101px; --d: 1.5s; --dl: -0.1s; }
+    .gp-fire b { display: none; }
+    /* A band of fire along the top edge so the flames grow out of something. */
+    .gp-panel[data-fire="flames"] .gp-fire::before {
+      content: ""; position: absolute; left: 0; right: 0; top: -26px; height: 52px; pointer-events: none;
+      background: radial-gradient(50% 60% at 50% 70%, color-mix(in srgb, var(--f2) 80%, transparent), transparent 75%),
+        linear-gradient(transparent, color-mix(in srgb, var(--f3) 55%, transparent) 55%, transparent);
+      filter: blur(8px);
+      animation: gp-side 1.4s ease-in-out infinite alternate;
+    }
+    /* Inferno: taller flames, flames along the sides and bottom too, embers. */
+    .gp-panel[data-fire="inferno"] .gp-fire i { --h: 180px; }
+    .gp-panel[data-fire="inferno"] .gp-fire::before,
+    .gp-panel[data-fire="inferno"] .gp-fire::after {
+      content: ""; position: absolute; inset: -14px; border-radius: inherit; pointer-events: none;
+      background:
+        radial-gradient(60% 18% at 50% 100%, color-mix(in srgb, var(--f2) 70%, transparent), transparent 70%),
+        radial-gradient(14% 55% at 0% 50%, color-mix(in srgb, var(--f2) 60%, transparent), transparent 70%),
+        radial-gradient(14% 55% at 100% 50%, color-mix(in srgb, var(--f2) 60%, transparent), transparent 70%);
+      filter: blur(10px);
+      animation: gp-side 1.9s ease-in-out infinite alternate;
+    }
+    .gp-panel[data-fire="inferno"] .gp-fire::after { animation-duration: 1.3s; animation-delay: -0.6s; opacity: 0.7; }
+    @keyframes gp-side { from { opacity: 0.55; transform: scale(0.99); } to { opacity: 1; transform: scale(1.01); } }
+    .gp-panel[data-fire="inferno"] .gp-fire b {
+      display: block; position: absolute; bottom: 4%; left: calc(var(--x) * 1%);
+      width: 4px; height: 4px; border-radius: 50%; background: var(--f1);
+      box-shadow: 0 0 8px 2px var(--f2);
+      animation: gp-ember var(--d, 4s) linear infinite; animation-delay: var(--dl, 0s);
+    }
+    @keyframes gp-ember {
+      0% { transform: translate(0, 0); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translate(var(--dx, 20px), -110vh); opacity: 0; }
+    }
+    .gp-fire b:nth-child(13) { --x: 8; --d: 5s; --dx: 30px; }
+    .gp-fire b:nth-child(14) { --x: 20; --d: 4.2s; --dl: -1.5s; --dx: -20px; }
+    .gp-fire b:nth-child(15) { --x: 33; --d: 6s; --dl: -3s; --dx: 40px; }
+    .gp-fire b:nth-child(16) { --x: 47; --d: 4.6s; --dl: -0.8s; --dx: -35px; }
+    .gp-fire b:nth-child(17) { --x: 59; --d: 5.4s; --dl: -2.2s; --dx: 25px; }
+    .gp-fire b:nth-child(18) { --x: 71; --d: 4s; --dl: -3.4s; --dx: -15px; }
+    .gp-fire b:nth-child(19) { --x: 84; --d: 5.8s; --dl: -1.1s; --dx: 35px; }
+    .gp-fire b:nth-child(20) { --x: 93; --d: 4.4s; --dl: -2.7s; --dx: -30px; }
+    .gp-fire { overflow: visible; }
+    .gp-panel[data-fire="inferno"] .gp-fire { overflow: hidden; inset: -220px 0 0 0; border-radius: 20px; }
+    .gp-panel[data-fire="inferno"] .gp-fire i { top: 220px; }
+    @media (prefers-reduced-motion: reduce) {
+      .gp-panel[data-fire], .gp-fire i, .gp-fire b, .gp-fire::before, .gp-fire::after { animation: none !important; }
+      .gp-fire b { display: none !important; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .gp-member, .gp-member:hover { transition: none; transform: none; }
       .gp-hint { animation: none; }
@@ -305,8 +475,9 @@
       <svg class="gp-hint" id="gpHint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </section>
 
-    <section class="gp-panel" id="gpPanel">
-      
+    <section class="gp-panel" id="gpPanel" style="{{.LookStyle}}" data-fire="{{.Look.Fire}}" data-fire-color="{{.Look.FireColor}}">
+      <div class="gp-fire" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+      <div class="gp-top">
       <div class="gp-team">
         <figure class="gp-member">
           <div class="gp-photo" data-slot="member1"><img src="{{index .Pictures "member1"}}" alt="Hookey" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
@@ -364,11 +535,95 @@
           <div class="gp-wind" id="weatherWind">Wind: -- m/s</div>
         </div>
       </div>
+      </div>
+      {{if .IsAdmin}}
+      <button type="button" class="gp-custom-btn" id="gpCustomBtn" aria-expanded="false" aria-controls="gpCustom" title="Customize this container"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Customize</span></button>
+      <div class="gp-custom" id="gpCustom" role="dialog" aria-label="Customize the container" hidden>
+        <div class="gp-custom-head"><strong>Customize</strong><span class="gp-custom-note">Everyone sees this on the Main page.</span></div>
+        <label class="gp-c-row"><span>Walls</span><input type="color" data-k="panel"><input type="range" min="0" max="100" data-k="panelAlpha" aria-label="Walls opacity"><output data-o="panelAlpha"></output></label>
+        <label class="gp-c-row"><span>Boxes</span><input type="color" data-k="tile"><input type="range" min="0" max="100" data-k="tileAlpha" aria-label="Boxes opacity"><output data-o="tileAlpha"></output></label>
+        <label class="gp-c-row"><span>Edges</span><input type="color" data-k="border"></label>
+        <div class="gp-c-row"><span>Fire</span><div class="gp-c-seg" data-seg="fire"><button type="button" data-v="">Off</button><button type="button" data-v="flames">Burning</button><button type="button" data-v="inferno">Inferno</button></div></div>
+        <div class="gp-c-row"><span>Flame</span><div class="gp-c-seg" data-seg="fireColor"><button type="button" data-v="orange" class="is-orange">Orange</button><button type="button" data-v="blue" class="is-blue">Blue</button><button type="button" data-v="purple" class="is-purple">Purple</button><button type="button" data-v="green" class="is-green">Green</button></div></div>
+        <div class="gp-custom-foot"><button type="button" class="gp-btn" id="gpCustomReset">Reset</button><span class="gp-custom-status" id="gpCustomStatus" role="status"></span><button type="button" class="gp-btn gp-btn-primary" id="gpCustomDone">Done</button></div>
+      </div>
+      {{end}}
     </section>
   </main>
 
   {{if .IsAdmin}}
   <script>
+    // Admins: Customize the container (walls, boxes, edges, fire). Changes
+    // show at once and save by themselves for everyone (POST /site/main-look).
+    (function customize() {
+      const panel = document.getElementById("gpPanel");
+      const btn = document.getElementById("gpCustomBtn");
+      const box = document.getElementById("gpCustom");
+      const status = document.getElementById("gpCustomStatus");
+      if (!panel || !btn || !box) return;
+      let look = {{.LookJSON}};
+      let timer = 0;
+      const rgba = (hex, a) => {
+        const v = parseInt(hex.slice(1), 16);
+        return "rgba(" + (v >> 16 & 255) + ", " + (v >> 8 & 255) + ", " + (v & 255) + ", " + (a / 100).toFixed(2) + ")";
+      };
+      function apply() {
+        panel.style.setProperty("--gp-card", rgba(look.panel, look.panelAlpha));
+        panel.style.setProperty("--gp-tile", rgba(look.tile, look.tileAlpha));
+        panel.style.setProperty("--gp-line", look.border);
+        panel.dataset.fire = look.fire;
+        panel.dataset.fireColor = look.fireColor;
+      }
+      function show() {
+        box.querySelectorAll("[data-k]").forEach((input) => { input.value = look[input.dataset.k]; });
+        box.querySelectorAll("[data-o]").forEach((out) => { out.textContent = look[out.dataset.o] + "%"; });
+        box.querySelectorAll("[data-seg]").forEach((seg) => {
+          seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === look[seg.dataset.seg])));
+        });
+      }
+      function save(body) {
+        clearTimeout(timer);
+        status.textContent = "Saving…";
+        timer = setTimeout(async () => {
+          try {
+            const res = await fetch("/site/main-look", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || look) });
+            if (!res.ok) throw new Error();
+            look = await res.json();
+            apply();
+            show();
+            status.textContent = "Saved.";
+          } catch (_) {
+            status.textContent = "Couldn't save.";
+          }
+        }, body ? 0 : 350);
+      }
+      function change(part) {
+        Object.assign(look, part);
+        apply();
+        show();
+        save();
+      }
+      box.querySelectorAll("[data-k]").forEach((input) => {
+        input.addEventListener("input", () => change({ [input.dataset.k]: input.type === "range" ? Number(input.value) : input.value }));
+      });
+      box.querySelectorAll("[data-seg]").forEach((seg) => {
+        seg.addEventListener("click", (e) => {
+          const b = e.target.closest("button");
+          if (b) change({ [seg.dataset.seg]: b.dataset.v });
+        });
+      });
+      const open = (on) => {
+        box.hidden = !on;
+        btn.setAttribute("aria-expanded", String(on));
+        if (on) { show(); status.textContent = ""; }
+      };
+      btn.addEventListener("click", () => open(box.hidden));
+      document.getElementById("gpCustomDone").addEventListener("click", () => { open(false); btn.focus(); });
+      document.getElementById("gpCustomReset").addEventListener("click", () => save({ reset: true }));
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !box.hidden) { open(false); btn.focus(); } });
+      document.addEventListener("pointerdown", (e) => { if (!box.hidden && !box.contains(e.target) && !btn.contains(e.target)) open(false); });
+    })();
+
     // Admins: change or reset the team pictures on this page.
     (function () {
       const CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
@@ -379,7 +634,7 @@
         const tools = document.createElement("div");
         tools.className = "gp-pic-tools";
         tools.innerHTML = '<button type="button" data-change>' + CAMERA + '<span>Change</span></button>' +
-          '<button type="button" data-reset>Reset</button>' +
+          '<button type="button" data-reset><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg><span>Reset</span></button>' +
           '<input type="file" accept="image/*" hidden>';
         const input = tools.querySelector("input");
         tools.querySelector("[data-change]").setAttribute("aria-label", "Change " + who + "'s picture");

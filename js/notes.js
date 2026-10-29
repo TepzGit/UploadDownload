@@ -48,8 +48,30 @@ const ago = (t) => {
 const TABS = ["doses", "reports", "pad", "public"];
 const loaded = {};
 
+// The highlight behind the picked tab; it slides between tabs (css/notes.css).
+const seg = document.querySelector(".nt-seg");
+const glow = document.createElement("span");
+glow.className = "nt-seg-glow";
+glow.setAttribute("aria-hidden", "true");
+seg.prepend(glow);
+seg.classList.add("has-glow");
+function moveGlow(jump) {
+  const on = seg.querySelector('.nt-seg-btn[aria-selected="true"]');
+  if (!on) return;
+  if (jump) glow.style.transition = "none";
+  glow.style.width = on.offsetWidth + "px";
+  glow.style.transform = `translateX(${on.offsetLeft}px)`;
+  if (jump) { void glow.offsetWidth; glow.style.transition = ""; }
+}
+window.addEventListener("resize", () => moveGlow(true));
+document.fonts?.ready.then(() => moveGlow(true));
+let shownTab = "";
+
 function showTab(name, { push = true } = {}) {
   if (!TABS.includes(name)) name = "doses";
+  const from = TABS.indexOf(shownTab);
+  const first = !shownTab;
+  shownTab = name;
   document.querySelectorAll(".nt-seg-btn").forEach((b) => {
     const on = b.dataset.tab === name;
     b.setAttribute("aria-selected", String(on));
@@ -59,6 +81,16 @@ function showTab(name, { push = true } = {}) {
   $("paneReports").hidden = name !== "reports";
   $("panePad").hidden = name !== "pad";
   $("panePublic").hidden = name !== "public";
+  moveGlow(first);
+  // The new pane slides in from the side of the tab you moved to.
+  const pane = $({ doses: "paneDoses", reports: "paneReports", pad: "panePad", public: "panePublic" }[name]);
+  if (!first && from !== TABS.indexOf(name) && pane.animate) {
+    const dx = TABS.indexOf(name) > from ? 28 : -28;
+    pane.animate(
+      [{ opacity: 0, transform: `translateX(${dx}px)` }, { opacity: 1, transform: "none" }],
+      { duration: 320, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" }
+    );
+  }
   if (push) history.replaceState(null, "", name === "doses" ? location.pathname : "#" + name);
   if (!loaded[name]) {
     loaded[name] = true;

@@ -29,10 +29,7 @@ export function postTime(t) {
 /** Gives an admin's name the color they picked (lightened if too dark to read). */
 export function paintName(el, who) {
   if (!who || !who.color) return el;
-  if (who.color === "rainbow") {
-    el.classList.add("xn-named", "xn-rainbow");
-    return el;
-  }
+  if (window.xnNameFx && window.xnNameFx.is(who.color)) return window.xnNameFx.apply(el, who.color);
   el.style.color = (window.xnSiteColor && window.xnSiteColor.preview(who.color)) || who.color;
   el.classList.add("xn-named");
   return el;

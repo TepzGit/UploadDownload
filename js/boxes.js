@@ -246,7 +246,40 @@ export async function mountBoxes({ grid, user = "", editable = false }) {
     });
     card.append(area);
     card.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => pick(box)));
+    restIdle(card);
     return card;
+  }
+
+  // A Pictures box that hasn't been used for a while goes "idle" (mommy
+  // 2026-10-29): the pictures fill the whole box and the bar with the title
+  // and buttons only shows over them while the pointer is on the box (or a
+  // finger just touched it). Using the box starts the wait again.
+  const IDLE_MS = 5000;
+  function restIdle(card) {
+    if (!card.dataset.idleBound) {
+      card.dataset.idleBound = "1";
+      const poke = () => restIdle(card);
+      ["pointerdown", "keydown", "dragenter", "drop", "focusin"].forEach((type) => card.addEventListener(type, poke));
+      // Touch screens have no hover: a tap shows the bar for a moment.
+      card.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" || !card.classList.contains("is-idle")) return;
+        card.classList.add("is-peek");
+        clearTimeout(card._peek);
+        card._peek = setTimeout(() => card.classList.remove("is-peek"), 3500);
+      });
+    }
+    clearTimeout(card._idle);
+    const hasPictures = !!card.querySelector(".pf-pic");
+    if (!hasPictures) card.classList.remove("is-idle");
+    if (!hasPictures || card.classList.contains("is-idle")) return;
+    card._idle = setTimeout(() => {
+      // Not while uploading, arranging, or asking "Remove?".
+      if (card.classList.contains("is-busy") || grid.classList.contains("is-arranging") || card.querySelector(".is-confirm")) {
+        restIdle(card);
+        return;
+      }
+      card.classList.add("is-idle");
+    }, IDLE_MS);
   }
 
   function renderExperience(box) {

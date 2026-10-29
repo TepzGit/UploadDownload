@@ -1030,7 +1030,8 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 
 /* Geek rank under the name */
 .pf-rank { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
-.pf-rank .xn-rank { font-size: 12px; padding: 3px 10px 3px 8px; }
+.pf-rank .xn-rank { font-size: 14px; padding: 4px 12px 4px 8px; gap: 8px; }
+.pf-rank .xn-rank-pips i { width: 17px; height: 17px; }
 .pf-rank-meter { position: relative; width: 120px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--oled-surface-2); box-shadow: inset 0 0 0 1px var(--oled-line); }
 .pf-rank-meter i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--oled-accent); }
 @media (prefers-reduced-motion: no-preference) { .pf-rank-meter i { animation: pf-meter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.2s; transform-origin: left; } }
@@ -1165,3 +1166,44 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-bio-foot .pf-note { margin: 0 auto 0 0; }
 
 .pf-swatch-rainbow { background: conic-gradient(#ff5f6d, #ffb347, #ffe66d, #7cf29c, #4fd1ff, #7c8cff, #e36bff, #ff5f6d) !important; }
+.pf-swatch-fx { background: var(--fx-sw) !important; }
+
+/* Profile › Data › Import from PsychonautWiki Journal (journalimport.js) */
+.ji { display: grid; gap: 10px; width: 100%; padding-bottom: 14px; border-bottom: 1px solid var(--oled-line); }
+.ji .pf-note { margin: 0; }
+.ji-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ji-summary { margin: 0; color: var(--oled-text); font-size: 13px; }
+.ji-check { display: flex; align-items: center; gap: 8px; color: var(--oled-muted); font-size: 13px; cursor: pointer; }
+.ji-check input { width: 16px; height: 16px; accent-color: var(--oled-accent); }
+.ji-status { margin: 0; color: var(--oled-muted); font-size: 13px; line-height: 1.45; }
+.ji-status:empty { display: none; }
+.ji-status[data-kind="error"] { color: #ff8b8b; }
+.ji-status[data-kind="done"] { color: var(--oled-text); }
+
+/* Preferences > Drug icons: sample row for the OG colors switch. */
+.pr-og-sample { display: flex; flex-wrap: wrap; gap: 10px; margin: 2px 0 6px; }
+.pr-og-sample .sc-icon { width: 22px; height: 22px; margin: 0; }
+
+/* Idle Pictures box (boxes.js restIdle): the pictures fill the box and the
+   title bar only shows over them on hover, focus or a tap. */
+.pf-pics { position: relative; transition: padding 0.35s ease; }
+.pf-pics.is-idle { padding: 0; }
+.pf-pics.is-idle .pf-pics-grid { gap: 2px; }
+.pf-pics.is-idle .pf-pic { border: 0; border-radius: 0; }
+.pf-pics.is-idle .pf-box-head {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  padding: 12px 14px 22px;
+  background: linear-gradient(rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.45) 65%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.pf-pics.is-idle:has(:focus-visible) .pf-box-head,
+.pf-pics.is-idle.is-peek .pf-box-head { opacity: 1; pointer-events: auto; transform: none; }
+@media (hover: hover) { .pf-pics.is-idle:hover .pf-box-head { opacity: 1; pointer-events: auto; transform: none; } }
+.pf-pics.is-idle .pf-pic-x { top: auto; bottom: 6px; }
+.pf-data.is-arranging > .pf-pics.is-idle { padding: 20px; }
+@media (prefers-reduced-motion: reduce) { .pf-pics, .pf-pics.is-idle .pf-box-head { transition: none; } }

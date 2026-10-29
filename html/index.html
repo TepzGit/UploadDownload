@@ -250,6 +250,32 @@
   .exp-shared-title{ margin:.5rem 0 0; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
   .exp-item.is-shared .exp-open{ padding-right:.75rem; border-style:dashed; border-left-style:solid; }
   .exp-from{ font-size:11px; color:var(--violet); }
+  /* Bottom bar: totals for the past 7 and 30 days (mommy 2026-10-29). */
+  .gp-totals{ position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; align-items:center; gap:1.25rem; height:var(--gp-totals-h); padding:0 max(1rem, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(1rem, env(safe-area-inset-left)); border-top:1px solid var(--line); background:rgba(5,5,8,.88); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  .gp-totals[hidden]{ display:none; }
+  html:has(.gp-totals:not([hidden])){ --gp-totals-h:52px; }
+  body:has(.gp-totals:not([hidden])) .tl-wrap{ padding-bottom:calc(var(--gp-totals-h) + 1.5rem); }
+  .gp-tot-group{ display:flex; align-items:center; gap:.7rem; flex:1 1 0; min-width:0; }
+  .gp-tot-group + .gp-tot-group{ padding-left:1.25rem; border-left:1px solid var(--line); }
+  .gp-tot-label{ flex:none; font:400 10px 'JetBrains Mono',monospace; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+  .gp-tot-list{ display:flex; align-items:center; gap:.4rem; min-width:0; overflow-x:auto; scrollbar-width:none; -webkit-mask-image:linear-gradient(90deg, #000 calc(100% - 24px), transparent); mask-image:linear-gradient(90deg, #000 calc(100% - 24px), transparent); padding-right:24px; }
+  .gp-tot-list::-webkit-scrollbar{ display:none; }
+  .gp-tot{ display:inline-flex; align-items:center; gap:.4rem; flex:none; height:30px; padding:0 .65rem; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); font-size:12px; white-space:nowrap; }
+  .gp-tot i{ width:7px; height:7px; border-radius:50%; background:var(--c, var(--violet)); flex:none; }
+  .gp-tot b{ font-weight:600; }
+  .gp-tot small{ font:10.5px 'JetBrains Mono',monospace; color:var(--muted); }
+  .gp-tot-none{ font-size:12px; color:var(--muted); white-space:nowrap; }
+  @media (max-width:767.98px){
+    html:has(.gp-totals:not([hidden])){ --gp-totals-h:84px; }
+    .gp-totals{ bottom:var(--xn-tabs-h, 0px); flex-direction:column; align-items:stretch; justify-content:center; gap:.35rem; padding-bottom:0; }
+    .gp-tot-group + .gp-tot-group{ padding-left:0; border-left:0; }
+    .gp-tot-label{ width:6.6rem; letter-spacing:.12em; }
+    .gp-tot{ height:28px; }
+    /* Only on the phone list, not over the graph or the add-dose sheet. */
+    html.gp-phone.gp-graph .gp-totals, html.gp-phone.gp-sheet .gp-totals{ display:none; }
+    html.gp-phone:not(.gp-graph) .gp-fab{ bottom:calc(var(--xn-tabs-h, 0px) + var(--gp-totals-h, 0px) + 14px + env(safe-area-inset-bottom)); }
+    html.gp-phone:not(.gp-graph) #gpList{ padding-bottom:calc(var(--gp-totals-h, 0px) + 90px); }
+  }
   /* The expand button in the Experiences box head, and the big view it opens. */
   .exp-expand{ display:inline-grid; place-items:center; width:30px; height:30px; margin:-6px -6px -6px -.25rem; color:var(--muted); border-radius:.125rem; }
   .exp-expand svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
@@ -600,6 +626,11 @@
 </header>
 <button id="gpFab" type="button" class="gp-fab" aria-label="New experience"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 <div id="gpScrim" class="gp-scrim" aria-hidden="true"></div>
+<!-- Totals for the past 7 and 30 days along the bottom (ui.js renderTotalsBar), signed in only. -->
+<footer id="gpTotals" class="gp-totals" aria-label="What you took lately" hidden>
+  <div class="gp-tot-group"><span class="gp-tot-label">Past 7 days</span><div class="gp-tot-list" data-tot="week"></div></div>
+  <div class="gp-tot-group"><span class="gp-tot-label">Past 30 days</span><div class="gp-tot-list" data-tot="month"></div></div>
+</footer>
 <dialog id="expBig" class="exp-big" aria-labelledby="expBigTitle">
   <div class="exp-big-head">
     <h2 id="expBigTitle">Experiences</h2>

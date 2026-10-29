@@ -319,6 +319,10 @@ html.xn-menu .xn-brand,
 html.xn-menu .xn.has-mail .xn-mail { margin-right: 0; }
 html.xn-menu .xn-out { margin-left: auto; }
 html.xn-menu .xn-toggle { display: inline-flex; }
+/* Menu button in the left corner, the logo at the far right (mommy 2026-10-29). */
+html.xn-menu .xn { padding-left: max(8px, env(safe-area-inset-left)); }
+html.xn-menu .xn-toggle { order: -1; }
+html.xn-menu .xn .xn-brand { order: 10; margin-left: auto; }
 @media (hover: hover) { html.xn-menu .xn-toggle:hover { color: var(--oled-text); border-color: var(--oled-line-strong); background: var(--oled-surface-2); } }
 html.xn-menu .xn.open .xn-toggle { color: var(--oled-accent); border-color: rgba(var(--xn-accent-rgb), 0.45); background: var(--oled-accent-soft); }
 html.xn-menu .xn-toggle.has-unread { color: var(--oled-text); }
@@ -360,6 +364,20 @@ html.xn-menu .xn .xn-links a {
 }
 html.xn-menu .xn .xn-links a:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
 html.xn-menu .xn .xn-links a.xn-admin { color: #ff8b8b; }
+/* Last row of the menu: Log out on the left, your name and then your picture in the right corner (nav.js initMenuFoot).
+   It replaces the Log out button in the bar. */
+html.xn-menu .xn > .xn-out { display: none; }
+.xn-menu-foot { display: none; }
+html.xn-menu .xn-menu-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; margin-top: 4px; padding: 10px 6px 2px; border-top: 1px solid var(--oled-line); }
+.xn-foot-out { margin: 0; }
+.xn-foot-out button { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: 1px solid var(--oled-line-strong); border-radius: 10px; background: transparent; color: var(--oled-muted); font: inherit; font-size: 13px; cursor: pointer; }
+.xn-foot-out svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.xn-foot-out button:hover, .xn-foot-out button:focus-visible { color: #ff8b8b; border-color: rgba(255, 139, 139, 0.45); background: rgba(255, 139, 139, 0.08); outline: none; }
+html.xn-menu .xn .xn-links a.xn-foot-me { display: inline-flex; align-items: center; gap: 12px; min-height: 0; min-width: 0; margin-left: auto; padding: 4px 4px 4px 12px; border-radius: 12px; }
+.xn-foot-face { position: relative; display: grid; place-items: center; flex: none; width: 40px; height: 40px; overflow: hidden; border: 1px solid rgba(var(--xn-accent-rgb), 0.35); border-radius: 9px; background: var(--oled-accent-soft); color: var(--oled-accent); font-weight: 600; font-size: 16px; }
+/* The picture fills the whole square, edge to edge. */
+.xn-foot-face img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; object-fit: cover; }
+.xn-foot-name { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 html.xn-menu .xn .xn-links .xn-chat-count { margin-left: auto; }
 .xn-link-ic { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border: 1px solid rgba(var(--xn-accent-rgb), 0.25); border-radius: 10px; background: var(--oled-accent-soft); color: var(--oled-accent); }
 .xn-links a.xn-admin .xn-link-ic { border-color: rgba(255, 139, 139, 0.3); background: rgba(255, 139, 139, 0.1); color: #ff8b8b; }
@@ -907,8 +925,11 @@ html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: 
 /* An admin's colored name (forum.js paintName) glows softly in its own color. */
 .xn-named { text-shadow: 0 0 12px color-mix(in srgb, currentColor 55%, transparent); }
 /* Rainbow name (admin name color "rainbow"): a moving gradient through the letters. */
+/* The colors run twice across a 200% wide background, so even a short
+   name shows all of them, and sliding it one name width loops cleanly. */
 .xn-named.xn-rainbow {
-  background: linear-gradient(90deg, #ff5f6d, #ffb347, #ffe66d, #7cf29c, #4fd1ff, #7c8cff, #e36bff, #ff5f6d) 0 50% / 300% 100%;
+  --fx: #ff5f6d, #ffb347, #ffe66d, #7cf29c, #4fd1ff, #7c8cff, #e36bff;
+  background: linear-gradient(90deg, var(--fx), var(--fx-first, #ff5f6d), var(--fx), var(--fx-first, #ff5f6d)) 0 50% / 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent !important;
@@ -917,7 +938,22 @@ html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: 
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.18));
   animation: xn-rainbow-name 6s linear infinite;
 }
-@keyframes xn-rainbow-name { to { background-position: 300% 50%; } }
+@keyframes xn-rainbow-name { to { background-position: -100% 50%; } }
+/* More animated name colors (mommy 2026-10-29: darker ones). */
+.xn-named.xn-rainbow[data-fx="blood"] { --fx: #7f0000, #d10f2f, #ff4d4d, #8b0a1a; }
+.xn-named.xn-rainbow[data-fx="midnight"] { --fx: #1e3a8a, #4f46e5, #8b5cf6, #1e40af; }
+.xn-named.xn-rainbow[data-fx="toxic"] { --fx: #14532d, #16a34a, #a3e635, #166534; }
+.xn-named.xn-rainbow[data-fx="ember"] { --fx: #7c2d12, #ea580c, #fbbf24, #9a3412; }
+.xn-named.xn-rainbow[data-fx="void"] { --fx: #3b0764, #7e22ce, #db2777, #4c1d95; }
+.xn-named.xn-rainbow[data-fx="ocean"] { --fx: #0c4a6e, #0891b2, #22d3ee, #1e3a8a; }
+.xn-named.xn-rainbow[data-fx="shadow"] { --fx: #27272a, #71717a, #d4d4d8, #3f3f46; }
+.xn-named.xn-rainbow[data-fx="blood"] { --fx-first: #7f0000; }
+.xn-named.xn-rainbow[data-fx="midnight"] { --fx-first: #1e3a8a; }
+.xn-named.xn-rainbow[data-fx="toxic"] { --fx-first: #14532d; }
+.xn-named.xn-rainbow[data-fx="ember"] { --fx-first: #7c2d12; }
+.xn-named.xn-rainbow[data-fx="void"] { --fx-first: #3b0764; }
+.xn-named.xn-rainbow[data-fx="ocean"] { --fx-first: #0c4a6e; }
+.xn-named.xn-rainbow[data-fx="shadow"] { --fx-first: #27272a; }
 @media (prefers-reduced-motion: reduce) { .xn-named.xn-rainbow { animation: none; } }
 
 /* The letter next to the logo (nav.js initMail): unread comments on your posts. */
@@ -1139,17 +1175,17 @@ html[data-scene] .crosshatch { display: none; }
 /* Geek rank badge (nav.js xnRank.badge, Profile, public profile, Forum).
    Five pips fill up with the tier; the color climbs too. */
 .xn-rank {
-  --rank: #9c96aa;
+  --rank: #f472b6;
   position: relative; /* keeps the hidden label inside scrolling lists */
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px 2px 6px;
+  padding: 2px 9px 2px 6px;
   border: 1px solid color-mix(in srgb, var(--rank) 45%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--rank) 12%, transparent);
   color: var(--rank);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
   white-space: nowrap;
@@ -1159,19 +1195,36 @@ html[data-scene] .crosshatch { display: none; }
 .xn-rank[data-tier="3"] { --rank: #60a5fa; }
 .xn-rank[data-tier="4"] { --rank: rgb(var(--xn-accent-rgb)); }
 .xn-rank[data-tier="5"] { --rank: #fbbf24; box-shadow: 0 0 14px rgba(251, 191, 36, 0.35); }
-.xn-rank-pips { display: inline-flex; gap: 2px; }
-.xn-rank-pips i { width: 4px; height: 9px; border-radius: 2px; background: currentColor; opacity: 0.22; }
+/* The ticks: in color once reached, grey and faint before that. */
+.xn-rank-pips { display: inline-flex; align-items: center; gap: 1px; }
+.xn-rank-pips i { width: 13px; height: 13px; background: no-repeat center / contain; opacity: 0.3; filter: grayscale(1) brightness(0.7); transition: opacity 0.2s, filter 0.2s; }
 .xn-rank[data-tier="1"] .xn-rank-pips i:nth-child(-n+1),
 .xn-rank[data-tier="2"] .xn-rank-pips i:nth-child(-n+2),
 .xn-rank[data-tier="3"] .xn-rank-pips i:nth-child(-n+3),
 .xn-rank[data-tier="4"] .xn-rank-pips i:nth-child(-n+4),
-.xn-rank[data-tier="5"] .xn-rank-pips i { opacity: 1; }
-.xn-rank.is-compact { gap: 0; padding: 3px 5px; }
-.xn-rank.is-compact .xn-rank-pips i { width: 3px; height: 8px; }
+.xn-rank[data-tier="5"] .xn-rank-pips i { opacity: 1; filter: none; }
+.xn-rank.is-compact { gap: 0; padding: 3px 7px; }
+.xn-rank.is-compact .xn-rank-pips i { width: 11px; height: 11px; }
 @media (prefers-reduced-motion: no-preference) {
   .xn-rank[data-tier="5"] { animation: xn-rank-glow 2.6s ease-in-out infinite alternate; }
 }
 @keyframes xn-rank-glow { from { box-shadow: 0 0 6px rgba(251, 191, 36, 0.2); } to { box-shadow: 0 0 16px rgba(251, 191, 36, 0.5); } }
+/* Rank picture in front and the five ticks use only mommy's items
+   (2026-10-29): ticks joint, Lyrica, Elvanse, perc, lean; the picture in
+   front is the stage's item, a bag of crystals at Geek⁴.
+   Pictures from /home/claude/tools/rankicons/make2.py. */
+.xn-rank::before { content: ""; flex: none; width: 1.35em; height: 1.35em; background: no-repeat center / contain; }
+.xn-rank-pips i:nth-child(1) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-35 12 12)'%3E %3Cpath d='M1 10.2 18 8v8L1 13.8z' fill='%23efe2c4'/%3E%3Cpath d='M1 10.2v3.6l3 .35V9.85z' fill='%23c9a06a'/%3E %3Cpath d='M7 10.2l3.5-.3M11 9.85l3.6-.32M8 13.85l3.5.3' stroke='%23d8c79e' stroke-width='.6'/%3E %3Cpath d='M18 8l2.2-.3a4.3 4.3 0 0 1 0 8.6L18 16z' fill='%23e2481f'/%3E%3Ccircle cx='20.4' cy='12' r='1.8' fill='%23ffc04a'/%3E%3C/g%3E %3Cpath d='M19.5 5c1-1.2.2-2.2 1-3.4M17.5 6.5c.8-1 .2-1.8.9-2.8' stroke='%239aa3ad' stroke-width='.9' fill='none' stroke-linecap='round' opacity='.8'/%3E%3C/svg%3E"); }
+.xn-rank-pips i:nth-child(2) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-40 12 12)'%3E %3Cpath d='M12 7.5H7.5a4.5 4.5 0 0 0 0 9H12z' fill='%23ff8a2b'/%3E%3Cpath d='M12 7.5h4.5a4.5 4.5 0 0 1 0 9H12z' fill='%23ffd9b8'/%3E %3Cpath d='M7 9.6h4' stroke='%23ffc28f' stroke-width='1.1' stroke-linecap='round'/%3E %3Ctext x='16.3' y='13.3' font-family='Arial,sans-serif' font-size='3.4' font-weight='700' text-anchor='middle' fill='%23b5521a'%3EPGN%3C/text%3E%3C/g%3E%3C/svg%3E"); }
+.xn-rank-pips i:nth-child(3) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-40 12 12)'%3E %3Cpath d='M12 7.5H7.5a4.5 4.5 0 0 0 0 9H12z' fill='%233d7cf0'/%3E%3Cpath d='M12 7.5h4.5a4.5 4.5 0 0 1 0 9H12z' fill='%23ff7fb8'/%3E %3Cpath d='M7 9.6h4' stroke='%239fc1ff' stroke-width='1.1' stroke-linecap='round'/%3E %3Ctext x='16.3' y='13.3' font-family='Arial,sans-serif' font-size='3.4' font-weight='700' text-anchor='middle' fill='%23a3346b'%3ES489%3C/text%3E%3C/g%3E%3C/svg%3E"); }
+.xn-rank-pips i:nth-child(4) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='%234f9dff'/%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke='%232a6fd1' stroke-width='1.1'/%3E %3Ctext x='12' y='15.6' font-family='Arial,sans-serif' font-size='10' font-weight='700' text-anchor='middle' fill='%231d4f9e'%3EM%3C/text%3E%3Cellipse cx='8.6' cy='7.4' rx='2.8' ry='1.5' fill='%23c4e0ff' opacity='.8'/%3E%3C/svg%3E"); }
+.xn-rank-pips i:nth-child(5) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 2.5h14l-2 19a1.6 1.6 0 0 1-1.6 1.4H8.6A1.6 1.6 0 0 1 7 21.5z' fill='%23dcd8e6'/%3E %3Cpath d='M6.2 5h11.6l-1.8 16H8z' fill='%23cfcadd'/%3E%3Cpath d='M6.9 9h10.2l-1.4 12.2H8.3z' fill='%238e3fe0'/%3E%3Cpath d='M6.9 9h10.2l-.25 2.2H7.15z' fill='%23b57bff'/%3E %3Cpath d='M4.4 2.5h15.2' stroke='%23b9b3c9' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='14' r='.9' fill='%23c9a3ff' opacity='.8'/%3E%3Ccircle cx='13.5' cy='17' r='.6' fill='%23c9a3ff' opacity='.8'/%3E%3C/svg%3E"); }
+.xn-rank[data-tier="1"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-35 12 12)'%3E %3Cpath d='M1 10.2 18 8v8L1 13.8z' fill='%23efe2c4'/%3E%3Cpath d='M1 10.2v3.6l3 .35V9.85z' fill='%23c9a06a'/%3E %3Cpath d='M7 10.2l3.5-.3M11 9.85l3.6-.32M8 13.85l3.5.3' stroke='%23d8c79e' stroke-width='.6'/%3E %3Cpath d='M18 8l2.2-.3a4.3 4.3 0 0 1 0 8.6L18 16z' fill='%23e2481f'/%3E%3Ccircle cx='20.4' cy='12' r='1.8' fill='%23ffc04a'/%3E%3C/g%3E %3Cpath d='M19.5 5c1-1.2.2-2.2 1-3.4M17.5 6.5c.8-1 .2-1.8.9-2.8' stroke='%239aa3ad' stroke-width='.9' fill='none' stroke-linecap='round' opacity='.8'/%3E%3C/svg%3E"); }
+.xn-rank[data-tier="2"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-40 12 12)'%3E %3Cpath d='M12 7.5H7.5a4.5 4.5 0 0 0 0 9H12z' fill='%23ff8a2b'/%3E%3Cpath d='M12 7.5h4.5a4.5 4.5 0 0 1 0 9H12z' fill='%23ffd9b8'/%3E %3Cpath d='M7 9.6h4' stroke='%23ffc28f' stroke-width='1.1' stroke-linecap='round'/%3E %3Ctext x='16.3' y='13.3' font-family='Arial,sans-serif' font-size='3.4' font-weight='700' text-anchor='middle' fill='%23b5521a'%3EPGN%3C/text%3E%3C/g%3E%3C/svg%3E"); }
+.xn-rank[data-tier="3"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-40 12 12)'%3E %3Cpath d='M12 7.5H7.5a4.5 4.5 0 0 0 0 9H12z' fill='%233d7cf0'/%3E%3Cpath d='M12 7.5h4.5a4.5 4.5 0 0 1 0 9H12z' fill='%23ff7fb8'/%3E %3Cpath d='M7 9.6h4' stroke='%239fc1ff' stroke-width='1.1' stroke-linecap='round'/%3E %3Ctext x='16.3' y='13.3' font-family='Arial,sans-serif' font-size='3.4' font-weight='700' text-anchor='middle' fill='%23a3346b'%3ES489%3C/text%3E%3C/g%3E%3C/svg%3E"); }
+.xn-rank[data-tier="4"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='%234f9dff'/%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke='%232a6fd1' stroke-width='1.1'/%3E %3Ctext x='12' y='15.6' font-family='Arial,sans-serif' font-size='10' font-weight='700' text-anchor='middle' fill='%231d4f9e'%3EM%3C/text%3E%3Cellipse cx='8.6' cy='7.4' rx='2.8' ry='1.5' fill='%23c4e0ff' opacity='.8'/%3E%3C/svg%3E"); }
+.xn-rank[data-tier="5"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4.5 4h15v15.5A1.8 1.8 0 0 1 17.7 21.3H6.3A1.8 1.8 0 0 1 4.5 19.5z' fill='%239fd8ff' fill-opacity='.35' stroke='%23bfe6ff' stroke-width='1'/%3E %3Crect x='4.5' y='3' width='15' height='2.4' rx='.6' fill='%23ff4d6d'/%3E%3Cpath d='M4.5 6.6h15' stroke='%23bfe6ff' stroke-width='.8'/%3E %3Cpath d='M6.5 19.5l2-6 2.2 3.2 1.5-5.2 2.5 5 1.4-2.8 1.9 5.8z' fill='%23e8f7ff'/%3E%3Cpath d='M8.5 13.5l2.2 3.2-1.2 2.8z' fill='%23a9e1ff'/%3E%3Cpath d='M12.2 11.5l2.5 5-2 3z' fill='%23c8eeff'/%3E%3Cpath d='M16.1 13.7l1.9 5.8h-2.7z' fill='%239bd6ff'/%3E %3Cpath d='M7 8.5l1.5 2.5' stroke='%23ffffff' stroke-width='.8' stroke-linecap='round' opacity='.6'/%3E%3C/svg%3E"); }
+.xn-rank.is-compact::before { margin-right: 4px; }
 /* Level: how many times the account reached Geek⁴. */
 .xn-level {
   margin-left: 2px;

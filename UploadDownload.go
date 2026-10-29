@@ -237,6 +237,11 @@ CREATE TABLE IF NOT EXISTS site_pictures (
 	path TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS site_settings (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS forum_comments (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	post_id INTEGER NOT NULL,
@@ -282,6 +287,10 @@ const maxLikes = 500
 
 // Graph sessions ("Experiences"): times are Unix milliseconds, the newest are kept.
 const maxExperiences = 300
+
+// Saved Graph sessions an account keeps; the Graph lists the newest maxExperiences.
+// Higher than that so a whole PsychonautWiki Journal history fits.
+const maxStoredExperiences = 3000
 const maxExperienceDoses = 100
 
 // Boxes on the Profile page (the + button): pictures (up to 4), one Graph session, or a note.
@@ -385,6 +394,7 @@ func main() {
 	http.HandleFunc("/admin/stats", requireAdminLogin(adminStats))
 	http.HandleFunc("/admin/server", requireAdminLogin(adminServer))
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
+	http.HandleFunc("/site/main-look", requireAdminLogin(saveMainLook))
 	http.HandleFunc("/sitepic/", sitePicture)
 	http.HandleFunc("/notifications", requireLogin(notifications))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
@@ -393,6 +403,7 @@ func main() {
 	http.HandleFunc("/profile/boxes", requireLogin(profileBoxes))
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
 	http.HandleFunc("/profile/appearance", requireLogin(profileAppearance))
+	http.HandleFunc("/me", currentUser)
 	http.HandleFunc("/profile/bio", requireLogin(profileBio))
 	http.HandleFunc("/profiles/", requireLogin(profileImage))
 	http.HandleFunc("/u/", requireLogin(publicProfile))
@@ -408,6 +419,7 @@ func main() {
 	http.HandleFunc("/Replications", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/Utility", http.StatusMovedPermanently)
 	})
+	http.HandleFunc("/GetSportifyFileFromLink", requireLogin(GetSportifyFileFromLink))
 	http.HandleFunc("/replications/list", requireLogin(replicationsList))
 	http.HandleFunc("/replications/files/", requireLogin(replicationsFile))
 	http.HandleFunc("/replications/thumbs/", requireLogin(replicationsFile))
@@ -415,6 +427,7 @@ func main() {
 	// The Graph page is open to everyone, so this answers [] instead of redirecting when signed out.
 	http.HandleFunc("/graphColors", graphColors)
 	http.HandleFunc("/experiences", experiences)
+	http.HandleFunc("/experiences/import", importExperiences)
 	http.HandleFunc("/sub/saveData", requireLogin(saveData))
 	http.HandleFunc("/admin/createUser/AdminPanelCreateUserNow", requireAdminLogin(AdminPanelCreateUserData))
 
@@ -561,10 +574,18 @@ func Main(w http.ResponseWriter, r *http.Request) {
 		SessionInfo cookiesStruct
 		IsAdmin     bool
 		Pictures    map[string]string
+		Look        mainLook
+		LookStyle   template.CSS
+		LookJSON    template.JS
 	}{}
 
 	d.SessionInfo, d.Login = sessionFromRequest(r)
 	d.IsAdmin = d.Login && d.SessionInfo.Authority == "admin"
+	d.Look = loadMainLook()
+	d.LookStyle = d.Look.style()
+	if raw, err := json.Marshal(d.Look); err == nil {
+		d.LookJSON = template.JS(raw)
+	}
 	d.Pictures = map[string]string{}
 	for slot := range sitePictureSlots {
 		d.Pictures[slot] = sitePictureLink(slot)
@@ -3333,7 +3354,7 @@ func experiences(w http.ResponseWriter, r *http.Request) {
 			in.ID, _ = res.LastInsertId()
 			db.Exec(`DELETE FROM graph_experiences WHERE user_id = ? AND id NOT IN
 				(SELECT id FROM graph_experiences WHERE user_id = ? ORDER BY started_at DESC, id DESC LIMIT ?)`,
-				session.UserId, session.UserId, maxExperiences)
+				session.UserId, session.UserId, maxStoredExperiences)
 			db.Exec("DELETE FROM experience_people WHERE experience_id NOT IN (SELECT id FROM graph_experiences)")
 		} else {
 			db.QueryRow("SELECT started_at FROM graph_experiences WHERE id = ?", in.ID).Scan(&started)
@@ -3344,6 +3365,101 @@ func experiences(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// importedExperience is one session from another app (Profile > Data >
+// Import data reads a PsychonautWiki Journal export in the browser and sends
+// these), with the trip report written about it, if any.
+type importedExperience struct {
+	StartedAt int64            `json:"startedAt"`
+	Doses     []experienceDose `json:"doses"`
+	Report    *struct {
+		Title      string `json:"title"`
+		Substances string `json:"substances"`
+		Setting    string `json:"setting"`
+		Body       string `json:"body"`
+		Rating     int    `json:"rating"`
+	} `json:"report"`
+}
+
+const maxImportBatch = 200
+
+// importExperiences: POST {items: [importedExperience]} saves each session
+// with its own start time and returns {added, skipped, invalid, reports}.
+// A session that is already saved (same start and doses) is skipped, so
+// importing the same file twice adds nothing. Imports don't count for ranks.
+func importExperiences(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		Items []importedExperience `json:"items"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<20)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that import.", http.StatusBadRequest)
+		return
+	}
+	if len(in.Items) > maxImportBatch {
+		http.Error(w, "Send at most 200 sessions at a time.", http.StatusBadRequest)
+		return
+	}
+	now := time.Now().UnixMilli()
+	added, skipped, invalid, reports := 0, 0, 0, 0
+	for _, item := range in.Items {
+		doses, valid := cleanExperienceDoses(item.Doses)
+		if !valid || item.StartedAt <= 0 || item.StartedAt > now+86400000 {
+			invalid++
+			continue
+		}
+		body, _ := json.Marshal(doses)
+		var found int64
+		if db.QueryRow("SELECT id FROM graph_experiences WHERE user_id = ? AND started_at = ? AND doses = ?",
+			session.UserId, item.StartedAt, string(body)).Scan(&found) == nil {
+			skipped++
+			continue
+		}
+		res, err := db.Exec("INSERT INTO graph_experiences (user_id, started_at, updated_at, doses) VALUES (?, ?, ?, ?)",
+			session.UserId, item.StartedAt, now, string(body))
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save the import.", http.StatusInternalServerError)
+			return
+		}
+		added++
+		id, _ := res.LastInsertId()
+		if t := item.Report; t != nil {
+			title := cleanText(t.Title, 120)
+			text := cleanMultiline(t.Body, 50000)
+			if title == "" && text == "" {
+				continue
+			}
+			rating := t.Rating
+			if rating < 0 || rating > 5 {
+				rating = 0
+			}
+			_, err := db.Exec(`INSERT INTO trip_reports (user_id, experience_id, title, substances, setting, body, rating, happened_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, session.UserId, id, title, cleanText(t.Substances, 300),
+				cleanText(t.Setting, 300), text, rating, item.StartedAt, now)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			reports++
+		}
+	}
+	if added > 0 {
+		db.Exec(`DELETE FROM graph_experiences WHERE user_id = ? AND id NOT IN
+			(SELECT id FROM graph_experiences WHERE user_id = ? ORDER BY started_at DESC, id DESC LIMIT ?)`,
+			session.UserId, session.UserId, maxStoredExperiences)
+		db.Exec("DELETE FROM experience_people WHERE experience_id NOT IN (SELECT id FROM graph_experiences)")
+	}
+	writeJSON(w, map[string]int{"added": added, "skipped": skipped, "invalid": invalid, "reports": reports})
 }
 
 // profileBox is one box from the + menu on the Profile page. Kind "pictures"
@@ -4061,6 +4177,23 @@ func person(name, avatar, authority string) postAuthor {
 // profileAppearance reads (GET) or saves (POST JSON) the account's site color
 // and Profile card transparency. Fields left out of a POST stay as they are;
 // an empty color goes back to the default violet.
+// currentUser: GET /me gives the signed-in account's name, picture and name
+// color for the menu panel (nav.js); 401 when signed out.
+func currentUser(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		http.Error(w, "Log in first.", http.StatusUnauthorized)
+		return
+	}
+	var avatar, nameColor string
+	db.QueryRow("SELECT pathToProfilePic, nameColor FROM users WHERE id = ?", session.UserId).Scan(&avatar, &nameColor)
+	if session.Authority != "admin" {
+		nameColor = ""
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]string{"name": session.OriginalUsername, "avatar": existingPicture(avatar), "nameColor": nameColor})
+}
+
 func profileAppearance(w http.ResponseWriter, r *http.Request) {
 	session, ok := sessionFromRequest(r)
 	if !ok {
@@ -4084,7 +4217,7 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 		}
 		if in.SiteColor != nil {
 			color := strings.ToLower(strings.TrimSpace(*in.SiteColor))
-			if color != "" && color != "rainbow" && !hexColor.MatchString(color) {
+			if color != "" && !nameFx[color] && !hexColor.MatchString(color) {
 				http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
 				return
 			}
@@ -4100,7 +4233,7 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Only admins can color their name.", http.StatusForbidden)
 				return
 			}
-			if color != "" && color != "rainbow" && !hexColor.MatchString(color) {
+			if color != "" && !nameFx[color] && !hexColor.MatchString(color) {
 				http.Error(w, "Pick a color like #a67cff.", http.StatusBadRequest)
 				return
 			}
@@ -4193,6 +4326,8 @@ type siteLook struct {
 	Size int    `json:"size"`
 	Logo bool   `json:"logo"`
 	Aura string `json:"aura"` // glow around the profile picture: "", glow, pulse, rainbow, fire
+	// Drug icons in the real color of the pill or powder instead of the site color.
+	OgIcons bool `json:"ogIcons"`
 }
 
 var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "consolas": true, "courier": true, "inter": true, "grotesk": true, "system": true, "verdana": true, "trebuchet": true, "rounded": true, "comic": true, "serif": true, "garamond": true}
@@ -4985,12 +5120,16 @@ func adminFilesAccess(w http.ResponseWriter, r *http.Request) {
 var nameColorsMu sync.RWMutex
 var nameColors = map[string]string{} // lower-case name -> color, admins only
 
+// nameFx are the animated name colors (moving gradients, oled.css) an admin
+// can pick instead of a plain color. nav.js NAME_FX has the same keys.
+var nameFx = map[string]bool{"rainbow": true, "blood": true, "midnight": true, "toxic": true, "ember": true, "void": true, "ocean": true, "shadow": true}
+
 func loadNameColors() {
 	m := map[string]string{}
 	if rows, err := db.Query("SELECT originalUsername, nameColor FROM users WHERE authority = 'admin' AND nameColor != ''"); err == nil {
 		for rows.Next() {
 			var name, color string
-			if rows.Scan(&name, &color) == nil && (color == "rainbow" || hexColor.MatchString(color)) {
+			if rows.Scan(&name, &color) == nil && (nameFx[color] || hexColor.MatchString(color)) {
 				m[strings.ToLower(name)] = color
 			}
 		}
@@ -5221,6 +5360,96 @@ func sitePicture(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	http.ServeFile(w, r, p)
+}
+
+// mainLook is how the Main page container looks (admins change it on the
+// page): wall and tile colors with their opacity, the border color and an
+// optional fire effect. Everyone who opens the Main page sees it.
+type mainLook struct {
+	Panel      string `json:"panel"`
+	PanelAlpha int    `json:"panelAlpha"` // 0-100
+	Tile       string `json:"tile"`
+	TileAlpha  int    `json:"tileAlpha"`
+	Border     string `json:"border"`
+	Fire       string `json:"fire"`      // "", flames, inferno
+	FireColor  string `json:"fireColor"` // orange, blue, purple, green
+}
+
+var defaultMainLook = mainLook{Panel: "#0a0a0c", PanelAlpha: 100, Tile: "#111115", TileAlpha: 100, Border: "#23202b", Fire: "", FireColor: "orange"}
+
+func (l mainLook) clean() mainLook {
+	d := defaultMainLook
+	if !hexColor.MatchString(l.Panel) {
+		l.Panel = d.Panel
+	}
+	if !hexColor.MatchString(l.Tile) {
+		l.Tile = d.Tile
+	}
+	if !hexColor.MatchString(l.Border) {
+		l.Border = d.Border
+	}
+	l.Panel, l.Tile, l.Border = strings.ToLower(l.Panel), strings.ToLower(l.Tile), strings.ToLower(l.Border)
+	clamp := func(v int) int { return max(0, min(100, v)) }
+	l.PanelAlpha, l.TileAlpha = clamp(l.PanelAlpha), clamp(l.TileAlpha)
+	switch l.Fire {
+	case "", "flames", "inferno":
+	default:
+		l.Fire = ""
+	}
+	switch l.FireColor {
+	case "orange", "blue", "purple", "green":
+	default:
+		l.FireColor = d.FireColor
+	}
+	return l
+}
+
+func rgbaOf(hex string, alpha int) string {
+	v, _ := strconv.ParseUint(strings.TrimPrefix(hex, "#"), 16, 32)
+	return fmt.Sprintf("rgba(%d, %d, %d, %.2f)", v>>16&255, v>>8&255, v&255, float64(alpha)/100)
+}
+
+// style is the CSS variables Main.html reads on .gp-panel.
+func (l mainLook) style() template.CSS {
+	return template.CSS(fmt.Sprintf("--gp-card: %s; --gp-tile: %s; --gp-line: %s;",
+		rgbaOf(l.Panel, l.PanelAlpha), rgbaOf(l.Tile, l.TileAlpha), l.Border))
+}
+
+func loadMainLook() mainLook {
+	l := defaultMainLook
+	var raw string
+	if db.QueryRow("SELECT value FROM site_settings WHERE key = 'mainLook'").Scan(&raw) == nil {
+		json.Unmarshal([]byte(raw), &l)
+	}
+	return l.clean()
+}
+
+// saveMainLook: POST a mainLook (admins), or {"reset": true} for the original look.
+func saveMainLook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		mainLook
+		Reset bool `json:"reset"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+		return
+	}
+	look := in.mainLook.clean()
+	if in.Reset {
+		look = defaultMainLook
+	}
+	body, _ := json.Marshal(look)
+	if _, err := db.Exec(`INSERT INTO site_settings (key, value) VALUES ('mainLook', ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, string(body)); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save that.", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, look)
 }
 
 // sitePictureUpload: multipart POST slot=<slot> with an "image", or remove=1
@@ -12422,4 +12651,61 @@ func chatFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, filepath.Join(chatFilesDir, parts[0], name))
+}
+
+func GetSportifyFileFromLink(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	spotifyLink := r.FormValue("link")
+	parsed, err := url.ParseRequestURI(spotifyLink)
+	if err != nil || parsed.Host != "open.spotify.com" ||
+		(parsed.Scheme != "https" && parsed.Scheme != "http") {
+		http.Error(w, "Invalid Spotify link", http.StatusBadRequest)
+		return
+	}
+
+	downloadURL := os.Getenv("AUTHORIZED_AUDIO_DOWNLOAD_URL")
+	if downloadURL == "" {
+		http.Error(w, "Audio download source is not configured",
+			http.StatusServiceUnavailable)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(
+		r.Context(),
+		http.MethodPost,
+		downloadURL,
+		strings.NewReader(url.Values{"link": {spotifyLink}}.Encode()),
+	)
+	if err != nil {
+		http.Error(w, "Failed to create download request",
+			http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, "Download failed", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "Audio source could not provide the file",
+			http.StatusBadGateway)
+		return
+	}
+
+	filename := filepath.Base(parsed.Path) + ".audio"
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf(`attachment; filename="%s"`, filename))
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return
+	}
 }

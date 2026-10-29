@@ -13,6 +13,14 @@
 }
 .nt-seg-btn[aria-selected="true"] { background: var(--oled-accent-soft); color: var(--oled-text); }
 .nt-seg-btn:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+/* Switching tabs (mommy 2026-10-29): a highlight slides to the picked tab
+   (notes.js moveGlow), the tab gives a little press, and the new pane slides
+   in from the side you moved to (notes.js showTab). */
+.nt-seg { position: relative; }
+.nt-seg-glow { position: absolute; top: 3px; left: 0; z-index: 0; height: calc(100% - 6px); border-radius: 9px; background: var(--oled-accent-soft); box-shadow: inset 0 0 0 1px rgba(var(--xn-accent-rgb), 0.3), 0 0 18px -6px rgba(var(--xn-accent-rgb), 0.6); pointer-events: none; transition: transform 0.38s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.38s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.nt-seg.has-glow .nt-seg-btn { position: relative; z-index: 1; transition: color 0.25s ease, transform 0.12s ease; }
+.nt-seg.has-glow .nt-seg-btn[aria-selected="true"] { background: transparent; }
+.nt-seg-btn:active { transform: scale(0.94); }
 
 .nt-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .nt-bar { display: flex; align-items: center; gap: 10px; }

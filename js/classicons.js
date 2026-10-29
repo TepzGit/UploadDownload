@@ -81,8 +81,51 @@
   };
   let customIcons = new Map();
 
+  // "OG medication icons" (Profile > Preferences, html.xn-og-icons): what the
+  // drug really looks like, by name first, then by the icon's shape.
+  const OG_COLORS = [
+    [/heroin|diacetylmorphine/, "#8b5a2b"],
+    [/^(5-meo-)?dmt$|dimethyltryptamine/, "#e8b04f"],
+    [/^crack/, "#ece0bf"],
+    [/methamphetamine/, "#dff1ff"],
+    [/mdma|ecstasy|molly|mda$|2c-b|2c-/, "#ff8fcf"],
+    [/promethazine|lean/, "#9b5de5"],
+    [/dxm|dextromethorphan/, "#e0414f"],
+    [/kratom/, "#8aa35a"],
+    [/salvia|cannabis|marijuana|thc|cbd|hhc|weed/, "#6fb04a"],
+    [/mescaline|peyote|san pedro/, "#5f9e4a"],
+    [/psilocybin|psilocin|mushroom/, "#c49a6c"],
+    [/amanita/, "#e2483d"],
+    [/alcohol|ethanol|beer|wine/, "#d39a35"],
+    [/caffeine|coffee/, "#8a5a3b"],
+    [/poppers|nitrite/, "#a0632e"],
+    [/ghb|gbl|butanediol/, "#c8e8ff"],
+    [/nitrous/, "#c9ced6"],
+    [/nicotine|tobacco/, "#f2dfc0"],
+    [/gabapentin/, "#f2d04b"],
+    [/pregabalin|lyrica/, "#f0883e"],
+    [/tramadol/, "#e9d55a"],
+    [/adderall|dextroamphetamine/, "#f28c28"],
+    [/fluoxetine|prozac/, "#5aa36b"],
+  ];
+  const OG_SHAPES = {
+    blotter: "#f2e8cc", mushroom: "#c49a6c", xtc: "#ff8fcf", lines: "#f7f7f3", crystal: "#e2f2ff",
+    baggie: "#f4f3ee", bar: "#f5f5ef", tablet: "#f5f5ef", oblong: "#f5f5ef", capsule: "#f2d04b",
+    cannabinoid: "#6fb04a", bottle: "#d39a35", coffee: "#8a5a3b", cigarette: "#f2dfc0",
+    charger: "#c9ced6", dropper: "#c8e8ff", syrup: "#e0414f", cactus: "#5f9e4a", herb: "#6fb04a",
+  };
+  // Anything else (most research chemicals) is a white powder.
+  const OG_POWDER = "#f1efe8";
+
+  function ogColor(name, key) {
+    const n = String(name || "").toLowerCase();
+    const hit = n && OG_COLORS.find(([re]) => re.test(n));
+    return hit ? hit[1] : OG_SHAPES[key] || OG_POWDER;
+  }
+
   function applyCustomIcon(node) {
     const name = String(node.dataset.drugName || "").trim().toLowerCase();
+    node.style.setProperty("--sc-og", ogColor(name, node.dataset.class));
     const image = customIcons.get(name);
     if (image) {
       node.classList.add("has-custom-image");
@@ -136,7 +179,7 @@
     applyCustomIcon(node);
   }
 
-  window.xnClass = { keyFor, keyForClass, icon, setDrugName, LABELS };
+  window.xnClass = { keyFor, keyForClass, icon, setDrugName, ogColor, LABELS };
 
   fetch("/drug-icons", { cache: "no-cache" })
     .then((response) => {

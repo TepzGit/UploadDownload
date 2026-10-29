@@ -167,12 +167,13 @@
   const LOOK_FONTS = ["", "jetbrains", "consolas", "courier", "inter", "grotesk", "system", "verdana", "trebuchet", "rounded", "comic", "serif", "garamond"];
   const LOOK_AURAS = ["", "glow", "pulse", "rainbow", "fire"];
   const cleanLook = (raw) => {
-    const look = { font: "", size: 100, logo: true, aura: "" };
+    const look = { font: "", size: 100, logo: true, aura: "", ogIcons: false };
     if (raw && LOOK_FONTS.includes(raw.font)) look.font = raw.font;
     const size = Number(raw && raw.size);
     if (size >= 80 && size <= 130) look.size = Math.round(size / 5) * 5;
     if (raw && raw.logo === false) look.logo = false;
     if (raw && LOOK_AURAS.includes(raw.aura)) look.aura = raw.aura;
+    if (raw && raw.ogIcons === true) look.ogIcons = true;
     return look;
   };
   let look = cleanLook(null);
@@ -184,6 +185,8 @@
     if (look.font) root.dataset.font = look.font;
     else delete root.dataset.font;
     root.classList.toggle("xn-nologo", !look.logo);
+    // Drug icons in the pill's or powder's own color (classicons.css).
+    root.classList.toggle("xn-og-icons", look.ogIcons);
     root.style.zoom = look.size === 100 ? "" : String(look.size / 100);
   }
   applyLook(look);
@@ -228,11 +231,25 @@
     document.documentElement.classList.add("xn-files");
   }
 
+  // Animated name colors (a gradient moving through the letters). The keys
+  // match nameFx in UploadDownload.go; the colors are in oled.css.
+  const NAME_FX = ["rainbow", "blood", "midnight", "toxic", "ember", "void", "ocean", "shadow"];
+  window.xnNameFx = {
+    KEYS: NAME_FX,
+    is: (color) => NAME_FX.includes(color),
+    apply(el, color) {
+      el.classList.add("xn-named", "xn-rainbow");
+      if (color === "rainbow") delete el.dataset.fx;
+      else el.dataset.fx = color;
+      return el;
+    },
+  };
+
   // Admin name colors: elements marked data-name-color get painted in it.
   function paintNames(root) {
     (root || document).querySelectorAll("[data-name-color]").forEach((el) => {
-      if (el.dataset.nameColor === "rainbow") {
-        el.classList.add("xn-named", "xn-rainbow");
+      if (window.xnNameFx.is(el.dataset.nameColor)) {
+        window.xnNameFx.apply(el, el.dataset.nameColor);
         return;
       }
       const color = window.xnSiteColor.preview(el.dataset.nameColor);
@@ -347,6 +364,69 @@
     nav.append(form);
   }
 
+  // The menu panel's last row (mommy 2026-10-29): no page tiles, just Log out
+  // on the far left, then your picture and name (a link to your Profile).
+  // It takes the place of the Log out button in the bar (oled.css).
+  function initMenuFoot(box) {
+    if (!signedIn || !box || box.querySelector(".xn-menu-foot")) return;
+    const foot = document.createElement("div");
+    foot.className = "xn-menu-foot";
+    foot.innerHTML =
+      '<form method="post" action="/logout" class="xn-foot-out"><button type="submit" aria-label="Log out" title="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></svg></button></form>' +
+      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
+    box.append(foot);
+    const face = foot.querySelector(".xn-foot-face");
+    const name = foot.querySelector(".xn-foot-name");
+    const show = (me) => {
+      if (!me || !me.name) return;
+      name.textContent = me.name;
+      foot.querySelector(".xn-foot-me").setAttribute("aria-label", "Your profile, " + me.name);
+      face.textContent = "";
+      if (me.avatar) {
+        const img = document.createElement("img");
+        img.src = me.avatar;
+        img.alt = "";
+        img.addEventListener("error", () => { img.remove(); face.textContent = me.name.charAt(0).toUpperCase(); });
+        face.append(img);
+      } else {
+        face.textContent = me.name.charAt(0).toUpperCase();
+      }
+      if (me.nameColor) {
+        name.dataset.nameColor = me.nameColor;
+        paintNames(foot);
+      }
+    };
+    // Last seen values first so the row is filled at once, then the server's.
+    try { show(JSON.parse(localStorage.getItem("xn_me") || "null")); } catch {}
+    // A server from before /me answers 404: then the name and picture are
+    // read from the Profile page (this page, or fetched).
+    const fromProfile = (doc) => {
+      const name = doc.getElementById("username");
+      if (!name || !name.textContent.trim()) return null;
+      const img = doc.getElementById("avatarImg");
+      return {
+        name: name.textContent.trim(),
+        avatar: img && !img.hidden ? img.getAttribute("src") || "" : "",
+        nameColor: name.dataset.nameColor || "",
+      };
+    };
+    fetch("/me", { headers: { Accept: "application/json" } })
+      .then((res) => {
+        if (res.ok) return res.json();
+        if (res.status === 401) return null;
+        const here = document.querySelector(".xn-page.pf") && fromProfile(document);
+        if (here) return here;
+        return fetch("/Profile").then((page) => (page.ok ? page.text() : ""))
+          .then((html) => (html ? fromProfile(new DOMParser().parseFromString(html, "text/html")) : null));
+      })
+      .then((me) => {
+        if (!me) return;
+        show(me);
+        try { localStorage.setItem("xn_me", JSON.stringify(me)); } catch {}
+      })
+      .catch(() => {});
+  }
+
   function initMail(nav) {
     if (!signedIn) return;
     const brand = nav.querySelector(".xn-brand");
@@ -403,8 +483,8 @@
       const face = who.avatar
         ? '<img class="xn-inbox-face" src="' + esc(who.avatar) + '" alt="" loading="lazy">'
         : '<span class="xn-inbox-face" aria-hidden="true">' + esc(who.initial || (who.name || "?").charAt(0).toUpperCase()) + "</span>";
-      const name = who.color === "rainbow"
-        ? '<b class="xn-named xn-rainbow">' + esc(who.name) + "</b>"
+      const name = window.xnNameFx.is(who.color)
+        ? '<b class="xn-named xn-rainbow" data-fx="' + esc(who.color) + '">' + esc(who.name) + "</b>"
         : who.color
         ? '<b class="xn-named" style="color:' + esc(window.xnSiteColor.preview(who.color)) + '">' + esc(who.name) + "</b>"
         : "<b>" + esc(who.name) + "</b>";
@@ -485,6 +565,7 @@
     if (signedIn) addLink("/Notes", "Notes", "/journal");
     addIcons(linkBox);
     const links = nav.querySelectorAll(".xn-links a");
+    initMenuFoot(linkBox);
     initMail(nav);
     initChat(nav);
     initLogout(nav);
@@ -505,7 +586,7 @@
     // The tiles open under the menu button, each one dropping in after the
     // one before (--i, counting only the links this account can see).
     function place() {
-      nav.style.setProperty("--xn-menu-x", Math.max(0, toggle.offsetLeft - 8) + "px");
+      nav.style.setProperty("--xn-menu-x", Math.max(8, toggle.offsetLeft - 8) + "px");
     }
     function setOpen(open) {
       if (open) {

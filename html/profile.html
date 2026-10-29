@@ -265,6 +265,13 @@
         <button type="button" role="radio" class="pf-swatch" data-color="#f87171" style="--sw:#f87171" aria-label="Red"></button>
         <button type="button" role="radio" class="pf-swatch" data-color="#f472b6" style="--sw:#f472b6" aria-label="Pink"></button>
         <button type="button" role="radio" class="pf-swatch pf-swatch-rainbow" data-color="rainbow" aria-label="Rainbow, animated" title="Rainbow (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="blood" style="--fx-sw: linear-gradient(135deg, #7f0000, #d10f2f, #ff4d4d, #8b0a1a)" aria-label="Blood, animated" title="Blood (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="midnight" style="--fx-sw: linear-gradient(135deg, #1e3a8a, #4f46e5, #8b5cf6, #1e40af)" aria-label="Midnight, animated" title="Midnight (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="toxic" style="--fx-sw: linear-gradient(135deg, #14532d, #16a34a, #a3e635, #166534)" aria-label="Toxic, animated" title="Toxic (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="ember" style="--fx-sw: linear-gradient(135deg, #7c2d12, #ea580c, #fbbf24, #9a3412)" aria-label="Ember, animated" title="Ember (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="void" style="--fx-sw: linear-gradient(135deg, #3b0764, #7e22ce, #db2777, #4c1d95)" aria-label="Void, animated" title="Void (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="ocean" style="--fx-sw: linear-gradient(135deg, #0c4a6e, #0891b2, #22d3ee, #1e3a8a)" aria-label="Ocean, animated" title="Ocean (animated)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-fx" data-color="shadow" style="--fx-sw: linear-gradient(135deg, #27272a, #71717a, #d4d4d8, #3f3f46)" aria-label="Shadow, animated" title="Shadow (animated)"></button>
         <label class="pf-swatch pf-swatch-custom" title="Pick any color">
           <input type="color" id="nameCustom" value="#ffffff" aria-label="Pick any color for your name">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -284,7 +291,19 @@
       <button type="button" class="pop-x" data-close aria-label="Close">×</button>
     </div>
     <div class="content">
-      <button type="button" class="xn-btn">Import data</button>
+      <section class="ji" id="journalImport" aria-labelledby="jiTitle">
+        <span class="xn-label" id="jiTitle">Import from PsychonautWiki Journal</span>
+        <p class="pf-note">In the Journal app open Settings and tap Export file, then pick that file here. Each experience becomes a Graph session, and its notes become a trip report in Notes. Importing the same file again adds nothing twice.</p>
+        <input type="file" id="jiFile" accept=".json,application/json,text/plain" hidden>
+        <div class="ji-row">
+          <button type="button" class="xn-btn" id="jiPick">Import data</button>
+          <button type="button" class="xn-btn xn-btn-primary" id="jiGo" hidden>Import</button>
+        </div>
+        <p class="ji-summary" id="jiSummary" hidden></p>
+        <label class="ji-check"><input type="checkbox" id="jiReports" checked> Make trip reports from experience notes</label>
+        <label class="ji-check"><input type="checkbox" id="jiColors" checked> Use Journal colors for substances you haven't colored</label>
+        <p class="ji-status" id="jiStatus" role="status" aria-live="polite"></p>
+      </section>
       <button type="button" class="xn-btn xn-btn-danger">Clear</button>
     </div>
     <button type="button" class="xn-btn xn-btn-primary pop-done" id="CSD">Done</button>
@@ -332,6 +351,9 @@
       </div>
       <span class="xn-label pf-ap-label">Menu</span>
       <label class="ps-check pr-check"><input type="checkbox" id="lkLogo" checked><span>Show the geek⁴u logo (menu and front page)</span></label>
+      <span class="xn-label pf-ap-label">Drug icons</span>
+      <label class="ps-check pr-check"><input type="checkbox" id="lkOg"><span>OG medication icons: each pill or powder in its real color instead of purple</span></label>
+      <div class="pr-og-sample" id="lkOgSample" aria-hidden="true"></div>
       <span class="xn-label pf-ap-label" id="lkAuraLabel">Profile picture glow</span>
       <p class="pf-note">Shows around your picture on your profile, also when others look at it.</p>
       <div class="pr-auras" role="radiogroup" aria-labelledby="lkAuraLabel" id="lkAuras">
@@ -1352,6 +1374,18 @@
     const size = document.getElementById("lkSize");
     const sizeOut = document.getElementById("lkSizeOut");
     const logo = document.getElementById("lkLogo");
+    const og = document.getElementById("lkOg");
+    const ogSample = document.getElementById("lkOgSample");
+    // A row of icons so the change shows right away.
+    if (window.xnClass && ogSample) {
+      ["LSD", "Psilocybin mushrooms", "MDMA", "Cocaine", "Ketamine", "Heroin", "Alprazolam", "Gabapentin", "Cannabis", "Alcohol", "Caffeine", "Nitrous", "DXM", "Promethazine", "Kratom"].forEach((name) => {
+        const key = window.xnClass.keyFor({ name });
+        if (!key) return;
+        const i = window.xnClass.icon(key, "", name);
+        i.title = name;
+        ogSample.append(i);
+      });
+    }
     const status = document.getElementById("lkStatus");
     let timer = 0;
     function show(look) {
@@ -1372,6 +1406,7 @@
       size.value = look.size;
       sizeOut.textContent = look.size + "%";
       logo.checked = look.logo;
+      og.checked = look.ogIcons;
     }
     function change(part, saveNow) {
       const look = window.xnLook.clean(Object.assign(window.xnLook.get(), part));
@@ -1447,7 +1482,8 @@
     size.addEventListener("input", () => { sizeOut.textContent = size.value + "%"; });
     size.addEventListener("change", () => change({ size: Number(size.value) }));
     logo.addEventListener("change", () => change({ logo: logo.checked }, true));
-    document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true, aura: "" }, true));
+    og.addEventListener("change", () => change({ ogIcons: og.checked }, true));
+    document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true, aura: "", ogIcons: false }, true));
     show(window.xnLook.get());
   })();
 
@@ -1651,10 +1687,12 @@
       const nameCustom = document.getElementById("nameCustom");
       const heading = document.getElementById("username");
       const paint = (hex) => {
-        const rainbow = hex === "rainbow";
+        const rainbow = window.xnNameFx.is(hex);
         heading.style.color = hex && !rainbow ? site.preview(hex) : "";
         heading.classList.toggle("xn-named", !!hex);
         heading.classList.toggle("xn-rainbow", rainbow);
+        if (rainbow && hex !== "rainbow") heading.dataset.fx = hex;
+        else delete heading.dataset.fx;
       };
       const markName = (hex) => {
         const color = (hex || "").toLowerCase();
@@ -1667,7 +1705,7 @@
         });
         nameCustom.parentElement.classList.toggle("is-on", !hit);
         if (!hit) nameCustom.parentElement.style.setProperty("--sw", site.preview(color));
-        if (color && color !== "rainbow") nameCustom.value = color;
+        if (color && !window.xnNameFx.is(color)) nameCustom.value = color;
         if (!hit) nameSwatches[0].tabIndex = 0;
       };
       const pickName = (hex) => {
@@ -1773,6 +1811,10 @@
   })();
 </script>
 <script type="module" src="/plotstyle.js"></script>
+<script type="module">
+  import { setupJournalImport } from "/journalimport.js";
+  setupJournalImport(document.getElementById("journalImport"));
+</script>
 <script type="module">
   // ---------------- Boxes from the + button ----------------
   import { mountBoxes, MAX_BOXES, sessionChart, dayLabel } from "/boxes.js";

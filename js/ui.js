@@ -78,6 +78,7 @@ async function loadCustomColors() {
     const { data: list } = await offline.cachedJson("/graphColors", "xn_graph_colors");
     if (!Array.isArray(list) || !list.length) return;
     logic.setCustomColors(list);
+    window.dispatchEvent(new Event("xn-colors-ready"));
     renderRecent();
     renderDoseList();
     refreshChart();
@@ -714,6 +715,7 @@ function startPastExperience(value) {
 function bindEvents() {
   document.getElementById("expPast")?.addEventListener("click", askPastExperience);
   setupExpBig();
+  setupTotalsBar();
   document.getElementById("gpPast")?.addEventListener("click", askPastExperience);
   document.getElementById("pastDlg")?.addEventListener("close", (event) => {
     const dialog = event.target;
@@ -1030,6 +1032,7 @@ async function sendExperience(entry) {
   const saved = await res.json();
   experiences = [saved, ...experiences.filter((e) => e.id !== saved.id)];
   saveExperienceCache();
+  window.dispatchEvent(new Event("xn-doses-changed"));
   return saved;
 }
 
@@ -1060,6 +1063,7 @@ async function dropExperience(id) {
         if (res.status === 401) throw new Error("Log in again to change your experiences.");
         if (!res.ok) throw new Error("That couldn't be deleted. Try again.");
         sent = true;
+        window.dispatchEvent(new Event("xn-doses-changed"));
       } catch (error) {
         if (!offline.isNetworkError(error)) throw error;
       }
@@ -1453,6 +1457,53 @@ function sharedExperienceCard(entry, afterOpen) {
   });
   item.appendChild(open);
   return item;
+}
+
+// ------------------------------------------------------------
+// Bottom bar: what you took in the past 7 and 30 days, from
+// /profile/intake (the same totals as Profile), signed in only.
+// ------------------------------------------------------------
+
+function setupTotalsBar() {
+  const bar = document.getElementById("gpTotals");
+  if (!bar || !/(?:^|;\s*)xn_role=/.test(document.cookie)) return;
+  let timer = null;
+  let data = null;
+  const zone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } })();
+  const render = () => {
+    if (!data) return;
+    bar.hidden = false;
+    for (const key of ["week", "month"]) {
+      const list = bar.querySelector(`[data-tot="${key}"]`);
+      const items = data[key] || [];
+      const colors = logic.previewColors(items.map((t) => t.name));
+      list.replaceChildren();
+      if (!items.length) list.appendChild(el("span", "gp-tot-none", "Nothing yet"));
+      items.forEach((t, i) => {
+        const chip = el("span", "gp-tot");
+        chip.style.setProperty("--c", colors[i]);
+        chip.title = `${t.name}: ${t.amount} ${t.unit} in ${t.doses} dose${t.doses === 1 ? "" : "s"}`;
+        chip.append(el("i"), el("span", "", t.name), el("b", "", `${t.amount} ${t.unit}`.trim()), el("small", "", `${t.doses}×`));
+        list.appendChild(chip);
+      });
+    }
+  };
+  const load = async () => {
+    try {
+      const params = new URLSearchParams({ zone, tz: String(new Date().getTimezoneOffset()) });
+      const res = await fetch("/profile/intake?" + params, { headers: { Accept: "application/json" } });
+      if (!res.ok || !(res.headers.get("content-type") || "").includes("json")) return;
+      data = (await res.json()).totals || {};
+      render();
+    } catch {
+      // Offline: keep what is shown.
+    }
+  };
+  // A saved or deleted session changes the totals; wait for a pause in edits.
+  window.addEventListener("xn-doses-changed", () => { clearTimeout(timer); timer = setTimeout(load, 1200); });
+  // Custom graph colors arrive a moment later; repaint the dots then.
+  window.addEventListener("xn-colors-ready", render);
+  load();
 }
 
 // ------------------------------------------------------------

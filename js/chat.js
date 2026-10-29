@@ -90,7 +90,7 @@ function personOf(chat, id) {
 
 function paintName(node, p) {
   if (!p || !p.color) return node;
-  if (p.color === "rainbow") node.classList.add("xn-named", "xn-rainbow");
+  if (window.xnNameFx && window.xnNameFx.is(p.color)) window.xnNameFx.apply(node, p.color);
   else {
     node.style.color = (window.xnSiteColor && window.xnSiteColor.preview(p.color)) || p.color;
     node.classList.add("xn-named");
