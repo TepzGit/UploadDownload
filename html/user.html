@@ -43,13 +43,19 @@
   <section class="xn-card pf-head">
     <div class="pf-banner">{{if .Banner}}<img src="{{.Banner}}" alt="">{{end}}</div>
     <div class="pf-head-row">
+      <div class="pf-side">
       <div class="profile-avatar pf-avatar-static"{{if .Aura}} data-aura="{{.Aura}}"{{end}}{{if .AuraColor}} style="--aura: {{.AuraColor}}"{{end}}>{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}<span class="pf-initial" aria-hidden="true">{{.Initial}}</span>{{end}}</div>
+        <div class="pf-progress">
+          <span class="xn-pills" data-tier="{{.Rank.Tier}}" role="img" aria-label="{{.Rank.Tier}} of 5 pills, {{.Rank.Name}}"><span class="xn-rank-pips"><i></i><i></i><i></i><i></i><i></i></span></span>
+          <span class="pf-rank-meter" role="img" aria-label="{{.Rank.Progress}}% of the way to {{.Rank.Next}}"><i style="width:{{.Rank.Progress}}%"></i></span>
+          <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}}</small>
+        </div>
+      </div>
       <div class="pf-who">
         <p class="xn-eyebrow">{{if .Admin}}Admin{{else}}Member{{end}}</p>
-        <h1 class="xn-h1" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Name}}</h1>
-        <div class="pf-rank" data-tier="{{.Rank.Tier}}">
-          <span class="xn-rank" data-tier="{{.Rank.Tier}}"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}</span>
-          <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}}</small>
+        <div class="pf-name-row">
+          <h1 class="xn-h1" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Name}}</h1>
+          <span class="xn-rank" data-tier="{{.Rank.Tier}}" data-color="{{if eq .Rank.Look.Color "tier"}}tier{{end}}" data-style="{{.Rank.Look.Style}}" data-icon="{{if .Rank.Look.HideIcon}}0{{end}}" style="{{.Rank.Look.CSS}}"><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}</span>
         </div>
         <p class="xn-sub">{{if eq .Posts 1}}1 post{{else}}{{.Posts}} posts{{end}} · {{len .Liked}} liked substances</p>
         {{if .Bio}}<p class="pf-bio-text">{{.Bio}}</p>{{end}}
@@ -58,6 +64,9 @@
         {{if .IsSelf}}<a class="xn-btn xn-btn-primary" href="/Profile">Edit your profile</a>{{else}}<div class="pf-friend" id="friendButton" data-state="{{.Friend}}"></div><a class="xn-btn" href="/Chat?to={{.Name}}">Message</a>{{end}}
         <a class="xn-btn" href="/Forum">Forum</a>
       </div>
+      {{if .Shelf}}<section class="pf-shelf" aria-label="{{.Name}}'s shelf" {{if .ShelfColor}}style="--wood: {{.ShelfColor}}"{{end}}>
+        <ul class="pf-shelf-items">{{range .Shelf}}<li class="pf-shelf-item"><img src="{{.}}" alt="" draggable="false"></li>{{end}}</ul>
+      </section>{{end}}
     </div>
   </section>
 

@@ -65,14 +65,22 @@
       <button type="button" class="xn-btn pf-banner-btn" data-pick="banner"><svg aria-hidden="true"><use href="#i-camera"/></svg><span>Change banner</span></button>
     </div>
     <div class="pf-head-row">
+      <div class="pf-side">
       <button type="button" id="profile-pic" class="profile-avatar" data-pick="avatar" aria-label="Change profile picture">
         <img id="avatarImg" alt="" {{if .Avatar}}src="{{.Avatar}}"{{else}}hidden{{end}}>
         <span class="pf-initial" id="avatarInitial" aria-hidden="true" {{if .Avatar}}hidden{{end}}>{{.Initial}}</span>
         <span class="avatar-overlay"><svg aria-hidden="true"><use href="#i-camera"/></svg></span>
       </button>
+        <div class="pf-progress">
+          <span class="xn-pills" data-tier="{{.Rank.Tier}}" role="img" aria-label="{{.Rank.Tier}} of 5 pills, {{.Rank.Name}}"><span class="xn-rank-pips"><i></i><i></i><i></i><i></i><i></i></span></span>
+          <span class="pf-rank-meter" role="img" aria-label="{{.Rank.Progress}}% of the way to {{.Rank.Next}}"><i style="width:{{.Rank.Progress}}%"></i></span>
+          <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}} · {{.Rank.ToNext}} more to {{.Rank.Next}}{{if eq .Rank.Tier 5}} (level {{.Rank.Level}} reached){{end}}</small>
+        </div>
+      </div>
       <div class="pf-who">
         <div class="pf-name-row">
           <h1 class="xn-h1" id="username" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Username}}</h1>
+          <button type="button" class="xn-rank pf-rank-btn" id="rankLabel" data-tier="{{.Rank.Tier}}" data-color="{{if eq .Rank.Look.Color "tier"}}tier{{end}}" data-style="{{.Rank.Look.Style}}" data-icon="{{if .Rank.Look.HideIcon}}0{{end}}" style="{{.Rank.Look.CSS}}" aria-expanded="false" aria-controls="rankHow"><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}<span class="xn-sr"> (how ranks work)</span></button>
           <div class="pf-menu-wrap">
             <button type="button" class="pf-gear" id="pfGear" aria-label="Settings" title="Settings" aria-haspopup="menu" aria-expanded="false" aria-controls="options"><span aria-hidden="true"></span></button>
             <div class="pf-menu" id="options" role="menu" aria-label="Settings" hidden>
@@ -85,11 +93,6 @@
             </div>
           </div>
         </div>
-        <div class="pf-rank" data-tier="{{.Rank.Tier}}">
-          <button type="button" class="xn-rank pf-rank-btn" data-tier="{{.Rank.Tier}}" aria-expanded="false" aria-controls="rankHow"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}<span class="xn-sr"> (how ranks work)</span></button>
-          <span class="pf-rank-meter" role="img" aria-label="{{.Rank.Progress}}% of the way to {{.Rank.Next}}"><i style="width:{{.Rank.Progress}}%"></i></span>
-          <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}} · {{.Rank.ToNext}} more to {{.Rank.Next}}{{if eq .Rank.Tier 5}} (level {{.Rank.Level}} reached){{end}}</small>
-        </div>
         <p class="pf-note pf-rank-how" id="rankHow" hidden>Every Graph session and Forum post you make is a point. In your first round the ranks are Fresh Geek, Geek (5), Big Geek (20), Mega Geek (50) and Geek⁴ (120). Each time you reach Geek⁴ you earn a level. When a round is full (150 points the first time) the ranks start over from Fresh Geek, and every new round needs 10% more points than the one before. You're in round {{.Rank.Round}}, which takes {{.Rank.RoundSize}} points.</p>
         <div class="pf-bio" id="pfBio">
           <p class="pf-bio-text" id="bioText" {{if not .Bio}}hidden{{end}}>{{.Bio}}</p>
@@ -101,6 +104,25 @@
           </form>
         </div>
       </div>
+      <section class="pf-shelf" id="pfShelf" data-own="1" data-max="12" data-wood="{{.ShelfColor}}" aria-label="Shelf" {{if .ShelfColor}}style="--wood: {{.ShelfColor}}"{{end}}>
+        <ul class="pf-shelf-items" id="shelfItems">{{range .Shelf}}<li class="pf-shelf-item" data-url="{{.}}"><img src="{{.}}" alt="" draggable="false"></li>{{end}}</ul>
+        <p class="pf-shelf-empty" id="shelfEmpty" {{if .Shelf}}hidden{{end}}>Your shelf is empty. Put some PNGs on it with +.</p>
+        <button type="button" class="pf-shelf-add" id="shelfAdd" aria-label="Put a picture on the shelf" title="Put a picture on the shelf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" class="pf-shelf-add pf-shelf-paint" id="shelfPaint" aria-label="Shelf color" title="Shelf color" aria-expanded="false" aria-controls="shelfColors"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.5-1.1-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.2-4-7.6-9-7.6z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg></button>
+        <div class="pf-shelf-colors" id="shelfColors" role="radiogroup" aria-label="Shelf color" hidden>
+          <button type="button" role="radio" class="pf-swatch" data-wood="" style="--sw:#7a4c28" aria-label="Oak (default)"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#a0522d" style="--sw:#a0522d" aria-label="Cherry"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#3e2a1e" style="--sw:#3e2a1e" aria-label="Walnut"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#c9a46c" style="--sw:#c9a46c" aria-label="Pine"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#2b2b2e" style="--sw:#2b2b2e" aria-label="Black"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#e8e4dc" style="--sw:#e8e4dc" aria-label="White"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#d16ba5" style="--sw:#d16ba5" aria-label="Pink"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#5b3fa6" style="--sw:#5b3fa6" aria-label="Purple"></button>
+          <button type="button" role="radio" class="pf-swatch" data-wood="#2f6b4f" style="--sw:#2f6b4f" aria-label="Green"></button>
+          <label class="pf-swatch pf-swatch-custom" title="Pick any color"><input type="color" id="shelfCustom" value="#7a4c28" aria-label="Pick any shelf color"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></label>
+        </div>
+        <input type="file" class="pf-file" id="shelfFile" accept="image/png,image/webp,image/gif,image/jpeg" multiple tabindex="-1" aria-hidden="true">
+      </section>
     </div>
     <input type="file" class="pf-file" id="avatarFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
     <input type="file" class="pf-file" id="bannerFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
@@ -252,6 +274,32 @@
       </div>
       <p class="pf-note">Changes the main color of the whole site for your account.</p>
       <p class="pf-note pf-moved">Site background, font, text size and the logo are under Preferences.</p>
+      <span class="xn-label pf-ap-label" id="rlLabel">Geek badge</span>
+      <div class="pf-rl" id="rankLook" data-look="{{.RankLookJSON}}">
+        <p class="pf-rl-preview"><span class="xn-rank" id="rlPreview" data-tier="{{.Rank.Tier}}"><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}</span></p>
+      <div class="pf-colors" role="radiogroup" aria-labelledby="rlLabel" id="rlColors">
+        <button type="button" role="radio" class="pf-swatch" data-rl="" style="--sw:#4ade80" aria-label="Green (default)"></button>
+        <button type="button" role="radio" class="pf-swatch pf-swatch-tiers" data-rl="tier" aria-label="A color for each rank" title="A color for each rank"></button>
+        <button type="button" role="radio" class="pf-swatch" data-rl="#f472b6" style="--sw:#f472b6" aria-label="Pink"></button>
+        <button type="button" role="radio" class="pf-swatch" data-rl="#60a5fa" style="--sw:#60a5fa" aria-label="Blue"></button>
+        <button type="button" role="radio" class="pf-swatch" data-rl="#a67cff" style="--sw:#a67cff" aria-label="Violet"></button>
+        <button type="button" role="radio" class="pf-swatch" data-rl="#fbbf24" style="--sw:#fbbf24" aria-label="Gold"></button>
+        <button type="button" role="radio" class="pf-swatch" data-rl="#f87171" style="--sw:#f87171" aria-label="Red"></button>
+        <button type="button" role="radio" class="pf-swatch" data-rl="#e5e7eb" style="--sw:#e5e7eb" aria-label="White"></button>
+        <label class="pf-swatch pf-swatch-custom" title="Pick any color">
+          <input type="color" id="rlCustom" value="#4ade80" aria-label="Pick any color for your geek badge">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </label>
+      </div>
+        <div class="ps-seg" role="radiogroup" aria-label="Badge style" id="rlStyle">
+          <button type="button" role="radio" data-value="">Outline</button>
+          <button type="button" role="radio" data-value="filled">Filled</button>
+          <button type="button" role="radio" data-value="glow">Glow</button>
+          <button type="button" role="radio" data-value="text">Just text</button>
+        </div>
+        <label class="ps-check pr-check"><input type="checkbox" id="rlIcon" checked><span>Show the rank icon after the name</span></label>
+      </div>
+      <p class="pf-note">Your geek badge shows next to your name everywhere. Your pills and points sit under your profile picture.</p>
       {{if .IsAdmin}}
       <span class="xn-label pf-ap-label" id="nameColorLabel">Name color <small class="pf-admin-tag">Admin</small></span>
       <div class="pf-colors" role="radiogroup" aria-labelledby="nameColorLabel" id="namePicks" data-current="{{.NameColor}}">
@@ -1583,6 +1631,43 @@
       rankBtn.setAttribute("aria-expanded", String(!how.hidden));
     });
 
+    // Geek badge look: color, style and the stage picture, saved as rankLook.
+    (() => {
+      const box = document.getElementById("rankLook");
+      let look = {};
+      try { look = JSON.parse(box.dataset.look || "{}") || {}; } catch (e) {}
+      const swatches = [...box.querySelectorAll("[data-rl]")];
+      const custom = document.getElementById("rlCustom");
+      const styles = [...box.querySelectorAll("#rlStyle [data-value]")];
+      const icon = document.getElementById("rlIcon");
+      const targets = [document.getElementById("rlPreview"), document.getElementById("rankLabel")];
+      const show = () => {
+        targets.forEach((el) => el && window.xnRank.dress(el, look));
+        let hit = false;
+        swatches.forEach((sw) => {
+          const on = sw.dataset.rl === (look.color || "");
+          hit = hit || on;
+          sw.setAttribute("aria-checked", String(on));
+          sw.tabIndex = on ? 0 : -1;
+        });
+        custom.parentElement.classList.toggle("is-on", !hit);
+        if (!hit) { custom.parentElement.style.setProperty("--sw", look.color); custom.value = look.color; }
+        styles.forEach((b) => b.setAttribute("aria-checked", String(b.dataset.value === (look.style || ""))));
+        icon.checked = !look.hideIcon;
+      };
+      const change = (part) => {
+        look = Object.assign({}, look, part);
+        show();
+        save("rankLook", look, "Geek badge saved.");
+      };
+      swatches.forEach((sw) => sw.addEventListener("click", () => change({ color: sw.dataset.rl })));
+      custom.addEventListener("input", () => { look = Object.assign({}, look, { color: custom.value.toLowerCase() }); show(); });
+      custom.addEventListener("change", () => change({ color: custom.value.toLowerCase() }));
+      styles.forEach((b) => b.addEventListener("click", () => change({ style: b.dataset.value })));
+      icon.addEventListener("change", () => change({ hideIcon: !icon.checked }));
+      show();
+    })();
+
     // Site background: presets or your own picture, on every page.
     const scenePicks = document.getElementById("scenePicks");
     const sceneTiles = [...scenePicks.querySelectorAll(".pf-scene")];
@@ -1811,6 +1896,7 @@
   })();
 </script>
 <script type="module" src="/plotstyle.js"></script>
+<script type="module" src="/shelf.js"></script>
 <script type="module">
   import { setupJournalImport } from "/journalimport.js";
   setupJournalImport(document.getElementById("journalImport"));

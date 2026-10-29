@@ -242,6 +242,13 @@ CREATE TABLE IF NOT EXISTS site_settings (
 	value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS site_news (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	author TEXT NOT NULL,
+	body TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS forum_comments (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	post_id INTEGER NOT NULL,
@@ -395,6 +402,7 @@ func main() {
 	http.HandleFunc("/admin/server", requireAdminLogin(adminServer))
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
 	http.HandleFunc("/site/main-look", requireAdminLogin(saveMainLook))
+	http.HandleFunc("/site/news", siteNews)
 	http.HandleFunc("/sitepic/", sitePicture)
 	http.HandleFunc("/notifications", requireLogin(notifications))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
@@ -405,6 +413,7 @@ func main() {
 	http.HandleFunc("/profile/appearance", requireLogin(profileAppearance))
 	http.HandleFunc("/me", currentUser)
 	http.HandleFunc("/profile/bio", requireLogin(profileBio))
+	http.HandleFunc("/profile/shelf", requireLogin(profileShelf))
 	http.HandleFunc("/profiles/", requireLogin(profileImage))
 	http.HandleFunc("/u/", requireLogin(publicProfile))
 	http.HandleFunc("/Forum", requireLogin(Forum))
@@ -523,7 +532,7 @@ func main() {
 	// createdAt and lastSeen (ms) feed the Admin page's account list.
 	// graphsMade and postsMade count every Graph session and Forum post ever made
 	// (for the geek rank), so deleting or the session limit doesn't lower it.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0", "bio TEXT NOT NULL DEFAULT ''"} {
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0", "bio TEXT NOT NULL DEFAULT ''", "rankLook TEXT NOT NULL DEFAULT ''", "shelf TEXT NOT NULL DEFAULT ''", "shelfColor TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
@@ -577,6 +586,8 @@ func Main(w http.ResponseWriter, r *http.Request) {
 		Look        mainLook
 		LookStyle   template.CSS
 		LookJSON    template.JS
+		News        []newsItem
+		Owners      []ownerCard
 	}{}
 
 	d.SessionInfo, d.Login = sessionFromRequest(r)
@@ -590,6 +601,8 @@ func Main(w http.ResponseWriter, r *http.Request) {
 	for slot := range sitePictureSlots {
 		d.Pictures[slot] = sitePictureLink(slot)
 	}
+	d.News = loadNews()
+	d.Owners = siteOwners(d.Pictures)
 	setRoleHint(w, r, d.SessionInfo, d.Login)
 	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), d.SessionInfo.OriginalUsername, r.URL.Path)
 
@@ -604,6 +617,115 @@ func Main(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
 	}
+}
+
+// ---- Main page news and owners ----
+
+// newsItem is one message admins broadcast on the Main page.
+type newsItem struct {
+	ID     int64  `json:"id"`
+	Author string `json:"author"`
+	Body   string `json:"body"`
+	At     int64  `json:"at"` // unix ms
+}
+
+func (n newsItem) When() string { return time.UnixMilli(n.At).Format("2 Jan 2006, 15:04") }
+
+const newsShown = 20
+
+func loadNews() []newsItem {
+	out := []newsItem{}
+	rows, err := db.Query("SELECT id, author, body, created_at FROM site_news ORDER BY id DESC LIMIT ?", newsShown)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var n newsItem
+		if rows.Scan(&n.ID, &n.Author, &n.Body, &n.At) == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// siteNews: GET lists the news (anyone); POST JSON {action:"post", body} or
+// {action:"delete", id} is for admins. Answers {"items": [...]}.
+func siteNews(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		session, ok := sessionFromRequest(r)
+		if !ok || session.Authority != "admin" {
+			http.Error(w, "Only admins can post news.", http.StatusForbidden)
+			return
+		}
+		var in struct {
+			Action string `json:"action"`
+			Body   string `json:"body"`
+			ID     int64  `json:"id"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&in); err != nil {
+			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+			return
+		}
+		switch in.Action {
+		case "post":
+			body := strings.TrimSpace(strings.ReplaceAll(in.Body, "\r\n", "\n"))
+			if body == "" {
+				http.Error(w, "Write something first.", http.StatusBadRequest)
+				return
+			}
+			if utf8.RuneCountInString(body) > 2000 {
+				http.Error(w, "Keep it under 2000 characters.", http.StatusBadRequest)
+				return
+			}
+			if _, err := db.Exec("INSERT INTO site_news (author, body, created_at) VALUES (?, ?, ?)", session.OriginalUsername, body, time.Now().UnixMilli()); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't post it.", http.StatusInternalServerError)
+				return
+			}
+		case "delete":
+			if _, err := db.Exec("DELETE FROM site_news WHERE id = ?", in.ID); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't delete it.", http.StatusInternalServerError)
+				return
+			}
+		default:
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+			return
+		}
+	} else if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, map[string][]newsItem{"items": loadNews()})
+}
+
+// ownerCard is one of the site's owners in the bottom box of the Main page,
+// linked to their account when it exists.
+type ownerCard struct {
+	Name    string
+	Role    string
+	Slot    string
+	Picture string
+	Account string // username of their account, "" when there is none
+	Rank    geekRank
+}
+
+var siteOwnerList = []struct{ Name, Role, Slot string }{{"Hookey", "Frontend", "member1"}, {"Tepz", "Backend", "member2"}}
+
+func siteOwners(pictures map[string]string) []ownerCard {
+	out := []ownerCard{}
+	for _, o := range siteOwnerList {
+		c := ownerCard{Name: o.Name, Role: o.Role, Slot: o.Slot, Picture: pictures[o.Slot]}
+		var account string
+		if db.QueryRow("SELECT originalUsername FROM users WHERE username = ?", strings.ToLower(o.Name)).Scan(&account) == nil {
+			c.Account = account
+			c.Rank = rankOf(account)
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 func Profile(w http.ResponseWriter, r *http.Request) {
@@ -640,6 +762,9 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 		NameColor     string
 		IsAdmin       bool
 		Rank          geekRank
+		RankLookJSON  string
+		Shelf         []string
+		ShelfColor    string
 		Liked         []likedSubstance
 		RecentIntakes []dose
 		Totals        map[string]Totals
@@ -665,6 +790,11 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 	d.ClearAlpha = makeClearAlpha(d.WidgetClear)
 	d.IsAdmin = session.Authority == "admin"
 	d.Rank = rankOf(d.Username)
+	d.Shelf = loadShelf(userId)
+	d.ShelfColor = shelfColorOf(userId)
+	if look, err := json.Marshal(d.Rank.Look); err == nil {
+		d.RankLookJSON = string(look)
+	}
 	if !d.IsAdmin {
 		d.NameColor = ""
 	}
@@ -3778,6 +3908,156 @@ func profileBoxes(w http.ResponseWriter, r *http.Request) {
 
 // profileBio saves the account's description (POST {bio}), shown under the
 // name on its Profile and public profile. Up to 500 characters.
+// ---- Profile shelf ----
+
+// The shelf in the Profile header holds up to shelfMax pictures the owner put
+// there (PNGs with see-through backgrounds stand on the planks best). They are
+// kept as profiles/<uid>/shelf-*.ext, listed in users.shelf as a JSON array.
+const shelfMax = 12
+
+func loadShelf(uid int) []string {
+	var stored string
+	db.QueryRow("SELECT shelf FROM users WHERE id = ?", uid).Scan(&stored)
+	var links []string
+	if stored != "" {
+		json.Unmarshal([]byte(stored), &links)
+	}
+	out := []string{}
+	for _, link := range links {
+		if found := existingPicture(link); found != "" {
+			out = append(out, found)
+		}
+	}
+	return out
+}
+
+// shelfColorOf is the wood color the owner picked, "" for the default brown.
+func shelfColorOf(uid int) string {
+	var color string
+	db.QueryRow("SELECT shelfColor FROM users WHERE id = ?", uid).Scan(&color)
+	if !hexColor.MatchString(color) {
+		return ""
+	}
+	return color
+}
+
+func saveShelf(uid int, links []string) error {
+	body, _ := json.Marshal(links)
+	_, err := db.Exec("UPDATE users SET shelf = ? WHERE id = ?", string(body), uid)
+	return err
+}
+
+// profileShelf: POST multipart "image" puts a picture on the shelf; POST JSON
+// {action:"remove", url} takes one off, {action:"order", order:[urls]} moves them,
+// {action:"color", color} paints the wood ("" = default brown).
+// Every answer is the shelf as {"items": [...]}.
+func profileShelf(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		http.Error(w, "Sign in first.", http.StatusUnauthorized)
+		return
+	}
+	uid := session.UserId
+	items := loadShelf(uid)
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
+		r.Body = http.MaxBytesReader(w, r.Body, maxPictureBytes+(64<<10))
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			http.Error(w, fmt.Sprintf("That picture is too big. Pick one under %d MB.", maxPictureMB), http.StatusRequestEntityTooLarge)
+			return
+		}
+		if len(items) >= shelfMax {
+			http.Error(w, fmt.Sprintf("The shelf is full (%d pictures). Take one off first.", shelfMax), http.StatusBadRequest)
+			return
+		}
+		file, _, err := r.FormFile("image")
+		if err != nil {
+			http.Error(w, "Pick a picture first.", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		link, status, msg := saveProfileImage(file, uid, "shelf")
+		if status != 0 {
+			http.Error(w, msg, status)
+			return
+		}
+		items = append(items, link)
+		if err := saveShelf(uid, items); err != nil {
+			fmt.Println(err)
+			removeOwnPicture(link, uid)
+			http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string][]string{"items": items})
+		return
+	}
+	var in struct {
+		Action string   `json:"action"`
+		URL    string   `json:"url"`
+		Order  []string `json:"order"`
+		Color  string   `json:"color"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+		return
+	}
+	switch in.Action {
+	case "color":
+		color := strings.ToLower(strings.TrimSpace(in.Color))
+		if color != "" && !hexColor.MatchString(color) {
+			http.Error(w, "Pick a color like #7a4c28.", http.StatusBadRequest)
+			return
+		}
+		if _, err := db.Exec("UPDATE users SET shelfColor = ? WHERE id = ?", color, uid); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't save the color.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"items": items, "color": color})
+		return
+	case "remove":
+		kept := []string{}
+		for _, link := range items {
+			if link == in.URL {
+				removeOwnPicture(link, uid)
+			} else {
+				kept = append(kept, link)
+			}
+		}
+		items = kept
+	case "order":
+		have := map[string]bool{}
+		for _, link := range items {
+			have[link] = true
+		}
+		sorted := []string{}
+		for _, link := range in.Order {
+			if have[link] {
+				sorted = append(sorted, link)
+				delete(have, link)
+			}
+		}
+		for _, link := range items {
+			if have[link] {
+				sorted = append(sorted, link)
+			}
+		}
+		items = sorted
+	default:
+		http.Error(w, "Unknown action.", http.StatusBadRequest)
+		return
+	}
+	if err := saveShelf(uid, items); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save the shelf.", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string][]string{"items": items})
+}
+
 func profileBio(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -3843,6 +4123,8 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		Aura       string
 		AuraColor  string
 		Bio        string
+		Shelf      []string
+		ShelfColor string
 	}{Name: name}
 
 	var id int
@@ -3867,6 +4149,8 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		d.Admin = authority == "admin"
 		d.NameColor = adminNameColor(d.Name, authority)
 		d.Rank = rankOf(d.Name)
+		d.Shelf = loadShelf(id)
+		d.ShelfColor = shelfColorOf(id)
 		d.IsSelf = id == session.UserId
 		d.Friend = friendState(session.UserId, id)
 		db.QueryRow("SELECT COUNT(*) FROM forum_posts WHERE user_id = ?", id).Scan(&d.Posts)
@@ -3912,13 +4196,14 @@ func Forum(w http.ResponseWriter, r *http.Request) {
 }
 
 type postAuthor struct {
-	Name    string `json:"name"`
-	Initial string `json:"initial"`
-	Avatar  string `json:"avatar"`
-	Admin   bool   `json:"admin"`
-	Color   string `json:"color,omitempty"` // an admin's name color
-	Rank    int    `json:"rank,omitempty"`  // geek rank tier, 1 to 5
-	Level   int    `json:"level,omitempty"` // times the account reached Geek⁴
+	Name     string    `json:"name"`
+	Initial  string    `json:"initial"`
+	Avatar   string    `json:"avatar"`
+	Admin    bool      `json:"admin"`
+	Color    string    `json:"color,omitempty"` // an admin's name color
+	Rank     int       `json:"rank,omitempty"`  // geek rank tier, 1 to 5
+	Level    int       `json:"level,omitempty"` // times the account reached Geek⁴
+	RankLook *rankLook `json:"rankLook,omitempty"`
 }
 
 type forumPost struct {
@@ -4064,7 +4349,7 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			db.QueryRow("SELECT pathToProfilePic FROM users WHERE id = ?", uid).Scan(&avatar)
 			writeJSON(w, forumPost{
 				ID:        id,
-				Author:    postAuthor{Name: session.OriginalUsername, Initial: initialOf(session.OriginalUsername), Avatar: existingPicture(avatar), Admin: isAdmin, Color: adminNameColor(session.OriginalUsername, session.Authority), Rank: rankOf(session.OriginalUsername).Tier, Level: rankOf(session.OriginalUsername).Level},
+				Author:    postAuthor{Name: session.OriginalUsername, Initial: initialOf(session.OriginalUsername), Avatar: existingPicture(avatar), Admin: isAdmin, Color: adminNameColor(session.OriginalUsername, session.Authority), Rank: rankOf(session.OriginalUsername).Tier, Level: rankOf(session.OriginalUsername).Level, RankLook: rankOf(session.OriginalUsername).Look.ptr()},
 				Body:      body,
 				Pictures:  saved,
 				CreatedAt: now,
@@ -4171,7 +4456,7 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 
 // person is how an account is shown next to posts, comments and friends.
 func person(name, avatar, authority string) postAuthor {
-	return postAuthor{Name: name, Initial: initialOf(name), Avatar: existingPicture(avatar), Admin: authority == "admin", Color: adminNameColor(name, authority), Rank: rankOf(name).Tier, Level: rankOf(name).Level}
+	return postAuthor{Name: name, Initial: initialOf(name), Avatar: existingPicture(avatar), Admin: authority == "admin", Color: adminNameColor(name, authority), Rank: rankOf(name).Tier, Level: rankOf(name).Level, RankLook: rankOf(name).Look.ptr()}
 }
 
 // profileAppearance reads (GET) or saves (POST JSON) the account's site color
@@ -4210,6 +4495,7 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 			SiteBgDim   *int       `json:"siteBgDim"`
 			PlotStyle   *plotStyle `json:"plotStyle"`
 			SiteLook    *siteLook  `json:"siteLook"`
+			RankLook    *rankLook  `json:"rankLook"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in); err != nil {
 			http.Error(w, "Bad request.", http.StatusBadRequest)
@@ -4278,6 +4564,15 @@ func profileAppearance(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Couldn't save the site look.", http.StatusInternalServerError)
 				return
 			}
+		}
+		if in.RankLook != nil {
+			body, _ := json.Marshal(in.RankLook.clean())
+			if _, err := db.Exec("UPDATE users SET rankLook = ? WHERE id = ?", string(body), uid); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the geek badge.", http.StatusInternalServerError)
+				return
+			}
+			staleRanks()
 		}
 		if in.WidgetClear != nil {
 			clear := min(max(*in.WidgetClear, 0), 100)
@@ -5610,17 +5905,56 @@ var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars"
 // keeps counting up (Geek⁴ once = level 1, twice = level 2, ...). Every round
 // needs rankHarder (10%) more points than the one before, tiers included.
 type geekRank struct {
-	Tier      int    `json:"tier"`
-	Name      string `json:"name"`
-	Level     int    `json:"level"`     // times Geek⁴ was reached
-	Round     int    `json:"round"`     // which round the account is in, from 1
-	RoundSize int    `json:"roundSize"` // points this round takes
-	Score     int    `json:"score"`
-	Graphs    int    `json:"graphs"`
-	Posts     int    `json:"posts"`
-	Next      string `json:"next"`     // what comes next: a tier name or "a new round"
-	ToNext    int    `json:"toNext"`   // points still needed for it
-	Progress  int    `json:"progress"` // percent of the way from this tier to the next
+	Tier      int      `json:"tier"`
+	Name      string   `json:"name"`
+	Level     int      `json:"level"`     // times Geek⁴ was reached
+	Round     int      `json:"round"`     // which round the account is in, from 1
+	RoundSize int      `json:"roundSize"` // points this round takes
+	Score     int      `json:"score"`
+	Graphs    int      `json:"graphs"`
+	Posts     int      `json:"posts"`
+	Next      string   `json:"next"`     // what comes next: a tier name or "a new round"
+	ToNext    int      `json:"toNext"`   // points still needed for it
+	Progress  int      `json:"progress"` // percent of the way from this tier to the next
+	Look      rankLook `json:"look"`     // how the account dressed its geek label
+}
+
+// rankLook is how an account's geek label looks everywhere its name shows
+// (Profile > Appearance > Geek badge). Color "" is the default green, "tier"
+// uses a color per tier, or a hex color. Style "" is the outline pill.
+type rankLook struct {
+	Color    string `json:"color,omitempty"`
+	Style    string `json:"style,omitempty"`    // "", filled, glow, text
+	HideIcon bool   `json:"hideIcon,omitempty"` // leave out the rank icon after the name
+}
+
+var rankStyles = map[string]bool{"": true, "filled": true, "glow": true, "text": true}
+
+func (l rankLook) clean() rankLook {
+	l.Color = strings.ToLower(strings.TrimSpace(l.Color))
+	if l.Color != "tier" && !hexColor.MatchString(l.Color) {
+		l.Color = ""
+	}
+	if !rankStyles[l.Style] {
+		l.Style = ""
+	}
+	return l
+}
+
+// CSS gives a custom hex color to the label; the other colors are in oled.css.
+func (l rankLook) CSS() template.CSS {
+	if hexColor.MatchString(l.Color) {
+		return template.CSS("--rank: " + l.Color)
+	}
+	return ""
+}
+
+// ptr is the look for JSON, left out when it is all defaults.
+func (l rankLook) ptr() *rankLook {
+	if l == (rankLook{}) {
+		return nil
+	}
+	return &l
 }
 
 const rankRound = 150
@@ -5684,16 +6018,20 @@ func allRanks() map[string]geekRank {
 		return ranks
 	}
 	m := map[string]geekRank{}
-	rows, err := db.Query("SELECT username, graphsMade, postsMade FROM users")
+	rows, err := db.Query("SELECT username, graphsMade, postsMade, rankLook FROM users")
 	if err != nil {
 		fmt.Println(err)
 		return ranks
 	}
 	for rows.Next() {
-		var name string
+		var name, look string
 		var graphs, posts int
-		if rows.Scan(&name, &graphs, &posts) == nil {
-			m[strings.ToLower(name)] = makeRank(graphs, posts)
+		if rows.Scan(&name, &graphs, &posts, &look) == nil {
+			g := makeRank(graphs, posts)
+			if look != "" && json.Unmarshal([]byte(look), &g.Look) == nil {
+				g.Look = g.Look.clean()
+			}
+			m[strings.ToLower(name)] = g
 		}
 	}
 	rows.Close()

@@ -1029,9 +1029,25 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-scene-own .xn-label { margin-top: 10px; }
 
 /* Geek rank under the name */
-.pf-rank { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
-.pf-rank .xn-rank { font-size: 14px; padding: 4px 12px 4px 8px; gap: 8px; }
-.pf-rank .xn-rank-pips i { width: 17px; height: 17px; }
+/* Picture column: the profile picture with the pill slider and the
+   points bar under it; the green geek label sits next to the name. */
+.pf-side { display: flex; flex: none; flex-direction: column; gap: 10px; width: 192px; }
+.pf-progress { display: flex; flex-direction: column; gap: 7px; padding: 9px 10px 8px; border: 1px solid var(--oled-line); border-radius: 10px; background: color-mix(in srgb, var(--oled-surface) calc(var(--pf-a, 1) * 100%), transparent); }
+.pf-progress .xn-pills { gap: 8px; font-size: 22px; }
+.pf-progress .xn-rank-pips { flex: 1; justify-content: space-between; }
+.pf-progress .xn-rank-pips i { width: 23px; height: 23px; }
+.pf-progress .pf-rank-meter { width: 100%; }
+@media (max-width: 640px) {
+  .pf-side { width: 160px; }
+  .pf-progress .xn-pills { font-size: 18px; gap: 6px; }
+  .pf-progress .xn-rank-pips i { width: 19px; height: 19px; }
+}
+.pf-rl { display: grid; gap: 10px; }
+.pf-rl-preview { margin: 0; padding: 12px; border: 1px dashed var(--oled-line); border-radius: 10px; text-align: center; }
+.pf-rl-preview .xn-rank { font-size: 15px; padding: 4px 12px; }
+.pf-swatch-tiers { background: conic-gradient(#f472b6, #2dd4bf, #60a5fa, #a67cff, #fbbf24, #f472b6) !important; }
+.pf-name-row { flex-wrap: wrap; }
+.pf-name-row .xn-rank { flex: none; font-size: 13px; padding: 3px 10px; }
 .pf-rank-meter { position: relative; width: 120px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--oled-surface-2); box-shadow: inset 0 0 0 1px var(--oled-line); }
 .pf-rank-meter i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--oled-accent); }
 @media (prefers-reduced-motion: no-preference) { .pf-rank-meter i { animation: pf-meter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.2s; transform-origin: left; } }
@@ -1041,7 +1057,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-rank-btn { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color 0.15s ease; }
 .pf-rank-btn:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
 @media (hover: hover) { .pf-rank-btn:hover { background: color-mix(in srgb, var(--rank) 22%, transparent); } }
-.pf-head-row > .profile-avatar { align-self: flex-start; }
+.pf-head-row > .profile-avatar, .pf-head-row > .pf-side { align-self: flex-start; }
 
 /* ---- Phone sync popup ---- */
 .sy-intro { line-height: 1.5; }
@@ -1207,3 +1223,75 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-pics.is-idle .pf-pic-x { top: auto; bottom: 6px; }
 .pf-data.is-arranging > .pf-pics.is-idle { padding: 20px; }
 @media (prefers-reduced-motion: reduce) { .pf-pics, .pf-pics.is-idle .pf-box-head { transition: none; } }
+
+/* Shelf in the header (js/shelf.js): a dark wooden cabinet whose rows each
+   end in a plank the pictures stand on. */
+.pf-shelf {
+  --wood: #7a4c28; /* the owner's shelf color; frame, planks and back come from it */
+  --row: 104px;
+  --plank: 12px;
+  position: relative;
+  flex: 0 1 470px;
+  align-self: flex-end;
+  min-width: 0;
+  margin-left: auto;
+  padding: 10px 12px 0;
+  border: 7px solid color-mix(in srgb, var(--wood) 55%, #000);
+  border-bottom-width: 9px;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, color-mix(in srgb, var(--wood) 26%, #000), color-mix(in srgb, var(--wood) 14%, #000));
+  box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 200, 150, 0.06), 0 12px 26px rgba(0, 0, 0, 0.5);
+}
+.pf-shelf::before, .pf-shelf::after { content: ""; position: absolute; top: -7px; bottom: -9px; width: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--wood) 65%, #000), color-mix(in srgb, var(--wood) 40%, #000)); }
+.pf-shelf::before { left: -7px; border-radius: 6px 0 0 6px; }
+.pf-shelf::after { right: -7px; border-radius: 0 6px 6px 0; }
+.pf-shelf-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  grid-auto-rows: var(--row);
+  min-height: var(--row);
+  margin: 0 -12px;
+  padding: 0 12px;
+  list-style: none;
+  background: repeating-linear-gradient(180deg,
+    transparent 0 calc(var(--row) - var(--plank) - 6px),
+    rgba(0, 0, 0, 0.45) calc(var(--row) - var(--plank) - 6px) calc(var(--row) - var(--plank)),
+    color-mix(in srgb, var(--wood) 78%, #fff) calc(var(--row) - var(--plank)) calc(var(--row) - var(--plank) + 2px),
+    var(--wood) calc(var(--row) - var(--plank) + 2px) calc(var(--row) - 4px),
+    color-mix(in srgb, var(--wood) 50%, #000) calc(var(--row) - 4px) var(--row));
+}
+.pf-shelf-item { position: relative; display: flex; align-items: flex-end; justify-content: center; min-width: 0; padding: 6px 4px var(--plank); }
+.pf-shelf-item img { display: block; max-width: 100%; max-height: calc(var(--row) - var(--plank) - 12px); margin-bottom: -1px; object-fit: contain; filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.65)); -webkit-user-select: none; user-select: none; }
+.pf-shelf-item[draggable="true"] { cursor: grab; }
+.pf-shelf-item.is-dragging { opacity: 0.4; }
+.pf-shelf-item.is-going { opacity: 0.3; pointer-events: none; }
+.pf-shelf-off {
+  position: absolute; top: 2px; right: 2px;
+  width: 24px; height: 24px; padding: 0;
+  border: 1px solid var(--oled-line); border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75); color: var(--oled-text);
+  font: 600 16px/1 inherit; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s ease;
+}
+.pf-shelf-item:hover .pf-shelf-off, .pf-shelf-off:focus-visible { opacity: 1; }
+@media (hover: none) { .pf-shelf-off { opacity: 0.85; } }
+.pf-shelf-empty { position: absolute; left: 14px; right: 50px; top: calc(var(--row) / 2 - 18px); margin: 0; color: color-mix(in srgb, var(--wood) 45%, #ddd); font-size: 12px; text-align: center; }
+.pf-shelf-add {
+  position: absolute; top: -19px; right: -19px; z-index: 1;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid rgba(255, 210, 170, 0.25); border-radius: 50%;
+  background: color-mix(in srgb, var(--wood) 60%, #000); color: #f3dcc5; cursor: pointer;
+}
+.pf-shelf-paint { right: 17px; }
+.pf-shelf-colors { position: absolute; top: 18px; right: 8px; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; max-width: 260px; padding: 10px; border: 1px solid var(--oled-line); border-radius: 12px; background: #0b0b0e; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6); }
+.pf-shelf-colors[hidden] { display: none; }
+.pf-shelf-add svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.pf-shelf-add:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pf-shelf-add[hidden] { display: none; }
+@media (max-width: 640px) {
+  .pf-shelf { --row: 92px; flex: none; width: 100%; margin-left: 0; box-sizing: border-box; }
+  .pf-shelf-items { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+}

@@ -37,7 +37,7 @@ export function paintName(el, who) {
 
 /** The small geek rank pips beside a name. */
 export function rankBadge(who) {
-  return who && who.rank && window.xnRank ? window.xnRank.badge(who.rank, true, who.level) : null;
+  return who && who.rank && window.xnRank ? window.xnRank.badge(who.rank, true, who.level, who.rankLook) : null;
 }
 
 export function profileLink(name) {

@@ -261,26 +261,36 @@
   window.xnPaintNames = paintNames;
 
   // Geek rank: 5 tiers, one point per Graph session and per Forum post.
-  // The names match geekTiers in UploadDownload.go.
+  // The names match geekTiers in UploadDownload.go. The label next to a
+  // name is the tier name; look is the account's rankLook (color, style, icon).
   const RANKS = ["Fresh Geek", "Geek", "Big Geek", "Mega Geek", "Geek⁴"];
+  const HEX = /^#[0-9a-f]{6}$/i;
   window.xnRank = {
     NAMES: RANKS,
-    badge(tier, compact, level) {
+    dress(el, look) {
+      look = look || {};
+      el.dataset.color = look.color === "tier" ? "tier" : "";
+      if (HEX.test(look.color || "")) el.style.setProperty("--rank", look.color);
+      else el.style.removeProperty("--rank");
+      if (look.style) el.dataset.style = look.style;
+      else delete el.dataset.style;
+      el.dataset.icon = look.hideIcon ? "0" : "";
+      return el;
+    },
+    badge(tier, compact, level, look) {
       tier = Math.min(5, Math.max(1, Number(tier) || 1));
       const el = document.createElement("span");
       el.className = "xn-rank" + (compact ? " is-compact" : "");
       el.dataset.tier = String(tier);
       level = Math.max(0, Number(level) || 0);
       el.title = "Geek rank " + tier + " of 5: " + RANKS[tier - 1] + (level ? ", level " + level : "");
-      el.innerHTML = '<span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name"></span>';
-      const name = el.querySelector(".xn-rank-name");
-      name.textContent = compact ? "Rank: " + RANKS[tier - 1] + (level ? ", level " + level : "") : RANKS[tier - 1];
-      if (compact) name.className = "xn-rank-name xn-sr";
+      el.innerHTML = '<span class="xn-rank-name"></span>';
+      el.querySelector(".xn-rank-name").textContent = RANKS[tier - 1];
+      this.dress(el, look);
       if (level) {
         const lv = document.createElement("span");
         lv.className = "xn-level";
-        lv.setAttribute("aria-hidden", compact ? "true" : "false");
-        lv.textContent = compact ? String(level) : "Lv " + level;
+        lv.textContent = "Lv " + level;
         el.append(lv);
       }
       return el;

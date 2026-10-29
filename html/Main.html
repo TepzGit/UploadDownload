@@ -294,7 +294,38 @@
     }
     @media (max-width: 860px) {
       .gp-top { grid-template-columns: minmax(0, 1fr); }
-      .gp-top .gp-team { grid-template-columns: repeat(2, 104px); }
+    }
+
+    /* mommy 2026-10-29: one column. Log in + Weather on top, then the
+       admins' News, then a bottom box with the owners and their accounts. */
+    .gp-top { grid-template-columns: minmax(0, 1fr); }
+    .gp-box { position: relative; padding: 18px 20px 20px; border: 1px solid var(--gp-line); border-radius: 16px; background: var(--gp-tile); }
+    .gp-box-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 12px; }
+    .gp-box-title { margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: var(--oled-muted); }
+    .gp-box-note { font-size: 0.75rem; color: var(--oled-muted); opacity: 0.8; }
+    .gp-news-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; align-items: start; margin-bottom: 14px; }
+    .gp-news-form textarea { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--gp-line); border-radius: 10px; background: #000; color: var(--oled-text); font: inherit; resize: vertical; box-sizing: border-box; }
+    .gp-news-form textarea:focus { outline: 2px solid var(--oled-accent); outline-offset: 1px; border-color: transparent; }
+    .gp-news-form .gp-btn { height: 48px; padding: 0 20px; }
+    .gp-news-status { grid-column: 1 / -1; min-height: 0; font-size: 0.8rem; color: var(--oled-muted); }
+    .gp-news-status:empty { display: none; }
+    .gp-news-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; max-height: 420px; overflow-y: auto; }
+    .gp-news-item { position: relative; padding: 12px 14px; border: 1px solid var(--gp-line); border-left: 3px solid var(--oled-accent); border-radius: 10px; background: rgba(0, 0, 0, 0.35); }
+    .gp-news-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+    .gp-news-meta { margin: 6px 0 0; font-size: 0.75rem; color: var(--oled-muted); }
+    .gp-news-del { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; border: 1px solid var(--gp-line); border-radius: 50%; background: #000; color: var(--oled-muted); font: inherit; cursor: pointer; }
+    .gp-news-del:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+    @media (hover: hover) { .gp-news-del:hover { color: #fff; border-color: #f87171; } }
+    .gp-news-item:has(.gp-news-del) { padding-right: 44px; }
+    .gp-news-empty { margin: 0; color: var(--oled-muted); font-size: 0.9rem; }
+    .gp-owners .gp-team { grid-template-columns: repeat(auto-fit, minmax(150px, 220px)); justify-content: center; gap: 16px; }
+    .gp-owners .gp-member figcaption { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 12px; }
+    .gp-owners .gp-role { margin-top: 0; }
+    .gp-owner-link { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; font-size: 0.8rem; text-decoration: none; }
+    .gp-top .gp-owners .gp-photo > span { font-size: 3.4rem; }
+    @media (max-width: 560px) {
+      .gp-news-form { grid-template-columns: minmax(0, 1fr); }
+      .gp-owners .gp-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     }
 
     /* Admins: Customize button and panel (walls, boxes, edges, fire). */
@@ -478,17 +509,6 @@
     <section class="gp-panel" id="gpPanel" style="{{.LookStyle}}" data-fire="{{.Look.Fire}}" data-fire-color="{{.Look.FireColor}}">
       <div class="gp-fire" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
       <div class="gp-top">
-      <div class="gp-team">
-        <figure class="gp-member">
-          <div class="gp-photo" data-slot="member1"><img src="{{index .Pictures "member1"}}" alt="Hookey" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'H'}))"></div>
-          <figcaption><span class="gp-name">Hookey</span><span class="gp-role">Frontend</span></figcaption>
-        </figure>
-        <figure class="gp-member">
-          <div class="gp-photo" data-slot="member2"><img src="{{index .Pictures "member2"}}" alt="Tepz" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'T'}))"></div>
-          <figcaption><span class="gp-name">Tepz</span><span class="gp-role">Backend</span></figcaption>
-        </figure>
-      </div>
-
       <div class="gp-row">
         {{if not .Login}}
         <div class="gp-tile" id="gpAuth">
@@ -535,6 +555,38 @@
           <div class="gp-wind" id="weatherWind">Wind: -- m/s</div>
         </div>
       </div>
+
+      <section class="gp-box gp-news" aria-labelledby="gpNewsTitle">
+        <div class="gp-box-head"><h2 class="gp-box-title" id="gpNewsTitle">News</h2>{{if .IsAdmin}}<span class="gp-box-note">Admins can post here. Everyone sees it.</span>{{end}}</div>
+        {{if .IsAdmin}}
+        <form class="gp-news-form" id="gpNewsForm">
+          <label class="xn-sr" for="gpNewsText">News to broadcast</label>
+          <textarea id="gpNewsText" rows="2" maxlength="2000" placeholder="Broadcast something to everyone…"></textarea>
+          <button type="submit" class="gp-btn gp-btn-primary" id="gpNewsPost">Post</button>
+          <span class="gp-news-status" id="gpNewsStatus" role="status"></span>
+        </form>
+        {{end}}
+        <ol class="gp-news-list" id="gpNewsList">
+          {{range .News}}<li class="gp-news-item" data-id="{{.ID}}"><p class="gp-news-body">{{.Body}}</p><p class="gp-news-meta">{{.Author}} · <time data-at="{{.At}}">{{.When}}</time></p></li>{{end}}
+        </ol>
+        <p class="gp-news-empty" id="gpNewsEmpty" {{if .News}}hidden{{end}}>No news yet.</p>
+      </section>
+
+      <section class="gp-box gp-owners" aria-labelledby="gpOwnersTitle">
+        <div class="gp-box-head"><h2 class="gp-box-title" id="gpOwnersTitle">The owners</h2></div>
+        <div class="gp-team">
+          {{range .Owners}}
+          <figure class="gp-member">
+            <div class="gp-photo" data-slot="{{.Slot}}"><img src="{{.Picture}}" alt="{{.Name}}" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.alt.charAt(0)}))"></div>
+            <figcaption>
+              <span class="gp-name">{{.Name}}</span><span class="gp-role">{{.Role}}</span>
+              {{if .Account}}<span class="gp-owner-rank"><span class="xn-rank" data-tier="{{.Rank.Tier}}" data-color="{{if eq .Rank.Look.Color "tier"}}tier{{end}}" data-style="{{.Rank.Look.Style}}" data-icon="{{if .Rank.Look.HideIcon}}0{{end}}" style="{{.Rank.Look.CSS}}"><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}</span></span>
+              <a class="gp-btn gp-owner-link" href="/u/{{.Account}}">View account</a>{{end}}
+            </figcaption>
+          </figure>
+          {{end}}
+        </div>
+      </section>
       </div>
       {{if .IsAdmin}}
       <button type="button" class="gp-custom-btn" id="gpCustomBtn" aria-expanded="false" aria-controls="gpCustom" title="Customize this container"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Customize</span></button>
@@ -561,6 +613,54 @@
       const box = document.getElementById("gpCustom");
       const status = document.getElementById("gpCustomStatus");
       if (!panel || !btn || !box) return;
+      // News: admins post and delete messages everyone sees on this page.
+      (() => {
+        const form = document.getElementById("gpNewsForm");
+        const list = document.getElementById("gpNewsList");
+        const text = document.getElementById("gpNewsText");
+        const status = document.getElementById("gpNewsStatus");
+        const when = (ms) => new Date(ms).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        const delBtn = () => Object.assign(document.createElement("button"), { type: "button", className: "gp-news-del", textContent: "×", title: "Delete this news" });
+        function show(items) {
+          list.replaceChildren(...items.map((n) => {
+            const li = document.createElement("li");
+            li.className = "gp-news-item";
+            li.dataset.id = n.id;
+            const body = Object.assign(document.createElement("p"), { className: "gp-news-body", textContent: n.body });
+            const meta = Object.assign(document.createElement("p"), { className: "gp-news-meta", textContent: n.author + " · " + when(n.at) });
+            const del = delBtn();
+            del.setAttribute("aria-label", "Delete this news");
+            li.append(body, meta, del);
+            return li;
+          }));
+          document.getElementById("gpNewsEmpty").hidden = items.length > 0;
+        }
+        async function send(body) {
+          const res = await fetch("/site/news", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save that.");
+          show((await res.json()).items || []);
+        }
+        list.querySelectorAll(".gp-news-item").forEach((li) => { const d = delBtn(); d.setAttribute("aria-label", "Delete this news"); li.append(d); });
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          if (!text.value.trim()) return;
+          const btn = document.getElementById("gpNewsPost");
+          btn.disabled = true;
+          status.textContent = "";
+          try { await send({ action: "post", body: text.value }); text.value = ""; }
+          catch (error) { status.textContent = error.message; }
+          finally { btn.disabled = false; }
+        });
+        text.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+        list.addEventListener("click", async (e) => {
+          const del = e.target.closest(".gp-news-del");
+          if (!del) return;
+          if (del.dataset.sure !== "1") { del.dataset.sure = "1"; del.textContent = "?"; del.title = "Click again to delete"; setTimeout(() => { del.dataset.sure = ""; del.textContent = "×"; }, 3000); return; }
+          try { await send({ action: "delete", id: Number(del.closest(".gp-news-item").dataset.id) }); }
+          catch (error) { status.textContent = error.message; }
+        });
+      })();
+
       let look = {{.LookJSON}};
       let timer = 0;
       const rgba = (hex, a) => {
