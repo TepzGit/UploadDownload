@@ -1,0 +1,1752 @@
+[
+  {
+    "key": "alprazolam",
+    "name": "Xanax (alprazolam)",
+    "ingredient": "Alprazolam",
+    "aliases": [
+      "Xanax",
+      "Xanax XR",
+      "Xanor",
+      "Xanor Depot",
+      "Tafil",
+      "Afobam",
+      "Alprox",
+      "Neurol",
+      "Frontin",
+      "Zomiren",
+      "Helex",
+      "Xans",
+      "Xannies",
+      "Zannies",
+      "Bars",
+      "Xanax bars"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Alprazolam is a fast-acting benzodiazepine prescribed for anxiety and panic attacks. Xanax is the original brand. Xanor, Tafil, Afobam and the others are the same drug under other names. Ksalol has its own entry. Street names: xans, bars, zannies.",
+    "halfLife": {
+      "min": 6,
+      "max": 27
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.",
+    "notes": "Tablets are 0.25, 0.5, 1 and 2 mg. The 2 mg bars break into four 0.5 mg pieces. Xanax XR and Xanor Depot are slow-release tablets that last much longer.\nMany street Xanax bars and Ksalol are fakes. Tests often find stronger designer benzos such as bromazolam, flualprazolam or clonazolam, and sometimes fentanyl or nitazenes. Fakes copy the markings and the packaging. Use a drug checking service or test strips, start with a small piece, and wait at least two hours before taking more.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 0.25,
+        "max": 0.5
+      },
+      "common": {
+        "min": 0.5,
+        "max": 1
+      },
+      "strong": {
+        "min": 1,
+        "max": 2
+      },
+      "heavy": 2,
+      "threshold": 0.1
+    },
+    "durations": {
+      "onset": 0.33,
+      "comeup": 0.5,
+      "peak": 1.75,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    }
+  },
+  {
+    "key": "alprazolam-ksalol",
+    "name": "Ksalol 1 mg (alprazolam)",
+    "ingredient": "Alprazolam",
+    "aliases": [
+      "Ksalol",
+      "Ksalol 1mg",
+      "Ksalol xans",
+      "Galenika Ksalol",
+      "Ksalol blues",
+      "Blue Ksalol"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Ksalol is alprazolam (the same drug as Xanax) made by Galenika in Serbia. It is sold across the Balkans and often turns up in other countries without a prescription. Street names: Ksalol xans, Ksalol blues.",
+    "halfLife": {
+      "min": 6,
+      "max": 27
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.",
+    "notes": "Real Ksalol 1 mg is a small light blue round tablet with no score line and no markings, in blister strips of 15. 0.5 mg is light orange and 0.25 mg white. A blue tablet with a score line or a print on it is not Ksalol.\nFakes are common. Tests often find stronger designer benzos such as bromazolam, flualprazolam or clonazolam instead of alprazolam. Use a drug checking service or test strips, start with half a tablet, and wait at least two hours before taking more. 1 mg is already a strong dose without tolerance.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 0.25,
+        "max": 0.5
+      },
+      "common": {
+        "min": 0.5,
+        "max": 1
+      },
+      "strong": {
+        "min": 1,
+        "max": 2
+      },
+      "heavy": 2,
+      "threshold": 0.1
+    },
+    "durations": {
+      "onset": 0.33,
+      "comeup": 0.5,
+      "peak": 1.75,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    },
+    "icon": "pill-ksalol"
+  },
+  {
+    "key": "diazepam",
+    "name": "Valium (diazepam)",
+    "ingredient": "Diazepam",
+    "aliases": [
+      "Valium",
+      "Stesolid",
+      "Relanium",
+      "Vival",
+      "Apozepam",
+      "Vallies",
+      "Diazepam blues",
+      "MSJ"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Diazepam is a long-acting benzodiazepine used for anxiety, muscle spasms, alcohol withdrawal and seizures. Valium is the original brand. Stesolid, Relanium, Vival and Apozepam are the same drug. Street names: vallies, blues.",
+    "halfLife": {
+      "min": 20,
+      "max": 100
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.\nIt builds up: diazepam and its active breakdown product stay in the body for days, so a few days in a row adds up.",
+    "notes": "Tablets are 2, 5 and 10 mg. Stesolid also comes as rectal tubes. 10 mg diazepam is about as strong as 0.5 mg alprazolam or 1 mg lorazepam.\nFake blue Valium pills, often marked MSJ, are common, especially in the UK, and often contain etizolam or bromazolam instead. Test them and start low.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 2,
+        "max": 5
+      },
+      "common": {
+        "min": 5,
+        "max": 10
+      },
+      "strong": {
+        "min": 10,
+        "max": 20
+      },
+      "heavy": 20,
+      "threshold": 1
+    },
+    "durations": {
+      "onset": 0.33,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 2.5,
+      "comedownLevel": 0.4,
+      "offset": 3
+    }
+  },
+  {
+    "key": "clonazepam",
+    "name": "Rivotril (clonazepam)",
+    "ingredient": "Clonazepam",
+    "aliases": [
+      "Rivotril",
+      "Klonopin",
+      "Iktorivil",
+      "K-pins",
+      "Kpins",
+      "Klonnies"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Clonazepam is a strong, long-acting benzodiazepine used for epilepsy and panic disorder. Rivotril and Klonopin are the main brands (Iktorivil in Sweden). Street names: K-pins, kpins.",
+    "halfLife": {
+      "min": 18,
+      "max": 50
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.\nIt comes on slowly, so people take more too early. It lasts most of a day and stacks up when taken daily.",
+    "notes": "Tablets are 0.5, 1 and 2 mg (0.25 mg in some countries), and there are drops. 0.5 mg clonazepam is about as strong as 10 mg diazepam.\nStreet Rivotril and K-pins can be fakes made with other benzos. Test them and start low.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 0.25,
+        "max": 0.5
+      },
+      "common": {
+        "min": 0.5,
+        "max": 1
+      },
+      "strong": {
+        "min": 1,
+        "max": 2
+      },
+      "heavy": 2,
+      "threshold": 0.1
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 0.75,
+      "peak": 2.5,
+      "comedown": 2,
+      "comedownLevel": 0.45,
+      "offset": 3
+    }
+  },
+  {
+    "key": "lorazepam",
+    "name": "Ativan (lorazepam)",
+    "ingredient": "Lorazepam",
+    "aliases": [
+      "Ativan",
+      "Temesta",
+      "Tavor",
+      "Lorafen"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Lorazepam is a strong benzodiazepine used for anxiety, panic attacks and seizures. Ativan, Temesta, Tavor and Lorafen are the same drug.",
+    "halfLife": {
+      "min": 10,
+      "max": 20
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.",
+    "notes": "Tablets are 0.5, 1, 2 or 2.5 mg depending on the country, and some melt under the tongue. 1 mg lorazepam is about as strong as 10 mg diazepam.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 0.5,
+        "max": 1
+      },
+      "common": {
+        "min": 1,
+        "max": 2
+      },
+      "strong": {
+        "min": 2,
+        "max": 4
+      },
+      "heavy": 4,
+      "threshold": 0.25
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 0.75,
+      "peak": 2,
+      "comedown": 1.5,
+      "comedownLevel": 0.45,
+      "offset": 2.5
+    }
+  },
+  {
+    "key": "oxazepam",
+    "name": "Sobril (oxazepam)",
+    "ingredient": "Oxazepam",
+    "aliases": [
+      "Sobril",
+      "Oxascand",
+      "Oxapax",
+      "Serax",
+      "Seresta"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Oxazepam is a slower, milder benzodiazepine used for anxiety, sleep problems and alcohol withdrawal. Sobril and Oxascand are Nordic brands, Serax and Seresta are others.",
+    "halfLife": {
+      "min": 4,
+      "max": 15
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.\nIt can take an hour to kick in, so don't take more too early.",
+    "notes": "Tablets are usually 10, 15 or 25 mg. 20 mg oxazepam is about as strong as 10 mg diazepam.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 10,
+        "max": 15
+      },
+      "common": {
+        "min": 15,
+        "max": 30
+      },
+      "strong": {
+        "min": 30,
+        "max": 60
+      },
+      "heavy": 60,
+      "threshold": 5
+    },
+    "durations": {
+      "onset": 0.75,
+      "comeup": 0.75,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    }
+  },
+  {
+    "key": "etizolam",
+    "name": "Etilaam (etizolam)",
+    "ingredient": "Etizolam",
+    "aliases": [
+      "Etilaam",
+      "Etizola",
+      "Depas",
+      "Pasaden",
+      "Etiz"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Thienodiazepine (benzodiazepine-like)",
+    "summary": "Etizolam works like a benzodiazepine and is a prescription medicine in Japan, India and Italy. Etilaam and Etizola come from India, Depas from Japan. It is not an approved medicine in most of Europe or the US, and it is often what fake Xanax and Valium really contain.",
+    "halfLife": {
+      "min": 3,
+      "max": 8
+    },
+    "addictionPotential": "High",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.",
+    "notes": "Tablets are 0.25, 0.5 and 1 mg. Powders, liquids and blotters are easy to overdose on, because a few milligrams look like nothing. 1 mg etizolam is roughly as strong as 10 mg diazepam.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 0.25,
+        "max": 0.5
+      },
+      "common": {
+        "min": 0.5,
+        "max": 1
+      },
+      "strong": {
+        "min": 1,
+        "max": 2
+      },
+      "heavy": 2,
+      "threshold": 0.25
+    },
+    "durations": {
+      "onset": 0.33,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    }
+  },
+  {
+    "key": "zolpidem",
+    "name": "Stilnox (zolpidem)",
+    "ingredient": "Zolpidem",
+    "aliases": [
+      "Stilnox",
+      "Stilnoct",
+      "Ambien",
+      "Ambien CR",
+      "Edluar"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Z-drug",
+    "summary": "Zolpidem is a short-acting sleeping pill (a Z-drug) that works much like a benzodiazepine. Stilnox, Stilnoct and Ambien are the main brands.",
+    "halfLife": {
+      "min": 2,
+      "max": 3
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Take it only once you are in bed. Staying awake on it can cause hallucinations, confusion and things you won't remember, like sleepwalking, eating or driving.\nDangerous with alcohol, opioids, benzos and other sedatives, which together can stop your breathing.\nDaily use causes tolerance and dependence. Stopping after long use brings back worse insomnia and can cause withdrawal.",
+    "notes": "Tablets are 5 and 10 mg. Ambien CR (6.25 and 12.5 mg) is slow release. Women are usually prescribed 5 mg because they clear it more slowly. Don't drive the next morning.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "Benzodiazepines",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 2.5,
+        "max": 5
+      },
+      "common": {
+        "min": 5,
+        "max": 10
+      },
+      "strong": {
+        "min": 10,
+        "max": 20
+      },
+      "heavy": 20,
+      "threshold": 2.5
+    },
+    "durations": {
+      "onset": 0.25,
+      "comeup": 0.25,
+      "peak": 1,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 1.5
+    }
+  },
+  {
+    "key": "zopiclone",
+    "name": "Imovane (zopiclone)",
+    "ingredient": "Zopiclone",
+    "aliases": [
+      "Imovane",
+      "Zimovane",
+      "Zopiklon"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Z-drug",
+    "summary": "Zopiclone is a sleeping pill (a Z-drug) that works much like a benzodiazepine. Imovane and Zimovane are the main brands.",
+    "halfLife": {
+      "min": 3.5,
+      "max": 6.5
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Take it only once you are in bed. Staying awake on it can cause confusion and things you won't remember.\nDangerous with alcohol, opioids, benzos and other sedatives, which together can stop your breathing.\nDrowsiness often lasts into the next morning, so don't drive.\nDaily use causes tolerance and dependence.",
+    "notes": "Tablets are 3.75, 5 and 7.5 mg. A bitter, metallic taste the next day is a normal side effect. 7.5 mg zopiclone is about as strong as 5 mg diazepam.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "Benzodiazepines",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 2.5,
+        "max": 3.75
+      },
+      "common": {
+        "min": 3.75,
+        "max": 7.5
+      },
+      "strong": {
+        "min": 7.5,
+        "max": 15
+      },
+      "heavy": 15,
+      "threshold": 2.5
+    },
+    "durations": {
+      "onset": 0.33,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 2.5
+    }
+  },
+  {
+    "key": "oxycodone-er",
+    "name": "Mundipharma Oxy Depot (OxyContin)",
+    "ingredient": "Oxycodone",
+    "aliases": [
+      "OxyContin",
+      "Mundipharma OxyContin",
+      "Mundipharma oxys",
+      "Mundipharma 80",
+      "Oxy depot",
+      "Oxycodone depot",
+      "Oxikodon depot",
+      "OxyContin depot",
+      "Slow-release oxycodone",
+      "Targin",
+      "Targinact",
+      "OCs",
+      "OC 80",
+      "80s",
+      "Green 80s"
+    ],
+    "class": "Opioid",
+    "chemicalClass": "Morphinan",
+    "summary": "OxyContin is oxycodone, a strong opioid painkiller, in a slow-release tablet that lets the dose out over about 12 hours. Outside the US it is made by Mundipharma, the Mundipharma oxys. Targin is the same with naloxone added.",
+    "halfLife": {
+      "min": 4.5,
+      "max": 8
+    },
+    "addictionPotential": "Very high",
+    "risks": "Overdose: pinpoint pupils, very slow or stopped breathing, blue lips, can't be woken. Call an ambulance and give naloxone (Nyxoid, Narcan) if you have it.\nCrushing, chewing, snorting or injecting a slow-release tablet lets the whole 12-hour dose out at once, which can kill.\n40, 60 and 80 mg tablets are only for people who already take opioids every day. One can kill someone without tolerance.\nMixing with benzos, alcohol, pregabalin or gabapentin or other sedatives is how most people die from opioids: together they stop your breathing.\nDaily use causes tolerance and dependence quickly. Tolerance drops fast after a break, so your old dose can become an overdose.",
+    "notes": "Tablets are 5 to 80 mg (not every strength in every country).\nStreet oxys are often fakes pressed with fentanyl or nitazenes, which can kill in tiny amounts. Use fentanyl test strips (they don't catch nitazenes), don't use alone, start with a small piece and keep naloxone nearby.\nTargin's naloxone does little when swallowed, but snorted or injected it throws someone who is dependent on opioids into sudden withdrawal.\nThe Graph timeline for this entry already follows the slow release, so leave the release type on Immediate release.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "Gabapentinoids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Other opioids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP",
+        "Sedating antihistamines"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 5,
+        "max": 10
+      },
+      "common": {
+        "min": 10,
+        "max": 20
+      },
+      "strong": {
+        "min": 20,
+        "max": 30
+      },
+      "heavy": 30,
+      "threshold": 5
+    },
+    "durations": {
+      "onset": 0.75,
+      "comeup": 1.25,
+      "peak": 5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 5
+    },
+    "icon": "pill-oc80"
+  },
+  {
+    "key": "oxycodone",
+    "name": "OxyNorm (oxycodone)",
+    "ingredient": "Oxycodone",
+    "aliases": [
+      "OxyNorm",
+      "Mundipharma OxyNorm",
+      "Roxicodone",
+      "Endone",
+      "Percocet",
+      "Endocet",
+      "Oxys",
+      "Roxies",
+      "Percs",
+      "M30",
+      "M30s"
+    ],
+    "class": "Opioid",
+    "chemicalClass": "Morphinan",
+    "summary": "OxyNorm is quick-release oxycodone, a strong opioid painkiller, made by Mundipharma. Roxicodone and Endone are other brands, and Percocet is oxycodone with paracetamol. Street names: oxys, roxies, percs, M30s.",
+    "halfLife": {
+      "min": 3,
+      "max": 4.5
+    },
+    "addictionPotential": "Very high",
+    "risks": "Overdose: pinpoint pupils, very slow or stopped breathing, blue lips, can't be woken. Call an ambulance and give naloxone (Nyxoid, Narcan) if you have it.\nMixing with benzos, alcohol, pregabalin or gabapentin or other sedatives is how most people die from opioids: together they stop your breathing.\nDaily use causes tolerance and dependence quickly. Tolerance drops fast after a break, so your old dose can become an overdose.\nPercocet and other pills with paracetamol: more than 4 g of paracetamol a day can cause liver failure, and much less is safe if you drink.",
+    "notes": "Capsules are 5, 10 and 20 mg. There is also a liquid (1 mg/ml) and a concentrate (10 mg/ml) that is easy to overdose on.\nBlue M30 pills sold on the street are very often fakes made with fentanyl or nitazenes. Use fentanyl test strips (they don't catch nitazenes), don't use alone, start with a small piece and keep naloxone nearby.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "Gabapentinoids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Other opioids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP",
+        "Sedating antihistamines"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 2.5,
+        "max": 5
+      },
+      "common": {
+        "min": 5,
+        "max": 10
+      },
+      "strong": {
+        "min": 10,
+        "max": 20
+      },
+      "heavy": 20,
+      "threshold": 2.5
+    },
+    "durations": {
+      "onset": 0.25,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 2.5
+    }
+  },
+  {
+    "key": "morphine-er",
+    "name": "MST Continus (slow-release morphine)",
+    "ingredient": "Morphine",
+    "aliases": [
+      "MST Continus",
+      "MST",
+      "Mundipharma MST",
+      "MS Contin",
+      "Contalgin",
+      "Dolcontin"
+    ],
+    "class": "Opioid",
+    "chemicalClass": "Morphinan",
+    "summary": "MST Continus is morphine, a strong opioid painkiller, in a slow-release tablet that lasts about 12 hours. It is made by Mundipharma. MS Contin, Contalgin and Dolcontin are the same kind of tablet.",
+    "halfLife": {
+      "min": 2,
+      "max": 4
+    },
+    "addictionPotential": "Very high",
+    "risks": "Overdose: pinpoint pupils, very slow or stopped breathing, blue lips, can't be woken. Call an ambulance and give naloxone (Nyxoid, Narcan) if you have it.\nCrushing, chewing, snorting or injecting a slow-release tablet lets the whole 12-hour dose out at once, which can kill.\nMixing with benzos, alcohol, pregabalin or gabapentin or other sedatives is how most people die from opioids: together they stop your breathing.\nDaily use causes tolerance and dependence quickly. Tolerance drops fast after a break, so your old dose can become an overdose.\nMorphine builds up in people with weak kidneys.",
+    "notes": "Tablets are 5 to 200 mg. The higher strengths are only for people who already take opioids every day.\nQuick-release morphine (Sevredol tablets, Oramorph liquid) works within half an hour and lasts about 4 hours.\nThe Graph timeline for this entry already follows the slow release, so leave the release type on Immediate release.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "Gabapentinoids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Other opioids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP",
+        "Sedating antihistamines"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 5,
+        "max": 15
+      },
+      "common": {
+        "min": 15,
+        "max": 30
+      },
+      "strong": {
+        "min": 30,
+        "max": 45
+      },
+      "heavy": 45,
+      "threshold": 5
+    },
+    "durations": {
+      "onset": 1,
+      "comeup": 1.5,
+      "peak": 4,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 5
+    }
+  },
+  {
+    "key": "tramadol",
+    "name": "Tramal (tramadol)",
+    "ingredient": "Tramadol",
+    "aliases": [
+      "Tramal",
+      "Ultram",
+      "Nobligan",
+      "Tradolan",
+      "Mandolgin",
+      "Poltram",
+      "Tramadolor",
+      "Zaldiar",
+      "Ultracet",
+      "Trammies"
+    ],
+    "class": "Opioid",
+    "chemicalClass": "",
+    "summary": "Tramadol is an opioid painkiller that also raises serotonin and noradrenaline. Tramal, Ultram, Nobligan, Tradolan and Poltram are some of its brands. Zaldiar and Ultracet also contain paracetamol. Street name: trammies.",
+    "halfLife": {
+      "min": 5,
+      "max": 7.5
+    },
+    "addictionPotential": "High",
+    "risks": "Seizures: tramadol can cause fits, more likely above 400 mg a day, during alcohol withdrawal, or with antidepressants, bupropion or stimulants.\nSerotonin syndrome with SSRIs, SNRIs, MAOIs, MDMA, DXM or St John's wort: agitation, sweating, shaking, fever. It is an emergency.\nMixing with benzos, alcohol, pregabalin or gabapentin or other sedatives is how most people die from opioids: together they stop your breathing.\nSome people turn it into much more of its opioid than others (CYP2D6 genes), so the same dose can hit very differently.\nDaily use causes dependence, and withdrawal can include anxiety and panic.",
+    "notes": "Capsules and tablets are 50 mg, slow-release tablets 100, 150 and 200 mg, and drops 100 mg/ml (1 drop is about 2.5 mg).\nThe doses here are for quick-release tramadol. Slow-release tablets last about 12 hours, so don't crush them or take more early.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "SSRIs",
+        "SNRIs",
+        "MDMA",
+        "DXM",
+        "Alcohol",
+        "Benzodiazepines",
+        "Gabapentinoids",
+        "Other opioids",
+        "Stimulants"
+      ],
+      "unsafe": [
+        "Bupropion",
+        "St John's wort",
+        "Ketamine",
+        "Z-drugs",
+        "GHB",
+        "GBL"
+      ],
+      "uncertain": [
+        "Cannabis",
+        "Psychedelics"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 25,
+        "max": 50
+      },
+      "common": {
+        "min": 50,
+        "max": 100
+      },
+      "strong": {
+        "min": 100,
+        "max": 150
+      },
+      "heavy": 150,
+      "threshold": 25
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 0.75,
+      "peak": 2,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    }
+  },
+  {
+    "key": "codeine-paracetamol",
+    "name": "Co-codamol (codeine + paracetamol)",
+    "ingredient": "Codeine + paracetamol",
+    "aliases": [
+      "Co-codamol",
+      "Solpadeine",
+      "Tylenol 3",
+      "Tylenol with codeine",
+      "Pinex Forte",
+      "Paralgin forte",
+      "Citodon",
+      "Panocod",
+      "Panadeine"
+    ],
+    "class": "Opioid",
+    "chemicalClass": "Morphinan",
+    "summary": "Codeine is a mild opioid that the body turns into morphine. Most codeine pills also contain paracetamol: co-codamol, Solpadeine, Tylenol 3, Pinex Forte, Paralgin forte, Citodon and Panocod are codeine with paracetamol.",
+    "halfLife": {
+      "min": 2.5,
+      "max": 3.5
+    },
+    "addictionPotential": "High",
+    "risks": "The paracetamol (acetaminophen) is often the bigger danger: more than 4 g a day can cause liver failure, and much less is safe if you drink. Count the paracetamol in every pill.\nSome people turn codeine into morphine very fast (CYP2D6 ultra-rapid metabolisers) and can overdose on normal doses.\nMixing with benzos, alcohol, pregabalin or gabapentin or other sedatives is how most people die from opioids: together they stop your breathing.\nDaily use causes dependence.",
+    "notes": "The doses here are milligrams of codeine. Common pills (codeine/paracetamol in mg): co-codamol 8/500, 15/500 and 30/500, Tylenol 3 30/300, Pinex Forte, Citodon and Panocod 30/500, Paralgin forte 30/400.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "Gabapentinoids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Other opioids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP",
+        "Sedating antihistamines"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 15,
+        "max": 30
+      },
+      "common": {
+        "min": 30,
+        "max": 60
+      },
+      "strong": {
+        "min": 60,
+        "max": 90
+      },
+      "heavy": 90,
+      "threshold": 15
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 2.5
+    }
+  },
+  {
+    "key": "hydrocodone-paracetamol",
+    "name": "Norco (hydrocodone + paracetamol)",
+    "ingredient": "Hydrocodone + paracetamol",
+    "aliases": [
+      "Norco",
+      "Vicodin",
+      "Lortab",
+      "Lorcet",
+      "Vikes",
+      "Norcos",
+      "Hydros"
+    ],
+    "class": "Opioid",
+    "chemicalClass": "Morphinan",
+    "summary": "Hydrocodone is an opioid painkiller, mostly sold in the US with paracetamol (acetaminophen) as Norco, Vicodin and Lortab. Street names: vikes, norcos, hydros.",
+    "halfLife": {
+      "min": 3.5,
+      "max": 4.5
+    },
+    "addictionPotential": "Very high",
+    "risks": "Overdose: pinpoint pupils, very slow or stopped breathing, blue lips, can't be woken. Call an ambulance and give naloxone (Nyxoid, Narcan) if you have it.\nThe paracetamol (acetaminophen) is often the bigger danger: more than 4 g a day can cause liver failure, and much less is safe if you drink. Count the paracetamol in every pill.\nMixing with benzos, alcohol, pregabalin or gabapentin or other sedatives is how most people die from opioids: together they stop your breathing.\nDaily use causes tolerance and dependence quickly. Tolerance drops fast after a break, so your old dose can become an overdose.",
+    "notes": "Pills are 5, 7.5 or 10 mg hydrocodone with 300 or 325 mg paracetamol. The doses here are milligrams of hydrocodone.\nStreet pills sold as Norco can be fakes made with fentanyl. Use fentanyl test strips (they don't catch nitazenes), don't use alone, start with a small piece and keep naloxone nearby.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "Gabapentinoids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Other opioids",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP",
+        "Sedating antihistamines"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 2.5,
+        "max": 5
+      },
+      "common": {
+        "min": 5,
+        "max": 10
+      },
+      "strong": {
+        "min": 10,
+        "max": 15
+      },
+      "heavy": 15,
+      "threshold": 2.5
+    },
+    "durations": {
+      "onset": 0.33,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 2.5
+    }
+  },
+  {
+    "key": "amphetamine-salts",
+    "name": "Adderall (amphetamine)",
+    "ingredient": "Amphetamine",
+    "aliases": [
+      "Adderall",
+      "Adderall XR",
+      "Mydayis",
+      "Evekeo",
+      "Addy",
+      "Addies",
+      "Addys"
+    ],
+    "class": "Stimulant",
+    "chemicalClass": "Amphetamine",
+    "summary": "Adderall is a mix of amphetamine salts prescribed for ADHD and narcolepsy. Adderall XR and Mydayis are slow-release versions. Street names: addys, addies.",
+    "halfLife": {
+      "min": 9,
+      "max": 14
+    },
+    "addictionPotential": "High",
+    "risks": "Raises heart rate, blood pressure and body heat. Dangerous with heart problems and in hot, crowded places.\nBig doses or going without sleep can cause anxiety, paranoia and psychosis.\nThe comedown brings low mood and exhaustion. Taking more to avoid it leads to binges.\nDangerous with MAOIs and tramadol, and risky with other stimulants and MDMA.",
+    "notes": "Tablets are 5 to 30 mg. XR capsules are 5 to 30 mg and last 10 to 12 hours.\nFake Adderall pressed with methamphetamine is common in the US. Test it.\nEat, drink water and plan your sleep. Stimulants hide how drunk you are.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "Tramadol"
+      ],
+      "unsafe": [
+        "Cocaine",
+        "Other stimulants",
+        "MDMA",
+        "DXM"
+      ],
+      "uncertain": [
+        "Alcohol",
+        "Cannabis",
+        "Caffeine",
+        "Psychedelics",
+        "SSRIs"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 5,
+        "max": 10
+      },
+      "common": {
+        "min": 10,
+        "max": 20
+      },
+      "strong": {
+        "min": 20,
+        "max": 30
+      },
+      "heavy": 30,
+      "threshold": 2.5
+    },
+    "durations": {
+      "onset": 0.75,
+      "comeup": 0.75,
+      "peak": 2.5,
+      "comedown": 1.5,
+      "comedownLevel": 0.5,
+      "offset": 2
+    }
+  },
+  {
+    "key": "lisdexamfetamine",
+    "name": "Elvanse (lisdexamfetamine)",
+    "ingredient": "Lisdexamfetamine",
+    "aliases": [
+      "Elvanse",
+      "Elvanse Adult",
+      "Vyvanse"
+    ],
+    "class": "Stimulant",
+    "chemicalClass": "Amphetamine",
+    "summary": "Lisdexamfetamine is an ADHD medicine that the body slowly turns into dexamphetamine, so it starts later and lasts most of the day. Elvanse is the name in Europe, Vyvanse in the US and Canada.",
+    "halfLife": {
+      "min": 10,
+      "max": 12
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Raises heart rate, blood pressure and body heat. Dangerous with heart problems.\nBig doses or going without sleep can cause anxiety, paranoia and psychosis.\nDangerous with MAOIs and tramadol, and risky with other stimulants and MDMA.",
+    "notes": "Capsules are 20 to 70 mg (chewable tablets in the US). It is turned into dexamphetamine in the blood, so snorting or injecting it doesn't make it much faster or stronger, only riskier.\nTake it in the morning, or you won't sleep.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "Tramadol"
+      ],
+      "unsafe": [
+        "Cocaine",
+        "Other stimulants",
+        "MDMA",
+        "DXM"
+      ],
+      "uncertain": [
+        "Alcohol",
+        "Cannabis",
+        "Caffeine",
+        "Psychedelics",
+        "SSRIs"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 20,
+        "max": 30
+      },
+      "common": {
+        "min": 30,
+        "max": 50
+      },
+      "strong": {
+        "min": 50,
+        "max": 70
+      },
+      "heavy": 70,
+      "threshold": 10
+    },
+    "durations": {
+      "onset": 1.25,
+      "comeup": 1.25,
+      "peak": 4,
+      "comedown": 3,
+      "comedownLevel": 0.5,
+      "offset": 3
+    },
+    "icon": "pill-elvanse"
+  },
+  {
+    "key": "methylphenidate",
+    "name": "Ritalin (methylphenidate)",
+    "ingredient": "Methylphenidate",
+    "aliases": [
+      "Ritalin",
+      "Ritalina",
+      "Rilatine",
+      "Medikinet",
+      "Equasym",
+      "Methylin",
+      "Vitamin R",
+      "Rits",
+      "CG A/B"
+    ],
+    "class": "Stimulant",
+    "chemicalClass": "Phenidate",
+    "summary": "Methylphenidate is a stimulant prescribed for ADHD. Ritalin, Medikinet and Equasym are common brands. Street names: vitamin R, rits.",
+    "halfLife": {
+      "min": 2,
+      "max": 3
+    },
+    "addictionPotential": "High",
+    "risks": "Raises heart rate and blood pressure, and can cause anxiety, insomnia and, at high doses or without sleep, psychosis.\nSnorting or injecting crushed tablets is much riskier: the fillers can damage veins and lungs.\nDangerous with MAOIs and tramadol, and risky with other stimulants and MDMA.",
+    "notes": "Quick-release tablets are 5, 10 and 20 mg and last about 4 hours. Ritalin 10 mg is a small white round tablet marked CG on one side and A/B with a score line on the other.\nThe slow-release kinds have their own entries: Methylphenidate Retard (Medikinet Retard, Ritalin LA, Equasym XL) and Methylphenidate Depot (Concerta).",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "Tramadol"
+      ],
+      "unsafe": [
+        "Cocaine",
+        "Other stimulants",
+        "MDMA",
+        "DXM"
+      ],
+      "uncertain": [
+        "Alcohol",
+        "Cannabis",
+        "Caffeine",
+        "Psychedelics",
+        "SSRIs"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 5,
+        "max": 10
+      },
+      "common": {
+        "min": 10,
+        "max": 20
+      },
+      "strong": {
+        "min": 20,
+        "max": 30
+      },
+      "heavy": 30,
+      "threshold": 5
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 0.5,
+      "peak": 1.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 1.5
+    },
+    "icon": "pill-ritalin"
+  },
+  {
+    "key": "methylphenidate-mr",
+    "name": "Methylphenidate Retard (Medikinet Retard)",
+    "ingredient": "Methylphenidate",
+    "aliases": [
+      "Medikinet Retard",
+      "Medikinet CR",
+      "Medikinet XL",
+      "Methylphenidat retard",
+      "Methylphenidate retard",
+      "Ritalin LA",
+      "Ritalin Uno",
+      "Equasym XL",
+      "Equasym Depot",
+      "Equasym Retard",
+      "Aradix Retard"
+    ],
+    "class": "Stimulant",
+    "chemicalClass": "Phenidate",
+    "summary": "Methylphenidate Retard is methylphenidate in a capsule with two kinds of beads: half lets the dose out at once and half a few hours later. So it kicks in like a normal Ritalin, dips a little, then rises again and lasts about 8 hours. Medikinet Retard, Ritalin LA and Equasym XL work this way.",
+    "halfLife": {
+      "min": 2,
+      "max": 3
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Raises heart rate and blood pressure, and can cause anxiety and insomnia. Take it in the morning.\nDon't chew the beads or crush them: the slow half comes out at once and the whole dose hits together. You can open the capsule and sprinkle the beads on a spoon of yogurt or apple sauce if you swallow them whole.\nTake Medikinet Retard with or after food, or the slow beads release too early.\nDangerous with MAOIs and tramadol, and risky with other stimulants and MDMA.",
+    "notes": "Medikinet Retard capsules are 5 to 60 mg and get darker with the dose: 5 mg is all white, 10 mg white with a lilac cap, 20 mg all lilac, 30 and 40 mg grey with a dark violet cap, 60 mg all dark violet. The beads inside are white and blue.\nThe Graph shows the two rises (the second about 3 hours in), so leave the release type on Immediate release.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "Tramadol"
+      ],
+      "unsafe": [
+        "Cocaine",
+        "Other stimulants",
+        "MDMA",
+        "DXM"
+      ],
+      "uncertain": [
+        "Alcohol",
+        "Cannabis",
+        "Caffeine",
+        "Psychedelics",
+        "SSRIs"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 5,
+        "max": 10
+      },
+      "common": {
+        "min": 10,
+        "max": 20
+      },
+      "strong": {
+        "min": 20,
+        "max": 40
+      },
+      "heavy": 40,
+      "threshold": 5
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 0.75,
+      "peak": 1.25,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 2,
+      "peak2": {
+        "gap": 1.5,
+        "dip": 0.7,
+        "duration": 2.5,
+        "level": 0.9
+      }
+    },
+    "icon": "pill-medikinet"
+  },
+  {
+    "key": "methylphenidate-er",
+    "name": "Methylphenidate Depot (Concerta)",
+    "ingredient": "Methylphenidate",
+    "aliases": [
+      "Concerta",
+      "Concerta XL",
+      "Methylphenidat depot",
+      "Methylphenidate depot",
+      "Methylphenidat Sandoz depot",
+      "Methylphenidat Orion depot",
+      "Slow-release methylphenidate",
+      "Delmosart",
+      "Xaggitin",
+      "Matoride",
+      "alza 18",
+      "alza 36",
+      "alza 54"
+    ],
+    "class": "Stimulant",
+    "chemicalClass": "Phenidate",
+    "summary": "Methylphenidate Depot is methylphenidate in a special slow-release tablet (Concerta) that pushes the dose out through a tiny hole over about 12 hours. A little comes out in the first hour, then the level keeps climbing until 6 to 8 hours. Delmosart, Xaggitin, Matoride and the Sandoz and Orion depot tablets are copies of it.",
+    "halfLife": {
+      "min": 3,
+      "max": 4
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Raises heart rate and blood pressure, and can cause anxiety and insomnia. Take it in the morning.\nBreaking or crushing the tablet ruins the slow release.\nDangerous with MAOIs and tramadol, and risky with other stimulants and MDMA.",
+    "notes": "Tablets are 18, 27, 36 and 54 mg. Concerta 18 mg is yellow, 36 mg white and 54 mg brownish red, capsule shaped and printed alza 18, alza 36 or alza 54 in black. The empty tablet shell can come out in your stool, which is normal.\nThe Graph timeline for this entry already follows the slow release, so leave the release type on Immediate release.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "Tramadol"
+      ],
+      "unsafe": [
+        "Cocaine",
+        "Other stimulants",
+        "MDMA",
+        "DXM"
+      ],
+      "uncertain": [
+        "Alcohol",
+        "Cannabis",
+        "Caffeine",
+        "Psychedelics",
+        "SSRIs"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 18,
+        "max": 18
+      },
+      "common": {
+        "min": 18,
+        "max": 36
+      },
+      "strong": {
+        "min": 36,
+        "max": 54
+      },
+      "heavy": 54
+    },
+    "durations": {
+      "onset": 1,
+      "comeup": 1,
+      "peak": 6,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    },
+    "icon": "pill-concerta"
+  },
+  {
+    "key": "modafinil",
+    "name": "Provigil (modafinil)",
+    "ingredient": "Modafinil",
+    "aliases": [
+      "Provigil",
+      "Modiodal",
+      "Modalert",
+      "Modvigil",
+      "Alertec",
+      "Vigil",
+      "Modasomil"
+    ],
+    "class": "Stimulant",
+    "chemicalClass": "",
+    "summary": "Modafinil is a wakefulness drug prescribed for narcolepsy and shift work sleep problems, and used off label to stay alert. Provigil and Modiodal are the original brands. Modalert and Modvigil come from India. Armodafinil (Nuvigil, Waklert, Artvigil) is a stronger relative.",
+    "halfLife": {
+      "min": 12,
+      "max": 15
+    },
+    "addictionPotential": "Low",
+    "risks": "It lasts 12 hours or more, so take it early or you won't sleep.\nRare but serious skin reactions: stop and get help if you get a rash, blisters or mouth sores.\nIt makes hormonal birth control (pills, implants) less reliable, and for a month after you stop.\nIt can raise your heart rate and cause anxiety and headaches. Drink water.",
+    "notes": "Tablets are 100 and 200 mg. 150 mg armodafinil is about as strong as 200 mg modafinil.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs"
+      ],
+      "unsafe": [
+        "Other stimulants"
+      ],
+      "uncertain": [
+        "Hormonal birth control",
+        "Alcohol",
+        "Caffeine"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 50,
+        "max": 100
+      },
+      "common": {
+        "min": 100,
+        "max": 200
+      },
+      "strong": {
+        "min": 200,
+        "max": 400
+      },
+      "heavy": 400,
+      "threshold": 50
+    },
+    "durations": {
+      "onset": 0.75,
+      "comeup": 1.25,
+      "peak": 4,
+      "comedown": 4,
+      "comedownLevel": 0.5,
+      "offset": 3
+    }
+  },
+  {
+    "key": "pregabalin",
+    "name": "Lyrica (pregabalin)",
+    "ingredient": "Pregabalin",
+    "aliases": [
+      "Lyrica",
+      "Alzain",
+      "Axalid",
+      "Lecaent",
+      "Rewisca",
+      "Pregabs"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Gabapentinoid",
+    "summary": "Pregabalin is a gabapentinoid prescribed for epilepsy, nerve pain and anxiety. Lyrica is the original brand. Alzain, Axalid, Lecaent and Rewisca are UK copies. Street name: pregabs.",
+    "halfLife": {
+      "min": 5.5,
+      "max": 6.5
+    },
+    "addictionPotential": "Moderate",
+    "risks": "With opioids it is a leading cause of overdose deaths: together they can stop your breathing. Also dangerous with alcohol, benzos and other sedatives.\nHigh doses cause dizziness, blurred vision, falls and blackouts.\nDependence builds with daily use. Stopping suddenly after long use can cause withdrawal and seizures.",
+    "notes": "Capsules are 25 to 300 mg. It takes about an hour to work, so wait before taking more. The kidneys clear it, so it builds up in people with weak kidneys.",
+    "interactions": {
+      "dangerous": [
+        "Opioids",
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE"
+      ],
+      "uncertain": [
+        "Cannabis",
+        "Sedating antihistamines"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 75,
+        "max": 150
+      },
+      "common": {
+        "min": 150,
+        "max": 300
+      },
+      "strong": {
+        "min": 300,
+        "max": 450
+      },
+      "heavy": 450,
+      "threshold": 50
+    },
+    "durations": {
+      "onset": 0.75,
+      "comeup": 0.75,
+      "peak": 2,
+      "comedown": 2,
+      "comedownLevel": 0.5,
+      "offset": 2.5
+    }
+  },
+  {
+    "key": "gabapentin",
+    "name": "Neurontin (gabapentin)",
+    "ingredient": "Gabapentin",
+    "aliases": [
+      "Neurontin",
+      "Gralise",
+      "Gabbies"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Gabapentinoid",
+    "summary": "Gabapentin is a gabapentinoid prescribed for epilepsy and nerve pain. Neurontin is the original brand. Street name: gabbies.",
+    "halfLife": {
+      "min": 5,
+      "max": 7
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Dangerous with opioids, alcohol, benzos and other sedatives: together they can stop your breathing.\nHigh doses cause dizziness, unsteadiness and blackouts.\nDependence builds with daily use. Stopping suddenly after long use can cause withdrawal and seizures.",
+    "notes": "Capsules are 100, 300 and 400 mg, tablets 600 and 800 mg. The gut takes up less of each dose as doses get bigger, so big doses do less than you'd expect, but they still add to opioids and alcohol. It peaks 2 to 3 hours after taking it.",
+    "interactions": {
+      "dangerous": [
+        "Opioids",
+        "Alcohol",
+        "Benzodiazepines",
+        "Z-drugs",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE"
+      ],
+      "uncertain": [
+        "Cannabis",
+        "Sedating antihistamines"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 300,
+        "max": 600
+      },
+      "common": {
+        "min": 600,
+        "max": 1200
+      },
+      "strong": {
+        "min": 1200,
+        "max": 1800
+      },
+      "heavy": 1800,
+      "threshold": 200
+    },
+    "durations": {
+      "onset": 1.25,
+      "comeup": 1,
+      "peak": 2,
+      "comedown": 1.5,
+      "comedownLevel": 0.5,
+      "offset": 2
+    }
+  },
+  {
+    "key": "dextromethorphan",
+    "name": "Robitussin (dextromethorphan)",
+    "ingredient": "Dextromethorphan",
+    "aliases": [
+      "Robitussin",
+      "Delsym",
+      "Acodin",
+      "Dexofan",
+      "Romilar",
+      "Tussin",
+      "Coricidin",
+      "Triple C",
+      "Robo"
+    ],
+    "class": "Dissociative",
+    "chemicalClass": "Morphinan",
+    "summary": "Dextromethorphan (DXM) is a cough medicine that is a dissociative at high doses. It is in many cough syrups and tablets: Robitussin, Delsym, Acodin, Dexofan, Romilar and others. Coricidin (Triple C) also contains chlorphenamine, which is dangerous at high doses.",
+    "halfLife": {
+      "min": 2,
+      "max": 4
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Only use products where DXM is the only active ingredient. Paracetamol, guaifenesin, pseudoephedrine, chlorphenamine or promethazine in the same product can be deadly at DXM doses.\nSerotonin syndrome with SSRIs, SNRIs, MAOIs, tramadol or MDMA: agitation, sweating, shaking, fever. It is an emergency.\nHigh doses raise heart rate, blood pressure and body temperature, and cause vomiting, confusion and loss of coordination.\nSome people break it down very slowly (CYP2D6 poor metabolisers) and get far stronger, much longer effects.",
+    "notes": "Check the label for the milligrams of dextromethorphan hydrobromide per tablet or per ml. Doses depend on body weight; the ones here are for about 70 kg.\nDelsym and other slow-release syrups last 12 hours or more.",
+    "interactions": {
+      "dangerous": [
+        "MAOIs",
+        "SSRIs",
+        "SNRIs",
+        "Tramadol",
+        "MDMA"
+      ],
+      "unsafe": [
+        "Alcohol",
+        "Opioids",
+        "Benzodiazepines",
+        "GHB",
+        "GBL",
+        "Stimulants"
+      ],
+      "uncertain": [
+        "Ketamine",
+        "Cannabis",
+        "Psychedelics"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 75,
+        "max": 150
+      },
+      "common": {
+        "min": 150,
+        "max": 300
+      },
+      "strong": {
+        "min": 300,
+        "max": 600
+      },
+      "heavy": 600,
+      "threshold": 50
+    },
+    "durations": {
+      "onset": 0.75,
+      "comeup": 1,
+      "peak": 2.5,
+      "comedown": 0,
+      "comedownLevel": 0,
+      "offset": 3
+    }
+  }
+]

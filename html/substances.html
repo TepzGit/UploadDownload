@@ -40,7 +40,7 @@
       <a class="si-back" href="/admin">← Admin</a>
       <p class="xn-eyebrow">Admin</p>
       <h1 class="xn-h1">Substances Importer</h1>
-      <p class="xn-sub">Add medications and other substances PsychonautWiki doesn't have. They show up in the Graph search, the Journal and Drug info, marked Custom.</p>
+      <p class="xn-sub">Add medications and other substances PsychonautWiki doesn't have. They show up in the Graph search, the Journal and Drug info, marked Custom, or Medicine when they have an active ingredient.</p>
     </div>
     <button type="button" class="xn-btn" id="siNew"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New substance</button>
   </div>
@@ -62,6 +62,14 @@
           <label class="xn-label" for="fAliases">Other names <span class="si-hint">comma separated</span></label>
           <input class="xn-input" id="fAliases" maxlength="600" autocomplete="off" placeholder="Brand names, slang">
         </div>
+        <div class="si-field">
+          <label class="xn-label" for="fIngredient">Active ingredient <span class="si-hint">medicines only, marks it Medicine</span></label>
+          <input class="xn-input" id="fIngredient" maxlength="80" autocomplete="off" placeholder="Alprazolam">
+        </div>
+        <div class="si-field">
+          <label class="xn-label" for="fIcon">Icon <span class="si-hint">a pill picture or shape; Automatic picks one from the name and class</span></label>
+          <div class="si-icon-pick"><select class="xn-input" id="fIcon"><option value="">Automatic</option></select><i class="sc-icon" id="fIconShow" aria-hidden="true"></i></div>
+        </div>
         <div class="si-row">
           <div class="si-field">
             <label class="xn-label" for="fClass">Class</label>
@@ -70,7 +78,7 @@
               <option>Depressant</option><option>Stimulant</option><option>Opioid</option><option>Benzodiazepine</option>
               <option>Gabapentinoid</option><option>Antidepressant</option><option>Antipsychotic</option><option>Antihistamine</option>
               <option>Hypnotic</option><option>Psychedelic</option><option>Dissociative</option><option>Entactogen</option>
-              <option>Cannabinoid</option><option>Nootropic</option><option>Analgesic</option>
+              <option>Cannabinoid</option><option>Nootropic</option><option>Analgesic</option><option>Deliriant</option><option>Eugeroic</option><option>Oneirogen</option>
             </datalist>
           </div>
           <div class="si-field">

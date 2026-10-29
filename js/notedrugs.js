@@ -87,7 +87,7 @@ export function markDrugs(el, text) {
       const span = document.createElement("span");
       span.className = "nd-drug";
       span.title = sub.name;
-      span.append(window.xnClass.icon(key, "nd-icon"), m[0]);
+      span.append(window.xnClass.icon(key, "nd-icon", sub.name), m[0]);
       frag.append(span);
       at = m.index + m[0].length;
     }

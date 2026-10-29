@@ -12,6 +12,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
+  <style>
+    /* This page keeps the look it had before the shared page/card changes in
+       oled.css on the evening of 2026-10-28 (mommy 2026-10-29: "make the
+       profile and utility page look like before"). :where() keeps these as
+       weak as the old oled.css rules, so the page's own styles still win. */
+    :where(.xn-page.ut) { margin-left: 10rem; margin-right: 10rem !important; }
+    :where(.xn-page.ut) .xn-card { margin: 0; border-radius: 2px; padding: clamp(16px, 2.5vw, 24px); }
+    :where(.xn-page.ut) .xn-like { width: 44px; height: 44px; }
+    .xn-brand { padding: 8px 0; }
+    @media (max-width: 767px) {
+      :where(.xn-page.ut) { margin-left: 0; margin-right: 0 !important; }
+      :where(.xn-page.ut) .xn-card { padding: 14px; }
+    }
+  </style>
   <script src="/nav.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">

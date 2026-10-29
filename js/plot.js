@@ -38,7 +38,8 @@ export function loadPlotly() {
 // ------------------------------------------------------------
 
 export const PLOT_DEFAULTS = Object.freeze({
-  width: 6,        // line width in px (phones draw 1 px thinner)
+  v: 2,            // style version, 2 since the thicker line (older saves are scaled up)
+  width: 9,        // line width in px (phones draw 1 px thinner)
   shape: "smooth", // "smooth" or "sharp"
   fill: 30,        // area under the line, 0-60 %
   glow: false,     // soft glow around the line
@@ -56,7 +57,10 @@ export function cleanPlotStyle(raw) {
   const s = { ...PLOT_DEFAULTS };
   if (!raw || typeof raw !== "object") return s;
   const num = (v, lo, hi, d) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Math.round(Number(v)))) : d);
-  s.width = num(raw.width, 2, 12, s.width);
+  // Before version 2 the default line was 6 px, so older saved widths are
+  // scaled up by half and a saved line gets thicker along with the default.
+  const legacy = raw.v !== PLOT_DEFAULTS.v && raw.width != null;
+  s.width = num(legacy ? Number(raw.width) * 1.5 : raw.width, 2, 20, s.width);
   s.fill = num(raw.fill, 0, 60, s.fill);
   if (raw.shape === "sharp" || raw.shape === "smooth") s.shape = raw.shape;
   if (["compact", "normal", "tall"].includes(raw.height)) s.height = raw.height;
@@ -150,7 +154,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
         y: [0],
         mode: "markers",
         type: "scatter",
-        marker: { color: start.color, size: narrow ? 13 : 14 },
+        marker: { color: start.color, size: Math.max(narrow ? 13 : 14, width + 6) },
         cliponaxis: false,
         hoverinfo: "skip",
         showlegend: false,

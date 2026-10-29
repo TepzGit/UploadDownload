@@ -46,6 +46,9 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 .si-legend + * { clear: both; }
 .si-field { margin-bottom: 12px; min-width: 0; }
 .si-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.si-icon-pick { display: flex; align-items: center; gap: 10px; }
+.si-icon-pick .xn-input { flex: 1; min-width: 0; }
+.si-icon-pick .sc-icon { width: 30px; height: 30px; flex: none; }
 .si-doses { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0 12px; }
 .si-pair { display: flex; align-items: center; gap: 6px; }
 .si-pair span { color: var(--oled-muted); }
@@ -129,6 +132,7 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 .si-item-name > :first-child { flex: none; }
 .si-item-meta { font-size: 11px; color: var(--oled-muted); }
 .si-noicon { width: 16px; height: 16px; border: 1px solid var(--oled-line-strong); border-radius: 50%; }
+.sc-icon.si-noicon:not(.has-custom-image) { background: transparent; -webkit-mask: none; mask: none; }
 .si-icon-btn {
   flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 2px;
   background: transparent; color: var(--oled-muted); cursor: pointer;

@@ -96,6 +96,8 @@ export function customToSubstance(c) {
     name: c.name,
     custom: true,
     customId: c.id,
+    ingredient: c.ingredient || "", // medicines only: what is really in it
+    icon: c.icon || "", // medicines only: a pill picture key (js/classicons.js)
     commonNames: c.aliases || [],
     class: { psychoactive: c.class ? [c.class] : [], chemical: c.chemicalClass ? [c.chemicalClass] : [] },
     images: [],
@@ -140,7 +142,17 @@ export async function customByName(name) {
 export async function searchSuggestions(name) {
   await customSubstances();
   const custom = customMatches(name);
-  return [...custom, ...(await wikiSuggestions(name)).filter((s) => !custom.some((c) => c.name.toLowerCase() === s.name.toLowerCase()))];
+  const wiki = (await wikiSuggestions(name)).filter((s) => !custom.some((c) => c.name.toLowerCase() === s.name.toLowerCase()));
+  // Best matches first: names starting with the search, then brand or street
+  // names starting with it, then the rest. On a tie custom entries go first.
+  const q = String(name || "").trim().toLowerCase();
+  const rank = (s) => {
+    const own = String(s.name).toLowerCase();
+    if (own.startsWith(q)) return 0;
+    if ((s.commonNames || []).some((n) => String(n).toLowerCase().startsWith(q))) return 1;
+    return own.includes(q) ? 2 : 3;
+  };
+  return [...custom, ...wiki].map((s, i) => [rank(s), i, s]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([, , s]) => s);
 }
 
 async function wikiSuggestions(name) {

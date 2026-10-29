@@ -8,6 +8,23 @@ body {
     font-family: 'nerd';
     src: url('/JetBrainsMono-Regular.ttf') format('truetype');
 }
+
+
+.Drugs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 80%;
+  min-height: 0;
+  width: 100%;
+  border: 1px solid var(--oled-accent);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+  overflow-y: scroll;
+  box-sizing: border-box;
+  padding: 10px;
+  gap: 3%;
+}
+
 .cont {
   width: 50%;
   margin: auto;
@@ -86,20 +103,7 @@ body {
   top: 140;
 }
 
-.Drugs {
-  display: flex;
-  height: 80%;
-  min-height: 0;
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  border-radius: 5px;
-  overflow-y: scroll;
-  box-sizing: border-box;
-  padding: 10px;
-  flex-direction: column;
-  gap: 3%;
-}
+
 
 .drugimg{
 

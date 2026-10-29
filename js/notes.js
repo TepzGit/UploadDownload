@@ -2,10 +2,15 @@
 // notes.js — the Notes page (/Notes).
 //  - By substance: the notes written on Graph doses (/experiences),
 //    grouped by substance A–Z, newest first inside each.
-//  - Trip reports: longer write-ups, optionally tied to a Graph
-//    session (/notes/reports).
+//  - Trip reports: longer write-ups with up to 8 pictures, optionally
+//    tied to a Graph session (/notes/reports). Opening one shows it with
+//    its comments on the right; public ones can be liked.
+//  - Public reports: everyone's shared reports (/notes/reports/public).
 //  - Notepad: free notes that save as you type (/notes/pad).
+// Needs media.js on the page (pictures).
 // ============================================================
+
+import { postTime, paintName, rankBadge, profileLink } from "/forum.js";
 
 const $ = (id) => document.getElementById(id);
 const toast = (msg, isError) => (window.xnToast ? window.xnToast(msg, isError) : console.log(msg));
@@ -203,6 +208,11 @@ $("doseFind").addEventListener("input", renderDoses);
 let reports = [];
 let editing = null;
 let rating = 0;
+const MAX_PICS = 8;
+const touch = matchMedia("(pointer: coarse)");
+const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3c-.3 0-.6-.1-.8-.3C6.9 16.4 3 13.2 3 8.9 3 6.2 5.1 4 7.7 4c1.7 0 3.3.9 4.3 2.3C13 4.9 14.6 4 16.3 4 18.9 4 21 6.2 21 8.9c0 4.3-3.9 7.5-8.2 11.1-.2.2-.5.3-.8.3z"/></svg>';
+const BUBBLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4v-14z"/></svg>';
+const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
 
 async function loadReports() {
   try {
@@ -212,6 +222,93 @@ async function loadReports() {
     $("repList").innerHTML = '<p class="nt-empty"></p>';
     $("repList").firstChild.textContent = error.message;
   }
+}
+
+function srText(text) {
+  const span = document.createElement("span");
+  span.className = "xn-sr";
+  span.textContent = text;
+  return span;
+}
+
+/** A small heart or speech bubble with a number, for the report cards. */
+function stat(icon, n, word, on = false) {
+  const span = document.createElement("span");
+  span.className = "nt-stat" + (on ? " is-on" : "");
+  span.innerHTML = icon;
+  span.append(String(n || 0), srText(` ${word}${n === 1 ? "" : "s"}`));
+  return span;
+}
+
+/**
+ * A report in the lists: its first picture, who wrote it (public list), the
+ * day, title, stars, substances, the start of the text, likes and comments.
+ */
+function reportCard(r, { author = null } = {}) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "xn-card nt-report";
+  card.dataset.id = String(r.id);
+  const pics = r.pictures || [];
+  if (pics.length) {
+    const cover = document.createElement("span");
+    cover.className = "nt-report-cover";
+    const img = document.createElement("img");
+    img.src = pics[0];
+    img.alt = "";
+    img.loading = "lazy";
+    img.addEventListener("error", () => cover.classList.add("is-broken"), { once: true });
+    cover.append(img);
+    if (pics.length > 1) {
+      const more = document.createElement("span");
+      more.className = "nt-report-more";
+      more.textContent = `+${pics.length - 1}`;
+      more.append(srText(" more pictures"));
+      cover.append(more);
+    }
+    card.append(cover);
+  }
+  if (author) card.append(authorChip(author));
+  const day = document.createElement("span");
+  day.className = "nt-report-day";
+  day.textContent = dayLabel(r.happenedAt);
+  if (!author && r.public) {
+    const tag = document.createElement("span");
+    tag.className = "nt-tag";
+    tag.textContent = "Public";
+    day.append(tag);
+  }
+  const title = document.createElement("h3");
+  title.className = "nt-report-title";
+  title.textContent = r.title || "Untitled report";
+  card.append(day, title);
+  if (r.rating) {
+    const s = document.createElement("span");
+    s.className = "nt-report-stars";
+    s.textContent = stars(r.rating);
+    s.setAttribute("aria-label", `${r.rating} of 5`);
+    card.append(s);
+  }
+  if (r.substances) {
+    const subs = document.createElement("span");
+    subs.className = "nt-report-subs";
+    subs.textContent = r.substances;
+    card.append(subs);
+  }
+  if (r.body) {
+    const text = document.createElement("p");
+    text.className = "nt-report-text";
+    text.textContent = r.body;
+    card.append(text);
+  }
+  // Likes and comments: public reports, or a private one that got some while it was public.
+  if (r.public || r.likes || r.comments) {
+    const foot = document.createElement("span");
+    foot.className = "nt-report-foot";
+    foot.append(stat(HEART, r.likes, "like", r.liked), stat(BUBBLE, r.comments, "comment"));
+    card.append(foot);
+  }
+  return card;
 }
 
 function renderReports() {
@@ -227,50 +324,13 @@ function renderReports() {
     box.innerHTML = '<p class="nt-empty">Nothing matches that.</p>';
     return;
   }
-  list.forEach((r) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "xn-card nt-report";
-    card.dataset.id = String(r.id);
-    const day = document.createElement("span");
-    day.className = "nt-report-day";
-    day.textContent = dayLabel(r.happenedAt);
-    const title = document.createElement("h3");
-    title.className = "nt-report-title";
-    title.textContent = r.title || "Untitled report";
-    card.append(day, title);
-    if (r.public) {
-      const tag = document.createElement("span");
-      tag.className = "nt-tag";
-      tag.textContent = "Public";
-      day.append(tag);
-    }
-    if (r.rating) {
-      const stars = document.createElement("span");
-      stars.className = "nt-report-stars";
-      stars.textContent = "★".repeat(r.rating) + "☆".repeat(5 - r.rating);
-      stars.setAttribute("aria-label", `${r.rating} of 5`);
-      card.append(stars);
-    }
-    if (r.substances) {
-      const subs = document.createElement("span");
-      subs.className = "nt-report-subs";
-      subs.textContent = r.substances;
-      card.append(subs);
-    }
-    if (r.body) {
-      const text = document.createElement("p");
-      text.className = "nt-report-text";
-      text.textContent = r.body;
-      card.append(text);
-    }
-    box.append(card);
-  });
+  list.forEach((r) => box.append(reportCard(r)));
 }
 $("repFind").addEventListener("input", renderReports);
 $("repList").addEventListener("click", (event) => {
   const card = event.target.closest(".nt-report");
-  if (card) openReport(reports.find((r) => r.id === Number(card.dataset.id)));
+  const r = card && reports.find((x) => x.id === Number(card.dataset.id));
+  if (r) openReader({ ...r, mine: true });
 });
 $("repNew").addEventListener("click", () => openReport(null));
 
@@ -294,15 +354,117 @@ for (let i = 1; i <= 5; i++) {
   $("repStars").append(b);
 }
 
-async function openReport(report) {
+// Pictures in the report form: the ones it has ({url}) and new ones ({file, url}).
+let picState = [];
+
+function paintPics() {
+  const box = $("repPics");
+  box.replaceChildren();
+  picState.forEach((p, i) => {
+    const cell = document.createElement("div");
+    cell.className = "nt-pic-edit";
+    const img = document.createElement("img");
+    img.src = p.url;
+    img.alt = "";
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "nt-pic-x";
+    x.textContent = "×";
+    x.setAttribute("aria-label", `Remove picture ${i + 1}`);
+    x.addEventListener("click", () => {
+      if (p.file) URL.revokeObjectURL(p.url);
+      picState.splice(i, 1);
+      paintPics();
+      ($("repPics").querySelectorAll(".nt-pic-x")[i] || $("repPics").querySelector(".nt-pic-x, .nt-pic-add"))?.focus();
+    });
+    cell.append(img, x);
+    box.append(cell);
+  });
+  if (picState.length < MAX_PICS) {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "nt-pic-add";
+    add.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg><span></span>';
+    add.querySelector("span").textContent = picState.length ? "Add more" : "Add pictures";
+    add.addEventListener("click", () => $("repFiles").click());
+    box.append(add);
+  }
+  $("repPicsCount").textContent = picState.length ? `${picState.length} of ${MAX_PICS}` : "";
+}
+
+function addPictureFiles(files) {
+  const images = [...files].filter((f) => f.type.startsWith("image/"));
+  if (!images.length) return;
+  const room = MAX_PICS - picState.length;
+  if (images.length > room) toast(room ? `A report holds ${MAX_PICS} pictures, so only the first ${room} were added.` : `A report holds ${MAX_PICS} pictures.`);
+  images.slice(0, room).forEach((file) => picState.push({ file, url: URL.createObjectURL(file) }));
+  paintPics();
+}
+
+function dropNewPictures() {
+  picState.forEach((p) => p.file && URL.revokeObjectURL(p.url));
+  picState = [];
+}
+
+$("repFiles").addEventListener("change", () => {
+  addPictureFiles($("repFiles").files || []);
+  $("repFiles").value = "";
+});
+// The report box grows with what's written in it, so the form scrolls
+// instead of the text hiding inside a fixed box.
+function fitBody() {
+  const box = $("repForm").elements.body;
+  if (!box.offsetParent) return; // the form isn't showing
+  const cs = getComputedStyle(box);
+  const top = window.scrollY;
+  const form = $("repForm");
+  const formTop = form.scrollTop;
+  box.style.height = "auto";
+  box.style.height = box.scrollHeight + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth) + "px";
+  // Shrinking for a moment mustn't jump the form or the page.
+  form.scrollTop = formTop;
+  if (window.scrollY !== top) window.scrollTo(0, top);
+}
+$("repForm").elements.body.addEventListener("input", fitBody);
+window.addEventListener("resize", () => { if ($("repDlg").open) fitBody(); });
+
+// Pictures can also be pasted into the report or dropped on the form.
+$("repForm").elements.body.addEventListener("paste", (event) => {
+  const files = [...(event.clipboardData?.files || [])];
+  if (files.some((f) => f.type.startsWith("image/"))) {
+    event.preventDefault();
+    addPictureFiles(files);
+  }
+});
+$("repForm").addEventListener("dragover", (event) => {
+  if ([...(event.dataTransfer?.items || [])].some((i) => i.kind === "file")) {
+    event.preventDefault();
+    $("repPics").classList.add("is-drop");
+  }
+});
+$("repForm").addEventListener("dragleave", (event) => {
+  if (!event.currentTarget.contains(event.relatedTarget)) $("repPics").classList.remove("is-drop");
+});
+$("repForm").addEventListener("drop", (event) => {
+  $("repPics").classList.remove("is-drop");
+  const files = [...(event.dataTransfer?.files || [])];
+  if (!files.length) return;
+  event.preventDefault();
+  addPictureFiles(files);
+});
+
+let backToReader = false;
+
+async function openReport(report, { fromReader = false } = {}) {
   editing = report;
+  backToReader = fromReader;
   const form = $("repForm");
   form.reset();
   $("repError").hidden = true;
   $("repDelete").hidden = !report;
   $("repDelete").textContent = "Delete";
   $("repDelete").classList.remove("is-armed");
-  $("repDlgTitle").textContent = report ? "Trip report" : "New trip report";
+  $("repDlgTitle").textContent = report ? "Edit trip report" : "New trip report";
   form.elements.title.value = report?.title || "";
   form.elements.day.value = isoDay(report?.happenedAt || Date.now());
   form.elements.day.max = isoDay(Date.now());
@@ -312,6 +474,9 @@ async function openReport(report) {
   form.elements.public.checked = Boolean(report?.public);
   rating = report?.rating || 0;
   paintStars();
+  dropNewPictures();
+  picState = (report?.pictures || []).map((url) => ({ url }));
+  paintPics();
 
   // The account's Graph sessions, to tie the report to one.
   const select = form.elements.experience;
@@ -329,7 +494,10 @@ async function openReport(report) {
 
   const dlg = $("repDlg");
   if (!dlg.open) dlg.showModal();
-  (report ? form.elements.body : form.elements.title).focus();
+  form.elements.body.style.height = "";
+  fitBody();
+  form.scrollTop = 0;
+  (report ? form.elements.body : form.elements.title).focus({ preventScroll: true });
 }
 
 $("repForm").elements.experience.addEventListener("change", async (event) => {
@@ -345,12 +513,23 @@ $("repForm").elements.experience.addEventListener("change", async (event) => {
 const closeReport = () => $("repDlg").close();
 $("repClose").addEventListener("click", closeReport);
 $("repCancel").addEventListener("click", closeReport);
+$("repDlg").addEventListener("close", () => {
+  dropNewPictures();
+  const back = backToReader && editing;
+  backToReader = false;
+  // Cancel from Edit goes back to reading the report.
+  if (back && !$("repDlg").dataset.saved) {
+    const r = reports.find((x) => x.id === editing.id);
+    if (r) openReader({ ...r, mine: true });
+  }
+  delete $("repDlg").dataset.saved;
+});
 
 $("repForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
   const [y, m, d] = form.elements.day.value.split("-").map(Number);
-  const body = {
+  const report = {
     id: editing?.id || 0,
     experienceId: Number(form.elements.experience.value) || 0,
     title: form.elements.title.value,
@@ -360,21 +539,41 @@ $("repForm").addEventListener("submit", async (event) => {
     rating,
     happenedAt: y ? new Date(y, m - 1, d, 12).getTime() : Date.now(),
     public: form.elements.public.checked,
+    keep: picState.filter((p) => !p.file).map((p) => p.url),
   };
-  $("repSave").disabled = true;
+  const save = $("repSave");
+  save.disabled = true;
+  save.textContent = picState.some((p) => p.file) ? "Uploading…" : "Saving…";
   try {
-    const saved = await api("/notes/reports", body);
+    // Photos are made smaller (and lose their location data) before they go up.
+    const body = new FormData();
+    body.append("report", JSON.stringify(report));
+    for (const p of picState.filter((x) => x.file)) {
+      const small = await window.xnShrinkPicture(p.file, [1600, 1600]);
+      body.append("image", small, small === p.file ? p.file.name : "picture.jpg");
+    }
+    const res = await fetch("/notes/reports", { method: "POST", body });
+    if (res.status === 401) {
+      location.href = "/Main?next=" + encodeURIComponent(location.pathname + location.hash);
+      throw new Error("Log in again.");
+    }
+    if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save that report. Try again.");
+    const saved = await res.json();
     reports = [saved, ...reports.filter((r) => r.id !== saved.id)].sort((a, b) => b.happenedAt - a.happenedAt || b.id - a.id);
     renderReports();
+    const reopen = backToReader;
+    $("repDlg").dataset.saved = "1";
     closeReport();
     toast(saved.public ? "Report saved. Everyone can read it under Public reports." : editing ? "Report saved." : "Report added.");
     // The public list shows it (or drops it) the next time it opens.
     loaded.public = false;
+    if (reopen) openReader({ ...saved, mine: true });
   } catch (error) {
     $("repError").textContent = error.message;
     $("repError").hidden = false;
   } finally {
-    $("repSave").disabled = false;
+    save.disabled = false;
+    save.textContent = "Save";
   }
 });
 
@@ -389,7 +588,10 @@ $("repDelete").addEventListener("click", async (event) => {
   try {
     await api("/notes/reports", { id: editing.id, delete: true });
     reports = reports.filter((r) => r.id !== editing.id);
+    pubItems = pubItems.filter((r) => r.id !== editing.id);
     renderReports();
+    if (loaded.public) renderPublic();
+    $("repDlg").dataset.saved = "1";
     closeReport();
     toast("Report deleted.");
   } catch (error) {
@@ -427,7 +629,10 @@ function authorChip(a) {
   img.src = a.avatar || "/profiles/Default/default.png";
   img.loading = "lazy";
   img.addEventListener("error", () => (img.style.visibility = "hidden"), { once: true });
-  span.append(img, a.name);
+  const name = document.createElement("span");
+  name.textContent = a.name;
+  paintName(name, a);
+  span.append(img, name);
   return span;
 }
 
@@ -445,57 +650,72 @@ function renderPublic() {
     box.innerHTML = '<p class="nt-empty">Nothing matches that.</p>';
     return;
   }
-  list.forEach((r) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "xn-card nt-report";
-    card.dataset.id = String(r.id);
-    const day = document.createElement("span");
-    day.className = "nt-report-day";
-    day.textContent = dayLabel(r.happenedAt);
-    const title = document.createElement("h3");
-    title.className = "nt-report-title";
-    title.textContent = r.title || "Untitled report";
-    card.append(authorChip(r.author), day, title);
-    if (r.rating) {
-      const stars = document.createElement("span");
-      stars.className = "nt-report-stars";
-      stars.textContent = "★".repeat(r.rating) + "☆".repeat(5 - r.rating);
-      stars.setAttribute("aria-label", `${r.rating} of 5`);
-      card.append(stars);
-    }
-    if (r.substances) {
-      const subs = document.createElement("span");
-      subs.className = "nt-report-subs";
-      subs.textContent = r.substances;
-      card.append(subs);
-    }
-    if (r.body) {
-      const text = document.createElement("p");
-      text.className = "nt-report-text";
-      text.textContent = r.body;
-      card.append(text);
-    }
-    box.append(card);
-  });
+  list.forEach((r) => box.append(reportCard(r, { author: r.author })));
 }
 $("pubFind").addEventListener("input", renderPublic);
 $("pubMore").addEventListener("click", () => loadPublic({ older: true }));
 $("pubList").addEventListener("click", (event) => {
   const card = event.target.closest(".nt-report");
-  if (card) openPublic(pubItems.find((r) => r.id === Number(card.dataset.id)));
+  if (card) openReader(pubItems.find((r) => r.id === Number(card.dataset.id)));
 });
 
-function openPublic(r) {
+// ---------------------------------------------------------------- reading a report
+// The report on the left, its comments in a card on the right (under it on
+// phones), and the like button under the report.
+
+let reading = null; // the report open in the reader
+let readSeq = 0;
+
+/** Keeps both lists in step after a like, a comment or an edit. */
+function patchReport(id, fields) {
+  [reports, pubItems].forEach((list) => list.forEach((r) => r.id === id && Object.assign(r, fields)));
+  if (reports.length) renderReports();
+  if (pubItems.length) renderPublic();
+}
+
+function setReportParam(id) {
+  const url = new URL(location.href);
+  if (id) url.searchParams.set("report", String(id));
+  else url.searchParams.delete("report");
+  history.replaceState(null, "", url);
+}
+
+function openReader(r) {
   if (!r) return;
-  const author = $("pubAuthor");
-  author.replaceChildren(authorChip(r.author));
-  author.href = "/u/" + encodeURIComponent(r.author.name);
-  $("pubDay").textContent = dayLabel(r.happenedAt);
-  $("pubTitle").textContent = r.title || "Untitled report";
-  $("pubStars").textContent = r.rating ? "★".repeat(r.rating) + "☆".repeat(5 - r.rating) : "";
-  $("pubStars").hidden = !r.rating;
-  const facts = $("pubFacts");
+  const mine = r.mine ?? reports.some((x) => x.id === r.id);
+  reading = { likers: [], ...r, mine };
+  const seq = ++readSeq;
+  paintReader();
+  $("talkList").replaceChildren(talkNote("Loading comments…"));
+  $("talkCount").textContent = "";
+  $("talkNote").hidden = true;
+  $("talkForm").hidden = !reading.public;
+  $("talkText").value = "";
+  growTalk();
+  const dlg = $("readDlg");
+  if (!dlg.open) dlg.showModal();
+  dlg.querySelector(".nt-read-main").scrollTop = 0;
+  $("readClose").focus({ preventScroll: true });
+  setReportParam(r.id);
+  loadTalk(seq);
+}
+
+function paintReader() {
+  const r = reading;
+  const author = $("readAuthor");
+  author.hidden = r.mine || !r.author;
+  if (!author.hidden) {
+    author.replaceChildren(authorChip(r.author));
+    author.href = profileLink(r.author.name);
+  }
+  $("readMine").hidden = !r.mine;
+  $("readMine").textContent = r.public ? "Your report · Public" : "Your report · Only you";
+  $("readEdit").hidden = !r.mine;
+  $("readDay").textContent = dayLabel(r.happenedAt);
+  $("readTitle").textContent = r.title || "Untitled report";
+  $("readStars").textContent = r.rating ? stars(r.rating) : "";
+  $("readStars").hidden = !r.rating;
+  const facts = $("readFacts");
   facts.replaceChildren();
   [["Substances", r.substances], ["Set and setting", r.setting]].forEach(([k, v]) => {
     if (!v) return;
@@ -505,14 +725,287 @@ function openPublic(r) {
     dd.textContent = v;
     facts.append(dt, dd);
   });
-  $("pubBody").textContent = r.body || "";
-  $("pubDlg").showModal();
-  $("pubClose").focus();
+  facts.hidden = !facts.children.length;
+  paintGallery($("readPics"), r.pictures || []);
+  $("readBody").textContent = r.body || "";
+  $("readBody").hidden = !r.body;
+  paintLikes();
 }
-$("pubClose").addEventListener("click", () => $("pubDlg").close());
-$("pubDlg").addEventListener("click", (event) => {
+
+function paintGallery(box, pics) {
+  box.replaceChildren();
+  box.hidden = !pics.length;
+  box.dataset.count = String(Math.min(pics.length, 5));
+  pics.forEach((url, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "nt-pic";
+    b.setAttribute("aria-label", `Open picture ${i + 1} of ${pics.length}`);
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    img.loading = "lazy";
+    img.addEventListener("error", () => b.classList.add("is-broken"), { once: true });
+    b.append(img);
+    b.addEventListener("click", () => window.xnViewer && window.xnViewer.open(pics, i));
+    box.append(b);
+  });
+}
+
+/** "Liked by you, anna and 3 others" */
+function likersText(r) {
+  const total = r.likes || 0;
+  if (!total) return r.mine && r.public ? "No likes yet." : "";
+  const names = (r.likers || []).map((p) => p.name);
+  const shown = [...(r.liked ? ["you"] : []), ...names].slice(0, r.liked ? 3 : 2);
+  const rest = total - shown.length;
+  if (!shown.length) return `${total} ${total === 1 ? "like" : "likes"}`;
+  if (rest > 0) return `Liked by ${shown.join(", ")} and ${rest} ${rest === 1 ? "other" : "others"}`;
+  return "Liked by " + (shown.length > 1 ? shown.slice(0, -1).join(", ") + " and " + shown[shown.length - 1] : shown[0]);
+}
+
+function paintLikes() {
+  const r = reading;
+  const like = $("readLike");
+  like.hidden = r.mine || !r.public;
+  like.setAttribute("aria-pressed", String(!!r.liked));
+  like.querySelector(".nt-like-label").textContent = r.liked ? "Liked" : "Like";
+  like.querySelector(".nt-like-count").textContent = r.likes ? String(r.likes) : "";
+  like.setAttribute("aria-label", `${r.liked ? "Unlike" : "Like"} this report${r.likes ? `, ${r.likes} ${r.likes === 1 ? "like" : "likes"}` : ""}`);
+  const who = $("readLikers");
+  who.replaceChildren();
+  const text = likersText(r);
+  if (r.mine && r.likes) who.insertAdjacentHTML("afterbegin", HEART);
+  who.append(text);
+  who.hidden = !text;
+}
+
+function talkNote(text) {
+  const li = document.createElement("li");
+  li.className = "nt-talk-empty";
+  li.textContent = text;
+  return li;
+}
+
+async function loadTalk(seq) {
+  const r = reading;
+  try {
+    const data = await api("/notes/reports/comments?report=" + encodeURIComponent(r.id));
+    if (seq !== readSeq) return;
+    const comments = data.comments || [];
+    Object.assign(r, { likes: data.likes, liked: data.liked, likers: data.likers || [], public: data.public, comments: comments.length });
+    paintReader();
+    renderTalk(comments);
+    patchReport(r.id, { likes: r.likes, liked: r.liked, comments: r.comments, public: r.public });
+  } catch (error) {
+    if (seq !== readSeq) return;
+    $("talkList").replaceChildren(talkNote(error.message));
+    $("talkForm").hidden = true;
+  }
+}
+
+function renderTalk(comments) {
+  const r = reading;
+  const list = $("talkList");
+  list.replaceChildren(...comments.map(commentItem));
+  if (!comments.length && r.public) list.append(talkNote(r.mine ? "No comments yet." : "No comments yet. Write the first one."));
+  $("talkCount").textContent = comments.length ? String(comments.length) : "";
+  $("talkForm").hidden = !r.public;
+  const note = $("talkNote");
+  note.hidden = r.public;
+  note.textContent = r.public ? "" : "Only you can see this report. Turn on Public under Edit so others can like it and comment.";
+}
+
+function face(who) {
+  const span = document.createElement("span");
+  span.className = "nt-face";
+  span.setAttribute("aria-hidden", "true");
+  if (who.avatar) {
+    const img = document.createElement("img");
+    img.src = who.avatar;
+    img.alt = "";
+    img.loading = "lazy";
+    img.addEventListener("error", () => img.replaceWith(who.initial || "?"), { once: true });
+    span.append(img);
+  } else {
+    span.textContent = who.initial || (who.name || "?").charAt(0).toUpperCase();
+  }
+  return span;
+}
+
+function commentItem(c) {
+  const li = document.createElement("li");
+  li.className = "nt-comment";
+  const pic = document.createElement("a");
+  pic.className = "nt-comment-face";
+  pic.href = profileLink(c.author.name);
+  pic.setAttribute("aria-label", c.author.name + "'s profile");
+  pic.append(face(c.author));
+  const main = document.createElement("div");
+  main.className = "nt-comment-main";
+  const head = document.createElement("div");
+  head.className = "nt-comment-head";
+  const name = document.createElement("a");
+  name.className = "nt-comment-name";
+  name.href = profileLink(c.author.name);
+  name.textContent = c.author.name;
+  paintName(name, c.author);
+  head.append(name);
+  const badge = rankBadge(c.author);
+  if (badge) head.append(badge);
+  const when = document.createElement("time");
+  when.className = "nt-time";
+  when.dateTime = new Date(c.createdAt).toISOString();
+  when.title = new Date(c.createdAt).toLocaleString();
+  when.textContent = postTime(c.createdAt);
+  head.append(when);
+  if (c.canDelete) head.append(commentDelete(c, li));
+  const body = document.createElement("p");
+  body.className = "nt-comment-body";
+  body.textContent = c.body;
+  main.append(head, body);
+  li.append(pic, main);
+  return li;
+}
+
+/** Delete asks once ("Delete?") before it removes the comment. */
+function commentDelete(c, li) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "nt-comment-del";
+  b.textContent = "Delete";
+  let armed = null;
+  const disarm = () => {
+    clearTimeout(armed);
+    armed = null;
+    b.classList.remove("is-armed");
+    b.textContent = "Delete";
+  };
+  b.addEventListener("blur", disarm);
+  b.addEventListener("click", async () => {
+    if (!armed) {
+      b.classList.add("is-armed");
+      b.textContent = "Delete?";
+      armed = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    b.disabled = true;
+    try {
+      await api("/notes/reports/comments", { action: "delete", id: c.id });
+      li.remove();
+      commentsChanged(-1);
+    } catch (error) {
+      b.disabled = false;
+      toast(error.message, true);
+    }
+  });
+  return b;
+}
+
+function commentsChanged(by) {
+  if (!reading) return;
+  reading.comments = Math.max(0, (reading.comments || 0) + by);
+  $("talkCount").textContent = reading.comments ? String(reading.comments) : "";
+  if (!reading.comments && reading.public) $("talkList").append(talkNote("No comments yet."));
+  patchReport(reading.id, { comments: reading.comments });
+}
+
+const talkText = $("talkText");
+function growTalk() {
+  talkText.style.height = "auto";
+  talkText.style.height = Math.max(44, Math.min(talkText.scrollHeight + 2, 200)) + "px";
+  $("talkSend").disabled = !talkText.value.trim();
+}
+talkText.addEventListener("input", growTalk);
+talkText.addEventListener("keydown", (event) => {
+  // Enter sends on computers; phones keep Enter for new lines.
+  if (event.key === "Enter" && !event.shiftKey && (!touch.matches || event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    $("talkForm").requestSubmit();
+  }
+});
+$("talkForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const r = reading;
+  if (!r || !talkText.value.trim()) return;
+  $("talkSend").disabled = true;
+  talkText.disabled = true;
+  try {
+    const c = await api("/notes/reports/comments", { action: "add", report: r.id, body: talkText.value });
+    if (reading !== r) return;
+    const list = $("talkList");
+    list.querySelectorAll(".nt-talk-empty").forEach((n) => n.remove());
+    list.append(commentItem(c));
+    list.lastElementChild.scrollIntoView({ block: "nearest" });
+    talkText.value = "";
+    commentsChanged(1);
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    talkText.disabled = false;
+    growTalk();
+    if (reading === r) talkText.focus({ preventScroll: true });
+  }
+});
+
+let liking = false;
+$("readLike").addEventListener("click", async () => {
+  const r = reading;
+  if (!r || r.mine || liking) return;
+  const before = { likes: r.likes || 0, liked: !!r.liked };
+  const next = !before.liked;
+  liking = true;
+  Object.assign(r, { liked: next, likes: Math.max(0, before.likes + (next ? 1 : -1)) });
+  paintLikes();
+  const like = $("readLike");
+  if (next) {
+    like.classList.remove("is-pop");
+    void like.offsetWidth;
+    like.classList.add("is-pop");
+  }
+  try {
+    const data = await api("/notes/reports/like", { report: r.id, liked: next });
+    Object.assign(r, { likes: data.likes, liked: data.liked, likers: data.likers || r.likers });
+  } catch (error) {
+    Object.assign(r, before);
+    toast(error.message, true);
+  } finally {
+    liking = false;
+    if (reading === r) paintLikes();
+    patchReport(r.id, { likes: r.likes, liked: r.liked });
+  }
+});
+
+$("readEdit").addEventListener("click", () => {
+  const r = reading && reports.find((x) => x.id === reading.id);
+  if (!r) return;
+  $("readDlg").close();
+  openReport(r, { fromReader: true });
+});
+$("readClose").addEventListener("click", () => $("readDlg").close());
+$("readDlg").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
+$("readDlg").addEventListener("close", () => {
+  reading = null;
+  readSeq++;
+  setReportParam(0);
+});
+
+// /Notes?report=<id> (the comment letter links here) opens that report.
+async function openLinkedReport() {
+  const id = Number(new URLSearchParams(location.search).get("report"));
+  if (!id) return;
+  try {
+    const item = await api("/notes/reports/one?id=" + id);
+    showTab(item.mine ? "reports" : "public");
+    openReader(item);
+  } catch (error) {
+    setReportParam(0);
+    toast(error.message, true);
+  }
+}
 
 // ---------------------------------------------------------------- notepad
 
@@ -747,3 +1240,4 @@ $("padDelete").addEventListener("click", async () => {
 
 showTab(location.hash.slice(1) || "doses", { push: false });
 window.addEventListener("hashchange", () => showTab(location.hash.slice(1) || "doses", { push: false }));
+openLinkedReport();

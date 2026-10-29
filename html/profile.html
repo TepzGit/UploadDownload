@@ -14,6 +14,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
+  <style>
+    /* This page keeps the look it had before the shared page/card changes in
+       oled.css on the evening of 2026-10-28 (mommy 2026-10-29: "make the
+       profile and utility page look like before"). :where() keeps these as
+       weak as the old oled.css rules, so the page's own styles still win. */
+    :where(.xn-page.pf) { margin-left: 10rem; margin-right: 10rem !important; }
+    :where(.xn-page.pf) .xn-card { margin: 0; border-radius: 2px; padding: clamp(16px, 2.5vw, 24px); }
+    :where(.xn-page.pf) .xn-like { width: 44px; height: 44px; }
+    .xn-brand { padding: 8px 0; }
+    @media (max-width: 767px) {
+      :where(.xn-page.pf) { margin-left: 0; margin-right: 0 !important; }
+      :where(.xn-page.pf) .xn-card { padding: 14px; }
+    }
+  </style>
   <link rel="stylesheet" href="/classicons.css" />
   <script src="/classicons.js"></script>
   <script src="/nav.js"></script>
@@ -364,8 +378,8 @@
       <div class="ps-form" id="psForm" aria-labelledby="psLabel">
         <label class="xn-label pf-ap-label" for="psWidth">Line thickness</label>
         <div class="pf-range-row">
-          <input type="range" id="psWidth" class="pf-slider" min="2" max="12" step="1" value="6">
-          <output id="psWidthOut" for="psWidth">6 px</output>
+          <input type="range" id="psWidth" class="pf-slider" min="2" max="20" step="1" value="9">
+          <output id="psWidthOut" for="psWidth">9 px</output>
         </div>
         <label class="xn-label pf-ap-label" for="psFill">Fill under the line</label>
         <div class="pf-range-row">
@@ -1192,47 +1206,78 @@
       }
     }
 
+    // Custom substances and medicines (Substances Importer, js/medicines.json)
+    // are searched too, by name and other names, and listed first. The Graph
+    // colors a line by its substance name, so the color is saved under that name.
+    let customList = null;
+    async function customSubstances() {
+      if (customList) return customList;
+      try {
+        const res = await fetch("/substances/custom", { headers: { Accept: "application/json" } });
+        const data = res.ok ? await res.json() : [];
+        customList = Array.isArray(data) ? data : [];
+      } catch (_) {
+        return [];
+      }
+      return customList;
+    }
+
     async function suggest() {
       const value = search.value.trim();
       const mine = ++seq;
       if (value.length < 2) return closeSug();
-      try {
-        const res = await fetch("https://api.psychonautwiki.org", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: "query S($name: String!) { substances(query: $name) { name } }", variables: { name: value } }),
-        });
-        const data = await res.json();
-        if (mine !== seq) return;
-        const names = (data?.data?.substances || []).map((s) => s.name).filter(Boolean).slice(0, 8);
-        sug.innerHTML = "";
-        active = -1;
-        if (!names.length) {
-          const none = document.createElement("p");
-          none.className = "gc-none";
-          none.textContent = "No substance matches “" + value + "”.";
-          sug.append(none);
-        }
-        names.forEach((name, i) => {
-          const opt = document.createElement("button");
-          opt.type = "button";
-          opt.className = "gc-opt";
-          opt.id = "gcOpt" + i;
-          opt.setAttribute("role", "option");
-          opt.setAttribute("aria-selected", "false");
-          opt.tabIndex = -1;
-          opt.textContent = name;
-          if (rowFor(name)) opt.classList.add("is-added");
-          opt.addEventListener("click", () => pick(name));
-          sug.append(opt);
-        });
-        sug.hidden = false;
-        search.setAttribute("aria-expanded", "true");
-      } catch (_) {
-        if (mine !== seq) return;
-        sug.innerHTML = '<p class="gc-none">Couldn\'t reach PsychonautWiki. Check your connection.</p>';
-        sug.hidden = false;
+      const q = value.toLowerCase();
+      const pw = fetch("https://api.psychonautwiki.org", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "query S($name: String!) { substances(query: $name) { name } }", variables: { name: value } }),
+      }).then((res) => res.json()).then((data) => (data?.data?.substances || []).map((s) => s.name).filter(Boolean)).catch(() => null);
+      const custom = (await customSubstances())
+        .filter((c) => [c.name, ...(c.aliases || [])].some((n) => String(n).toLowerCase().includes(q)))
+        .map((c) => ({ name: c.name, tag: c.ingredient ? "Medicine" : "Custom" }));
+      const wiki = await pw;
+      if (mine !== seq) return;
+      const seen = new Set(custom.map((c) => keyOf(c.name)));
+      const items = [...custom, ...(wiki || []).filter((n) => !seen.has(keyOf(n))).map((name) => ({ name, tag: "" }))].slice(0, 10);
+      sug.innerHTML = "";
+      active = -1;
+      if (!items.length) {
+        const none = document.createElement("p");
+        none.className = "gc-none";
+        none.textContent = wiki ? "No substance matches “" + value + "”." : "Couldn't reach PsychonautWiki. Check your connection.";
+        sug.append(none);
       }
+      items.forEach((item, i) => {
+        const opt = document.createElement("button");
+        opt.type = "button";
+        opt.className = "gc-opt";
+        opt.id = "gcOpt" + i;
+        opt.dataset.name = item.name;
+        opt.setAttribute("role", "option");
+        opt.setAttribute("aria-selected", "false");
+        opt.tabIndex = -1;
+        const label = document.createElement("span");
+        label.className = "gc-opt-name";
+        label.textContent = item.name;
+        opt.append(label);
+        if (item.tag) {
+          const tag = document.createElement("span");
+          tag.className = "gc-opt-tag";
+          tag.textContent = item.tag;
+          label.append(tag);
+        }
+        if (rowFor(item.name)) opt.classList.add("is-added");
+        opt.addEventListener("click", () => pick(item.name));
+        sug.append(opt);
+      });
+      if (!wiki && items.length) {
+        const note = document.createElement("p");
+        note.className = "gc-none";
+        note.textContent = "Couldn't reach PsychonautWiki, so only custom substances are shown.";
+        sug.append(note);
+      }
+      sug.hidden = false;
+      search.setAttribute("aria-expanded", "true");
     }
 
     search.addEventListener("input", () => {
@@ -1246,7 +1291,7 @@
         event.preventDefault();
         const items = [...sug.querySelectorAll(".gc-opt")];
         const chosen = items[active] || (items.length === 1 ? items[0] : null);
-        if (chosen) pick(chosen.textContent);
+        if (chosen) pick(chosen.dataset.name);
       } else if (event.key === "Escape" && !sug.hidden) {
         event.preventDefault();
         event.stopPropagation();

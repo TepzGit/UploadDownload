@@ -244,6 +244,8 @@ ${DETAIL_FIELDS}
 
     // At a glance
     const facts = [];
+    // Medicines: what is really in it, linked to that substance's own page.
+    if (s.ingredient) facts.push(["Active ingredient", s.ingredient, "/journal/Drug?drug=" + encodeURIComponent(s.ingredient.split(" + ")[0])]);
     const names = [].concat(s.commonNames || []).filter((n) => n && n.toLowerCase() !== s.name.toLowerCase());
     if (names.length) facts.push(["Also known as", names.join(", ")]);
     if (s.systematicName) facts.push(["Systematic name", s.systematicName]);
@@ -254,9 +256,15 @@ ${DETAIL_FIELDS}
     if (facts.length) {
       const c = card("At a glance");
       const list = el("dl", "di-facts");
-      facts.forEach(([label, value]) => {
+      facts.forEach(([label, value, href]) => {
         const row = el("div", "di-fact");
-        row.append(el("dt", "", label), el("dd", "", value));
+        const dd = el("dd", "", href ? "" : value);
+        if (href) {
+          const link = el("a", "di-ingredient", value);
+          link.href = href;
+          dd.append(link);
+        }
+        row.append(el("dt", "", label), dd);
         list.append(row);
       });
       c.append(list);
@@ -272,7 +280,9 @@ ${DETAIL_FIELDS}
       c.append(list);
       if (s.risks) c.append(el("h3", "xn-label di-sub", "Risks"), el("p", "di-card-note di-pre", s.risks));
       if (s.notes) c.append(el("h3", "xn-label di-sub", "Notes"), el("p", "di-card-note di-pre", s.notes));
-      c.append(el("p", "di-card-note di-custom-note", "Added by an admin on this site, not from PsychonautWiki."));
+      c.append(el("p", "di-card-note di-custom-note", s.ingredient
+        ? "A medicine entry made on this site, not from PsychonautWiki. Pills from outside a pharmacy are often fakes with other drugs in them, so test them."
+        : "Added by an admin on this site, not from PsychonautWiki."));
       box.append(c);
     }
 
@@ -337,6 +347,7 @@ ${DETAIL_FIELDS}
     icon.dataset.class = iconKey;
     icon.title = window.xnClass?.LABELS[iconKey] || "";
     icon.hidden = !iconKey;
+    window.xnClass?.setDrugName(icon, name);
     renderDetails(substance);
 
     const classes = [].concat(substance.class?.chemical || [], substance.class?.psychoactive || []);
@@ -359,10 +370,14 @@ ${DETAIL_FIELDS}
       thumb.hidden = false;
     }
 
-    document.getElementById("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(name.replace(/\s+/g, "_"));
-    document.getElementById("diWiki").hidden = !!substance.custom;
-    if (substance.custom) document.getElementById("diNote").textContent = "Dose and duration data were added by an admin on this site and are a rough guide, not advice.";
-    document.getElementById("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"));
+    // A medicine links out to its active ingredient (the first one of a combination).
+    const outName = substance.ingredient ? substance.ingredient.split(" + ")[0] : name;
+    document.getElementById("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(outName.replace(/\s+/g, "_"));
+    document.getElementById("diWiki").hidden = !!substance.custom && !substance.ingredient;
+    if (substance.custom) document.getElementById("diNote").textContent = substance.ingredient
+      ? "Doses are for the active ingredient, for adults without tolerance. They are a rough guide, not medical advice."
+      : "Dose and duration data were added by an admin on this site and are a rough guide, not advice.";
+    document.getElementById("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(outName.toLowerCase().replace(/\s+/g, "-"));
     document.getElementById("diLinks").hidden = false;
 
     const sub = { name, image: thumbUrl || "", class: classes.join(", ") };

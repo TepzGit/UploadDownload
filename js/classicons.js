@@ -6,6 +6,9 @@
   const RULES = [
     ["zdrug", /hypnotic|imidazopyridine|cyclopyrrolone|pyrazolopyrimidine/],
     ["antipsychotic", /antipsychotic/],
+    ["deliriant", /deliriant|anticholinergic/],
+    ["oneirogen", /oneirogen/],
+    ["eugeroic", /eugeroic|wakefulness/],
     ["cannabinoid", /cannabinoid/],
     ["dissociative", /dissociative/],
     ["empathogen", /entactogen|empathogen/],
@@ -47,6 +50,9 @@
     cannabinoid: "Cannabinoid",
     antipsychotic: "Antipsychotic",
     zdrug: "Z-drug",
+    deliriant: "Deliriant",
+    eugeroic: "Eugeroic",
+    oneirogen: "Oneirogen",
     blotter: "Blotter tab",
     mushroom: "Mushroom",
     xtc: "Pressed pill",
@@ -65,7 +71,29 @@
     syrup: "Syrup",
     cactus: "Cactus",
     herb: "Leaf",
+    // Pictures of real pills, set per medicine (js/medicines.json "icon").
+    "pill-oc80": "OxyContin 80 mg",
+    "pill-ksalol": "Ksalol 1 mg",
+    "pill-ritalin": "Ritalin 10 mg",
+    "pill-concerta": "Concerta",
+    "pill-medikinet": "Medikinet Retard",
+    "pill-elvanse": "Elvanse",
   };
+  let customIcons = new Map();
+
+  function applyCustomIcon(node) {
+    const name = String(node.dataset.drugName || "").trim().toLowerCase();
+    const image = customIcons.get(name);
+    if (image) {
+      node.classList.add("has-custom-image");
+      node.style.setProperty("--sc-icon-image", `url(${JSON.stringify(image)})`);
+      node.hidden = false;
+    } else {
+      node.classList.remove("has-custom-image");
+      node.style.removeProperty("--sc-icon-image");
+      node.hidden = !node.dataset.class && !node.classList.contains("si-noicon");
+    }
+  }
 
   /** One class name, e.g. "Opioids" -> "opioid", or "" when none fits. */
   function keyForClass(text) {
@@ -76,10 +104,13 @@
 
   /** A whole PsychonautWiki substance -> one icon key. */
   function keyFor(substance) {
+    if (substance?.icon && LABELS[substance.icon]) return substance.icon;
     const name = String(substance?.name || "").toLowerCase().trim();
-    const drug = DRUGS.find(([, re]) => re.test(name));
+    // Medicines are named by brand ("Xanax (alprazolam)"), so their active ingredient counts too.
+    const ingredient = String(substance?.ingredient || "").toLowerCase().split("+")[0].trim();
+    const drug = DRUGS.find(([, re]) => re.test(name)) || (ingredient && DRUGS.find(([, re]) => re.test(ingredient)));
     if (drug) return drug[0];
-    if (Z_DRUGS.includes(name)) return "zdrug";
+    if (Z_DRUGS.includes(name) || Z_DRUGS.includes(ingredient)) return "zdrug";
     const classes = [...(substance?.class?.psychoactive || []), ...(substance?.class?.chemical || [])].join(" ");
     // Benzodiazepines usually come as small round scored tablets.
     if (/benzodiazepine/i.test(classes)) return "tablet";
@@ -87,15 +118,34 @@
   }
 
   /** An <i> icon element for a key; hidden when the key is empty. */
-  function icon(key, extraClass) {
+  function icon(key, extraClass, drugName) {
     const node = document.createElement("i");
     node.className = "sc-icon" + (extraClass ? " " + extraClass : "");
     node.setAttribute("aria-hidden", "true");
     node.dataset.class = key || "";
+    if (drugName) node.dataset.drugName = drugName;
     node.title = LABELS[key] || "";
     node.hidden = !key;
+    applyCustomIcon(node);
     return node;
   }
 
-  window.xnClass = { keyFor, keyForClass, icon, LABELS };
+  function setDrugName(node, name) {
+    if (!node) return;
+    node.dataset.drugName = name || "";
+    applyCustomIcon(node);
+  }
+
+  window.xnClass = { keyFor, keyForClass, icon, setDrugName, LABELS };
+
+  fetch("/drug-icons", { cache: "no-cache" })
+    .then((response) => {
+      if (!response.ok) throw new Error("Couldn't load custom drug icons.");
+      return response.json();
+    })
+    .then((icons) => {
+      customIcons = new Map(Object.entries(icons).map(([name, image]) => [name.toLowerCase(), image]));
+      document.querySelectorAll(".sc-icon[data-drug-name]").forEach(applyCustomIcon);
+    })
+    .catch(() => {});
 })();

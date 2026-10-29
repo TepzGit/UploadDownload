@@ -17,6 +17,8 @@
   .suggestion{ display:block; width:100%; text-align:left; padding:.5rem .75rem; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
   .suggestion:hover{ background:rgba(255,255,255,.08); }
   .sug-custom{ margin-left:.5rem; padding:0 .35rem; border:1px solid var(--line); border-radius:2px; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  .sug-alias{ margin-left:.5rem; font-size:11px; color:var(--muted); }
+  #customIngredient a{ color:var(--text); text-decoration:underline; text-underline-offset:3px; }
   /* Drug class icons: shared styles in classicons.css */
   .sc-icon-lg{ width:20px; height:20px; margin:0; }
   .recent-tile .sc-icon{ width:18px; height:18px; margin:0; background:var(--c, var(--violet)); }
@@ -119,11 +121,37 @@
   .recent-tile{ display:grid; place-items:center; width:34px; height:34px; border-radius:.125rem; background:color-mix(in srgb, var(--c, var(--violet)) 18%, transparent); border:1px solid color-mix(in srgb, var(--c, var(--violet)) 45%, transparent); color:var(--c, var(--violet)); font:600 14px 'JetBrains Mono',monospace; }
   .recent-text{ display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:.6rem; row-gap:.15rem; min-width:0; }
   .recent-text .recent-meta{ grid-column:1 / -1; }
-  .recent-item .recent-dose strong{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:var(--c, var(--text)); }
+  .recent-item .recent-dose {
+    display: grid;
+    grid-template-columns: auto minmax(0,1fr) auto;
+    align-items: center;
+    column-gap: .75rem;
+    width: 100%;
+    min-height: 82px;
+    padding: .55rem 2.9rem .55rem .6rem;
+    border-left: 3px solid var(--c, var(--line));
+    background: linear-gradient(90deg, var(--ct, transparent), transparent 70%), var(--surface-2);
+    transition: border-color .15s, background-color .15s, transform .12s ease;
+  }
+
   .recent-item .recent-meta{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
   .recent-meta b{ font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--text); }
   .recent-item .recent-when{ align-self:center; font:10px 'JetBrains Mono',monospace; color:var(--muted); white-space:nowrap; }
   .recent-item .recent-tile{ color:var(--c, var(--violet)); font-size:14px; }
+  .recent-tile{
+    display: grid;
+    place-items: center;
+    width: 50px;
+    height: 50px;
+    border-radius: .125rem;
+    background: color-mix(in srgb, var(--c, var(--violet)) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c, var(--violet)) 45%, transparent);
+    color: var(--c, var(--violet));
+    font: 600 14px 'JetBrains Mono',monospace;
+      font-size: 14px;
+      font-family: JetBrains Mono, monospace;
+  }
+
   .recent-add{ display:grid; place-items:center; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); color:var(--muted); transition:color .15s, border-color .15s, background-color .15s, transform .2s ease; }
   .recent-add svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
   @media (hover:hover){ .recent-item .recent-dose:hover .recent-add{ color:#0b0716; background:var(--c, var(--violet)); border-color:var(--c, var(--violet)); transform:rotate(90deg); } }
@@ -197,7 +225,14 @@
     overflow: visible;
     max-height: 300px;
   }
-
+  .menubut {
+    background-color: #00000000;
+    border-radius: 0px;
+    width: 100px;
+    height: 100px;
+    cursor: pointer;
+    padding: 2px;
+  }
   .exp-spark path{ fill:none; stroke:var(--c); stroke-width:2.75; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
   .exp-spark line{ stroke:var(--line); stroke-width:1; vector-effect:non-scaling-stroke; }
   .exp-subs{ display:flex; flex-wrap:wrap; gap:.15rem .7rem; font-size:12px; color:var(--text); }
@@ -215,6 +250,34 @@
   .exp-shared-title{ margin:.5rem 0 0; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
   .exp-item.is-shared .exp-open{ padding-right:.75rem; border-style:dashed; border-left-style:solid; }
   .exp-from{ font-size:11px; color:var(--violet); }
+  /* The expand button in the Experiences box head, and the big view it opens. */
+  .exp-expand{ display:inline-grid; place-items:center; width:30px; height:30px; margin:-6px -6px -6px -.25rem; color:var(--muted); border-radius:.125rem; }
+  .exp-expand svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .exp-expand:hover, .exp-expand:focus-visible{ color:var(--text); background:rgba(255,255,255,.06); outline:none; }
+  .exp-big{ width:min(1240px, calc(100vw - 32px)); height:min(90vh, 980px); max-width:none; max-height:none; padding:0; border:1px solid var(--line); border-radius:.5rem; background:var(--surface, #0b0b0e); color:var(--text); overflow:hidden; }
+  .exp-big[open]{ display:flex; flex-direction:column; }
+  .exp-big::backdrop{ background:rgba(0,0,0,.75); }
+  .exp-big-head{ display:flex; align-items:center; gap:.5rem .9rem; flex-wrap:wrap; padding:.8rem .9rem .8rem 1.1rem; border-bottom:1px solid var(--line); }
+  .exp-big-head h2{ font:400 10px 'JetBrains Mono',monospace; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+  .exp-big-count{ font:10px 'JetBrains Mono',monospace; color:var(--muted); }
+  .exp-big-find{ flex:1 1 12rem; min-width:0; max-width:24rem; margin-left:auto; height:38px; padding:0 .8rem; border:1px solid var(--line); border-radius:.125rem; background:var(--surface-2); color:var(--text); font-size:16px; }
+  .exp-big-find:focus{ outline:none; border-color:var(--violet); }
+  .exp-big-close{ display:grid; place-items:center; width:38px; height:38px; flex:none; color:var(--muted); font-size:22px; line-height:1; border-radius:.125rem; }
+  .exp-big-close:hover, .exp-big-close:focus-visible{ color:var(--text); background:rgba(255,255,255,.06); outline:none; }
+  .exp-big-body{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:1rem 1.1rem 1.5rem; }
+  .exp-big-month{ margin:1.4rem 0 .6rem; font:400 10px 'JetBrains Mono',monospace; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+  .exp-big-month:first-child{ margin-top:0; }
+  .exp-big-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr)); gap:.75rem; }
+  .exp-big .exp-item{ display:flex; }
+  .exp-big .exp-open{ min-height:0; height:100%; }
+  .exp-big .exp-spark{ height:120px; }
+  @media (max-width:640px){
+    .exp-big{ width:100vw; height:100dvh; max-height:100dvh; margin:0; border:0; border-radius:0; }
+    .exp-big-head{ padding:calc(.6rem + env(safe-area-inset-top)) .6rem .6rem 1rem; }
+    .exp-big-find{ order:3; flex-basis:100%; max-width:none; margin-left:0; }
+    .exp-big-close{ margin-left:auto; }
+    .exp-big-body{ padding:.9rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); }
+  }
   .ppl{ width:min(26rem, calc(100% - 2rem)); max-height:min(80vh, 36rem); padding:0; border:1px solid var(--line); border-radius:2px; background:var(--surface); color:var(--text); box-shadow:0 30px 80px -30px rgba(var(--xn-accent-rgb), .35); }
   .ppl::backdrop{ background:rgba(0,0,0,.72); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
   .ppl-case{ display:flex; flex-direction:column; gap:14px; padding:20px; }
@@ -537,6 +600,16 @@
 </header>
 <button id="gpFab" type="button" class="gp-fab" aria-label="New experience"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 <div id="gpScrim" class="gp-scrim" aria-hidden="true"></div>
+<dialog id="expBig" class="exp-big" aria-labelledby="expBigTitle">
+  <div class="exp-big-head">
+    <h2 id="expBigTitle">Experiences</h2>
+    <span data-expbig-count class="exp-big-count"></span>
+    <input id="expBigFind" class="exp-big-find" type="search" placeholder="Search substances, days or friends" autocomplete="off" enterkeyhint="search" aria-label="Search your experiences">
+    <button type="button" class="exp-big-close" data-close aria-label="Close the big view">×</button>
+  </div>
+  <div class="exp-big-body" data-expbig-list></div>
+</dialog>
+
 <dialog id="pastDlg" class="past-dlg" aria-labelledby="pastTitle">
   <form method="dialog" class="past-card">
     <h2 id="pastTitle">Add a past experience</h2>
@@ -564,13 +637,13 @@
               <h2 id="recentTitle" class="font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[var(--muted)]">Recent doses · tap to reuse</h2>
               <span class="recent-tools"><span data-recent-count class="font-mono text-[10px] text-[var(--muted)]"></span><button id="recentClear" type="button" class="link-btn">Clear all</button></span>
             </div>
-            <div data-recent-list class="box-list grid grid-cols-1 gap-2"></div>
+            <div data-recent-list class="box-list grid grid-cols-2 gap-2"></div>
           </section>
 
           <section id="experiences" class="recent-box exp-box text-left" aria-labelledby="expTitle">
             <div class="box-head flex items-center justify-between gap-3 mb-3">
               <h2 id="expTitle" class="font-mono text-[10px] font-normal uppercase tracking-[0.2em] text-[var(--muted)]">Experiences · tap to open</h2>
-              <span class="recent-tools"><span data-exp-count class="font-mono text-[10px] text-[var(--muted)]"></span><button id="expPast" type="button" class="link-btn">+ Past experience</button></span>
+              <span class="recent-tools"><span data-exp-count class="font-mono text-[10px] text-[var(--muted)]"></span><button id="expPast" type="button" class="link-btn">+ Past experience</button><button id="expExpand" type="button" class="exp-expand" aria-label="Open a bigger view of all your experiences" title="Bigger view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg></button></span>
             </div>
             <p data-exp-note class="exp-note" hidden></p>
             <div data-exp-list class="box-list exp-list" role="list"></div>
@@ -708,10 +781,11 @@
       <p id="substanceSummary" class="text-[#fff] text-sm leading-relaxed mb-6 p-3 border border-[var(--line)] bg-[var(--bg)]"></p>
       <p class="text-lg text-[var(--muted)] mb-6 pb-4 border-b-2 border-[var(--line)]">Addiction potential:<br><strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>
       <div id="customInfo" class="mb-6 pb-4 border-b-2 border-[var(--line)] text-sm" hidden>
+        <p class="text-[var(--muted)] mb-1" hidden>Active ingredient</p><p id="customIngredient" class="text-[var(--text)] mb-3" hidden></p>
         <p class="text-[var(--muted)] mb-1">Half-life</p><p id="customHalfLife" class="text-[var(--text)] mb-3"></p>
         <p class="text-[var(--muted)] mb-1">Risks</p><p id="customRisks" class="text-[var(--text)] leading-relaxed mb-3 whitespace-pre-line"></p>
         <p class="text-[var(--muted)] mb-1">Notes</p><p id="customNotes" class="text-[var(--text)] leading-relaxed whitespace-pre-line"></p>
-        <p class="text-[10px] text-[var(--muted)] mt-3 uppercase tracking-widest">Custom entry, added by an admin</p>
+        <p id="customSource" class="text-[10px] text-[var(--muted)] mt-3 uppercase tracking-widest">Custom entry, added by an admin</p>
       </div>
       <div class="space-y-7">
         <div><p class="text-base text-amber-300 mb-2">Caution</p><div data-interaction="caution"></div></div>

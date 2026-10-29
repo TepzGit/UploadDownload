@@ -1,0 +1,126 @@
+.dia-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  width: min(920px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: calc(var(--oled-nav-h, 56px) + 32px) 0 48px;
+}
+.dia-back {
+  color: var(--oled-muted);
+  text-decoration: none;
+}
+.dia-card {
+  display: grid;
+  gap: 16px;
+}
+.dia-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+.dia-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.dia-field input[type="file"] {
+  width: 100%;
+  color: var(--oled-muted);
+  font: inherit;
+}
+.dia-hint {
+  color: var(--oled-muted);
+  font-weight: 400;
+}
+.dia-preview-wrap {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--oled-line);
+  border-radius: 12px;
+  background: var(--oled-surface-2);
+}
+.dia-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dia-default {
+  color: var(--oled-muted);
+  font-size: 11px;
+  text-align: center;
+}
+.dia-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dia-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--oled-muted);
+}
+.dia-status[data-error="true"] {
+  color: #ff8b8b;
+}
+.dia-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dia-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--oled-line);
+  border-radius: 12px;
+  background: var(--oled-surface);
+}
+.dia-item img {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.dia-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dia-item-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.dia-item-actions .xn-btn {
+  min-height: 34px;
+  padding: 0 10px;
+}
+.dia-empty {
+  padding: 12px 0;
+  color: var(--oled-muted);
+}
+@media (max-width: 640px) {
+  .dia-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dia-item {
+    flex-wrap: wrap;
+  }
+  .dia-item-name {
+    flex-basis: calc(100% - 60px);
+  }
+  .dia-item-actions {
+    width: 100%;
+    padding-left: 52px;
+  }
+}

@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
+  <script src="/media.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
   <link rel="stylesheet" href="/notes.css" />
@@ -97,18 +98,40 @@
   </section>
 </main>
 
-<dialog class="nt-dlg" id="pubDlg" aria-labelledby="pubTitle">
-  <article class="nt-dlg-card xn-card">
-    <div class="nt-dlg-head">
-      <a class="nt-author" id="pubAuthor" href="#"></a>
-      <button type="button" class="nt-x" id="pubClose" aria-label="Close">×</button>
-    </div>
-    <span class="nt-report-day" id="pubDay"></span>
-    <h2 class="xn-h2 nt-pub-title" id="pubTitle"></h2>
-    <span class="nt-report-stars" id="pubStars"></span>
-    <dl class="nt-pub-facts" id="pubFacts"></dl>
-    <p class="nt-pub-body" id="pubBody"></p>
-  </article>
+<dialog class="nt-dlg nt-read-dlg" id="readDlg" aria-labelledby="readTitle">
+  <div class="nt-read">
+    <article class="nt-dlg-card xn-card nt-read-main">
+      <div class="nt-dlg-head">
+        <a class="nt-author" id="readAuthor" href="#"></a>
+        <span class="nt-mine" id="readMine" hidden></span>
+        <span class="nt-spacer"></span>
+        <button type="button" class="xn-btn nt-read-edit" id="readEdit" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>Edit</button>
+        <button type="button" class="nt-x" id="readClose" aria-label="Close">×</button>
+      </div>
+      <span class="nt-report-day" id="readDay"></span>
+      <h2 class="xn-h2 nt-pub-title" id="readTitle"></h2>
+      <span class="nt-report-stars" id="readStars"></span>
+      <dl class="nt-pub-facts" id="readFacts"></dl>
+      <div class="nt-gallery" id="readPics" hidden></div>
+      <p class="nt-pub-body" id="readBody"></p>
+      <div class="nt-read-foot">
+        <button type="button" class="nt-like" id="readLike" aria-pressed="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3c-.3 0-.6-.1-.8-.3C6.9 16.4 3 13.2 3 8.9 3 6.2 5.1 4 7.7 4c1.7 0 3.3.9 4.3 2.3C13 4.9 14.6 4 16.3 4 18.9 4 21 6.2 21 8.9c0 4.3-3.9 7.5-8.2 11.1-.2.2-.5.3-.8.3z"/></svg><span class="nt-like-label">Like</span><span class="nt-like-count"></span></button>
+        <span class="nt-likers" id="readLikers"></span>
+      </div>
+    </article>
+    <aside class="nt-dlg-card xn-card nt-talk" aria-labelledby="talkTitle">
+      <div class="nt-talk-head">
+        <h2 class="xn-h2" id="talkTitle">Comments</h2>
+        <span class="nt-count" id="talkCount"></span>
+      </div>
+      <p class="nt-talk-note" id="talkNote" hidden></p>
+      <ol class="nt-talk-list" id="talkList" aria-live="polite"></ol>
+      <form class="nt-talk-form" id="talkForm">
+        <textarea class="xn-input nt-talk-text" id="talkText" rows="1" maxlength="1000" placeholder="Write a comment…" aria-label="Write a comment"></textarea>
+        <button type="submit" class="xn-btn xn-btn-primary" id="talkSend" disabled>Send</button>
+      </form>
+    </aside>
+  </div>
 </dialog>
 
 <dialog class="nt-dlg" id="repDlg" aria-labelledby="repDlgTitle">
@@ -127,7 +150,11 @@
     <div class="nt-field"><span class="xn-label" id="rateLabel">How was it?</span>
       <div class="nt-stars" role="radiogroup" aria-labelledby="rateLabel" id="repStars"></div>
     </div>
-    <label class="nt-field"><span class="xn-label">Report</span><textarea class="xn-input nt-report-text" name="body" rows="12" placeholder="The come-up, the peak, the come-down, what you learned…"></textarea></label>
+    <label class="nt-field"><span class="xn-label">Report</span><textarea class="xn-input nt-body-input" name="body" rows="12" placeholder="The come-up, the peak, the come-down, what you learned…"></textarea></label>
+    <div class="nt-field"><span class="xn-label" id="repPicsLabel">Pictures <span class="nt-pics-count" id="repPicsCount"></span></span>
+      <div class="nt-pics-edit" id="repPics" role="group" aria-labelledby="repPicsLabel"></div>
+      <input type="file" class="nt-file" id="repFiles" accept="image/jpeg,image/png,image/gif,image/webp,image/*" multiple tabindex="-1" aria-hidden="true">
+    </div>
     <label class="nt-public"><input type="checkbox" name="public"><span><strong>Public</strong><small>Anyone with an account can read it under Public reports, with your name on it. Your Graph session stays private.</small></span></label>
     <p class="nt-error" id="repError" hidden></p>
     <div class="nt-actions">

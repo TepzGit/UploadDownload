@@ -520,6 +520,8 @@
   cursor: pointer;
 }
 .gc-opt.is-added::after { content: "added"; font-size: 11px; color: var(--oled-muted); }
+.gc-opt-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.gc-opt-tag { padding: 0 6px; border: 1px solid var(--oled-line-strong, rgba(255, 255, 255, 0.2)); border-radius: 2px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--oled-muted); }
 .gc-opt[aria-selected="true"] { background: rgba(var(--xn-accent-rgb), 0.16); }
 @media (hover: hover) { .gc-opt:hover { background: rgba(var(--xn-accent-rgb), 0.12); } }
 .gc-none { margin: 0; padding: 12px; font-size: 12px; color: var(--oled-muted); }

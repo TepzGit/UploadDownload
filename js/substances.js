@@ -305,6 +305,8 @@ function readForm() {
     id: editingId,
     name: $("fName").value.trim(),
     aliases: splitList($("fAliases").value),
+    ingredient: $("fIngredient").value.trim(),
+    icon: $("fIcon").value,
     class: $("fClass").value.trim(),
     chemicalClass: $("fChem").value.trim(),
     summary: $("fSummary").value.trim(),
@@ -380,11 +382,39 @@ function showError(problem) {
   }
 }
 
+// The Icon picker: every key js/classicons.js draws, pill pictures first.
+function fillIconOptions() {
+  const labels = window.xnClass?.LABELS || {};
+  const keys = Object.keys(labels).sort((a, b) => (b.startsWith("pill-") - a.startsWith("pill-")) || labels[a].localeCompare(labels[b]));
+  for (const key of keys) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = (key.startsWith("pill-") ? "Pill: " : "") + labels[key];
+    $("fIcon").append(option);
+  }
+}
+
+function setIcon(key) {
+  const select = $("fIcon");
+  select.value = key && [...select.options].some((o) => o.value === key) ? key : "";
+  showIcon();
+}
+
+function showIcon() {
+  const show = $("fIconShow");
+  const key = $("fIcon").value || window.xnClass?.keyFor({ name: $("fName").value.trim(), ingredient: $("fIngredient").value.trim(), class: { psychoactive: [$("fClass").value.trim()] } }) || "";
+  show.dataset.class = key;
+  show.title = window.xnClass?.LABELS[key] || "";
+  show.hidden = !key;
+}
+
 function fillForm(entry) {
   const e = entry || {};
   const set = (id, v) => ($(id).value = v == null ? "" : v);
   set("fName", e.name);
   set("fAliases", (e.aliases || []).join(", "));
+  set("fIngredient", e.ingredient);
+  setIcon(e.icon);
   set("fClass", e.class);
   set("fChem", e.chemicalClass);
   set("fSummary", e.summary);
@@ -489,8 +519,13 @@ function changed() {
 function iconFor(entry) {
   const xc = window.xnClass;
   if (!xc) return document.createElement("span");
-  const key = xc.keyFor({ name: entry.name, class: { psychoactive: [entry.class || ""] } }) || "";
-  return key ? xc.icon(key) : Object.assign(document.createElement("span"), { className: "si-noicon" });
+  const key = xc.keyFor({ name: entry.name, icon: entry.icon, ingredient: entry.ingredient, class: { psychoactive: [entry.class || ""] } }) || "";
+  const icon = xc.icon(key, "", entry.name);
+  if (!key) {
+    icon.hidden = false;
+    icon.classList.add("si-noicon");
+  }
+  return icon;
 }
 
 function markListSelection() {
@@ -500,7 +535,7 @@ function markListSelection() {
 function renderList() {
   const q = $("lsFind").value.trim().toLowerCase();
   const box = $("lsList");
-  const shown = list.filter((e) => !q || [e.name, ...(e.aliases || []), e.class || ""].some((n) => n.toLowerCase().includes(q)));
+  const shown = list.filter((e) => !q || [e.name, ...(e.aliases || []), e.class || "", e.ingredient || ""].some((n) => n.toLowerCase().includes(q)));
   $("lsCount").textContent = list.length ? String(list.length) : "";
   box.replaceChildren();
   if (!shown.length) {
@@ -523,7 +558,7 @@ function renderList() {
     name.append(iconFor(e), e.name);
     const meta = document.createElement("span");
     meta.className = "si-item-meta";
-    meta.textContent = [e.class, [e.route, ...(e.methods || []).map((m) => m.route)].filter(Boolean).join(", "), `${fmtHours(effectHours(e.durations))}`, e.durations?.peak2 ? "2 peaks" : ""].filter(Boolean).join(" · ");
+    meta.textContent = [e.ingredient ? "Medicine" : "", e.class, [e.route, ...(e.methods || []).map((m) => m.route)].filter(Boolean).join(", "), `${fmtHours(effectHours(e.durations))}`, e.durations?.peak2 ? "2 peaks" : ""].filter(Boolean).join(" · ");
     main.append(name, meta);
     main.addEventListener("click", () => inspect(e));
     const edit = iconButton("Edit", '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>', () => startEdit(e));
@@ -593,6 +628,7 @@ function inspect(entry) {
   };
   const r = (v) => (v ? [v.min, v.max].filter((n) => n != null).join("–") : "");
   const u = entry.units || "";
+  add("Active ingredient", entry.ingredient);
   add("Other names", entry.aliases);
   add("Class", [entry.class, entry.chemicalClass].filter(Boolean).join(" · "));
   add("Half-life", r(entry.halfLife) ? r(entry.halfLife) + " h" : "");
@@ -612,7 +648,7 @@ function inspect(entry) {
   add("Dangerous with", entry.interactions?.dangerous);
   add("Unsafe with", entry.interactions?.unsafe);
   add("Caution with", entry.interactions?.uncertain);
-  add("Added by", entry.createdBy);
+  add("Added by", entry.createdBy || (entry.ingredient ? "The medicines list (js/medicines.json)" : ""));
   add("Last changed", entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : "");
   const text = (label, v) => (v ? `<h3 class="si-legend">${esc(label)}</h3><p class="si-para">${esc(v)}</p>` : "");
   const charts = all.map((m) =>
@@ -665,6 +701,7 @@ async function save(event) {
 // ---------------------------------------------------------------- start
 
 function init() {
+  fillIconOptions();
   try { unit = localStorage.getItem("xn_si_unit") === "min" ? "min" : "h"; } catch (_) {}
   buildRows($("siTimes"), TIMES);
   buildRows($("siPeak2"), PEAK2);
@@ -674,6 +711,7 @@ function init() {
   $("siForm").addEventListener("submit", save);
   $("siForm").addEventListener("input", (e) => {
     if (!e.target.closest(".si-slider")) dirty = true;
+    if (["fIcon", "fName", "fIngredient", "fClass"].includes(e.target.id)) showIcon();
     if (e.target.classList.contains("is-invalid")) e.target.classList.remove("is-invalid");
     if (!$("siError").hidden) showError(null);
   });

@@ -19,6 +19,7 @@
   const syncMenu = () => document.documentElement.classList.toggle("xn-menu", LOCAL_SERVER || WIDE.matches);
   syncMenu();
   WIDE.addEventListener("change", syncMenu);
+  
 
   // Inside the Music page's frame (js/musicshell.js) the song keeps playing in
   // the page around us, so the Music link just closes the frame.
@@ -38,6 +39,8 @@
       }
     }, true);
   }
+
+  
 
   // Safari's page-to-page transitions can leave the new page blank (the
   // Admin page on iPhones did), so Safari changes pages without them.
@@ -406,9 +409,12 @@
         ? '<b class="xn-named" style="color:' + esc(window.xnSiteColor.preview(who.color)) + '">' + esc(who.name) + "</b>"
         : "<b>" + esc(who.name) + "</b>";
       const post = (n.postText || "").trim();
-      return '<a class="xn-inbox-item' + (n.unread ? " is-new" : "") + '" href="/Forum?post=' + encodeURIComponent(n.post) + '">' +
+      // Comments on a trip report open it on the Notes page.
+      const report = n.kind === "report";
+      const href = report ? "/Notes?report=" + encodeURIComponent(n.post) : "/Forum?post=" + encodeURIComponent(n.post);
+      return '<a class="xn-inbox-item' + (n.unread ? " is-new" : "") + '" href="' + href + '">' +
         face +
-        '<span class="xn-inbox-text"><span class="xn-inbox-line">' + name + " commented" +
+        '<span class="xn-inbox-text"><span class="xn-inbox-line">' + name + (report ? " commented on your trip report" : " commented") +
         '<time datetime="' + new Date(n.at).toISOString() + '">' + ago(n.at) + "</time></span>" +
         '<span class="xn-inbox-body">' + esc(n.body) + "</span>" +
         (post ? '<span class="xn-inbox-post">On: ' + esc(post.length > 90 ? post.slice(0, 90) + "…" : post) + "</span>" : "") +
@@ -446,6 +452,21 @@
     const nav = document.querySelector(".xn");
     if (!nav) return;
     const toggle = nav.querySelector(".xn-toggle");
+    const toggleIcon = toggle && (toggle.querySelector(".xn-toggle-icon") || (() => {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.classList.add("menubut");
+      svg.classList.add("xn-toggle-icon");
+      svg.setAttribute("viewBox", "0 0 20 20");
+      svg.setAttribute("aria-hidden", "true");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M218,7888 L218,7886 C218,7885.448 217.552,7885 217,7885 L211,7885 C210.448,7885 210,7885.448 210,7886 L210,7892 C210,7892.552 210.448,7893 211,7893 L221,7893 C221.552,7893 222,7892.552 222,7892 L222,7882 C222,7881.448 221.552,7881 221,7881 L207,7881 C206.448,7881 206,7881.448 206,7882 L206,7896 C206,7896.552 206.448,7897 207,7897 L223,7897 C223.552,7897 224,7897.448 224,7898 C224,7898.552 223.552,7899 223,7899 L206,7899 C204.896,7899 204,7898.105 204,7897 L204,7881 C204,7879.895 204.896,7879 206,7879 L222,7879 C223.105,7879 224,7879.895 224,7881 L224,7893 C224,7894.105 223.105,7895 222,7895 L210,7895 C208.896,7895 208,7894.105 208,7893 L208,7885 C208,7883.895 208.896,7883 210,7883 L218,7883 C219.105,7883 220,7883.895 220,7885 L220,7889 C220,7890.105 219.105,7891 218,7891 L214,7891 C212.896,7891 212,7890.105 212,7889 C212,7887.895 212.896,7887 214,7887 C215.105,7887 216,7887.895 216,7889 L217,7889 C217.552,7889 218,7888.552 218,7888");
+      path.setAttribute("transform", "translate(-204 -7879)");
+      path.setAttribute("fill", "currentColor");
+      svg.append(path);
+      toggle.append(svg);
+      return svg;
+    })());
+    if (toggleIcon) toggle.classList.add("has-icon");
     // Chat and Music sit after the Forum and Notes after the Journal on every
     // page (added here, not in each page's HTML), in the same order on every
     // page so the menu tiles keep their places.
@@ -499,9 +520,28 @@
       toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
     }
     const isOpen = () => nav.classList.contains("open");
+    // The menu button spins on every press: a full turn one way to open and
+    // back the other way to close, picking up from wherever a spin is when
+    // pressed again quickly. (An SVG has no offsetWidth, so restarting a CSS
+    // class only spun it the first time.) It spins even with "reduce motion"
+    // on (Windows turns that on when Animation effects is off): mommy asked
+    // for it, and it only moves when pressed.
+    let spin = null;
+    function spinIcon(opening) {
+      if (!toggleIcon || !toggleIcon.animate) return;
+      const now = new DOMMatrixReadOnly(getComputedStyle(toggleIcon).transform === "none" ? undefined : getComputedStyle(toggleIcon).transform);
+      const from = Math.atan2(now.b, now.a) * 180 / Math.PI;
+      if (spin) spin.cancel();
+      spin = toggleIcon.animate(
+        [{ transform: `rotate(${from}deg)` }, { transform: `rotate(${opening ? 360 : -360}deg)` }],
+        { duration: 650, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+      );
+      spin.onfinish = () => { spin = null; };
+    }
 
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
+      spinIcon(!isOpen());
       setOpen(!isOpen());
     });
     links.forEach((link) => link.addEventListener("click", () => setOpen(false)));

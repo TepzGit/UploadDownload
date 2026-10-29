@@ -713,6 +713,7 @@ function startPastExperience(value) {
 
 function bindEvents() {
   document.getElementById("expPast")?.addEventListener("click", askPastExperience);
+  setupExpBig();
   document.getElementById("gpPast")?.addEventListener("click", askPastExperience);
   document.getElementById("pastDlg")?.addEventListener("close", (event) => {
     const dialog = event.target;
@@ -1295,6 +1296,7 @@ function experienceSpark(preview, colors) {
 
 function renderExperiences() {
   renderPhoneList();
+  if (document.getElementById("expBig")?.open) renderExpBig();
   const wrap = document.getElementById("experiences");
   if (!wrap) return;
   const list = wrap.querySelector("[data-exp-list]");
@@ -1327,116 +1329,221 @@ function renderExperiences() {
   }
 
   experiences.forEach((entry) => {
-    const preview = logic.previewTimeline(entry.doses);
-    if (!preview) return;
-    const colors = logic.previewColors(preview.names);
-    const times = entry.doses.map((d) => d.time).filter(Boolean).sort();
-    const first = times[0] || "";
-    const last = times[times.length - 1] || "";
-    const day = expDayLabel(entry.startedAt);
-    const doseWord = `${entry.doses.length} dose${entry.doses.length === 1 ? "" : "s"}`;
-
-    const item = el("div", "exp-item");
-    item.setAttribute("role", "listitem");
-    item.style.setProperty("--c", colors[0]);
-
-    const open = el("button", "exp-open");
-    open.type = "button";
-    open.setAttribute("aria-label", `Open session from ${day}, ${first}${last !== first ? ` to ${last}` : ""}: ${preview.names.join(", ")}, ${doseWord}`);
-    const top = el("span", "exp-top");
-    top.append(el("strong", "", day), el("span", "", last !== first ? `${first}–${last}` : first));
-    const subs = el("span", "exp-subs");
-    preview.names.forEach((name, index) => {
-      const tag = el("span");
-      const dot = el("i");
-      dot.style.setProperty("--c", colors[index]);
-      tag.append(dot, document.createTextNode(name));
-      subs.appendChild(tag);
-    });
-    const length = formatHours(preview.hours);
-    open.append(top, experienceSpark(preview, colors), subs, el("span", "exp-meta", length ? `${doseWord} · about ${length}` : doseWord));
-    if (entry.people?.length) open.appendChild(el("span", "exp-with", peopleText(entry.people)));
-    open.addEventListener("click", () => openExperience(entry.id));
-
-    const del = el("button", "recent-del", "×");
-    del.type = "button";
-    const label = `Delete the session from ${day}${first ? ` at ${first}` : ""}`;
-    del.setAttribute("aria-label", label);
-    let armed = null;
-    const disarm = () => {
-      clearTimeout(armed);
-      armed = null;
-      del.classList.remove("is-confirm");
-      del.textContent = "×";
-      del.setAttribute("aria-label", label);
-    };
-    del.addEventListener("blur", disarm);
-    del.addEventListener("click", () => {
-      if (!armed) {
-        // First tap asks, second tap deletes.
-        del.classList.add("is-confirm");
-        del.textContent = "Delete?";
-        del.setAttribute("aria-label", `${label}? Tap again to delete`);
-        armed = setTimeout(disarm, 4000);
-        return;
-      }
-      disarm();
-      queueExperience(async () => {
-        await dropExperience(entry.id);
-        if (activeExp?.id === entry.id) activeExp = null;
-        renderExperiences();
-        showToast("Session deleted.");
-        document.querySelector("#experiences .exp-open, #experiences .exp-empty")?.focus?.();
-      });
-    });
-
-    item.append(open, del);
-    if (expMode === "account") {
-      const ppl = el("button", "exp-ppl");
-      ppl.type = "button";
-      ppl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3.1 4.7"/></svg>';
-      ppl.setAttribute("aria-label", `Who was with you, session from ${day}`);
-      ppl.title = "Who was with you";
-      if (entry.people?.length) ppl.classList.add("has-people");
-      ppl.addEventListener("click", () => editPeople(entry));
-      item.appendChild(ppl);
-    }
-    list.appendChild(item);
+    const item = experienceCard(entry);
+    if (item) list.appendChild(item);
   });
 
   if (!sharedExperiences.length) return;
   list.appendChild(el("p", "exp-shared-title", "Shared with you"));
   sharedExperiences.forEach((entry) => {
-    const preview = logic.previewTimeline(entry.doses);
-    if (!preview) return;
-    const colors = logic.previewColors(preview.names);
-    const times = entry.doses.map((d) => d.time).filter(Boolean).sort();
-    const first = times[0] || "";
-    const last = times[times.length - 1] || "";
-    const day = expDayLabel(entry.startedAt);
-    const owner = entry.owner?.name || "A friend";
-    const item = el("div", "exp-item is-shared");
-    item.setAttribute("role", "listitem");
-    item.style.setProperty("--c", colors[0]);
-    const open = el("button", "exp-open");
-    open.type = "button";
-    open.setAttribute("aria-label", `Open ${owner}'s session from ${day}: ${preview.names.join(", ")}`);
-    const top = el("span", "exp-top");
-    top.append(el("strong", "", day), el("span", "", last !== first ? `${first}–${last}` : first));
-    const subs = el("span", "exp-subs");
-    preview.names.forEach((name, index) => {
-      const tag = el("span");
-      const dot = el("i");
-      dot.style.setProperty("--c", colors[index]);
-      tag.append(dot, document.createTextNode(name));
-      subs.appendChild(tag);
+    const item = sharedExperienceCard(entry);
+    if (item) list.appendChild(item);
+  });
+}
+
+/** The day, time and substances of one saved session, shared by its cards. */
+function experienceParts(entry) {
+  const preview = logic.previewTimeline(entry.doses);
+  if (!preview) return null;
+  const colors = logic.previewColors(preview.names);
+  const times = entry.doses.map((d) => d.time).filter(Boolean).sort();
+  const first = times[0] || "";
+  const last = times[times.length - 1] || "";
+  const day = expDayLabel(entry.startedAt);
+  const top = el("span", "exp-top");
+  top.append(el("strong", "", day), el("span", "", last !== first ? `${first}–${last}` : first));
+  const subs = el("span", "exp-subs");
+  preview.names.forEach((name, index) => {
+    const tag = el("span");
+    const dot = el("i");
+    dot.style.setProperty("--c", colors[index]);
+    tag.append(dot, document.createTextNode(name));
+    subs.appendChild(tag);
+  });
+  return { preview, colors, first, last, day, top, subs };
+}
+
+/** One of your saved sessions: open it, delete it (two taps) or say who was there. afterOpen runs once it is open. */
+function experienceCard(entry, afterOpen) {
+  const parts = experienceParts(entry);
+  if (!parts) return null;
+  const { preview, colors, first, last, day, top, subs } = parts;
+  const doseWord = `${entry.doses.length} dose${entry.doses.length === 1 ? "" : "s"}`;
+
+  const item = el("div", "exp-item");
+  item.setAttribute("role", "listitem");
+  item.style.setProperty("--c", colors[0]);
+
+  const open = el("button", "exp-open");
+  open.type = "button";
+  open.setAttribute("aria-label", `Open session from ${day}, ${first}${last !== first ? ` to ${last}` : ""}: ${preview.names.join(", ")}, ${doseWord}`);
+  const length = formatHours(preview.hours);
+  open.append(top, experienceSpark(preview, colors), subs, el("span", "exp-meta", length ? `${doseWord} · about ${length}` : doseWord));
+  if (entry.people?.length) open.appendChild(el("span", "exp-with", peopleText(entry.people)));
+  open.addEventListener("click", () => {
+    openExperience(entry.id);
+    afterOpen?.();
+  });
+
+  const del = el("button", "recent-del", "×");
+  del.type = "button";
+  const label = `Delete the session from ${day}${first ? ` at ${first}` : ""}`;
+  del.setAttribute("aria-label", label);
+  let armed = null;
+  const disarm = () => {
+    clearTimeout(armed);
+    armed = null;
+    del.classList.remove("is-confirm");
+    del.textContent = "×";
+    del.setAttribute("aria-label", label);
+  };
+  del.addEventListener("blur", disarm);
+  del.addEventListener("click", () => {
+    if (!armed) {
+      // First tap asks, second tap deletes.
+      del.classList.add("is-confirm");
+      del.textContent = "Delete?";
+      del.setAttribute("aria-label", `${label}? Tap again to delete`);
+      armed = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    const inBig = !!del.closest("#expBig");
+    queueExperience(async () => {
+      await dropExperience(entry.id);
+      if (activeExp?.id === entry.id) activeExp = null;
+      renderExperiences();
+      showToast("Session deleted.");
+      document.querySelector(inBig ? "#expBig .exp-open, #expBigFind" : "#experiences .exp-open, #experiences .exp-empty")?.focus?.();
     });
-    const others = entry.people || []; // the server leaves you out
-    open.append(el("span", "exp-from", `${owner}'s session`), top, experienceSpark(preview, colors), subs);
-    if (others.length) open.appendChild(el("span", "exp-with", peopleText(others).replace(/^With/, "Also with")));
-    open.addEventListener("click", () => openSharedExperience(entry.id));
-    item.appendChild(open);
-    list.appendChild(item);
+  });
+
+  item.append(open, del);
+  if (expMode === "account") {
+    const ppl = el("button", "exp-ppl");
+    ppl.type = "button";
+    ppl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3.1 4.7"/></svg>';
+    ppl.setAttribute("aria-label", `Who was with you, session from ${day}`);
+    ppl.title = "Who was with you";
+    if (entry.people?.length) ppl.classList.add("has-people");
+    ppl.addEventListener("click", () => editPeople(entry));
+    item.appendChild(ppl);
+  }
+  return item;
+}
+
+/** A friend's session this account was added to (view only). */
+function sharedExperienceCard(entry, afterOpen) {
+  const parts = experienceParts(entry);
+  if (!parts) return null;
+  const { preview, colors, day, top, subs } = parts;
+  const owner = entry.owner?.name || "A friend";
+  const item = el("div", "exp-item is-shared");
+  item.setAttribute("role", "listitem");
+  item.style.setProperty("--c", colors[0]);
+  const open = el("button", "exp-open");
+  open.type = "button";
+  open.setAttribute("aria-label", `Open ${owner}'s session from ${day}: ${preview.names.join(", ")}`);
+  const others = entry.people || []; // the server leaves you out
+  open.append(el("span", "exp-from", `${owner}'s session`), top, experienceSpark(preview, colors), subs);
+  if (others.length) open.appendChild(el("span", "exp-with", peopleText(others).replace(/^With/, "Also with")));
+  open.addEventListener("click", () => {
+    openSharedExperience(entry.id);
+    afterOpen?.();
+  });
+  item.appendChild(open);
+  return item;
+}
+
+// ------------------------------------------------------------
+// Experiences, big view: every session as a grid, by month, with a search
+// ------------------------------------------------------------
+
+function expSearchText(entry) {
+  const names = (entry.doses || []).map((d) => d.substance || d.name || "");
+  const d = new Date(entry.startedAt);
+  return [
+    ...names,
+    expDayLabel(entry.startedAt),
+    d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+    ...(entry.people || []).map((p) => p.name || ""),
+    entry.owner?.name || "",
+  ].join(" ").toLowerCase();
+}
+
+function renderExpBig() {
+  const dlg = document.getElementById("expBig");
+  if (!dlg) return;
+  const body = dlg.querySelector("[data-expbig-list]");
+  const count = dlg.querySelector("[data-expbig-count]");
+  const words = document.getElementById("expBigFind").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (entry) => {
+    const text = expSearchText(entry);
+    return words.every((w) => text.includes(w));
+  };
+  const close = () => dlg.close();
+  const mine = experiences.filter(matches);
+  const shared = sharedExperiences.filter(matches);
+  const total = experiences.length + sharedExperiences.length;
+  const shown = mine.length + shared.length;
+  count.textContent = !total ? "" : words.length ? `${shown} of ${total}` : `${total} session${total === 1 ? "" : "s"}`;
+  body.replaceChildren();
+
+  if (!shown) {
+    body.appendChild(el("p", "exp-empty", total ? "No sessions match. Try a substance, a day or a friend's name." :
+      expMode === "loading" ? "Loading your experiences…" : "Each time you use the graph it's saved here, so you can open it again later."));
+    return;
+  }
+  // Newest first, one heading per month.
+  let month = "";
+  let grid = null;
+  mine.forEach((entry) => {
+    const d = new Date(entry.startedAt);
+    const label = d.toLocaleDateString([], { month: "long", year: "numeric" });
+    if (label !== month) {
+      month = label;
+      body.appendChild(el("h3", "exp-big-month", label));
+      grid = el("div", "exp-big-grid");
+      grid.setAttribute("role", "list");
+      body.appendChild(grid);
+    }
+    const item = experienceCard(entry, close);
+    if (item) grid.appendChild(item);
+  });
+  if (shared.length) {
+    body.appendChild(el("h3", "exp-big-month", "Shared with you"));
+    const sharedGrid = el("div", "exp-big-grid");
+    sharedGrid.setAttribute("role", "list");
+    shared.forEach((entry) => {
+      const item = sharedExperienceCard(entry, close);
+      if (item) sharedGrid.appendChild(item);
+    });
+    body.appendChild(sharedGrid);
+  }
+}
+
+function setupExpBig() {
+  const dlg = document.getElementById("expBig");
+  const button = document.getElementById("expExpand");
+  if (!dlg || !button) return;
+  const find = document.getElementById("expBigFind");
+  button.addEventListener("click", () => {
+    renderExpBig();
+    dlg.showModal();
+    dlg.querySelector(".exp-big-body").scrollTop = 0;
+    // A phone keyboard popping up would hide the cards, so only desktops focus the search.
+    if (matchMedia("(hover:hover) and (pointer:fine)").matches) find.focus({ preventScroll: true });
+    else dlg.querySelector("[data-close]").focus({ preventScroll: true });
+  });
+  find.addEventListener("input", renderExpBig);
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.close());
+  // A click on the dark area around the card closes it.
+  dlg.addEventListener("click", (event) => {
+    if (event.target === dlg) dlg.close();
+  });
+  dlg.addEventListener("close", () => {
+    find.value = "";
+    if (document.activeElement === document.body) button.focus({ preventScroll: true });
   });
 }
 
@@ -1464,9 +1571,18 @@ function showSuggestions(substances) {
     option.setAttribute("role", "option");
     option.append(classIcon(substance.name), substance.name);
     if (substance.custom) {
+      // Found by a brand or street name ("ksalol"): show which one.
+      const q = els.input.value.trim().toLowerCase();
+      const hit = q && !substance.name.toLowerCase().includes(q) && substance.commonNames.find((n) => n.toLowerCase().includes(q));
+      if (hit) {
+        const alias = document.createElement("span");
+        alias.className = "sug-alias";
+        alias.textContent = hit;
+        option.append(alias);
+      }
       const tag = document.createElement("span");
       tag.className = "sug-custom";
-      tag.textContent = "Custom";
+      tag.textContent = substance.ingredient ? "Medicine" : "Custom";
       option.append(tag);
     }
     option.addEventListener("click", () => {
@@ -1510,11 +1626,13 @@ const CLASS_LABELS = window.xnClass?.LABELS || {};
 
 function setClassIcon(icon, name, known) {
   icon.dataset.for = name;
+  window.xnClass?.setDrugName(icon, name);
   const apply = (key) => {
     if (icon.dataset.for !== name) return;
     icon.dataset.class = key || "";
     icon.hidden = !key;
     icon.title = CLASS_LABELS[key] || "";
+    window.xnClass?.setDrugName(icon, name);
     icon.dispatchEvent(new Event("sc-icon"));
   };
   const key = known ?? logic.cachedClassKey(name);
@@ -1678,6 +1796,24 @@ function renderCustomInfo(substance) {
   fill("customHalfLife", half ? `${half} hours` : "");
   fill("customRisks", substance.risks || "");
   fill("customNotes", substance.notes || "");
+  // Medicines link to their active ingredient's own page.
+  const ingredient = document.getElementById("customIngredient");
+  if (ingredient) {
+    ingredient.replaceChildren();
+    ingredient.hidden = ingredient.previousElementSibling.hidden = !substance.ingredient;
+    if (substance.ingredient) {
+      const link = document.createElement("a");
+      link.href = "/journal/Drug?drug=" + encodeURIComponent(substance.ingredient.split(" + ")[0]);
+      link.textContent = substance.ingredient;
+      ingredient.append(link);
+    }
+  }
+  const source = document.getElementById("customSource");
+  if (source) {
+    source.textContent = substance.ingredient
+      ? "Medicine. Pills from outside a pharmacy are often fakes, so test them"
+      : "Custom entry, added by an admin";
+  }
 }
 
 function setPills(type, items) {

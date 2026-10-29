@@ -18,10 +18,26 @@
 .nt-bar { display: flex; align-items: center; gap: 10px; }
 .nt-find { flex: 1; min-width: 0; }
 .nt-count { flex: none; font-size: 12px; color: var(--oled-muted); }
-.nt-empty { margin: 0; padding: 28px 16px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; font-size: 13px; line-height: 1.6; color: var(--oled-muted); text-align: center; }
+.nt-empty { margin: 0; padding: 28px 16px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; font-size: 13px; line-height: 1.6; color: var(--oled-muted); text-align: center; background: #0000005c; }
 .nt-empty a { color: var(--oled-accent); }
 .nt .xn-btn svg, .nt-dlg .xn-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .nt-icon-btn { width: 40px; padding: 0; justify-content: center; }
+
+#padEditor {
+  width: 1024px;
+  height: 850px;
+}
+.drug-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  width: 590px;
+  padding-left: 3rem;
+  text-align: right;
+}
+  
+
 
 /* By substance */
 .nt-groups { display: flex; flex-direction: column; gap: 14px; }
@@ -64,7 +80,7 @@
 .nt-dlg { width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0; background: transparent; color: var(--oled-text); }
 .nt-dlg::backdrop { background: rgba(0, 0, 0, 0.72); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 .nt-dlg, .nt-dlg * { box-sizing: border-box; }
-.nt-dlg-card { display: flex; flex-direction: column; gap: 12px; margin: 0; max-height: calc(100dvh - 24px); overflow-y: auto; }
+.nt-dlg-card { display: flex; flex-direction: column; gap: 12px; margin: 0; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
 .nt-dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .nt-dlg-head .xn-h2 { margin: 0; }
 .nt-x { width: 36px; height: 36px; border: 1px solid var(--oled-line); border-radius: 8px; background: transparent; color: var(--oled-muted); font-size: 20px; line-height: 1; cursor: pointer; }
@@ -74,7 +90,9 @@
 .nt-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
 @media (max-width: 520px) { .nt-row { grid-template-columns: 1fr; } }
 .nt-dlg input[type="date"] { color-scheme: dark; }
-.nt-report-text { min-height: 220px; padding: 10px 12px; line-height: 1.6; resize: vertical; }
+/* The report box grows with the text (notes.js fitBody), so the whole form
+   scrolls as one instead of a box inside a box. */
+.nt-body-input { min-height: 220px; padding: 10px 12px; line-height: 1.6; resize: none; overflow-y: auto; }
 .nt-stars { display: flex; gap: 4px; }
 .nt-star { width: 40px; height: 40px; padding: 0; border: 1px solid var(--oled-line); border-radius: 8px; background: transparent; color: var(--oled-line-strong); font-size: 20px; cursor: pointer; }
 .nt-star.is-on { color: var(--oled-accent); border-color: rgba(var(--xn-accent-rgb), 0.4); }
@@ -144,3 +162,112 @@
 .nt-public strong { font-size: 13.5px; }
 .nt-public small { font-size: 12px; line-height: 1.5; color: var(--oled-muted); }
 .nt-public:has(input:checked) { border-color: rgba(var(--xn-accent-rgb), 0.5); background: var(--oled-accent-soft); }
+
+/* Pictures, likes and comments on trip reports */
+.nt-file { display: none; }
+.nt-report-cover { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 10px; background: var(--oled-surface-2); }
+.nt-report-cover img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+@media (hover: hover) { .nt-report:hover .nt-report-cover img { transform: scale(1.03); } }
+.nt-report-cover.is-broken img { visibility: hidden; }
+.nt-report-more { position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.66); font-size: 12px; font-weight: 600; color: #fff; }
+.nt-report-foot { display: flex; align-items: center; gap: 14px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--oled-line); }
+.nt-stat { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+.nt-stat svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.nt-stat.is-on { color: #ff7a9c; }
+.nt-stat.is-on svg { fill: currentColor; stroke: none; }
+
+/* Reader: the report with its comments in a card on the right */
+.nt-read-dlg { width: min(1180px, calc(100vw - 24px)); }
+.nt-read { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 14px; height: min(calc(100dvh - 24px), 980px); }
+.nt-read > .nt-dlg-card { max-height: none; min-height: 0; }
+.nt-read-main { overflow-y: auto; overscroll-behavior: contain; }
+.nt-read-main > [hidden] { display: none; }
+.nt-mine { font-size: 12px; font-weight: 600; color: var(--oled-muted); }
+.nt-read-edit { min-height: 36px; }
+.nt-read-edit svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nt-read-main .nt-dlg-head { flex-wrap: wrap; }
+.nt-read-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--oled-line); }
+.nt-like {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--oled-line-strong); border-radius: 20px;
+  background: transparent; color: var(--oled-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.nt-like svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.nt-like[aria-pressed="true"] { border-color: rgba(255, 122, 156, 0.5); background: rgba(255, 122, 156, 0.12); color: #ff9db5; }
+.nt-like[aria-pressed="true"] svg { fill: #ff7a9c; stroke: #ff7a9c; }
+.nt-like-count { font-variant-numeric: tabular-nums; color: var(--oled-muted); }
+.nt-like[aria-pressed="true"] .nt-like-count { color: inherit; }
+.nt-like:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+@media (hover: hover) { .nt-like:hover { border-color: rgba(255, 122, 156, 0.6); } }
+.nt-likers { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--oled-muted); }
+.nt-likers svg { width: 15px; height: 15px; fill: #ff7a9c; }
+.nt-likers[hidden] { display: none; }
+
+/* 1 picture fills the width, 2 to 4 sit two by two, 5 or more three across. */
+.nt-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.nt-gallery[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.nt-gallery[data-count="3"] .nt-pic:first-child { grid-column: span 2; aspect-ratio: 16 / 9; }
+.nt-gallery[data-count="5"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.nt-pic { position: relative; display: block; aspect-ratio: 4 / 3; padding: 0; overflow: hidden; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); cursor: zoom-in; }
+.nt-gallery[data-count="1"] .nt-pic { aspect-ratio: auto; }
+.nt-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nt-gallery[data-count="1"] .nt-pic img { height: auto; max-height: min(62vh, 36rem); object-fit: contain; margin: 0 auto; }
+.nt-pic:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.nt-pic.is-broken img { visibility: hidden; }
+.nt-pic.is-broken::before { content: "Picture missing"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--oled-muted); }
+
+/* Comments card */
+.nt-talk { display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.nt-talk-head { display: flex; align-items: baseline; gap: 10px; }
+.nt-talk-head .xn-h2 { margin: 0; }
+.nt-talk-note { margin: 0; padding: 10px 12px; border: 1px dashed var(--oled-line-strong); border-radius: 10px; font-size: 12.5px; line-height: 1.55; color: var(--oled-muted); }
+.nt-talk-list { display: flex; flex: 1; flex-direction: column; gap: 10px; min-height: 0; margin: 0 -6px; padding: 0 6px; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
+.nt-talk-empty { margin: auto 0; padding: 18px 8px; font-size: 12.5px; color: var(--oled-muted); text-align: center; }
+.nt-comment { display: flex; align-items: flex-start; gap: 10px; }
+.nt-comment-face { flex: none; margin-top: 2px; border-radius: 8px; }
+.nt-comment-face:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.nt-face { display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 8px; background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), 0.35), #0d0a16); font-size: 12px; font-weight: 600; color: #e9e0ff; }
+.nt-face img { width: 100%; height: 100%; object-fit: cover; }
+.nt-comment-main { flex: 1; min-width: 0; padding: 7px 10px 9px; border: 1px solid var(--oled-line); border-radius: 4px 12px 12px 12px; background: var(--oled-surface-2); }
+.nt-comment-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.nt-comment-name { overflow: hidden; font-size: 12.5px; font-weight: 600; color: var(--oled-text); text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .nt-comment-name:hover { color: var(--oled-accent); } }
+.nt-comment-name:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; border-radius: 2px; }
+.nt-time { font-size: 11px; color: var(--oled-muted); }
+.nt-comment-del { margin-left: auto; min-height: 26px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--oled-muted); font: inherit; font-size: 11px; cursor: pointer; }
+.nt-comment-del.is-armed { border-color: rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.12); color: #fca5a5; }
+@media (hover: hover) { .nt-comment-del:hover { color: #fca5a5; } }
+.nt-comment-del:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.nt-comment-body { margin: 3px 0 0; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nt-talk-form { display: flex; align-items: flex-end; gap: 8px; padding-top: 10px; border-top: 1px solid var(--oled-line); }
+.nt-talk-form[hidden] { display: none; }
+.xn-input.nt-talk-text { flex: 1; min-width: 0; height: 44px; max-height: 200px; padding: 10px 12px; font-family: inherit; line-height: 1.45; resize: none; }
+.nt-talk-form .xn-btn { flex: none; min-height: 44px; }
+
+/* Picture picker in the report form */
+.nt-pics-count { margin-left: 6px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--oled-muted); }
+.nt-pics-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; padding: 2px; border-radius: 12px; transition: background-color 0.15s ease, outline-color 0.15s ease; outline: 2px dashed transparent; outline-offset: 2px; }
+.nt-pics-edit.is-drop { outline-color: var(--oled-accent); background: var(--oled-accent-soft); }
+.nt-pic-edit { position: relative; aspect-ratio: 1 / 1; overflow: hidden; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); }
+.nt-pic-edit img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nt-pic-x { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
+.nt-pic-x:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.nt-pic-add {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 1 / 1; padding: 6px;
+  border: 1px dashed var(--oled-line-strong); border-radius: 10px; background: transparent; color: var(--oled-muted); font: inherit; font-size: 12px; cursor: pointer;
+}
+.nt-pic-add svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (hover: hover) { .nt-pic-add:hover { border-color: var(--oled-accent); color: var(--oled-text); } }
+.nt-pic-add:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+
+/* Phones and narrow windows: the comments go under the report and the whole dialog scrolls. */
+@media (max-width: 860px) {
+  .nt-read { grid-template-columns: minmax(0, 1fr); height: auto; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+  .nt-read-main, .nt-talk { overflow: visible; }
+  .nt-talk-list { overflow: visible; }
+  .nt-talk-empty { margin: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nt-like.is-pop svg { animation: nt-like-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  @keyframes nt-like-pop { 0% { transform: scale(0.6); } 55% { transform: scale(1.3); } 100% { transform: none; } }
+}

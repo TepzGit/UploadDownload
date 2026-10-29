@@ -107,6 +107,8 @@
 .di-fact:last-child { border-bottom: 0; }
 .di-fact dt { color: var(--oled-muted); }
 .di-fact dd { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.di-ingredient { color: var(--oled-text); font-weight: 600; text-decoration: underline; text-decoration-color: rgba(var(--xn-accent-rgb), 0.6); text-underline-offset: 3px; }
+@media (hover: hover) { .di-ingredient:hover { color: var(--oled-accent); } }
 
 .di-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .di-chip {

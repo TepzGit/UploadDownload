@@ -15,15 +15,44 @@
     .jr-search .xn-input{ padding-left:34px; }
     .drug-item{ position:relative; }
     .drug-item .drug-like{ position:absolute; top:50%; right:8px; transform:translateY(-50%); }
-    .Drug{ display:grid; grid-template-columns:56px minmax(0,1fr) 44px; align-items:center; gap:14px; min-height:76px; padding:10px 10px 10px 10px; border:1px solid var(--line); border-radius:2px; background:var(--surface-2); color:var(--text); text-decoration:none; transition:border-color .15s ease, background-color .15s ease; }
+    .Drug{ display:grid;
+        grid-template-columns:56px minmax(0,1fr) 44px;
+        align-items:center;
+        gap:14px;
+        min-height:150px;
+        padding:10px 10px 10px 10px;
+        border:1px solid var(--line);
+        border-radius:2px;
+        background:var(--surface-2);
+        color:var(--text);
+        text-decoration:none;
+        transition:border-color .15s ease, background-color .15s ease;
+        }
     @media (hover:hover){ .Drug:hover{ border-color:var(--violet); background:#16161b; } }
     .Drug:focus-visible{ outline:2px solid var(--violet); outline-offset:2px; }
-    .drug-thumb{ display:flex; align-items:center; justify-content:center; width:56px; height:56px; overflow:hidden; border:1px solid var(--line); border-radius:2px; background:#000; color:var(--violet); font-size:20px; font-weight:600; }
+    .drug-thumb {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:100px;
+        height:100px;
+        overflow:hidden;
+        border:1px solid var(--line);
+        border-radius:2px;
+        background:#000;
+        color:var(--violet);
+        font-size:20px;
+        font-weight:600;
+        margin-left: 10px;
+        }
+
     /* Wiki structure drawings are black on white/clear; inverting them suits the black theme. */
     .drug-thumb img{ width:100%; height:100%; object-fit:contain; padding:4px; filter:invert(1) hue-rotate(180deg); }
     .drug-text{ display:flex; flex-direction:column; gap:3px; min-width:0; }
     .drugname{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
     .drugclass{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
+    /* "Medicine" / "Custom" tag after the name (journal.css isn't loaded on this page) */
+    .drug-custom{ display:inline-block; margin-left:8px; padding:0 6px; border:1px solid var(--line); border-radius:2px; font-size:10px; font-weight:500; line-height:16px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); vertical-align:2px; }
     .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
     .jr-classes{ display:flex; gap:6px; margin-top:16px; overflow-x:auto; padding-bottom:4px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
     .jr-classes[hidden]{ display:none; }
@@ -191,6 +220,8 @@
 
             // "Stimulants" and "stimulant" are the same class.
             const classKey = (name) => String(name || "").trim().toLowerCase().replace(/s$/, "");
+            // The Medicines chip: entries with an active ingredient (js/medicines.json and the Importer).
+            const MEDICINES = "@medicine";
             const classesOf = (substance) => [].concat(substance?.class?.psychoactive || []).filter(Boolean);
 
             function buildChips() {
@@ -213,7 +244,7 @@
                     b.className = "jr-chip";
                     b.dataset.class = key;
                     b.setAttribute("aria-pressed", String(key === currentClass));
-                    const iconKey = window.xnClass.keyForClass(key);
+                    const iconKey = key === MEDICINES ? "tablet" : window.xnClass.keyForClass(key);
                     if (iconKey) b.append(window.xnClass.icon(iconKey, "jr-chip-icon"));
                     b.append(label);
                     if (count != null) {
@@ -229,6 +260,8 @@
                     return b;
                 };
                 box.append(chip("", "All", catalog.length));
+                const medicines = catalog.filter((s) => s.ingredient).length;
+                if (medicines) box.append(chip(MEDICINES, "Medicines", medicines));
                 list.forEach((entry) => {
                     const label = [...entry.labels.entries()].sort((a, b) => b[1] - a[1])[0][0];
                     box.append(chip(entry.key, label.charAt(0).toUpperCase() + label.slice(1), entry.count));
@@ -239,7 +272,7 @@
             function filtered(query) {
                 const q = query.toLowerCase();
                 return catalog.filter((substance) => {
-                    if (currentClass && !classesOf(substance).some((c) => classKey(c) === currentClass)) return false;
+                    if (currentClass === MEDICINES ? !substance.ingredient : currentClass && !classesOf(substance).some((c) => classKey(c) === currentClass)) return false;
                     if (!q) return true;
                     return (substance.name || "").toLowerCase().includes(q) ||
                         [].concat(substance.commonNames || []).some((n) => String(n).toLowerCase().includes(q));
@@ -300,12 +333,14 @@
                             <span class="drug-thumb"></span>
                             <span class="drug-text"><span class="drugname"></span><span class="drugclass"></span></span>
                         `;
-                        drugDiv.querySelector(".drugname").append(window.xnClass.icon(window.xnClass.keyFor(substance)), DrugName);
-                        drugDiv.querySelector(".drugclass").textContent = [Psycho, DrugClass].filter(Boolean).join(" · ") || "Substance";
+                        drugDiv.querySelector(".drugname").append(window.xnClass.icon(window.xnClass.keyFor(substance), "", DrugName), DrugName);
+                        // A word only once: Adderall reads "Amphetamine · Stimulant", not "... · Amphetamine" again.
+                        const classLine = [substance.ingredient, Psycho, DrugClass].filter((part, i, all) => part && all.findIndex((p) => p && p.toLowerCase() === part.toLowerCase()) === i);
+                        drugDiv.querySelector(".drugclass").textContent = classLine.join(" · ") || "Substance";
                         if (substance.custom) {
                             const tag = document.createElement("span");
                             tag.className = "drug-custom";
-                            tag.textContent = "Custom";
+                            tag.textContent = substance.ingredient ? "Medicine" : "Custom";
                             drugDiv.querySelector(".drugname").append(tag);
                         }
                         const thumb = drugDiv.querySelector(".drug-thumb");

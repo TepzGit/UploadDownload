@@ -3,7 +3,7 @@
    this file, so overrides of those classes use two class names. */
 
 .fm { display: flex; flex-direction: column; gap: 20px; }
-.fm-intro { display: flex; flex-direction: column; }
+.fm-intro { display: flex; flex-direction: column; margin-left: 15rem;}
 .fm-intro .xn-sub { max-width: 60ch; }
 
 

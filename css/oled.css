@@ -115,11 +115,27 @@ body * {
   text-decoration: none;
 }
 
+.Drugs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 72vh;
+  min-height: 80%;
+  width: 100%;
+  border: 1px solid var(--oled-accent);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border-radius: 5px;
+  overflow-y: scroll;
+  box-sizing: border-box;
+  padding: 10px;
+  gap: 3%;
+}
+
+
 .xn-brand {
   display: inline-flex;
   align-items: center;
   margin-right: auto;
-  padding: 8px 0;
+  padding: 0px 0;
   color: var(--oled-text);
   font-size: 19px;
   font-weight: 600;
@@ -175,26 +191,67 @@ body * {
   color: #ff8b8b;
 }
 
-/* The menu button (html.xn-menu, see "Menu button" below): four squares,
-   drawn with a mask so it looks right before nav.js runs. */
+/* Menu toggle icon; the pseudo-element is a fallback until nav.js adds the SVG. */
+.menubut {
+  margin: auto;
+    margin-right: auto;
+  margin-right: 12px;
+}
+
+
+
 .xn-toggle {
   display: none;
   position: relative;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 42px;
+  width: 51px;
   height: 42px;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--oled-line);
+  border: none;
   border-radius: 10px;
   background: transparent;
   color: var(--oled-muted);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+
 .xn-toggle > span:not(.xn-chat-count) { display: none; }
+.xn-toggle.has-icon::before { display: none; }
+.xn-toggle-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  transform-origin: center;
+}
+.xn-toggle .menubut {
+  width: 40px;
+  height: 30px;
+  margin: 0;
+}
+
+.menubut {
+  background-color: #6390;
+  border-radius: 10px;
+  width: 100px;
+  height: 100px;
+  cursor: pointer;
+  padding: 2px;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
 .xn-toggle::before {
   content: "";
   width: 20px;
@@ -525,10 +582,10 @@ html body.xn-bg { background: transparent !important; }
 @media (prefers-reduced-motion: reduce) { .xn-hatch { animation: none; } }
 
 .xn-page {
-  margin-left: 10rem;
-  margin-right: 10rem !important;
+  margin: auto;
   box-sizing: border-box;
-  width: 85%;
+  /* 85% of the window, but never so wide that the 10rem margin pushes it past the right edge. */
+  width: min(85%, calc(100% - 10rem));
   padding: clamp(16px, 3vw, 32px) max(16px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   color: var(--oled-text);
 }
@@ -536,12 +593,44 @@ html body.xn-bg { background: transparent !important; }
 .xn-page *::before,
 .xn-page *::after { box-sizing: border-box; }
 
+.xn-card.fm-post {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  min-width: 70%;
+}
+
+
+
 .xn-card {
   background: var(--oled-surface);
   border: 1px solid var(--oled-line);
-  border-radius: 2px;
-  padding: clamp(16px, 2.5vw, 24px);
+  padding: 20px;
 }
+.logolol {
+  background-image: url("https://psychonautwiki.org/eye.svg");
+  height: 37px;
+  width: 37px;
+}
+.xn-card {
+  background: var(--oled-surface);
+  border: 1px solid var(--oled-line);
+  padding: 20px;
+  
+  margin: auto;
+  
+  top: 0rem;
+}
+
+.xn-card.fm-members {
+  top: -22rem;
+  right: 14rem;
+  height: 500px;
+  width: 398px !important;
+  min-width: 300px !important;
+}
+
 
 .xn-eyebrow {
   margin: 0;
@@ -733,6 +822,9 @@ input[type="search"].xn-input::-webkit-search-cancel-button { filter: invert(0.6
 
   /* Cards reach close to the screen edges on phones. */
   .xn-page {
+    margin-left: 0;
+    margin-right: 0 !important;
+    width: auto;
     padding-left: max(6px, env(safe-area-inset-left));
     padding-right: max(6px, env(safe-area-inset-right));
     padding-top: 10px;
@@ -756,8 +848,8 @@ html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: 
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 144px;
+  height: 144px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 2px;
@@ -769,6 +861,7 @@ html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: 
   -webkit-tap-highlight-color: transparent;
   transition: color 0.15s ease, background-color 0.15s ease;
 }
+
 .xn-heart { width: 20px; height: 20px; flex: none; fill: transparent; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; transition: fill 0.15s ease; }
 .xn-like[aria-pressed="true"],
 .xn-btn[aria-pressed="true"] { color: var(--oled-accent); }
@@ -1240,15 +1333,16 @@ html[data-font="garamond"] { --oled-font: Garamond, "EB Garamond", "Cormorant Ga
   .xn-page > :is(.xn-card, section):nth-child(4) { animation-delay: 170ms; }
   .xn-page > :is(.xn-card, section):nth-child(n+5) { animation-delay: 210ms; }
 
+  .menubut.rotate { animation: rotate 0.7s reverse; }
+
   /* Menu (mommy 2026-10-28: "add a animation to the menu dropdown"): it
      unfolds out of the menu button with a little spring, the tiles flow in
+
      one after another and their icons pop in; closing folds it back into the
-     button. The squares turn a quarter as it opens and a tile's icon lifts
+     button. The spiral spins on click and a tile's icon lifts
      when pointed at. */
   .xn-toggle { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
   .xn-toggle:active { transform: scale(0.94); }
-  .xn-toggle::before { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
-  html.xn-menu .xn.open .xn-toggle::before { transform: rotate(90deg); }
   html.xn-menu .xn .xn-links {
     clip-path: inset(0 calc(100% - 52px) calc(100% - 52px) 0 round 12px);
     transform: translateY(-6px) scale(0.96);

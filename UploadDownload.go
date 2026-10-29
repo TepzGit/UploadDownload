@@ -20,6 +20,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,6 +30,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -163,6 +165,12 @@ CREATE TABLE IF NOT EXISTS liked_substances (
 	FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS drug_icons (
+	name TEXT PRIMARY KEY COLLATE NOCASE,
+	path TEXT NOT NULL,
+	updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS user_drug_color_settings (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	user_id INTEGER NOT NULL,
@@ -269,6 +277,7 @@ const defaultProfilePic = "/profiles/Default/default.png"
 // maxPictureMB is the biggest picture anyone can upload, in megabytes.
 const maxPictureMB = 150
 const maxPictureBytes = maxPictureMB << 20
+const maxDrugIconBytes = 10 << 20
 const maxLikes = 500
 
 // Graph sessions ("Experiences"): times are Unix milliseconds, the newest are kept.
@@ -354,6 +363,10 @@ func main() {
 	// Substances Importer: admins add their own substances next to PsychonautWiki's.
 	http.HandleFunc("/admin/substances", requireAdminLogin(SubstancesImporter))
 	http.HandleFunc("/admin/substances/api", requireAdminLogin(adminCustomSubstances))
+	http.HandleFunc("/admin/drug-icons", requireAdminLogin(AdminDrugIcons))
+	http.HandleFunc("/admin/drug-icons/api", requireAdminLogin(adminDrugIcons))
+	http.HandleFunc("/drug-icons", publicDrugIcons)
+	http.HandleFunc("/drug-icon/", drugIconFile)
 	// Open like the Graph page, so the Graph can draw custom substances for everyone.
 	http.HandleFunc("/substances/custom", publicCustomSubstances)
 	// Phone sync: the folders a member picked on their Profile are copied into the app's folder on the phone.
@@ -512,6 +525,7 @@ func main() {
 		panic("cannot create the music tables: " + err.Error())
 	}
 	registerNotes()
+	seedMedicines()
 	registerAppUpdates()
 	registerLinkDownloads()
 	registerChat()
@@ -2240,6 +2254,11 @@ func AdminPanel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
 	}
+}
+
+func AdminDrugIcons(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, "html/drug-icons.html")
 }
 
 func AdminPanelCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -4197,6 +4216,7 @@ func (l siteLook) clean() siteLook {
 // plotStyle is how an account likes the Graph drawn (Profile > Preferences);
 // js/plot.js has the same fields and defaults.
 type plotStyle struct {
+	V        int    `json:"v,omitempty"` // plotStyleVersion once saved by the current site
 	Width    *int   `json:"width,omitempty"`
 	Shape    string `json:"shape,omitempty"`
 	Fill     *int   `json:"fill,omitempty"`
@@ -4209,11 +4229,20 @@ type plotStyle struct {
 	Height   string `json:"height,omitempty"`
 }
 
+// plotStyleVersion went to 2 when the default line went from 6 to 9 px.
+const plotStyleVersion = 2
+
 func (p plotStyle) clean() plotStyle {
 	if p.Width != nil {
-		v := min(max(*p.Width, 2), 12)
+		v := *p.Width
+		if p.V != plotStyleVersion {
+			// Saved before the thicker line: scale it up by half like the default.
+			v = int(math.Round(float64(v) * 1.5))
+		}
+		v = min(max(v, 2), 20)
 		p.Width = &v
 	}
+	p.V = plotStyleVersion
 	if p.Fill != nil {
 		v := min(max(*p.Fill, 0), 60)
 		p.Fill = &v
@@ -4992,6 +5021,166 @@ var sitePictureSlots = map[string]string{
 }
 
 var sitePicturesDir = filepath.Join(ProfilePicturesDirName, "site")
+var drugIconsDir = filepath.Join(UploadedFilesDirName, "drug-icons")
+
+type drugIconEntry struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
+}
+
+func drugIconURL(file string, updatedAt int64) string {
+	return "/drug-icon/" + url.PathEscape(filepath.Base(file)) + "?v=" + strconv.FormatInt(updatedAt, 36)
+}
+
+func publicDrugIcons(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	rows, err := db.Query("SELECT name, path, updated_at FROM drug_icons ORDER BY lower(name)")
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	icons := map[string]string{}
+	for rows.Next() {
+		var name, file string
+		var updatedAt int64
+		if err := rows.Scan(&name, &file, &updatedAt); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
+			return
+		}
+		icons[strings.ToLower(strings.TrimSpace(name))] = drugIconURL(file, updatedAt)
+	}
+	if err := rows.Err(); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	writeJSON(w, icons)
+}
+
+func adminDrugIcons(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		rows, err := db.Query("SELECT name, path, updated_at FROM drug_icons ORDER BY lower(name)")
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		icons := []drugIconEntry{}
+		for rows.Next() {
+			var name, file string
+			var updatedAt int64
+			if err := rows.Scan(&name, &file, &updatedAt); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
+				return
+			}
+			icons = append(icons, drugIconEntry{Name: name, Image: drugIconURL(file, updatedAt)})
+		}
+		if err := rows.Err(); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, icons)
+	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, maxDrugIconBytes+(64<<10))
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				http.Error(w, "That picture is too big. Pick one under 10 MB.", http.StatusRequestEntityTooLarge)
+			} else {
+				http.Error(w, "Couldn't read the picture upload.", http.StatusBadRequest)
+			}
+			return
+		}
+		if r.MultipartForm != nil {
+			defer r.MultipartForm.RemoveAll()
+		}
+		name := cleanText(r.FormValue("name"), 100)
+		if name == "" {
+			http.Error(w, "Enter a drug name.", http.StatusBadRequest)
+			return
+		}
+		var oldFile string
+		err := db.QueryRow("SELECT path FROM drug_icons WHERE name = ?", name).Scan(&oldFile)
+		if err != nil && err != sql.ErrNoRows {
+			fmt.Println(err)
+			http.Error(w, "Couldn't read the current drug icon.", http.StatusInternalServerError)
+			return
+		}
+		if r.FormValue("remove") == "1" {
+			if _, err := db.Exec("DELETE FROM drug_icons WHERE name = ?", name); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't restore the default icon.", http.StatusInternalServerError)
+				return
+			}
+			if oldFile != "" {
+				if err := os.Remove(filepath.Join(drugIconsDir, filepath.Base(oldFile))); err != nil && !os.IsNotExist(err) {
+					fmt.Println(err)
+				}
+			}
+			writeJSON(w, map[string]any{"name": name, "default": true})
+			return
+		}
+		file, header, err := r.FormFile("image")
+		if err != nil {
+			http.Error(w, "Choose a picture to upload.", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		if header.Size > maxDrugIconBytes {
+			http.Error(w, "That picture is too big. Pick one under 10 MB.", http.StatusRequestEntityTooLarge)
+			return
+		}
+		fileName, status, message := saveImageIn(file, drugIconsDir, "drug")
+		if status != 0 {
+			http.Error(w, message, status)
+			return
+		}
+		updatedAt := time.Now().UnixMilli()
+		if _, err := db.Exec(`INSERT INTO drug_icons (name, path, updated_at) VALUES (?, ?, ?)
+			ON CONFLICT(name) DO UPDATE SET path = excluded.path, updated_at = excluded.updated_at`, name, fileName, updatedAt); err != nil {
+			fmt.Println(err)
+			os.Remove(filepath.Join(drugIconsDir, fileName))
+			http.Error(w, "Couldn't save the drug icon.", http.StatusInternalServerError)
+			return
+		}
+		if oldFile != "" && oldFile != fileName {
+			if err := os.Remove(filepath.Join(drugIconsDir, filepath.Base(oldFile))); err != nil && !os.IsNotExist(err) {
+				fmt.Println(err)
+			}
+		}
+		writeJSON(w, drugIconEntry{Name: name, Image: drugIconURL(fileName, updatedAt)})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func drugIconFile(w http.ResponseWriter, r *http.Request) {
+	file := strings.TrimPrefix(r.URL.Path, "/drug-icon/")
+	if file == "" || filepath.Base(file) != file {
+		http.NotFound(w, r)
+		return
+	}
+	switch strings.ToLower(filepath.Ext(file)) {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeFile(w, r, filepath.Join(drugIconsDir, file))
+}
 
 // sitePictureLink is the link Main uses for a slot: the uploaded picture
 // (with a version so browsers fetch a new one) or the original file.
@@ -5099,8 +5288,11 @@ func notifications(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		// Comments on the account's Forum posts (kind "post") and on its trip
+		// reports (kind "report", Post is then the report's id).
 		type note struct {
 			ID       int64      `json:"id"`
+			Kind     string     `json:"kind"`
 			Post     int64      `json:"post"`
 			PostText string     `json:"postText"`
 			From     postAuthor `json:"from"`
@@ -5112,20 +5304,32 @@ func notifications(w http.ResponseWriter, r *http.Request) {
 			Unread int    `json:"unread"`
 			Items  []note `json:"items"`
 		}{Items: []note{}}
+		var onReports int
 		db.QueryRow(`SELECT COUNT(*) FROM forum_comments c JOIN forum_posts p ON p.id = c.post_id
 			WHERE p.user_id = ? AND c.user_id != ? AND c.created_at > ?`, me, me, seen).Scan(&out.Unread)
+		db.QueryRow(`SELECT COUNT(*) FROM trip_report_comments c JOIN trip_reports t ON t.id = c.report_id
+			WHERE t.user_id = ? AND c.user_id != ? AND c.created_at > ?`, me, me, seen).Scan(&onReports)
+		out.Unread += onReports
 		if r.URL.Query().Get("count") == "1" {
 			writeJSON(w, out)
 			return
 		}
 		rows, err := db.Query(`
-		SELECT c.id, c.post_id, p.body, c.body, c.created_at, u.originalUsername, u.pathToProfilePic, u.authority
-		FROM forum_comments c
-		JOIN forum_posts p ON p.id = c.post_id
-		JOIN users u ON u.id = c.user_id
-		WHERE p.user_id = ? AND c.user_id != ?
-		ORDER BY c.id DESC
-		LIMIT 30`, me, me)
+		SELECT * FROM (
+			SELECT c.id, 'post', c.post_id, p.body, c.body, c.created_at, u.originalUsername, u.pathToProfilePic, u.authority
+			FROM forum_comments c
+			JOIN forum_posts p ON p.id = c.post_id
+			JOIN users u ON u.id = c.user_id
+			WHERE p.user_id = ? AND c.user_id != ?
+			UNION ALL
+			SELECT c.id, 'report', c.report_id, CASE WHEN t.title != '' THEN t.title ELSE t.body END, c.body, c.created_at, u.originalUsername, u.pathToProfilePic, u.authority
+			FROM trip_report_comments c
+			JOIN trip_reports t ON t.id = c.report_id
+			JOIN users u ON u.id = c.user_id
+			WHERE t.user_id = ? AND c.user_id != ?
+		)
+		ORDER BY 6 DESC
+		LIMIT 30`, me, me, me, me)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Couldn't load your messages.", http.StatusInternalServerError)
@@ -5135,7 +5339,7 @@ func notifications(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			var n note
 			var name, avatar, authority string
-			if rows.Scan(&n.ID, &n.Post, &n.PostText, &n.Body, &n.At, &name, &avatar, &authority) != nil {
+			if rows.Scan(&n.ID, &n.Kind, &n.Post, &n.PostText, &n.Body, &n.At, &name, &avatar, &authority) != nil {
 				continue
 			}
 			if runes := []rune(n.PostText); len(runes) > 80 {
@@ -6854,6 +7058,8 @@ type customSubstance struct {
 	ID                 int64       `json:"id"`
 	Name               string      `json:"name"`
 	Aliases            []string    `json:"aliases"`
+	Ingredient         string      `json:"ingredient,omitempty"` // set on medicines: the active ingredient, e.g. "Alprazolam"
+	Icon               string      `json:"icon,omitempty"`       // a picture key from js/classicons.js, e.g. "pill-oc80"
 	Class              string      `json:"class"`
 	ChemicalClass      string      `json:"chemicalClass"`
 	Summary            string      `json:"summary"`
@@ -6936,12 +7142,18 @@ func okRange(r *rangeValue, max float64) bool {
 }
 
 // clean checks an entry from the form; the message says what to fix.
+var iconKeyPattern = regexp.MustCompile(`^[a-z0-9-]{0,40}$`)
+
 func (c *customSubstance) clean() string {
 	c.Name = cleanText(c.Name, 80)
 	if c.Name == "" {
 		return "Give the substance a name."
 	}
 	c.Aliases = cleanList(c.Aliases, 20, 80)
+	c.Ingredient = cleanText(c.Ingredient, 80)
+	if c.Icon = strings.ToLower(strings.TrimSpace(c.Icon)); !iconKeyPattern.MatchString(c.Icon) {
+		c.Icon = ""
+	}
 	c.Class = cleanText(c.Class, 60)
 	c.ChemicalClass = cleanText(c.ChemicalClass, 60)
 	c.Summary = cleanMultiline(c.Summary, 4000)
@@ -7136,6 +7348,85 @@ func adminCustomSubstances(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"id": id, "name": c.Name})
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- Medicines ----
+//
+// js/medicines.json lists well-known prescription medicines by brand and
+// street name with their active ingredient, so people can look up what a
+// pill really is. They go into custom_substances like the Importer's entries,
+// so admins can edit or delete them there. custom_seeded remembers what was
+// added from the file: an entry an admin edited or deleted is left alone, and
+// an untouched one follows later changes to the file.
+
+const medicinesFile = "js/medicines.json"
+
+func seedMedicines() {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS custom_seeded (key TEXT PRIMARY KEY, substance_id INTEGER NOT NULL, data TEXT NOT NULL)`); err != nil {
+		fmt.Println("medicines:", err)
+		return
+	}
+	raw, err := os.ReadFile(medicinesFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Println("medicines:", err)
+		}
+		return
+	}
+	var list []struct {
+		Key string `json:"key"`
+		customSubstance
+	}
+	if err := json.Unmarshal(raw, &list); err != nil {
+		fmt.Println("medicines: can't read "+medicinesFile+":", err)
+		return
+	}
+	now := time.Now().UnixMilli()
+	added, updated := 0, 0
+	for _, m := range list {
+		c := m.customSubstance
+		if m.Key == "" {
+			continue
+		}
+		if msg := c.clean(); msg != "" {
+			fmt.Println("medicines:", m.Key+":", msg)
+			continue
+		}
+		c.ID, c.CreatedBy, c.CreatedAt, c.UpdatedAt = 0, "", 0, 0
+		body, _ := json.Marshal(c)
+		var id int64
+		var seeded string
+		err := db.QueryRow("SELECT substance_id, data FROM custom_seeded WHERE key = ?", m.Key).Scan(&id, &seeded)
+		switch {
+		case err == sql.ErrNoRows:
+			// New in the file. If an admin already has an entry with that
+			// name, theirs stays and this one is skipped for good.
+			res, err := db.Exec("INSERT INTO custom_substances (name, data, created_by, created_at, updated_at) VALUES (?, ?, 0, ?, ?)", c.Name, string(body), now, now)
+			if err != nil {
+				db.Exec("INSERT OR IGNORE INTO custom_seeded (key, substance_id, data) VALUES (?, 0, '')", m.Key)
+				continue
+			}
+			id, _ = res.LastInsertId()
+			db.Exec("INSERT OR REPLACE INTO custom_seeded (key, substance_id, data) VALUES (?, ?, ?)", m.Key, id, string(body))
+			added++
+		case err != nil:
+			fmt.Println("medicines:", err)
+			return
+		case id > 0 && seeded != string(body):
+			// Changed in the file: only update it while it is still exactly as seeded.
+			res, err := db.Exec("UPDATE custom_substances SET name = ?, data = ?, updated_at = ? WHERE id = ? AND data = ?", c.Name, string(body), now, id, seeded)
+			if err != nil {
+				continue
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				db.Exec("UPDATE custom_seeded SET data = ? WHERE key = ?", string(body), m.Key)
+				updated++
+			}
+		}
+	}
+	if added+updated > 0 {
+		fmt.Printf("medicines: %d added, %d updated\n", added, updated)
 	}
 }
 
@@ -8930,6 +9221,20 @@ CREATE TABLE IF NOT EXISTS trip_reports (
 	updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS trip_reports_user ON trip_reports(user_id);
+CREATE TABLE IF NOT EXISTS trip_report_comments (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	report_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	body TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS trip_report_comments_by_report ON trip_report_comments(report_id, id);
+CREATE TABLE IF NOT EXISTS trip_report_likes (
+	report_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY(report_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS notepad_notes (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	user_id INTEGER NOT NULL,
@@ -8960,41 +9265,103 @@ func registerNotes() {
 		panic("cannot add trip_reports.public: " + err.Error())
 	}
 	db.Exec("CREATE INDEX IF NOT EXISTS trip_reports_public ON trip_reports(public, happened_at)")
+	if _, err := db.Exec("ALTER TABLE trip_reports ADD COLUMN pictures TEXT NOT NULL DEFAULT '[]'"); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		panic("cannot add trip_reports.pictures: " + err.Error())
+	}
 	http.HandleFunc("/Notes", requireLogin(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "html/notes.html")
 	}))
 	http.HandleFunc("/notes/reports", tripReports)
 	http.HandleFunc("/notes/reports/public", publicTripReports)
+	http.HandleFunc("/notes/reports/one", oneTripReport)
+	http.HandleFunc("/notes/reports/comments", tripReportComments)
+	http.HandleFunc("/notes/reports/like", tripReportLike)
 	http.HandleFunc("/notes/pad", notepad)
 	http.HandleFunc("/apps", portableApps)
 	http.HandleFunc("/apps/run", portableAppRun)
 	http.HandleFunc("/apps/file", portableAppFile)
 }
 
+// Trip reports can have pictures (saved in profiles/<user id>/ like Forum
+// pictures). Public ones can be liked and commented on by other accounts.
+const maxReportPictures = 8
+
 type tripReport struct {
-	ID           int64  `json:"id"`
-	ExperienceID int64  `json:"experienceId"`
-	Title        string `json:"title"`
-	Substances   string `json:"substances"`
-	Setting      string `json:"setting"`
-	Body         string `json:"body"`
-	Rating       int    `json:"rating"`
-	HappenedAt   int64  `json:"happenedAt"`
-	UpdatedAt    int64  `json:"updatedAt"`
-	Public       bool   `json:"public"`
+	ID           int64    `json:"id"`
+	ExperienceID int64    `json:"experienceId"`
+	Title        string   `json:"title"`
+	Substances   string   `json:"substances"`
+	Setting      string   `json:"setting"`
+	Body         string   `json:"body"`
+	Rating       int      `json:"rating"`
+	HappenedAt   int64    `json:"happenedAt"`
+	UpdatedAt    int64    `json:"updatedAt"`
+	Public       bool     `json:"public"`
+	Pictures     []string `json:"pictures"`
+	Likes        int      `json:"likes"`
+	Liked        bool     `json:"liked"`
+	Comments     int      `json:"comments"`
+}
+
+// tripReportItem is a report with who wrote it, as the public list and the
+// reader show it.
+type tripReportItem struct {
+	tripReport
+	Author postAuthor `json:"author"`
+	Mine   bool       `json:"mine"`
+}
+
+// tripReportColumns are what scanTripReport reads from trip_reports t. The one
+// ? is the account asking (for liked).
+const tripReportColumns = `t.id, t.experience_id, t.title, t.substances, t.setting, t.body, t.rating, t.happened_at, t.updated_at, t.public, t.pictures,
+	(SELECT COUNT(*) FROM trip_report_likes l WHERE l.report_id = t.id),
+	(SELECT COUNT(*) FROM trip_report_comments c WHERE c.report_id = t.id),
+	EXISTS(SELECT 1 FROM trip_report_likes l WHERE l.report_id = t.id AND l.user_id = ?)`
+
+func scanTripReport(scan func(...any) error, t *tripReport, more ...any) error {
+	var pictures string
+	if err := scan(append([]any{&t.ID, &t.ExperienceID, &t.Title, &t.Substances, &t.Setting, &t.Body, &t.Rating, &t.HappenedAt, &t.UpdatedAt, &t.Public, &pictures, &t.Likes, &t.Comments, &t.Liked}, more...)...); err != nil {
+		return err
+	}
+	if json.Unmarshal([]byte(pictures), &t.Pictures) != nil || t.Pictures == nil {
+		t.Pictures = []string{}
+	}
+	return nil
+}
+
+// tripReportFor answers one report the account may read: its own, or a public one.
+func tripReportFor(id int64, me int) (tripReportItem, error) {
+	var it tripReportItem
+	var uid int
+	var name, avatar, authority string
+	row := db.QueryRow(`SELECT `+tripReportColumns+`, u.id, u.originalUsername, u.pathToProfilePic, u.authority
+		FROM trip_reports t JOIN users u ON u.id = t.user_id
+		WHERE t.id = ? AND (t.public = 1 OR t.user_id = ?)`, me, id, me)
+	if err := scanTripReport(row.Scan, &it.tripReport, &uid, &name, &avatar, &authority); err != nil {
+		return it, err
+	}
+	it.Author = person(name, avatar, authority)
+	it.Mine = uid == me
+	if !it.Mine {
+		it.ExperienceID = 0 // the Graph session stays private
+	}
+	return it, nil
 }
 
 // tripReports: GET lists the account's reports, newest first. POST saves one
-// (id 0 = new) and POST {id, delete: true} removes one.
+// (id 0 = new) and POST {id, delete: true} removes one. A multipart POST has
+// the report as JSON in "report" (with keep = the pictures it had that stay)
+// and new pictures as "image" files; a JSON save leaves the pictures alone.
 func tripReports(w http.ResponseWriter, r *http.Request) {
 	session, ok := sessionFromRequest(r)
 	if !ok {
 		notSignedIn(w, r)
 		return
 	}
+	me := session.UserId
 	if r.Method == http.MethodGet {
-		rows, err := db.Query(`SELECT id, experience_id, title, substances, setting, body, rating, happened_at, updated_at, public
-			FROM trip_reports WHERE user_id = ? ORDER BY happened_at DESC, id DESC LIMIT ?`, session.UserId, maxReports)
+		rows, err := db.Query(`SELECT `+tripReportColumns+` FROM trip_reports t
+			WHERE t.user_id = ? ORDER BY t.happened_at DESC, t.id DESC LIMIT ?`, me, me, maxReports)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Couldn't load your trip reports.", http.StatusInternalServerError)
@@ -9004,7 +9371,7 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 		items := []tripReport{}
 		for rows.Next() {
 			var t tripReport
-			if rows.Scan(&t.ID, &t.ExperienceID, &t.Title, &t.Substances, &t.Setting, &t.Body, &t.Rating, &t.HappenedAt, &t.UpdatedAt, &t.Public) == nil {
+			if scanTripReport(rows.Scan, &t) == nil {
 				items = append(items, t)
 			}
 		}
@@ -9018,14 +9385,39 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 	}
 	var in struct {
 		tripReport
-		Delete bool `json:"delete"`
+		Delete bool     `json:"delete"`
+		Keep   []string `json:"keep"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10)).Decode(&in); err != nil {
+	var files []*multipart.FileHeader
+	withPictures := strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data")
+	if withPictures {
+		r.Body = http.MaxBytesReader(w, r.Body, maxReportPictures*maxPictureBytes+(256<<10))
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			http.Error(w, fmt.Sprintf("That report is too big. Each picture has to be under %d MB.", maxPictureMB), http.StatusRequestEntityTooLarge)
+			return
+		}
+		defer r.MultipartForm.RemoveAll()
+		if err := json.Unmarshal([]byte(r.FormValue("report")), &in); err != nil {
+			http.Error(w, "Couldn't read that report.", http.StatusBadRequest)
+			return
+		}
+		files = r.MultipartForm.File["image"]
+	} else if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10)).Decode(&in); err != nil {
 		http.Error(w, "Couldn't read that report.", http.StatusBadRequest)
 		return
 	}
 	if in.Delete {
-		db.Exec("DELETE FROM trip_reports WHERE id = ? AND user_id = ?", in.ID, session.UserId)
+		var stored string
+		if db.QueryRow("SELECT pictures FROM trip_reports WHERE id = ? AND user_id = ?", in.ID, me).Scan(&stored) == nil {
+			db.Exec("DELETE FROM trip_reports WHERE id = ? AND user_id = ?", in.ID, me)
+			db.Exec("DELETE FROM trip_report_comments WHERE report_id = ?", in.ID)
+			db.Exec("DELETE FROM trip_report_likes WHERE report_id = ?", in.ID)
+			var links []string
+			json.Unmarshal([]byte(stored), &links)
+			for _, link := range links {
+				removeOwnPicture(link, me)
+			}
+		}
 		writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
 		return
 	}
@@ -9043,43 +9435,105 @@ func tripReports(w http.ResponseWriter, r *http.Request) {
 	}
 	if t.ExperienceID > 0 {
 		var owner int
-		if db.QueryRow("SELECT user_id FROM graph_experiences WHERE id = ?", t.ExperienceID).Scan(&owner) != nil || owner != session.UserId {
+		if db.QueryRow("SELECT user_id FROM graph_experiences WHERE id = ?", t.ExperienceID).Scan(&owner) != nil || owner != me {
 			t.ExperienceID = 0
 		}
 	}
-	if t.Title == "" && t.Body == "" {
+
+	// The pictures the report had, and which of them stay.
+	had := []string{}
+	if t.ID > 0 {
+		var stored string
+		if db.QueryRow("SELECT pictures FROM trip_reports WHERE id = ? AND user_id = ?", t.ID, me).Scan(&stored) == nil {
+			json.Unmarshal([]byte(stored), &had)
+		} else {
+			t.ID = 0 // gone, or not this account's: it is saved as a new report
+		}
+	}
+	pictures := had
+	if withPictures {
+		pictures = []string{}
+		for _, link := range in.Keep {
+			if slices.Contains(had, link) && !slices.Contains(pictures, link) {
+				pictures = append(pictures, link)
+			}
+		}
+	}
+	if len(pictures)+len(files) > maxReportPictures {
+		http.Error(w, fmt.Sprintf("A trip report can have up to %d pictures.", maxReportPictures), http.StatusBadRequest)
+		return
+	}
+	if t.Title == "" && t.Body == "" && len(pictures)+len(files) == 0 {
 		http.Error(w, "Give the report a title or write something first.", http.StatusBadRequest)
 		return
 	}
+	if t.ID == 0 {
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM trip_reports WHERE user_id = ?", me).Scan(&count)
+		if count >= maxReports {
+			http.Error(w, fmt.Sprintf("You have %d trip reports, the most there can be. Delete an old one first.", maxReports), http.StatusConflict)
+			return
+		}
+	}
+
+	saved := []string{}
+	fail := func(status int, msg string) {
+		for _, link := range saved {
+			removeOwnPicture(link, me)
+		}
+		http.Error(w, msg, status)
+	}
+	for _, header := range files {
+		if header.Size > maxPictureBytes {
+			fail(http.StatusRequestEntityTooLarge, fmt.Sprintf("Each picture has to be under %d MB.", maxPictureMB))
+			return
+		}
+		file, err := header.Open()
+		if err != nil {
+			fail(http.StatusBadRequest, "Couldn't read one of the pictures.")
+			return
+		}
+		link, status, msg := saveProfileImage(file, me, "trip")
+		file.Close()
+		if status != 0 {
+			fail(status, msg)
+			return
+		}
+		saved = append(saved, link)
+	}
+	pictures = append(pictures, saved...)
+	raw, _ := json.Marshal(pictures)
 	t.UpdatedAt = now
 	if t.ID > 0 {
-		res, err := db.Exec(`UPDATE trip_reports SET experience_id = ?, title = ?, substances = ?, setting = ?, body = ?, rating = ?, happened_at = ?, updated_at = ?, public = ?
-			WHERE id = ? AND user_id = ?`, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.Public, t.ID, session.UserId)
+		if _, err := db.Exec(`UPDATE trip_reports SET experience_id = ?, title = ?, substances = ?, setting = ?, body = ?, rating = ?, happened_at = ?, updated_at = ?, public = ?, pictures = ?
+			WHERE id = ? AND user_id = ?`, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.Public, string(raw), t.ID, me); err != nil {
+			fmt.Println(err)
+			fail(http.StatusInternalServerError, "Couldn't save that report.")
+			return
+		}
+	} else {
+		res, err := db.Exec(`INSERT INTO trip_reports (user_id, experience_id, title, substances, setting, body, rating, happened_at, updated_at, public, pictures)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, me, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.Public, string(raw))
 		if err != nil {
 			fmt.Println(err)
-			http.Error(w, "Couldn't save that report.", http.StatusInternalServerError)
+			fail(http.StatusInternalServerError, "Couldn't save that report.")
 			return
 		}
-		if n, _ := res.RowsAffected(); n > 0 {
-			writeJSON(w, t)
-			return
+		t.ID, _ = res.LastInsertId()
+	}
+	// Pictures taken out of the report are deleted.
+	for _, link := range had {
+		if !slices.Contains(pictures, link) {
+			removeOwnPicture(link, me)
 		}
 	}
-	var count int
-	db.QueryRow("SELECT COUNT(*) FROM trip_reports WHERE user_id = ?", session.UserId).Scan(&count)
-	if count >= maxReports {
-		http.Error(w, fmt.Sprintf("You have %d trip reports, the most there can be. Delete an old one first.", maxReports), http.StatusConflict)
-		return
-	}
-	res, err := db.Exec(`INSERT INTO trip_reports (user_id, experience_id, title, substances, setting, body, rating, happened_at, updated_at, public)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, session.UserId, t.ExperienceID, t.Title, t.Substances, t.Setting, t.Body, t.Rating, t.HappenedAt, now, t.Public)
+	it, err := tripReportFor(t.ID, me)
 	if err != nil {
 		fmt.Println(err)
-		http.Error(w, "Couldn't save that report.", http.StatusInternalServerError)
+		http.Error(w, "The report was saved, but couldn't be read back. Reload the page.", http.StatusInternalServerError)
 		return
 	}
-	t.ID, _ = res.LastInsertId()
-	writeJSON(w, t)
+	writeJSON(w, it)
 }
 
 // publicTripReports: GET lists everyone's public trip reports, newest first,
@@ -9093,7 +9547,7 @@ func publicTripReports(w http.ResponseWriter, r *http.Request) {
 	}
 	const page = 30
 	where := "t.public = 1"
-	args := []any{}
+	args := []any{session.UserId}
 	if b := r.URL.Query().Get("before"); b != "" {
 		parts := strings.SplitN(b, "_", 2)
 		at, _ := strconv.ParseInt(parts[0], 10, 64)
@@ -9109,8 +9563,7 @@ func publicTripReports(w http.ResponseWriter, r *http.Request) {
 		args = append(args, u)
 	}
 	args = append(args, page+1)
-	rows, err := db.Query(`SELECT t.id, t.title, t.substances, t.setting, t.body, t.rating, t.happened_at, t.updated_at,
-			u.id, u.originalUsername, u.pathToProfilePic
+	rows, err := db.Query(`SELECT `+tripReportColumns+`, u.id, u.originalUsername, u.pathToProfilePic, u.authority
 		FROM trip_reports t JOIN users u ON u.id = t.user_id
 		WHERE `+where+` ORDER BY t.happened_at DESC, t.id DESC LIMIT ?`, args...)
 	if err != nil {
@@ -9119,21 +9572,14 @@ func publicTripReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
-	type author struct {
-		Name   string `json:"name"`
-		Avatar string `json:"avatar"`
-	}
-	type item struct {
-		tripReport
-		Author author `json:"author"`
-		Mine   bool   `json:"mine"`
-	}
-	items := []item{}
+	items := []tripReportItem{}
 	for rows.Next() {
-		var it item
+		var it tripReportItem
 		var uid int
-		if rows.Scan(&it.ID, &it.Title, &it.Substances, &it.Setting, &it.Body, &it.Rating, &it.HappenedAt, &it.UpdatedAt, &uid, &it.Author.Name, &it.Author.Avatar) == nil {
-			it.Public = true
+		var name, avatar, authority string
+		if scanTripReport(rows.Scan, &it.tripReport, &uid, &name, &avatar, &authority) == nil {
+			it.ExperienceID = 0
+			it.Author = person(name, avatar, authority)
 			it.Mine = uid == session.UserId
 			items = append(items, it)
 		}
@@ -9144,6 +9590,222 @@ func publicTripReports(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"items": items, "more": more})
+}
+
+// oneTripReport: GET ?id= answers one report (the account's own or a public
+// one) for links like /Notes?report=<id>.
+func oneTripReport(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	it, err := tripReportFor(id, session.UserId)
+	if err == sql.ErrNoRows {
+		http.Error(w, "That trip report was deleted or made private.", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load that trip report.", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, it)
+}
+
+// tripReportComments: GET ?report=<id> lists a report's comments (oldest
+// first) with its likes (likers = the other accounts that like it). POST JSON {action: "add", report, body} adds one to a
+// public report and {action: "delete", id} removes one (its author, the
+// report's author or an admin).
+func tripReportComments(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	me := session.UserId
+	isAdmin := session.Authority == "admin"
+
+	switch r.Method {
+	case http.MethodGet:
+		id, _ := strconv.ParseInt(r.URL.Query().Get("report"), 10, 64)
+		var owner int
+		var public bool
+		if db.QueryRow("SELECT user_id, public FROM trip_reports WHERE id = ?", id).Scan(&owner, &public) != nil || (!public && owner != me) {
+			http.Error(w, "That trip report was deleted or made private.", http.StatusNotFound)
+			return
+		}
+		rows, err := db.Query(`
+		SELECT c.id, c.user_id, c.body, c.created_at, u.originalUsername, u.pathToProfilePic, u.authority
+		FROM trip_report_comments c
+		JOIN users u ON u.id = c.user_id
+		WHERE c.report_id = ?
+		ORDER BY c.id
+		LIMIT 500`, id)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't load the comments.", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		comments := []forumComment{}
+		for rows.Next() {
+			var c forumComment
+			var author int
+			var name, avatar, authority string
+			if rows.Scan(&c.ID, &author, &c.Body, &c.CreatedAt, &name, &avatar, &authority) != nil {
+				continue
+			}
+			c.Author = person(name, avatar, authority)
+			c.CanDelete = author == me || owner == me || isAdmin
+			comments = append(comments, c)
+		}
+		rows.Close()
+		likes, liked, likers := tripReportLikes(id, me)
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"comments": comments, "likes": likes, "liked": liked, "likers": likers, "public": public})
+
+	case http.MethodPost:
+		var in struct {
+			Action string `json:"action"`
+			Report int64  `json:"report"`
+			ID     int64  `json:"id"`
+			Body   string `json:"body"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil {
+			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+			return
+		}
+		switch in.Action {
+		case "add":
+			body := cleanMultiline(in.Body, maxCommentChars)
+			if body == "" {
+				http.Error(w, "Write something first.", http.StatusBadRequest)
+				return
+			}
+			var public bool
+			if db.QueryRow("SELECT public FROM trip_reports WHERE id = ?", in.Report).Scan(&public) != nil || !public {
+				http.Error(w, "That trip report was deleted or made private, so it can't get comments.", http.StatusNotFound)
+				return
+			}
+			var recent int
+			db.QueryRow("SELECT COUNT(*) FROM trip_report_comments WHERE user_id = ? AND created_at > ?", me, time.Now().Add(-10*time.Minute).UnixMilli()).Scan(&recent)
+			if recent >= commentsPer10Minutes {
+				http.Error(w, "You've commented a lot just now. Wait a few minutes and try again.", http.StatusTooManyRequests)
+				return
+			}
+			now := time.Now().UnixMilli()
+			res, err := db.Exec("INSERT INTO trip_report_comments (report_id, user_id, body, created_at) VALUES (?, ?, ?, ?)", in.Report, me, body, now)
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save your comment.", http.StatusInternalServerError)
+				return
+			}
+			id, _ := res.LastInsertId()
+			var avatar, authority string
+			db.QueryRow("SELECT pathToProfilePic, authority FROM users WHERE id = ?", me).Scan(&avatar, &authority)
+			writeJSON(w, forumComment{ID: id, Author: person(session.OriginalUsername, avatar, authority), Body: body, CreatedAt: now, CanDelete: true})
+
+		case "delete":
+			var author, owner int
+			err := db.QueryRow("SELECT c.user_id, t.user_id FROM trip_report_comments c JOIN trip_reports t ON t.id = c.report_id WHERE c.id = ?", in.ID).Scan(&author, &owner)
+			if err == sql.ErrNoRows {
+				writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
+				return
+			}
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't delete that comment.", http.StatusInternalServerError)
+				return
+			}
+			if author != me && owner != me && !isAdmin {
+				http.Error(w, "You can only delete your own comments.", http.StatusForbidden)
+				return
+			}
+			if _, err := db.Exec("DELETE FROM trip_report_comments WHERE id = ?", in.ID); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't delete that comment.", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
+
+		default:
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+		}
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// tripReportLike: POST JSON {report, liked} likes or unlikes someone else's
+// public report and answers {likes, liked, likers}.
+func tripReportLike(w http.ResponseWriter, r *http.Request) {
+	session, ok := sessionFromRequest(r)
+	if !ok {
+		notSignedIn(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	me := session.UserId
+	var in struct {
+		Report int64 `json:"report"`
+		Liked  bool  `json:"liked"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&in); err != nil {
+		http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+		return
+	}
+	var owner int
+	var public bool
+	if db.QueryRow("SELECT user_id, public FROM trip_reports WHERE id = ?", in.Report).Scan(&owner, &public) != nil || !public {
+		http.Error(w, "That trip report was deleted or made private.", http.StatusNotFound)
+		return
+	}
+	if owner == me {
+		http.Error(w, "That's your own report. Likes come from other people.", http.StatusBadRequest)
+		return
+	}
+	var err error
+	if in.Liked {
+		_, err = db.Exec("INSERT OR IGNORE INTO trip_report_likes (report_id, user_id, created_at) VALUES (?, ?, ?)", in.Report, me, time.Now().UnixMilli())
+	} else {
+		_, err = db.Exec("DELETE FROM trip_report_likes WHERE report_id = ? AND user_id = ?", in.Report, me)
+	}
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save that. Try again.", http.StatusInternalServerError)
+		return
+	}
+	likes, liked, likers := tripReportLikes(in.Report, me)
+	writeJSON(w, map[string]any{"likes": likes, "liked": liked, "likers": likers})
+}
+
+// tripReportLikes answers how many accounts like a report, whether me is one
+// of them and who the others are (newest first, up to 50).
+func tripReportLikes(id int64, me int) (int, bool, []postAuthor) {
+	var likes int
+	var liked bool
+	db.QueryRow("SELECT COUNT(*), COALESCE(MAX(user_id = ?), 0) FROM trip_report_likes WHERE report_id = ?", me, id).Scan(&likes, &liked)
+	likers := []postAuthor{}
+	rows, err := db.Query(`SELECT u.originalUsername, u.pathToProfilePic, u.authority FROM trip_report_likes l
+		JOIN users u ON u.id = l.user_id WHERE l.report_id = ? AND l.user_id != ? ORDER BY l.created_at DESC LIMIT 50`, id, me)
+	if err != nil {
+		return likes, liked, likers
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, avatar, authority string
+		if rows.Scan(&name, &avatar, &authority) == nil {
+			likers = append(likers, person(name, avatar, authority))
+		}
+	}
+	return likes, liked, likers
 }
 
 type padNote struct {
