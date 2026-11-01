@@ -1037,6 +1037,19 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-progress .xn-rank-pips { flex: 1; justify-content: space-between; }
 .pf-progress .xn-rank-pips i { width: 23px; height: 23px; }
 .pf-progress .pf-rank-meter { width: 100%; }
+/* Level pack (mommy 2026-11-01): hexagon badge with the level, rank name lettering, rank icon bar (oled.css). */
+.pf-lp { display: grid; justify-items: center; gap: 6px; padding-top: 4px; }
+.pf-lp .xn-hexb { font-size: 92px; }
+.pf-lp .xn-rn { max-width: 100%; }
+.pf-lp .xn-rn[data-tier="4"] { font-size: .86rem; }
+.pf-progress .xn-lbar { --m: 23px; margin-block: 4px 2px; }
+.pf-progress .pf-rank-note { text-align: center; }
+@media (max-width: 640px) {
+  .pf-lp .xn-hexb { font-size: 80px; }
+  .pf-lp .xn-rn { font-size: 1.1rem; }
+  .pf-lp .xn-rn[data-tier="4"] { font-size: .74rem; letter-spacing: .06em; }
+  .pf-progress .xn-lbar { --m: 20px; }
+}
 @media (max-width: 640px) {
   .pf-side { width: 160px; }
   .pf-progress .xn-pills { font-size: 18px; gap: 6px; }

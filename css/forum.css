@@ -3,7 +3,7 @@
    this file, so overrides of those classes use two class names. */
 
 .fm { display: flex; flex-direction: column; gap: 20px; }
-.fm-intro { display: flex; flex-direction: column; margin-left: 15rem;}
+.fm-intro { display: flex; flex-direction: column; }
 .fm-intro .xn-sub { max-width: 60ch; }
 
 
@@ -274,4 +274,12 @@
 .fm-post.is-focus { border-color: var(--oled-accent); box-shadow: 0 0 0 1px var(--oled-accent), 0 0 40px -12px rgba(var(--xn-accent-rgb), 0.8); transition: border-color 0.3s ease, box-shadow 0.6s ease; }
 .fm-member-top { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .fm-member-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Phones: the members row is narrow tiles, so the label goes under the name. */
+@media (max-width: 900px) {
+  .fm-member-top { flex-direction: column; gap: 4px; max-width: 100%; }
+  .fm-member-top strong { max-width: 100%; }
+  .fm-member-list { gap: 8px; }
+  .fm-member { width: 6.5rem; }
+  .fm-member .xn-rank { max-width: 100%; }
+}
 .fm-post-head .xn-rank, .fm-comment-head .xn-rank { flex: none; }

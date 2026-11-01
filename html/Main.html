@@ -303,30 +303,271 @@
     .gp-box-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 12px; }
     .gp-box-title { margin: 0; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: var(--oled-muted); }
     .gp-box-note { font-size: 0.75rem; color: var(--oled-muted); opacity: 0.8; }
-    .gp-news-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; align-items: start; margin-bottom: 14px; }
-    .gp-news-form textarea { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--gp-line); border-radius: 10px; background: #000; color: var(--oled-text); font: inherit; resize: vertical; box-sizing: border-box; }
-    .gp-news-form textarea:focus { outline: 2px solid var(--oled-accent); outline-offset: 1px; border-color: transparent; }
-    .gp-news-form .gp-btn { height: 48px; padding: 0 20px; }
-    .gp-news-status { grid-column: 1 / -1; min-height: 0; font-size: 0.8rem; color: var(--oled-muted); }
-    .gp-news-status:empty { display: none; }
-    .gp-news-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; max-height: 420px; overflow-y: auto; }
-    .gp-news-item { position: relative; padding: 12px 14px; border: 1px solid var(--gp-line); border-left: 3px solid var(--oled-accent); border-radius: 10px; background: rgba(0, 0, 0, 0.35); }
-    .gp-news-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
-    .gp-news-meta { margin: 6px 0 0; font-size: 0.75rem; color: var(--oled-muted); }
-    .gp-news-del { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; border: 1px solid var(--gp-line); border-radius: 50%; background: #000; color: var(--oled-muted); font: inherit; cursor: pointer; }
-    .gp-news-del:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
-    @media (hover: hover) { .gp-news-del:hover { color: #fff; border-color: #f87171; } }
-    .gp-news-item:has(.gp-news-del) { padding-right: 44px; }
-    .gp-news-empty { margin: 0; color: var(--oled-muted); font-size: 0.9rem; }
+    /* System announcements (mommy's mockup 2026-10-31): date | tag | title + one line, opens on click. */
+    .gp-ann { padding: 0; border-color: rgba(var(--xn-accent-rgb), 0.5); background: linear-gradient(180deg, rgba(var(--xn-accent-rgb), 0.07), rgba(var(--xn-accent-rgb), 0.02) 120px), var(--gp-tile); box-shadow: 0 0 0 1px rgba(var(--xn-accent-rgb), 0.08), 0 0 28px rgba(var(--xn-accent-rgb), 0.16); overflow: hidden; }
+    .gp-ann-head { display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 0 28px 0 32px; border-bottom: 1px solid rgba(var(--xn-accent-rgb), 0.32); }
+    .gp-ann-icon { flex: none; width: 34px; height: 34px; color: var(--oled-accent); }
+    .gp-ann-title { flex: 1; min-width: 0; margin: 0; font-size: 1.15rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: #c9b5ff; }
+    .gp-ann-tools { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: flex-end; }
+    .gp-ann-all, .gp-news-edit { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 4px; border: 0; background: none; color: var(--oled-accent); font: inherit; font-size: 0.9rem; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; cursor: pointer; }
+    .gp-news-edit { letter-spacing: 0.04em; text-transform: none; font-size: 0.8rem; color: var(--oled-muted); }
+    .gp-ann-all svg { width: 18px; height: 18px; transition: transform 0.2s; }
+    .gp-ann-all[aria-expanded="true"] svg { transform: rotate(-90deg); }
+    .gp-ann-all:focus-visible, .gp-news-edit:focus-visible, .gp-ann-row:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; border-radius: 6px; }
+    @media (hover: hover) { .gp-ann-all:hover, .gp-news-edit:hover { color: #fff; } }
+    .gp-news-list { margin: 0; padding: 0 36px; list-style: none; }
+    .gp-news-item { border-bottom: 1px solid var(--gp-line); }
+    .gp-news-item.is-more { display: none; }
+    .gp-ann.is-all .gp-news-item.is-more { display: block; }
+    .gp-ann-row { display: grid; grid-template-columns: 112px 1px 180px minmax(0, 1fr) 24px; align-items: center; column-gap: 0; width: 100%; min-height: 86px; padding: 14px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .gp-ann-date { color: var(--oled-muted); font-size: 1rem; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+    .gp-ann-bar { align-self: stretch; margin: 4px 0; background: var(--gp-line-hi); }
+    .gp-ann-kind { justify-self: start; margin-left: 40px; padding: 5px 13px; border: 1px solid; border-radius: 6px; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+    .gp-ann-kind[data-kind="update"] { color: #7fb2ff; border-color: rgba(96, 150, 255, 0.55); background: rgba(60, 110, 230, 0.16); }
+    .gp-ann-kind[data-kind="notice"] { color: #fbbf24; border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.12); }
+    .gp-ann-kind[data-kind="feature"] { color: #e879f9; border-color: rgba(232, 121, 249, 0.55); background: rgba(192, 38, 211, 0.16); }
+    .gp-ann-kind[data-kind="fix"] { color: #4ade80; border-color: rgba(74, 222, 128, 0.5); background: rgba(34, 197, 94, 0.12); }
+    .gp-ann-text { display: grid; gap: 6px; min-width: 0; padding-right: 20px; }
+    .gp-news-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.3; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+    .gp-news-pin { flex: none; padding: 1px 7px; border: 1px solid rgba(var(--xn-accent-rgb), 0.5); border-radius: 4px; font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--oled-accent); }
+    .gp-ann-sum { overflow: hidden; color: var(--oled-muted); font-size: 0.92rem; text-overflow: ellipsis; white-space: nowrap; }
+    .gp-ann-chev { width: 22px; height: 22px; color: var(--oled-accent); transition: transform 0.2s; }
+    .gp-ann-row[aria-expanded="true"] .gp-ann-chev { transform: rotate(90deg); }
+    .gp-ann-row[aria-expanded="true"] .gp-ann-sum { display: none; }
+    .gp-ann-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+    .gp-ann-thumb { flex: none; width: 56px; height: 56px; border-radius: 10px; object-fit: cover; border: 1px solid var(--gp-line); background: #000; }
+    .gp-ann-pic { display: block; max-width: min(100%, 420px); max-height: 280px; margin: 0 0 12px; border-radius: 12px; border: 1px solid var(--gp-line); object-fit: cover; }
+    .gp-news-item[style] .gp-news-title { color: var(--ann-color); }
+    .gp-news-item[style] .gp-ann-chev { color: var(--ann-color); }
+    /* Fonts per news: the site sets font-family from --oled-font with !important, so swap the variable. */
+    .gp-news-item[data-font="sans"] .gp-ann-text, .gp-news-item[data-font="sans"] .gp-news-body { --oled-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .gp-news-item[data-font="serif"] .gp-ann-text, .gp-news-item[data-font="serif"] .gp-news-body { --oled-font: Georgia, "Times New Roman", Times, serif; }
+    .gp-news-item[data-font="rounded"] .gp-ann-text, .gp-news-item[data-font="rounded"] .gp-news-body { --oled-font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", Nunito, "Varela Round", system-ui, sans-serif; }
+    .gp-news-item[data-font="mono"] .gp-ann-text, .gp-news-item[data-font="mono"] .gp-news-body { --oled-font: ui-monospace, "Courier New", Courier, monospace; }
+    .gp-news-item[data-font="display"] .gp-news-title { --oled-font: Impact, Haettenschweiler, "Arial Narrow Bold", Oswald, sans-serif; font-weight: 400; letter-spacing: 0.04em; font-size: 1.15rem; }
+    .gp-news-item[data-font="hand"] .gp-ann-text, .gp-news-item[data-font="hand"] .gp-news-body { --oled-font: "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive; }
+    .gp-ann-ver { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 12px; border: 1px solid rgba(var(--xn-accent-rgb), 0.45); border-radius: 999px; background: rgba(var(--xn-accent-rgb), 0.1); color: var(--oled-text); font: inherit; font-size: 0.8rem; cursor: pointer; }
+    .gp-ann-ver-name { color: var(--oled-muted); }
+    .gp-ann-ver-v { color: #c9b5ff; font-weight: 600; letter-spacing: 0.04em; }
+    .gp-ann-ver svg { width: 16px; height: 16px; color: var(--oled-accent); }
+    .gp-ann-ver:focus-visible, .gp-ver-close:focus-visible, .gp-ver-dot:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+    @media (hover: hover) { .gp-ann-ver:hover { border-color: var(--oled-accent); background: rgba(var(--xn-accent-rgb), 0.18); } }
+    .gp-ann .gp-ann-head > .gp-ann-title { flex: 0 1 auto; }
+    .gp-ann .gp-ann-tools { margin-left: auto; }
+
+    /* Version timeline: a line going down with a dot per version. */
+    .gp-ver-view { --gp-tile: #111115; --gp-line: #23202b; --gp-line-hi: #3a3150; box-sizing: border-box; position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .gp-ver-view[hidden] { display: none; }
+    .gp-ver-card { display: flex; flex-direction: column; width: min(1100px, 100%); max-height: min(820px, calc(100dvh - 48px)); border: 1px solid rgba(var(--xn-accent-rgb), 0.5); border-radius: 16px; background: #0d0c12; }
+    .gp-ver-close { display: grid; place-items: center; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 1px solid var(--gp-line); border-radius: 50%; background: #000; color: var(--oled-text); cursor: pointer; }
+    .gp-ver-close svg { width: 18px; height: 18px; }
+    .gp-ver-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; flex: 1; }
+    .gp-ver-line { position: relative; margin: 0; padding: 22px 12px 22px 28px; list-style: none; overflow-y: auto; border-right: 1px solid var(--gp-line); }
+    .gp-ver-item { position: relative; }
+    .gp-ver-item:not(:last-child)::after { content: ""; position: absolute; left: 13px; top: 50%; width: 2px; height: 100%; background: linear-gradient(var(--oled-accent), rgba(var(--xn-accent-rgb), 0.35)); pointer-events: none; }
+    .gp-ver-loading { padding-left: 32px; color: var(--oled-muted); font-size: 0.9rem; }
+    .gp-ver-dot { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-items: center; width: 100%; min-height: 64px; padding: 8px 6px 8px 0; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .gp-ver-pt { position: relative; z-index: 1; grid-row: 1 / 3; justify-self: center; width: 16px; height: 16px; border: 2px solid var(--oled-accent); border-radius: 50%; background: #0d0c12; box-shadow: 0 0 0 4px #0d0c12; transition: transform 0.15s, background 0.15s; }
+    .gp-ver-item.is-now .gp-ver-pt { background: var(--oled-accent); }
+    .gp-ver-dot[aria-current="true"] .gp-ver-pt { transform: scale(1.3); background: var(--oled-accent); box-shadow: 0 0 0 4px #0d0c12, 0 0 14px rgba(var(--xn-accent-rgb), 0.8); }
+    .gp-ver-dot[aria-current="true"] { background: rgba(var(--xn-accent-rgb), 0.12); }
+    .gp-ver-name { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: 0.04em; }
+    .gp-ver-tag { padding: 0 6px; border: 1px solid rgba(var(--xn-accent-rgb), 0.5); border-radius: 4px; font-size: 9px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--oled-accent); }
+    .gp-ver-meta { font-size: 0.75rem; color: var(--oled-muted); }
+    @media (hover: hover) { .gp-ver-dot:hover .gp-ver-pt { transform: scale(1.2); } .gp-ver-dot:hover { background: rgba(var(--xn-accent-rgb), 0.07); } }
+    .gp-ver-news { min-width: 0; overflow-y: auto; padding-bottom: 12px; }
+    .gp-ver-now { margin: 0; padding: 18px 36px 4px; color: #c9b5ff; font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; }
+    .gp-ver-news .gp-news-list { padding: 0 28px; }
+    .gp-ver-news .gp-news-item:last-child { border-bottom: 0; }
+    .gp-ver-news .gp-ann-row { grid-template-columns: 96px 1px 160px minmax(0, 1fr) 24px; }
+    .gp-ver-news .gp-ann-kind { margin-left: 24px; }
+    .gp-ver-news .gp-ann-more { padding-left: 257px; }
+    @media (hover: hover) { .gp-ann-row:hover .gp-news-title { color: #fff; } .gp-ann-row:hover .gp-ann-chev { transform: translateX(3px); } .gp-ann-row[aria-expanded="true"]:hover .gp-ann-chev { transform: rotate(90deg); } }
+    .gp-ann-more { padding: 0 44px 18px 293px; }
+    .gp-panel:has(> .gp-custom-btn) > .gp-top { padding-bottom: 40px; }
+    .gp-news-body { margin: 0; color: #d4d0de; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+    .gp-news-meta { margin: 10px 0 0; font-size: 0.75rem; color: var(--oled-muted); }
+    .gp-news-empty { margin: 0; padding: 26px 36px 4px; color: var(--oled-muted); font-size: 0.9rem; }
+    .gp-ann-foot { display: flex; align-items: center; gap: 14px; min-height: 76px; padding: 0 36px; color: var(--oled-muted); font-size: 0.95rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .gp-ann-foot svg { flex: none; width: 26px; height: 26px; color: var(--oled-accent); }
+    @media (max-width: 900px) {
+      .gp-ann-row { grid-template-columns: 92px 1px 150px minmax(0, 1fr) 22px; }
+      .gp-ann-kind { margin-left: 22px; }
+      .gp-ann-more { padding-left: 243px; }
+    }
+    @media (max-width: 760px) {
+      .gp-ver-view { padding: 0; place-items: stretch; }
+      .gp-ver-card { max-height: none; height: 100dvh; border-radius: 0; border-width: 0; }
+      .gp-ver-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+      .gp-ver-line { display: flex; gap: 0; padding: 14px 16px 10px; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--gp-line); }
+      .gp-ver-item:not(:last-child)::after { left: 50%; top: 17px; width: 100%; height: 2px; background: linear-gradient(90deg, var(--oled-accent), rgba(var(--xn-accent-rgb), 0.35)); }
+      .gp-ver-item { flex: none; }
+      .gp-ver-dot { grid-template-columns: auto; grid-template-rows: 28px auto auto; justify-items: center; min-width: 92px; padding: 4px 6px 8px; text-align: center; }
+      .gp-ver-pt { grid-row: 1; }
+      .gp-ver-news .gp-news-list { padding: 0 16px; }
+      .gp-ver-now { padding: 14px 16px 2px; }
+      .gp-ver-news .gp-ann-more { padding-left: 0; }
+    }
+    @media (max-width: 640px) {
+      .gp-ann-head { flex-wrap: wrap; row-gap: 4px; padding-top: 10px; padding-bottom: 10px; }
+      .gp-ann-ver { order: 3; min-height: 30px; font-size: 0.72rem; }
+      .gp-ver-news .gp-ann-row { grid-template-columns: auto auto minmax(0, 1fr) 22px; }
+      .gp-ver-news .gp-ann-kind { margin-left: 12px; }
+      .gp-ann-thumb { width: 44px; height: 44px; border-radius: 8px; }
+      .gp-ann-main { gap: 12px; }
+      .gp-ann-head { gap: 10px; min-height: 60px; padding: 0 14px 0 16px; }
+      .gp-ann-icon { width: 28px; height: 28px; }
+      .gp-ann-title { font-size: 0.9rem; letter-spacing: 0.08em; }
+      .gp-ann-tools { gap: 6px; }
+      .gp-ann-all { font-size: 0.8rem; letter-spacing: 0.08em; }
+      .gp-news-edit { display: none; }
+      .gp-news-list { padding: 0 16px; }
+      .gp-ann-row { grid-template-columns: auto auto minmax(0, 1fr) 22px; grid-template-areas: "date kind . chev" "text text text chev"; row-gap: 10px; min-height: 0; }
+      .gp-ann-date { grid-area: date; font-size: 0.85rem; }
+      .gp-ann-bar { display: none; }
+      .gp-ann-kind { grid-area: kind; margin-left: 12px; padding: 3px 9px; font-size: 0.7rem; }
+      .gp-ann-main { grid-area: text; }
+      .gp-ann-text { padding-right: 10px; }
+      .gp-ann-chev { grid-area: chev; }
+      .gp-news-title { font-size: 0.98rem; }
+      .gp-ann-more { padding: 0 32px 16px 0; }
+      .gp-news-empty { padding: 20px 16px 4px; }
+      .gp-ann-foot { min-height: 60px; padding: 0 16px; font-size: 0.78rem; letter-spacing: 0.06em; }
+      .gp-ann-foot svg { width: 22px; height: 22px; }
+    }
     .gp-owners .gp-team { grid-template-columns: repeat(auto-fit, minmax(150px, 220px)); justify-content: center; gap: 16px; }
     .gp-owners .gp-member figcaption { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 12px; }
     .gp-owners .gp-role { margin-top: 0; }
     .gp-owner-link { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; font-size: 0.8rem; text-decoration: none; }
     .gp-top .gp-owners .gp-photo > span { font-size: 3.4rem; }
     @media (max-width: 560px) {
-      .gp-news-form { grid-template-columns: minmax(0, 1fr); }
       .gp-owners .gp-team { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     }
+
+    /* Quieter look (mommy 2026-10-31 19:04, "too loud"): same greys and lines as the
+       other boxes and pages; the site color only marks small things. */
+    .gp-ann { border-color: var(--gp-line); background: var(--gp-tile); box-shadow: none; }
+    .gp-ann-head { gap: 10px; min-height: 52px; padding: 0 20px; border-bottom-color: var(--gp-line); }
+    .gp-ann-icon { width: 18px; height: 18px; color: var(--oled-muted); }
+    .gp-ann-title { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.24em; color: var(--oled-muted); }
+    .gp-ann-ver { min-height: 26px; padding: 0 10px; gap: 6px; border-color: var(--gp-line); background: none; font-size: 0.72rem; }
+    .gp-ann-ver-v { color: var(--oled-text); font-weight: 500; }
+    .gp-ann-ver svg { width: 13px; height: 13px; color: var(--oled-muted); }
+    @media (hover: hover) { .gp-ann-ver:hover { border-color: var(--gp-line-hi); background: rgba(255, 255, 255, 0.03); } .gp-ann-ver:hover svg { color: var(--oled-accent); } }
+    .gp-ann-all { min-height: 30px; font-size: 0.72rem; letter-spacing: 0.16em; color: var(--oled-muted); }
+    .gp-ann-all svg { width: 14px; height: 14px; }
+    @media (hover: hover) { .gp-ann-all:hover { color: var(--oled-text); } }
+    .gp-news-list { padding: 0 20px; }
+    .gp-ann-row { grid-template-columns: 84px 1px 150px minmax(0, 1fr) 20px; min-height: 68px; padding: 12px 0; }
+    .gp-ann-date { font-size: 0.8rem; letter-spacing: 0.04em; }
+    .gp-ann-bar { background: var(--gp-line); }
+    .gp-ann-kind { margin-left: 20px; display: inline-flex; align-items: center; gap: 7px; padding: 3px 9px; border-color: var(--gp-line-hi) !important; border-radius: 999px; background: none !important; color: var(--oled-muted) !important; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.12em; }
+    .gp-ann-kind::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--kind-dot, var(--oled-accent)); }
+    .gp-ann-kind[data-kind="update"] { --kind-dot: #7c9fd6; }
+    .gp-ann-kind[data-kind="notice"] { --kind-dot: #c9a45a; }
+    .gp-ann-kind[data-kind="feature"] { --kind-dot: var(--oled-accent); }
+    .gp-ann-kind[data-kind="fix"] { --kind-dot: #6fae8a; }
+    .gp-news-title { font-size: 0.95rem; font-weight: 600; letter-spacing: 0; }
+    .gp-ann-sum { font-size: 0.84rem; }
+    .gp-ann-text { gap: 3px; }
+    .gp-ann-thumb { width: 44px; height: 44px; border-radius: 8px; }
+    .gp-ann-chev { width: 18px; height: 18px; color: var(--oled-muted); }
+    .gp-news-item[style] .gp-ann-chev { color: var(--oled-muted); }
+    @media (hover: hover) { .gp-ann-row:hover .gp-ann-chev { color: var(--oled-text); } }
+    .gp-news-pin { border-color: var(--gp-line-hi); color: var(--oled-muted); }
+    .gp-ann-more { padding: 0 32px 16px 235px; }
+    .gp-news-body { font-size: 0.9rem; }
+    .gp-ann-foot { min-height: 48px; gap: 10px; padding: 0 20px; font-size: 0.7rem; letter-spacing: 0.16em; opacity: 0.8; }
+    .gp-ann-foot svg { width: 15px; height: 15px; color: var(--oled-muted); }
+    .gp-news-empty { padding: 20px 20px 4px; }
+    .gp-ver-card { border-color: var(--gp-line); background: #0a0a0c; }
+    .gp-ver-now { padding: 16px 20px 2px; color: var(--oled-muted); font-size: 0.72rem; letter-spacing: 0.2em; }
+    .gp-ver-news .gp-news-list { padding: 0 20px; }
+    .gp-ver-news .gp-ann-row { grid-template-columns: 84px 1px 150px minmax(0, 1fr) 20px; }
+    .gp-ver-news .gp-ann-kind { margin-left: 20px; }
+    .gp-ver-news .gp-ann-more { padding-left: 235px; }
+    .gp-ver-line { border-right-color: var(--gp-line); }
+    .gp-ver-pt { width: 12px; height: 12px; border-color: var(--gp-line-hi); }
+    .gp-ver-item:not(:last-child)::after { background: var(--gp-line-hi) !important; }
+    .gp-ver-item.is-now .gp-ver-pt { border-color: var(--oled-accent); background: none; }
+    .gp-ver-dot[aria-current="true"] .gp-ver-pt { transform: none; border-color: var(--oled-accent); background: var(--oled-accent); box-shadow: 0 0 0 4px #0a0a0c; }
+    .gp-ver-dot[aria-current="true"] { background: rgba(255, 255, 255, 0.04); }
+    .gp-ver-name { font-weight: 600; font-size: 0.9rem; }
+    .gp-ver-tag { border-color: var(--gp-line-hi); color: var(--oled-muted); }
+    @media (hover: hover) { .gp-ver-dot:hover { background: rgba(255, 255, 255, 0.03); } .gp-ver-dot:hover .gp-ver-pt { transform: none; border-color: var(--oled-accent); } }
+    @media (max-width: 760px) {
+      .gp-ver-news .gp-news-list { padding: 0 16px; }
+      .gp-ver-now { padding: 14px 16px 2px; }
+      .gp-ver-news .gp-ann-more { padding-left: 0; }
+      .gp-ver-item:not(:last-child)::after { top: 17px; }
+    }
+    @media (max-width: 640px) {
+      .gp-ann-head { padding: 8px 14px; min-height: 48px; }
+      .gp-ann-title { font-size: 0.7rem; letter-spacing: 0.18em; }
+      .gp-ann-ver { order: 0; }
+      .gp-news-list { padding: 0 14px; }
+      .gp-ann-row { grid-template-columns: auto auto minmax(0, 1fr) 20px; row-gap: 8px; min-height: 0; }
+      .gp-ann-kind { margin-left: 10px; font-size: 0.6rem; }
+      .gp-ann-date { font-size: 0.75rem; }
+      .gp-ann-more { padding: 0 28px 14px 0; }
+      .gp-ann-foot { padding: 0 14px; font-size: 0.62rem; letter-spacing: 0.1em; }
+      .gp-ver-news .gp-ann-row { grid-template-columns: auto auto minmax(0, 1fr) 20px; }
+      .gp-ver-news .gp-ann-kind { margin-left: 10px; }
+    }
+
+    /* Main order (mommy 2026-10-31 19:18): System announcements on top, then
+       Log in / Signed in + Weather. Signed in (mommy's picture 21:06): the
+       board and the Signed in/Weather row on the left, your profile card on
+       the right as tall as both; the owners box is only for visitors. */
+    .gp-top > .gp-row { margin-top: 0; }
+    .gp-top.is-me { grid-template-columns: minmax(0, 1fr) minmax(260px, 390px); grid-template-rows: 1fr auto; grid-template-areas: "board me" "row me"; }
+    .gp-top.is-me > .gp-ann { grid-area: board; display: flex; flex-direction: column; }
+    .gp-top.is-me > .gp-ann .gp-ann-foot { margin-top: auto; }
+    .gp-top.is-me > .gp-row { grid-area: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .gp-top.is-me > .gp-me-card { grid-area: me; }
+    .gp-me-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 12px 12px 18px; border: 1px solid var(--gp-line); border-radius: 16px; background: var(--gp-tile); }
+    .gp-me-pic { display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; border-radius: 10px; background: #000; color: var(--oled-muted); font-size: 5rem; font-weight: 600; text-decoration: none; }
+    .gp-me-pic img { width: 100%; height: 100%; object-fit: cover; }
+    .gp-me-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; padding: 0 2px; }
+    .gp-me-name { min-width: 0; overflow: hidden; color: var(--oled-text); font-size: 1.6rem; font-weight: 600; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+    .gp-me-role { flex: none; padding: 3px 10px; border: 1px solid var(--gp-line-hi); border-radius: 999px; background: var(--oled-accent-soft); color: #cdb8ff; font-size: 0.85rem; }
+    .gp-me-bio { margin: 0; padding: 0 4px; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; font-size: 0.9rem; }
+    .gp-me-geek { display: grid; gap: 8px; margin-top: auto; padding: 12px; border: 1px solid var(--gp-line); border-radius: 12px; background: rgba(0, 0, 0, 0.25); }
+    .gp-me-geek-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .gp-me-geek-label { font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--oled-muted); }
+    .gp-me-geek-chev { flex: none; width: 16px; height: 16px; color: var(--oled-muted); transition: transform 0.2s; }
+    .gp-me-geek-head[aria-expanded="true"] .gp-me-geek-chev { transform: rotate(180deg); }
+    .gp-me-geek-head:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 4px; border-radius: 6px; }
+    /* Level pack (mommy 2026-11-01): small hexagon badge, rank name lettering, rank icon bar (oled.css). */
+    .gp-me-geek .xn-hexb { font-size: 52px; }
+    .gp-me-geek-who { flex: 1; display: grid; justify-items: start; gap: 2px; min-width: 0; }
+    .gp-me-geek-who .xn-rn { max-width: 100%; }
+    .gp-me-geek .xn-lbar { --m: 30px; margin-block: 6px 2px; }
+    .gp-me-next { margin: 0; font-size: 0.75rem; color: var(--oled-muted); }
+    .gp-me-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin: 4px 0 0; }
+    .gp-me-stats div { display: flex; flex-direction: column; gap: 2px; }
+    .gp-me-stats dt { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--oled-muted); }
+    .gp-me-stats dd { margin: 0; font-size: 0.95rem; font-weight: 600; }
+    .gp-me-how { margin: 0; font-size: 0.75rem; line-height: 1.5; color: var(--oled-muted); }
+    @media (max-width: 1000px) {
+      .gp-top.is-me { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "me" "board" "row"; }
+      .gp-me-card { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: start; gap: 12px 16px; }
+      .gp-me-pic { grid-row: 1 / 4; font-size: 3rem; }
+      .gp-me-bio { text-align: left; padding: 0 2px; }
+      .gp-me-geek { margin-top: 0; }
+    }
+    @media (max-width: 560px) {
+      .gp-top.is-me > .gp-row { grid-template-columns: minmax(0, 1fr); }
+      .gp-me-card { grid-template-columns: 96px minmax(0, 1fr); }
+      .gp-me-pic { grid-row: 1 / 3; }
+      .gp-me-geek { grid-column: 1 / -1; }
+      .gp-me-name { font-size: 1.3rem; }
+      .gp-me-line { flex-wrap: wrap; justify-content: flex-start; }
+    }
+
+    /* mommy 2026-10-31 21:15: while the clock is on screen the container is
+       faded and slightly blurred; scrolling past the clock makes it normal
+       (the hero scroll script sets the panel's opacity and the blur). */
 
     /* Admins: Customize button and panel (walls, boxes, edges, fire). */
     .gp-custom-btn {
@@ -508,10 +749,175 @@
 
     <section class="gp-panel" id="gpPanel" style="{{.LookStyle}}" data-fire="{{.Look.Fire}}" data-fire-color="{{.Look.FireColor}}">
       <div class="gp-fire" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
-      <div class="gp-top">
-      <div class="gp-row">
+      <div class="gp-top{{if .Me}} is-me{{end}}">
+      <!-- System announcements: admins write them on the Admin page (/admin#newsBoard); everyone sees them here.
+           The version chip opens the version timeline: one dot per Geek⁴u version, click a dot for that version's news. -->
+      <section class="gp-box gp-news gp-ann gp-fx" id="gpAnn" aria-labelledby="gpNewsTitle" data-version="{{.Version}}">
+        <div class="gp-ann-head">
+          <svg class="gp-ann-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13v6a2 2 0 0 0 2 2h3l9 5V6l-9 5H7a2 2 0 0 0-2 2z"/><path d="M10 21l2 6h3l-1.5-5"/><path d="M23 12.5a4.5 4.5 0 0 1 0 7"/><path d="M26 9.5a8.5 8.5 0 0 1 0 13"/></svg>
+          <h2 class="gp-ann-title" id="gpNewsTitle">System announcements</h2>
+          <button type="button" class="gp-ann-ver" id="gpAnnVer" aria-haspopup="dialog" aria-controls="gpVerView" title="Open the version timeline"><span class="gp-ann-ver-name">Geek⁴u</span><span class="gp-ann-ver-v">v{{.Version}}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/><path d="M12 7v3M12 14v3"/></svg></button>
+          <div class="gp-ann-tools">
+            {{if .IsAdmin}}<a class="gp-news-edit" href="/admin#newsBoard">Edit</a>{{end}}
+            {{if gt (len .News) 4}}<button type="button" class="gp-ann-all" id="gpAnnAll" aria-expanded="false" aria-controls="gpNewsList"><span>View all</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></button>{{end}}
+          </div>
+        </div>
+        <ol class="gp-news-list" id="gpNewsList">
+          {{range $i, $n := .News}}<li class="gp-news-item{{if .Pinned}} is-pinned{{end}}{{if ge $i 4}} is-more{{end}}" data-id="{{.ID}}" data-kind="{{.Kind}}"{{if .Font}} data-font="{{.Font}}"{{end}}{{with .Style}} style="{{.}}"{{end}}>
+            <button type="button" class="gp-ann-row" aria-expanded="false" aria-controls="gpAnnMore{{.ID}}">
+              <time class="gp-ann-date" data-at="{{.At}}" title="{{.When}}">{{.Day}}</time>
+              <span class="gp-ann-bar" aria-hidden="true"></span>
+              <span class="gp-ann-kind" data-kind="{{.Kind}}">{{.KindLabel}}</span>
+              <span class="gp-ann-main">{{with .ThumbURL}}<img class="gp-ann-thumb" src="{{.}}" alt="" loading="lazy">{{end}}<span class="gp-ann-text"><span class="gp-news-title">{{if .Title}}{{.Title}}{{else}}{{.KindLabel}}{{end}}{{if .Pinned}}<span class="gp-news-pin">Pinned</span>{{end}}</span><span class="gp-ann-sum">{{.Body}}</span></span></span>
+              <svg class="gp-ann-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div class="gp-ann-more" id="gpAnnMore{{.ID}}" hidden>{{with .ThumbURL}}<img class="gp-ann-pic" src="{{.}}" alt="" loading="lazy">{{end}}<p class="gp-news-body">{{.Body}}</p><p class="gp-news-meta">{{.Author}} · {{.When}} · v{{.Version}}{{if .Edited}} · edited{{end}}</p></div>
+          </li>{{end}}
+        </ol>
+        <p class="gp-news-empty" id="gpNewsEmpty" {{if .News}}hidden{{end}}>No announcements yet.</p>
+        <p class="gp-ann-foot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/></svg><span>&gt; Select an entry to read more</span></p>
+      </section>
+      <div class="gp-ver-view" id="gpVerView" role="dialog" aria-modal="true" aria-labelledby="gpVerTitle" hidden>
+        <div class="gp-ver-card gp-ann">
+          <div class="gp-ann-head">
+            <svg class="gp-ann-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/><path d="M12 7v3M12 14v3"/></svg>
+            <h2 class="gp-ann-title" id="gpVerTitle">Geek⁴u versions</h2>
+            <button type="button" class="gp-ver-close" id="gpVerClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div>
+          <div class="gp-ver-body">
+            <ol class="gp-ver-line" id="gpVerLine" aria-label="Versions"></ol>
+            <div class="gp-ver-news">
+              <p class="gp-ver-now" id="gpVerNow"></p>
+              <ol class="gp-news-list" id="gpVerList"></ol>
+              <p class="gp-news-empty" id="gpVerEmpty" hidden>No announcements for this version.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        (function () {
+          // Geek level details on your profile card
+          document.addEventListener('click', function (e) {
+            var geek = e.target.closest('#gpGeekBtn');
+            if (!geek) return;
+            var on = geek.getAttribute('aria-expanded') !== 'true';
+            geek.setAttribute('aria-expanded', on ? 'true' : 'false');
+            document.getElementById('gpGeekMore').hidden = !on;
+            document.getElementById('gpGeekHow').hidden = !on;
+          });
+
+          var box = document.getElementById('gpAnn');
+          if (!box) return;
+          function toggleRow(row) {
+            var open = row.getAttribute('aria-expanded') !== 'true';
+            row.setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.getElementById(row.getAttribute('aria-controls')).hidden = !open;
+          }
+          box.addEventListener('click', function (e) {
+            var row = e.target.closest('.gp-ann-row');
+            if (row) { toggleRow(row); return; }
+            var all = e.target.closest('.gp-ann-all');
+            if (all) {
+              var on = !box.classList.contains('is-all');
+              box.classList.toggle('is-all', on);
+              all.setAttribute('aria-expanded', on ? 'true' : 'false');
+              all.querySelector('span').textContent = on ? 'Show less' : 'View all';
+            }
+          });
+
+          // Version timeline
+          var view = document.getElementById('gpVerView'), line = document.getElementById('gpVerLine');
+          var list = document.getElementById('gpVerList'), empty = document.getElementById('gpVerEmpty'), now = document.getElementById('gpVerNow');
+          var opener = document.getElementById('gpAnnVer');
+          document.body.appendChild(view); // out of the panel, so position: fixed covers the screen
+          var KINDS = { update: 'Update', notice: 'Notice', feature: 'New feature', fix: 'Fix' };
+          var FONTS = { sans: 1, serif: 1, rounded: 1, mono: 1, display: 1, hand: 1 };
+          var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+          var day = function (ms) { var d = new Date(ms); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + String(d.getFullYear()).slice(2); };
+          var when = function (ms) { return new Date(ms).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+          var el = function (tag, cls, text) { var x = document.createElement(tag); if (cls) x.className = cls; if (text != null) x.textContent = text; return x; };
+          var SVG = 'http://www.w3.org/2000/svg';
+          function chevron() { var s = document.createElementNS(SVG, 'svg'); s.setAttribute('class', 'gp-ann-chev'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true'); var p = document.createElementNS(SVG, 'path'); p.setAttribute('d', 'M9 5l7 7-7 7'); s.appendChild(p); return s; }
+          function rowFor(n) {
+            var kind = KINDS[n.kind] ? n.kind : 'update';
+            var li = el('li', 'gp-news-item' + (n.pinned ? ' is-pinned' : ''));
+            li.dataset.kind = kind;
+            if (FONTS[n.font]) li.dataset.font = n.font;
+            if (/^#[0-9a-f]{6}$/i.test(n.color || '')) li.style.setProperty('--ann-color', n.color);
+            var btn = el('button', 'gp-ann-row'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', 'gpVerMore' + n.id);
+            var date = el('time', 'gp-ann-date', day(n.at)); date.title = when(n.at);
+            var bar = el('span', 'gp-ann-bar'); bar.setAttribute('aria-hidden', 'true');
+            var tag = el('span', 'gp-ann-kind', KINDS[kind]); tag.dataset.kind = kind;
+            var main = el('span', 'gp-ann-main');
+            if (n.thumb) { var im = el('img', 'gp-ann-thumb'); im.src = '/newspic/' + n.thumb; im.alt = ''; im.loading = 'lazy'; main.appendChild(im); }
+            var text = el('span', 'gp-ann-text'), title = el('span', 'gp-news-title', n.title || KINDS[kind]);
+            if (n.pinned) title.appendChild(el('span', 'gp-news-pin', 'Pinned'));
+            text.append(title, el('span', 'gp-ann-sum', n.body));
+            main.appendChild(text);
+            btn.append(date, bar, tag, main, chevron());
+            var more = el('div', 'gp-ann-more'); more.id = 'gpVerMore' + n.id; more.hidden = true;
+            if (n.thumb) { var pic = el('img', 'gp-ann-pic'); pic.src = '/newspic/' + n.thumb; pic.alt = ''; more.appendChild(pic); }
+            more.append(el('p', 'gp-news-body', n.body), el('p', 'gp-news-meta', n.author + ' · ' + when(n.at) + ' · v' + (n.version || '') + (n.edited ? ' · edited' : '')));
+            li.append(btn, more);
+            return li;
+          }
+          function pick(v, dot) {
+            line.querySelectorAll('.gp-ver-dot').forEach(function (d) { d.setAttribute('aria-current', d === dot ? 'true' : 'false'); });
+            now.textContent = 'v' + v + (v === box.dataset.version ? ' · the version now' : '');
+            list.replaceChildren(); empty.hidden = true; list.setAttribute('aria-busy', 'true');
+            fetch('/site/news?version=' + encodeURIComponent(v), { cache: 'no-store' })
+              .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+              .then(function (d) { list.replaceChildren.apply(list, (d.items || []).map(rowFor)); empty.hidden = (d.items || []).length > 0; })
+              .catch(function () { empty.textContent = "Couldn't load that version's news."; empty.hidden = false; })
+              .finally(function () { list.removeAttribute('aria-busy'); });
+          }
+          function openView() {
+            view.hidden = false;
+            document.documentElement.classList.add('xn-modal-open');
+            line.replaceChildren(el('li', 'gp-ver-loading', 'Loading versions…'));
+            fetch('/site/news', { cache: 'no-store' })
+              .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+              .then(function (d) {
+                var vs = d.versions || [];
+                line.replaceChildren.apply(line, vs.map(function (v) {
+                  var li = el('li', 'gp-ver-item' + (v.version === d.version ? ' is-now' : ''));
+                  var b = el('button', 'gp-ver-dot'); b.type = 'button';
+                  var nm = el('span', 'gp-ver-name', 'v' + v.version);
+                  if (v.version === d.version) nm.appendChild(el('span', 'gp-ver-tag', 'Now'));
+                  b.append(el('span', 'gp-ver-pt'), nm, el('span', 'gp-ver-meta', v.count ? (v.last ? day(v.last) + ' · ' : '') + v.count + (v.count === 1 ? ' entry' : ' entries') : 'No news yet'));
+                  b.addEventListener('click', function () { pick(v.version, b); });
+                  li.appendChild(b);
+                  return li;
+                }));
+                var first = line.querySelector('.gp-ver-dot');
+                if (first) { pick(vs[0].version, first); first.focus(); }
+              })
+              .catch(function () { line.replaceChildren(el('li', 'gp-ver-loading', "Couldn't load the versions.")); });
+          }
+          function closeView() { view.hidden = true; document.documentElement.classList.remove('xn-modal-open'); opener.focus(); }
+          opener.addEventListener('click', openView);
+          document.getElementById('gpVerClose').addEventListener('click', closeView);
+          view.addEventListener('click', function (e) {
+            if (e.target === view) { closeView(); return; }
+            var row = e.target.closest('.gp-ann-row');
+            if (row) toggleRow(row);
+          });
+          document.addEventListener('keydown', function (e) {
+            if (view.hidden) return;
+            if (e.key === 'Escape') closeView();
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              var dots = [].slice.call(line.querySelectorAll('.gp-ver-dot')), i = dots.indexOf(document.activeElement);
+              if (i < 0) return;
+              e.preventDefault();
+              var next = dots[Math.max(0, Math.min(dots.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+              next.focus(); next.click();
+            }
+          });
+        })();
+      </script>
+      <div class="gp-row{{if .Me}} is-me{{end}}">
         {{if not .Login}}
-        <div class="gp-tile" id="gpAuth">
+        <div class="gp-tile gp-fx" id="gpAuth">
           <p class="gp-note" id="gpNextNote" hidden>Log in or sign up to open that page.</p>
           <div class="gp-tabs" role="tablist" aria-label="Account">
             <button type="button" role="tab" id="tabLogin" aria-selected="true" aria-controls="passwordEntry">Log in</button>
@@ -535,7 +941,7 @@
           </form>
         </div>
         {{else}}
-        <div class="gp-tile">
+        <div class="gp-tile gp-fx">
           <p class="gp-note" id="gpNeedAdmin" hidden>That page is only open to admin accounts.</p>
           <div class="gp-label">Signed in as</div>
           <div class="gp-who">{{.SessionInfo.OriginalUsername}}</div>
@@ -547,32 +953,46 @@
         </div>
         {{end}}
 
-        <div class="gp-tile">
-          
+        <div class="gp-tile gp-fx">
           <div class="gp-place" id="weatherLocation">Copenhagen, DK</div>
           <div class="gp-temp" id="weatherTemp">--°</div>
           <div class="gp-cond" id="weatherCondition">Loading weather…</div>
           <div class="gp-wind" id="weatherWind">Wind: -- m/s</div>
         </div>
       </div>
+      {{with .Me}}
+      <!-- Signed in (mommy's picture 2026-10-31 21:06): your profile card on the right, next to the board and the Signed in/Weather row. -->
+      <aside class="gp-me-card gp-fx" aria-label="Your profile">
+        <a class="gp-me-pic" href="/Profile" aria-label="Open your profile">{{if .Avatar}}<img src="{{.Avatar}}" alt="" referrerpolicy="no-referrer">{{else}}<span>{{.Initial}}</span>{{end}}</a>
+        <div class="gp-me-line">
+          <a class="gp-me-name" href="/Profile" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Name}}</a>
+          {{if .OwnerRole}}<span class="gp-me-role">{{.OwnerRole}}</span>{{end}}
+        </div>
+        {{if .Bio}}<p class="gp-me-bio">{{.Bio}}</p>{{end}}
+        <div class="gp-me-geek">
+          <button type="button" class="gp-me-geek-head" id="gpGeekBtn" aria-expanded="false" aria-controls="gpGeekMore">
+            <span class="xn-hexb is-small" data-tier="{{.Rank.Tier}}" data-level="{{.Rank.Level}}"{{if ge .Rank.Level 10}} data-level-big{{end}} role="img" aria-label="{{.Rank.Name}} badge, level {{.Rank.Level}}"><span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv">Level {{.Rank.Level}}</span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span></span>
+            <span class="gp-me-geek-who"><span class="gp-me-geek-label">Geek level {{.Rank.Level}}</span><span class="xn-rn" data-tier="{{.Rank.Tier}}">{{.Rank.Name}}</span></span>
+            <svg class="gp-me-geek-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <span class="xn-lbar" data-tier="{{.Rank.Tier}}" style="--fill: {{.Rank.BarPct}}%" role="progressbar" aria-label="Rank progress this round, {{.Rank.ToNext}} points to {{.Rank.Next}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Rank.BarPct}}"><span class="xn-lbar-track"><span class="xn-lbar-fill"></span></span><span class="xn-lbar-mile" data-t="1" title="Fresh Geek"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="2" title="Noob"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="3" title="Refined Geeker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="4" title="Mythical Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="5" title="Twea(king)"><i class="xn-lp-ico"></i></span></span>
+          <p class="gp-me-next">{{.Rank.ToNext}} points to {{.Rank.Next}}</p>
+          <dl class="gp-me-stats" id="gpGeekMore" hidden>
+            <div><dt>Level</dt><dd>{{.Rank.Level}}</dd></div>
+            <div><dt>Round</dt><dd>{{.Rank.Round}}</dd></div>
+            <div><dt>Points</dt><dd>{{.Rank.Score}}</dd></div>
+            <div><dt>Graph sessions</dt><dd>{{.Rank.Graphs}}</dd></div>
+            <div><dt>Forum posts</dt><dd>{{.Rank.Posts}}</dd></div>
+            <div><dt>This round</dt><dd>{{.Rank.RoundSize}} points</dd></div>
+          </dl>
+          <p class="gp-me-how" id="gpGeekHow" hidden>You get 1 point for every Graph session and every Forum post. Reaching Twea(king) in a round adds a level, and each round needs a bit more points.</p>
+        </div>
+      </aside>
+      {{end}}
 
-      <section class="gp-box gp-news" aria-labelledby="gpNewsTitle">
-        <div class="gp-box-head"><h2 class="gp-box-title" id="gpNewsTitle">News</h2>{{if .IsAdmin}}<span class="gp-box-note">Admins can post here. Everyone sees it.</span>{{end}}</div>
-        {{if .IsAdmin}}
-        <form class="gp-news-form" id="gpNewsForm">
-          <label class="xn-sr" for="gpNewsText">News to broadcast</label>
-          <textarea id="gpNewsText" rows="2" maxlength="2000" placeholder="Broadcast something to everyone…"></textarea>
-          <button type="submit" class="gp-btn gp-btn-primary" id="gpNewsPost">Post</button>
-          <span class="gp-news-status" id="gpNewsStatus" role="status"></span>
-        </form>
-        {{end}}
-        <ol class="gp-news-list" id="gpNewsList">
-          {{range .News}}<li class="gp-news-item" data-id="{{.ID}}"><p class="gp-news-body">{{.Body}}</p><p class="gp-news-meta">{{.Author}} · <time data-at="{{.At}}">{{.When}}</time></p></li>{{end}}
-        </ol>
-        <p class="gp-news-empty" id="gpNewsEmpty" {{if .News}}hidden{{end}}>No news yet.</p>
-      </section>
 
-      <section class="gp-box gp-owners" aria-labelledby="gpOwnersTitle">
+      {{if not .Me}}
+      <section class="gp-box gp-owners gp-fx" aria-labelledby="gpOwnersTitle">
         <div class="gp-box-head"><h2 class="gp-box-title" id="gpOwnersTitle">The owners</h2></div>
         <div class="gp-team">
           {{range .Owners}}
@@ -587,6 +1007,7 @@
           {{end}}
         </div>
       </section>
+      {{end}}
       </div>
       {{if .IsAdmin}}
       <button type="button" class="gp-custom-btn" id="gpCustomBtn" aria-expanded="false" aria-controls="gpCustom" title="Customize this container"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Customize</span></button>
@@ -613,53 +1034,6 @@
       const box = document.getElementById("gpCustom");
       const status = document.getElementById("gpCustomStatus");
       if (!panel || !btn || !box) return;
-      // News: admins post and delete messages everyone sees on this page.
-      (() => {
-        const form = document.getElementById("gpNewsForm");
-        const list = document.getElementById("gpNewsList");
-        const text = document.getElementById("gpNewsText");
-        const status = document.getElementById("gpNewsStatus");
-        const when = (ms) => new Date(ms).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-        const delBtn = () => Object.assign(document.createElement("button"), { type: "button", className: "gp-news-del", textContent: "×", title: "Delete this news" });
-        function show(items) {
-          list.replaceChildren(...items.map((n) => {
-            const li = document.createElement("li");
-            li.className = "gp-news-item";
-            li.dataset.id = n.id;
-            const body = Object.assign(document.createElement("p"), { className: "gp-news-body", textContent: n.body });
-            const meta = Object.assign(document.createElement("p"), { className: "gp-news-meta", textContent: n.author + " · " + when(n.at) });
-            const del = delBtn();
-            del.setAttribute("aria-label", "Delete this news");
-            li.append(body, meta, del);
-            return li;
-          }));
-          document.getElementById("gpNewsEmpty").hidden = items.length > 0;
-        }
-        async function send(body) {
-          const res = await fetch("/site/news", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-          if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save that.");
-          show((await res.json()).items || []);
-        }
-        list.querySelectorAll(".gp-news-item").forEach((li) => { const d = delBtn(); d.setAttribute("aria-label", "Delete this news"); li.append(d); });
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          if (!text.value.trim()) return;
-          const btn = document.getElementById("gpNewsPost");
-          btn.disabled = true;
-          status.textContent = "";
-          try { await send({ action: "post", body: text.value }); text.value = ""; }
-          catch (error) { status.textContent = error.message; }
-          finally { btn.disabled = false; }
-        });
-        text.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
-        list.addEventListener("click", async (e) => {
-          const del = e.target.closest(".gp-news-del");
-          if (!del) return;
-          if (del.dataset.sure !== "1") { del.dataset.sure = "1"; del.textContent = "?"; del.title = "Click again to delete"; setTimeout(() => { del.dataset.sure = ""; del.textContent = "×"; }, 3000); return; }
-          try { await send({ action: "delete", id: Number(del.closest(".gp-news-item").dataset.id) }); }
-          catch (error) { status.textContent = error.message; }
-        });
-      })();
 
       let look = {{.LookJSON}};
       let timer = 0;
@@ -975,6 +1349,7 @@
       const inner = document.getElementById('gpHeroInner');
       const panel = document.getElementById('gpPanel');
       const hint = document.getElementById('gpHint');
+      const boxes = panel && panel.querySelector('.gp-top');
       if (!hero || !inner || !panel) return;
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       let range = 1, ticking = false;
@@ -989,6 +1364,8 @@
         const shift = s / 2 + Math.max(0, y - range);
         inner.style.transform = `translateY(${-shift}px) scale(${1 - 0.55 * eased})`;
         panel.style.opacity = String(0.4 + 0.6 * eased);
+        // Slight blur while the clock is in view, none once it has scrolled away.
+        if (boxes) boxes.style.filter = eased >= 1 ? '' : `blur(${(2.5 * (1 - eased)).toFixed(2)}px)`;
         panel.style.transform = `translateY(${(1 - eased) * 28}px)`;
         panel.style.setProperty('--gp-glow', (0.35 * eased).toFixed(3));
         if (hint) hint.style.opacity = String(Math.max(0, 1 - p * 4));

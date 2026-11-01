@@ -1,12 +1,12 @@
+/* Width, margins and padding come from .xn-page, like the other admin pages. */
 .dia-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
-  width: min(920px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: calc(var(--oled-nav-h, 56px) + 32px) 0 48px;
 }
 .dia-back {
+  justify-self: start;
+  font-size: 12px;
   color: var(--oled-muted);
   text-decoration: none;
 }

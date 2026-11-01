@@ -486,6 +486,8 @@
     .gp-rows{ display:flex; flex-direction:column; }
     .gp-row{ position:relative; display:flex; align-items:stretch; animation:gp-in .3s ease both; }
     .gp-row + .gp-row::before{ content:""; position:absolute; top:0; left:1.35rem; right:-1rem; height:1px; background:#24222b; }
+    /* The divider runs to the screen edge; clip it there so the page doesn't scroll sideways. */
+    .gp-list{ overflow-x:clip; }
     .gp-open{ flex:1; min-width:0; display:flex; align-items:stretch; gap:1rem; padding:.7rem 0; text-align:left; background:none; border:0; color:var(--text); -webkit-touch-callout:none; }
     .gp-open:active{ background:rgba(255,255,255,.04); }
     .gp-bar-c{ flex:none; width:6px; border-radius:3px; background:var(--bar, var(--violet)); }

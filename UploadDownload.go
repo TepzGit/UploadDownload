@@ -403,6 +403,8 @@ func main() {
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
 	http.HandleFunc("/site/main-look", requireAdminLogin(saveMainLook))
 	http.HandleFunc("/site/news", siteNews)
+	http.HandleFunc("/site/news/thumb", requireAdminLogin(newsThumbUpload))
+	http.HandleFunc("/newspic/", newsPicture)
 	http.HandleFunc("/sitepic/", sitePicture)
 	http.HandleFunc("/notifications", requireLogin(notifications))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
@@ -551,6 +553,13 @@ func main() {
 	registerAppUpdates()
 	registerLinkDownloads()
 	registerChat()
+	// News board items got a title, a pin and an edit time.
+	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''"} {
+		if _, err := db.Exec("ALTER TABLE site_news ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			panic("cannot add the news columns: " + err.Error())
+		}
+	}
+	seedNews()
 	// Boxes from before the + menu are all picture boxes; data holds a note or a Graph session id.
 	for _, column := range []string{"kind TEXT NOT NULL DEFAULT 'pictures'", "data TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE profile_boxes ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -587,7 +596,9 @@ func Main(w http.ResponseWriter, r *http.Request) {
 		LookStyle   template.CSS
 		LookJSON    template.JS
 		News        []newsItem
+		Version     string // the Geek⁴u version admins set on the Admin page
 		Owners      []ownerCard
+		Me          *meCard // the signed-in account; it takes the owners' place
 	}{}
 
 	d.SessionInfo, d.Login = sessionFromRequest(r)
@@ -602,7 +613,21 @@ func Main(w http.ResponseWriter, r *http.Request) {
 		d.Pictures[slot] = sitePictureLink(slot)
 	}
 	d.News = loadNews()
+	d.Version = siteVersion()
 	d.Owners = siteOwners(d.Pictures)
+	if d.Login {
+		d.Me = loadMeCard(d.SessionInfo.UserId)
+		// An owner's tile carries their role (Frontend/Backend) and, while
+		// they only have the default profile picture, their team picture.
+		for _, o := range siteOwnerList {
+			if d.Me != nil && strings.EqualFold(o.Name, d.Me.Name) {
+				d.Me.OwnerRole = o.Role
+				if d.Me.Avatar == "" || strings.Contains(d.Me.Avatar, "/Default/") {
+					d.Me.Avatar = d.Pictures[o.Slot]
+				}
+			}
+		}
+	}
 	setRoleHint(w, r, d.SessionInfo, d.Login)
 	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), d.SessionInfo.OriginalUsername, r.URL.Path)
 
@@ -623,35 +648,169 @@ func Main(w http.ResponseWriter, r *http.Request) {
 
 // newsItem is one message admins broadcast on the Main page.
 type newsItem struct {
-	ID     int64  `json:"id"`
-	Author string `json:"author"`
-	Body   string `json:"body"`
-	At     int64  `json:"at"` // unix ms
+	ID      int64  `json:"id"`
+	Author  string `json:"author"`
+	Title   string `json:"title"`
+	Body    string `json:"body"`
+	Pinned  bool   `json:"pinned"`
+	Kind    string `json:"kind"`    // a key of newsKinds: the tag before the title
+	Thumb   string `json:"thumb"`   // file name of the thumbnail in sitePicturesDir, "" for none
+	Font    string `json:"font"`    // a key of newsFonts, "" for the site font
+	Color   string `json:"color"`   // #rrggbb for the title and marker, "" for the site color
+	Version string `json:"version"` // the Geek⁴u version it belongs to, like 1.4
+	At      int64  `json:"at"`      // unix ms
+	Edited  int64  `json:"edited"`  // unix ms of the last edit, 0 when never edited
+}
+
+// newsKinds are the tags a news can carry on the Main page's announcements board.
+var newsKinds = map[string]string{"update": "Update", "notice": "Notice", "feature": "New feature", "fix": "Fix"}
+
+// newsFonts are the fonts an admin can give a news (CSS in Main.html, data-font).
+var newsFonts = map[string]bool{"": true, "sans": true, "serif": true, "rounded": true, "mono": true, "display": true, "hand": true}
+
+var newsThumbName = regexp.MustCompile(`^news-[0-9a-f]{12}\.(jpg|png|gif|webp)$`)
+var newsVersionText = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z._ -]{0,19}$`)
+
+func cleanNewsKind(k string) string {
+	if _, ok := newsKinds[k]; ok {
+		return k
+	}
+	return "update"
 }
 
 func (n newsItem) When() string { return time.UnixMilli(n.At).Format("2 Jan 2006, 15:04") }
 
+// Day is the short date on the announcements board, like 31.10.26.
+func (n newsItem) Day() string { return time.UnixMilli(n.At).Format("02.01.06") }
+
+// KindLabel is the tag text, like "New feature".
+func (n newsItem) KindLabel() string { return newsKinds[cleanNewsKind(n.Kind)] }
+
+// ThumbURL is the link to the thumbnail, "" when there is none.
+func (n newsItem) ThumbURL() string {
+	if n.Thumb == "" {
+		return ""
+	}
+	return "/newspic/" + n.Thumb
+}
+
+// Style is the news' own color as CSS variables, "" for the site color.
+func (n newsItem) Style() template.CSS {
+	if !hexColor.MatchString(n.Color) {
+		return ""
+	}
+	return template.CSS("--ann-color: " + n.Color)
+}
+
 const newsShown = 20
 
-func loadNews() []newsItem {
-	out := []newsItem{}
-	rows, err := db.Query("SELECT id, author, body, created_at FROM site_news ORDER BY id DESC LIMIT ?", newsShown)
-	if err != nil {
-		fmt.Println(err)
-		return out
+const defaultSiteVersion = "1.0"
+
+// siteVersion is the Geek⁴u version shown on the announcements board.
+func siteVersion() string {
+	var v string
+	if db.QueryRow("SELECT value FROM site_settings WHERE key = 'siteVersion'").Scan(&v) != nil || v == "" {
+		return defaultSiteVersion
 	}
+	return v
+}
+
+const newsColumns = "id, author, title, body, pinned, kind, thumb, font, color, version, created_at, edited_at"
+
+func scanNews(rows *sql.Rows) []newsItem {
+	out := []newsItem{}
 	defer rows.Close()
 	for rows.Next() {
 		var n newsItem
-		if rows.Scan(&n.ID, &n.Author, &n.Body, &n.At) == nil {
+		if rows.Scan(&n.ID, &n.Author, &n.Title, &n.Body, &n.Pinned, &n.Kind, &n.Thumb, &n.Font, &n.Color, &n.Version, &n.At, &n.Edited) == nil {
+			n.Kind = cleanNewsKind(n.Kind)
+			if !newsFonts[n.Font] {
+				n.Font = ""
+			}
+			if n.Version == "" {
+				n.Version = defaultSiteVersion
+			}
 			out = append(out, n)
 		}
 	}
 	return out
 }
 
-// siteNews: GET lists the news (anyone); POST JSON {action:"post", body} or
-// {action:"delete", id} is for admins. Answers {"items": [...]}.
+func loadNews() []newsItem {
+	rows, err := db.Query("SELECT "+newsColumns+" FROM site_news ORDER BY pinned DESC, id DESC LIMIT ?", newsShown)
+	if err != nil {
+		fmt.Println(err)
+		return []newsItem{}
+	}
+	return scanNews(rows)
+}
+
+// newsVersion is one dot on the version timeline.
+type newsVersion struct {
+	Version string `json:"version"`
+	Count   int    `json:"count"`
+	First   int64  `json:"first"` // unix ms of its oldest news
+	Last    int64  `json:"last"`  // unix ms of its newest news
+}
+
+// loadNewsVersions lists every version that has news, newest first, plus the
+// current version even when nothing was posted for it yet.
+func loadNewsVersions() []newsVersion {
+	out := []newsVersion{}
+	rows, err := db.Query(`SELECT CASE WHEN version = '' THEN ? ELSE version END AS v, COUNT(*), MIN(created_at), MAX(created_at)
+		FROM site_news GROUP BY v ORDER BY MAX(created_at) DESC`, defaultSiteVersion)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	defer rows.Close()
+	current := siteVersion()
+	seen := false
+	for rows.Next() {
+		var v newsVersion
+		if rows.Scan(&v.Version, &v.Count, &v.First, &v.Last) == nil {
+			seen = seen || v.Version == current
+			out = append(out, v)
+		}
+	}
+	if !seen {
+		out = append([]newsVersion{{Version: current}}, out...)
+	}
+	return out
+}
+
+func loadNewsOfVersion(version string) []newsItem {
+	q := "SELECT " + newsColumns + " FROM site_news WHERE version = ? ORDER BY pinned DESC, id DESC LIMIT 200"
+	args := []any{version}
+	if version == defaultSiteVersion {
+		q = "SELECT " + newsColumns + " FROM site_news WHERE version = ? OR version = '' ORDER BY pinned DESC, id DESC LIMIT 200"
+	}
+	rows, err := db.Query(q, args...)
+	if err != nil {
+		fmt.Println(err)
+		return []newsItem{}
+	}
+	return scanNews(rows)
+}
+
+// removeNewsThumb deletes a thumbnail file no news uses any more.
+func removeNewsThumb(name string) {
+	if !newsThumbName.MatchString(name) {
+		return
+	}
+	var used int
+	db.QueryRow("SELECT COUNT(*) FROM site_news WHERE thumb = ?", name).Scan(&used)
+	if used == 0 {
+		os.Remove(filepath.Join(sitePicturesDir, name))
+	}
+}
+
+// siteNews: GET lists the news board (anyone): {items, version, versions};
+// ?version=1.2 answers that version's news instead (the timeline). Admins
+// change it from the Admin page with POST JSON {action:"post", title, body,
+// kind, thumb, font, color, version, pinned}, {action:"edit", id, ...same},
+// {action:"pin", id, pinned}, {action:"delete", id} or
+// {action:"setVersion", version}. Pinned first, then newest.
 func siteNews(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		session, ok := sessionFromRequest(r)
@@ -660,17 +819,34 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var in struct {
-			Action string `json:"action"`
-			Body   string `json:"body"`
-			ID     int64  `json:"id"`
+			Action  string `json:"action"`
+			Title   string `json:"title"`
+			Body    string `json:"body"`
+			Pinned  bool   `json:"pinned"`
+			Kind    string `json:"kind"`
+			Thumb   string `json:"thumb"`
+			Font    string `json:"font"`
+			Color   string `json:"color"`
+			Version string `json:"version"`
+			ID      int64  `json:"id"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&in); err != nil {
 			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
 			return
 		}
-		switch in.Action {
-		case "post":
-			body := strings.TrimSpace(strings.ReplaceAll(in.Body, "\r\n", "\n"))
+		title := strings.TrimSpace(strings.Join(strings.Fields(in.Title), " "))
+		body := strings.TrimSpace(strings.ReplaceAll(in.Body, "\r\n", "\n"))
+		version := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(in.Version), "v"), "V"))
+		if in.Action == "post" || in.Action == "edit" || in.Action == "setVersion" {
+			if version == "" {
+				version = siteVersion()
+			}
+			if !newsVersionText.MatchString(version) {
+				http.Error(w, "Write the version like 1.4 or 2.0-beta (up to 20 letters, numbers and dots).", http.StatusBadRequest)
+				return
+			}
+		}
+		if in.Action == "post" || in.Action == "edit" {
 			if body == "" {
 				http.Error(w, "Write something first.", http.StatusBadRequest)
 				return
@@ -679,15 +855,68 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Keep it under 2000 characters.", http.StatusBadRequest)
 				return
 			}
-			if _, err := db.Exec("INSERT INTO site_news (author, body, created_at) VALUES (?, ?, ?)", session.OriginalUsername, body, time.Now().UnixMilli()); err != nil {
+			if utf8.RuneCountInString(title) > 120 {
+				http.Error(w, "Keep the title under 120 characters.", http.StatusBadRequest)
+				return
+			}
+			if !newsFonts[in.Font] {
+				in.Font = ""
+			}
+			if !hexColor.MatchString(in.Color) {
+				in.Color = ""
+			}
+			if in.Thumb != "" {
+				if _, err := os.Stat(filepath.Join(sitePicturesDir, in.Thumb)); !newsThumbName.MatchString(in.Thumb) || err != nil {
+					http.Error(w, "That thumbnail is gone. Upload it again.", http.StatusBadRequest)
+					return
+				}
+			}
+		}
+		switch in.Action {
+		case "post":
+			if _, err := db.Exec("INSERT INTO site_news (author, title, body, pinned, kind, thumb, font, color, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				session.OriginalUsername, title, body, in.Pinned, cleanNewsKind(in.Kind), in.Thumb, in.Font, in.Color, version, time.Now().UnixMilli()); err != nil {
 				fmt.Println(err)
 				http.Error(w, "Couldn't post it.", http.StatusInternalServerError)
 				return
 			}
+		case "edit":
+			var oldThumb string
+			db.QueryRow("SELECT thumb FROM site_news WHERE id = ?", in.ID).Scan(&oldThumb)
+			res, err := db.Exec("UPDATE site_news SET title = ?, body = ?, pinned = ?, kind = ?, thumb = ?, font = ?, color = ?, version = ?, edited_at = ? WHERE id = ?",
+				title, body, in.Pinned, cleanNewsKind(in.Kind), in.Thumb, in.Font, in.Color, version, time.Now().UnixMilli(), in.ID)
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save it.", http.StatusInternalServerError)
+				return
+			}
+			if n, _ := res.RowsAffected(); n == 0 {
+				http.Error(w, "That news is gone.", http.StatusNotFound)
+				return
+			}
+			if oldThumb != in.Thumb {
+				removeNewsThumb(oldThumb)
+			}
+		case "pin":
+			if _, err := db.Exec("UPDATE site_news SET pinned = ? WHERE id = ?", in.Pinned, in.ID); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't change it.", http.StatusInternalServerError)
+				return
+			}
 		case "delete":
+			var oldThumb string
+			db.QueryRow("SELECT thumb FROM site_news WHERE id = ?", in.ID).Scan(&oldThumb)
 			if _, err := db.Exec("DELETE FROM site_news WHERE id = ?", in.ID); err != nil {
 				fmt.Println(err)
 				http.Error(w, "Couldn't delete it.", http.StatusInternalServerError)
+				return
+			}
+			removeNewsThumb(oldThumb)
+		case "setVersion":
+			if _, err := db.Exec(`INSERT INTO site_settings (key, value) VALUES ('siteVersion', ?)
+				ON CONFLICT(key) DO UPDATE SET value = excluded.value`, version); err != nil {
+				fmt.Println(err)
+				http.Error(w, "Couldn't save the version.", http.StatusInternalServerError)
 				return
 			}
 		default:
@@ -697,8 +926,101 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
+	} else if v := strings.TrimSpace(r.URL.Query().Get("version")); v != "" {
+		writeJSON(w, map[string]any{"version": v, "items": loadNewsOfVersion(v)})
+		return
 	}
-	writeJSON(w, map[string][]newsItem{"items": loadNews()})
+	writeJSON(w, map[string]any{"items": loadNews(), "version": siteVersion(), "versions": loadNewsVersions()})
+}
+
+// seedNews fills the announcements board once with what was added lately
+// (mommy 2026-10-31), so it is not empty. It runs at startup and marks
+// site_settings 'newsSeeded', so deleted entries never come back.
+func seedNews() {
+	var done string
+	if db.QueryRow("SELECT value FROM site_settings WHERE key = 'newsSeeded'").Scan(&done) == nil {
+		return
+	}
+	type seed struct{ day, kind, version, title, body string }
+	seeds := []seed{
+		{"2026-10-25", "feature", "1.0", "Music is here", "A new Music page: import your Spotify playlists, match them to songs in Files, play them on the site and share them with friends.\nThe iPhone app can keep songs for offline listening."},
+		{"2026-10-25", "feature", "1.0", "The apps work offline", "The Android and iPhone apps keep working without internet, and your phone folder can sync with the site."},
+		{"2026-10-25", "update", "1.0", "Your own substances", "Admins can add custom substances with their own timeline, including a second peak and the come-down."},
+		{"2026-10-27", "feature", "1.0", "Notes and trip reports", "Write trip reports and keep a notepad on the new Notes page. Doses can have notes too, and you can look back at past experiences."},
+		{"2026-10-27", "feature", "1.0", "Download from links", "Paste a link on the Upload page and the site downloads the video or song for you."},
+		{"2026-10-27", "feature", "1.0", "Geek⁴u for your PC", "A desktop app for Windows and Linux that works offline, updates itself and keeps a copy of the site from your last visit."},
+		{"2026-10-28", "feature", "1.1", "Chat", "Send messages to friends or make group chats, with pictures."},
+		{"2026-10-28", "update", "1.1", "Trip reports got comments and likes", "Comment on and like trip reports, and add pictures to them."},
+		{"2026-10-28", "update", "1.1", "Medicines and new pill pictures", "22 common medicines were added, with real pill pictures."},
+		{"2026-10-28", "update", "1.1", "One menu button", "All pages now open from the menu button at the top as tiles."},
+		{"2026-10-28", "update", "1.1", "Delete a dose from the calendar", "The Profile calendar has a delete button. It removes the dose from the Journal and its Graph session."},
+		{"2026-10-29", "feature", "1.2", "Import your PsychonautWiki Journal", "Bring your experiences from the PsychonautWiki Journal app in from Profile > Data."},
+		{"2026-10-29", "feature", "1.2", "Your shelf", "Put your favorite pictures on a wooden shelf on your Profile."},
+		{"2026-10-29", "update", "1.2", "Graph totals", "The Graph shows the totals of a session in a bar."},
+		{"2026-10-30", "update", "1.2", "Journal pictures and class menu", "Every substance in the Journal shows a picture of its usual form, and the drug classes are in a dropdown."},
+		{"2026-10-30", "update", "1.2", "Menu on iPhone", "On iPhone the pages open from the menu button like apps."},
+		{"2026-10-30", "fix", "1.2", "Smoother page changes in Firefox", "Moving between pages in Firefox now fades instead of jumping."},
+		{"2026-10-31", "feature", "1.3", "System announcements", "This board. News is tagged by type, and the version button opens a timeline of every Geek⁴u version."},
+		{"2026-10-31", "update", "1.3", "Your profile on the Main page", "After you sign in, the Main page shows your profile card with your geek level."},
+	}
+	for _, n := range seeds {
+		day, err := time.ParseInLocation("2006-01-02 15:04", n.day+" 12:00", time.Local)
+		if err != nil {
+			continue
+		}
+		var exists int
+		db.QueryRow("SELECT COUNT(*) FROM site_news WHERE title = ?", n.title).Scan(&exists)
+		if exists > 0 {
+			continue
+		}
+		if _, err := db.Exec("INSERT INTO site_news (author, title, body, pinned, kind, version, created_at) VALUES (?, ?, ?, 0, ?, ?, ?)",
+			"Geek⁴u", n.title, n.body, n.kind, n.version, day.UnixMilli()); err != nil {
+			fmt.Println(err)
+		}
+	}
+	// Older news without a version and the site version follow the seeded ones.
+	db.Exec("UPDATE site_news SET version = '1.3' WHERE version = ''")
+	db.Exec("INSERT INTO site_settings (key, value) VALUES ('siteVersion', '1.3') ON CONFLICT(key) DO NOTHING")
+	db.Exec("INSERT INTO site_settings (key, value) VALUES ('newsSeeded', '1') ON CONFLICT(key) DO NOTHING")
+}
+
+// newsThumbUpload saves a thumbnail for a news (admins, multipart "image")
+// and answers {name, url}; the news keeps it once it is posted or saved.
+func newsThumbUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPictureBytes+(64<<10))
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		http.Error(w, fmt.Sprintf("That picture is too big. Pick one under %d MB.", maxPictureMB), http.StatusRequestEntityTooLarge)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	file, _, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "Pick a picture first.", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	name, status, msg := saveImageIn(file, sitePicturesDir, "news")
+	if status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
+	writeJSON(w, map[string]string{"name": name, "url": "/newspic/" + name})
+}
+
+// newsPicture serves a news thumbnail to everyone (Main is public).
+func newsPicture(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/newspic/")
+	if !newsThumbName.MatchString(name) {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeFile(w, r, filepath.Join(sitePicturesDir, name))
 }
 
 // ownerCard is one of the site's owners in the bottom box of the Main page,
@@ -726,6 +1048,43 @@ func siteOwners(pictures map[string]string) []ownerCard {
 		out = append(out, c)
 	}
 	return out
+}
+
+// meCard is the signed-in account's own picture tile at the start of the
+// Main page's top row (next to Signed in and Weather).
+type meCard struct {
+	OwnerRole string // Frontend/Backend for the site's owners, "" for everyone else
+	Name      string
+	Initial   string
+	Avatar    string
+	Banner    string
+	NameColor string
+	Admin     bool
+	Bio       string
+	Rank      geekRank
+	Posts     int
+	Friends   int
+	Liked     int
+}
+
+func loadMeCard(uid int) *meCard {
+	c := &meCard{}
+	var avatar, banner, authority string
+	if db.QueryRow("SELECT originalUsername, pathToProfilePic, pathToBanner, authority, bio FROM users WHERE id = ?", uid).Scan(&c.Name, &avatar, &banner, &authority, &c.Bio) != nil {
+		return nil
+	}
+	c.Initial = initialOf(c.Name)
+	c.Avatar = existingPicture(avatar)
+	c.Banner = existingPicture(banner)
+	c.Admin = authority == "admin"
+	c.NameColor = adminNameColor(c.Name, authority)
+	c.Rank = rankOf(c.Name)
+	c.Posts = c.Rank.Posts
+	db.QueryRow("SELECT COUNT(*) FROM friendships WHERE (requester_id = ? OR addressee_id = ?) AND status = 'accepted'", uid, uid).Scan(&c.Friends)
+	if liked, err := likedSubstances(uid); err == nil {
+		c.Liked = len(liked)
+	}
+	return c
 }
 
 func Profile(w http.ResponseWriter, r *http.Request) {
@@ -4202,7 +4561,7 @@ type postAuthor struct {
 	Admin    bool      `json:"admin"`
 	Color    string    `json:"color,omitempty"` // an admin's name color
 	Rank     int       `json:"rank,omitempty"`  // geek rank tier, 1 to 5
-	Level    int       `json:"level,omitempty"` // times the account reached Geek⁴
+	Level    int       `json:"level,omitempty"` // times the account reached Twea(king)
 	RankLook *rankLook `json:"rankLook,omitempty"`
 }
 
@@ -5900,14 +6259,14 @@ var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars"
 // ---- Geek rank ----
 
 // geekRank: every Graph session and every Forum post an account ever made is a point.
-// The five tiers make a round of rankRound points. Reaching Geek⁴ earns a level,
+// The five tiers make a round of rankRound points. Reaching Twea(king) earns a level,
 // and when the round is full the tiers start over from Fresh Geek, so the level
-// keeps counting up (Geek⁴ once = level 1, twice = level 2, ...). Every round
+// keeps counting up (Twea(king) once = level 1, twice = level 2, ...). Every round
 // needs rankHarder (10%) more points than the one before, tiers included.
 type geekRank struct {
 	Tier      int      `json:"tier"`
 	Name      string   `json:"name"`
-	Level     int      `json:"level"`     // times Geek⁴ was reached
+	Level     int      `json:"level"`     // times Twea(king) was reached
 	Round     int      `json:"round"`     // which round the account is in, from 1
 	RoundSize int      `json:"roundSize"` // points this round takes
 	Score     int      `json:"score"`
@@ -5968,7 +6327,21 @@ func scaled(points int, r int) int { return int(math.Round(float64(points) * ran
 var geekTiers = []struct {
 	Name string
 	From int
-}{{"Fresh Geek", 0}, {"Geek", 5}, {"Big Geek", 20}, {"Mega Geek", 50}, {"Geek⁴", 120}}
+}{{"Fresh Geek", 0}, {"Noob", 5}, {"Refined Geeker", 20}, {"Mythical Tweaker", 50}, {"Twea(king)", 120}} // names from mommy 2026-11-01 (were Geek, Big Geek, Mega Geek, Geek⁴)
+
+// BarPct is how full the rank icon bar is (Level pack, mommy 2026-11-01):
+// the five rank icons sit at 0, 25, 50, 75 and 100%, and the fill moves
+// between two icons as the account gets closer to the next rank.
+func (g geekRank) BarPct() int {
+	if g.Tier >= len(geekTiers) {
+		return 100
+	}
+	p := (g.Tier-1)*25 + g.Progress/4
+	if p < 0 {
+		p = 0
+	}
+	return p
+}
 
 func makeRank(graphs, posts int) geekRank {
 	g := geekRank{Graphs: graphs, Posts: posts, Score: graphs + posts}

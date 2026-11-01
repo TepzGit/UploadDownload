@@ -1,0 +1,67 @@
+<main class="xn-page nt">
+  <header class="nt-top">
+    <h1 class="xn-eyebrow">Notes</h1>
+    
+    
+  <div class="nt-seg has-glow" role="tablist" aria-label="Notes"><span class="nt-seg-glow" aria-hidden="true" style="width: 87px; transform: translateX(254px);"></span>
+    <button type="button" role="tab" class="nt-seg-btn" id="tabDoses" aria-controls="paneDoses" data-tab="doses" aria-selected="false" tabindex="-1">By substance</button>
+    <button type="button" role="tab" class="nt-seg-btn" id="tabReports" aria-controls="paneReports" data-tab="reports" aria-selected="false" tabindex="-1">Trip reports</button>
+    <button type="button" role="tab" class="nt-seg-btn" id="tabPad" aria-controls="panePad" data-tab="pad" aria-selected="true" tabindex="0">Notepad</button>
+    <button type="button" role="tab" class="nt-seg-btn" id="tabPublic" aria-controls="panePublic" data-tab="public" aria-selected="false" tabindex="-1">Public reports</button>
+  </div></header>
+
+  
+
+  <section class="nt-pane" id="paneDoses" role="tabpanel" aria-labelledby="tabDoses" hidden="">
+    <div class="nt-bar">
+      <label class="nt-find"><span class="xn-sr">Find a substance or word</span><input class="xn-input" id="doseFind" type="search" placeholder="Find a substance or word…" autocomplete="off" spellcheck="false"></label>
+      <span class="nt-count" id="doseCount"></span>
+    </div>
+    <div class="nt-groups" id="doseGroups" aria-live="polite"><p class="nt-empty">No dose notes yet. On the <a href="/">Graph</a>, tap the pencil on a dose and write how it felt. Every note shows up here, sorted by substance.</p></div>
+  </section>
+
+  <section class="nt-pane" id="paneReports" role="tabpanel" aria-labelledby="tabReports" hidden="">
+    <div class="nt-bar">
+      <label class="nt-find"><span class="xn-sr">Find a report</span><input class="xn-input" id="repFind" type="search" placeholder="Find a report…" autocomplete="off" spellcheck="false"></label>
+      <button type="button" class="xn-btn xn-btn-primary" id="repNew"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>New report</button>
+    </div>
+    <div class="nt-reports" id="repList" aria-live="polite"><p class="nt-empty">No trip reports yet. Press New report to write one, about a Graph session or any day you remember.</p></div>
+  </section>
+
+  <section class="nt-pane" id="panePublic" role="tabpanel" aria-labelledby="tabPublic" hidden="">
+    <div class="nt-bar">
+      <label class="nt-find"><span class="xn-sr">Find a public report</span><input class="xn-input" id="pubFind" type="search" placeholder="Find a substance, word or person…" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <p class="nt-hint">Trip reports people chose to share. Anyone with an account can read them.</p>
+    <div class="nt-reports" id="pubList" aria-live="polite"><p class="nt-empty">No public trip reports yet. Turn on Public when you save one of yours and it shows here.</p></div>
+    <button type="button" class="xn-btn nt-more" id="pubMore" hidden="">Show older reports</button>
+  </section>
+
+  <section class="nt-pane" id="panePad" role="tabpanel" aria-labelledby="tabPad">
+    
+  <div class="nt-pad is-editing" id="pad">
+  <div>
+      <aside class="nt-pad-side">
+        <div class="nt-bar">
+          <label class="nt-find"><span class="xn-sr">Find a note</span><input class="xn-input" id="padFind" type="search" placeholder="Find a note…" autocomplete="off" spellcheck="false"></label>
+          <button type="button" class="xn-btn xn-btn-primary nt-icon-btn" id="padNew" aria-label="New note" title="New note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+        </div>
+        <ul class="nt-pad-list" id="padList" aria-label="Notes"><li><button type="button" class="nt-pad-item" data-id="1" aria-current="true"><strong>wsg gng test</strong><span>just now · wsg gng meow wddddddddew</span></button></li><li><button type="button" class="nt-pad-item" data-id="3"><strong>fdsafasdfdasf</strong><span>1 min ago · fdasfasdfda</span></button></li><li><button type="button" class="nt-pad-item" data-id="2"><strong>cdfdafsf</strong><span>1 min ago · fdsafdsafdasfsda</span></button></li></ul>
+</aside></div><div>
+        
+      
+      <div class="nt-pad-main xn-card" id="padEditor">
+        <div class="nt-pad-head">
+          <button type="button" class="nt-back" id="padBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Notes</button>
+          <span class="nt-saved" id="padSaved" aria-live="polite">Saved</span>
+          <button type="button" class="nt-tool" id="padPin" aria-pressed="false" title="Pin to the top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 4H6l4-4zM12 13v8"></path></svg></button>
+          <button type="button" class="nt-tool" id="padMono" aria-pressed="false" title="Typewriter font"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h16v2M12 5v14M9 19h6"></path></svg></button>
+          <button type="button" class="nt-tool nt-del" id="padDelete" title="Delete note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+        </div>
+        <input class="nt-pad-title" id="padTitle" type="text" placeholder="Title" maxlength="120" aria-label="Title">
+        <textarea class="nt-pad-text" id="padText" placeholder="Write anything…" aria-label="Note" spellcheck="true"></textarea>
+        <p class="nt-pad-foot" id="padFoot">4 words · 24 characters</p>
+      </div>
+  </div>
+    </div></section>
+</main>

@@ -19,7 +19,7 @@
        oled.css on the evening of 2026-10-28 (mommy 2026-10-29: "make the
        profile and utility page look like before"). :where() keeps these as
        weak as the old oled.css rules, so the page's own styles still win. */
-    :where(.xn-page.pf) { margin-left: 10rem; margin-right: 10rem !important; }
+    :where(.xn-page.pf) { margin-left: auto; margin-right: auto !important; }
     :where(.xn-page.pf) .xn-card { margin: 0; border-radius: 2px; padding: clamp(16px, 2.5vw, 24px); }
     :where(.xn-page.pf) .xn-like { width: 44px; height: 44px; }
     .xn-brand { padding: 8px 0; }
@@ -72,8 +72,8 @@
         <span class="avatar-overlay"><svg aria-hidden="true"><use href="#i-camera"/></svg></span>
       </button>
         <div class="pf-progress">
-          <span class="xn-pills" data-tier="{{.Rank.Tier}}" role="img" aria-label="{{.Rank.Tier}} of 5 pills, {{.Rank.Name}}"><span class="xn-rank-pips"><i></i><i></i><i></i><i></i><i></i></span></span>
-          <span class="pf-rank-meter" role="img" aria-label="{{.Rank.Progress}}% of the way to {{.Rank.Next}}"><i style="width:{{.Rank.Progress}}%"></i></span>
+          <div class="pf-lp"><span class="xn-hexb" data-tier="{{.Rank.Tier}}" data-level="{{.Rank.Level}}"{{if ge .Rank.Level 10}} data-level-big{{end}} role="img" aria-label="{{.Rank.Name}} badge, level {{.Rank.Level}}"><span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv">Level {{.Rank.Level}}</span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span></span><span class="xn-rn" data-tier="{{.Rank.Tier}}">{{.Rank.Name}}</span></div>
+          <span class="xn-lbar" data-tier="{{.Rank.Tier}}" style="--fill: {{.Rank.BarPct}}%" role="progressbar" aria-label="Rank progress this round, {{.Rank.ToNext}} points to {{.Rank.Next}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Rank.BarPct}}"><span class="xn-lbar-track"><span class="xn-lbar-fill"></span></span><span class="xn-lbar-mile" data-t="1" title="Fresh Geek"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="2" title="Noob"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="3" title="Refined Geeker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="4" title="Mythical Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="5" title="Twea(king)"><i class="xn-lp-ico"></i></span></span>
           <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}} · {{.Rank.ToNext}} more to {{.Rank.Next}}{{if eq .Rank.Tier 5}} (level {{.Rank.Level}} reached){{end}}</small>
         </div>
       </div>
@@ -93,7 +93,7 @@
             </div>
           </div>
         </div>
-        <p class="pf-note pf-rank-how" id="rankHow" hidden>Every Graph session and Forum post you make is a point. In your first round the ranks are Fresh Geek, Geek (5), Big Geek (20), Mega Geek (50) and Geek⁴ (120). Each time you reach Geek⁴ you earn a level. When a round is full (150 points the first time) the ranks start over from Fresh Geek, and every new round needs 10% more points than the one before. You're in round {{.Rank.Round}}, which takes {{.Rank.RoundSize}} points.</p>
+        <p class="pf-note pf-rank-how" id="rankHow" hidden>Every Graph session and Forum post you make is a point. In your first round the ranks are Fresh Geek, Noob (5), Refined Geeker (20), Mythical Tweaker (50) and Twea(king) (120). Each time you reach Twea(king) you earn a level. When a round is full (150 points the first time) the ranks start over from Fresh Geek, and every new round needs 10% more points than the one before. You're in round {{.Rank.Round}}, which takes {{.Rank.RoundSize}} points.</p>
         <div class="pf-bio" id="pfBio">
           <p class="pf-bio-text" id="bioText" {{if not .Bio}}hidden{{end}}>{{.Bio}}</p>
           <button type="button" class="pf-bio-edit" id="bioEdit">{{if .Bio}}Edit description{{else}}+ Add a description{{end}}</button>

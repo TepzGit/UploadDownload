@@ -109,7 +109,217 @@
     </label>
     <div class="fa-list" id="faList" aria-live="polite"><p class="fa-empty">Loading accounts…</p></div>
   </section>
+
+  <section class="xn-card adm-card" id="newsBoard" aria-labelledby="nbTitle">
+    <p class="xn-eyebrow">Main page</p>
+    <h2 class="xn-h1 adm-h2" id="nbTitle">News board</h2>
+    <p class="xn-sub">The System announcements box on the Main page, under Log in and Weather. Each one gets a type tag; pinned ones stay on top.</p>
+    <div class="nb-ver">
+      <label for="nbSiteVer"><span class="xn-label">Geek⁴u version now</span></label>
+      <div class="nb-ver-row"><span class="nb-ver-v" aria-hidden="true">v</span><input class="xn-input" id="nbSiteVer" maxlength="20" autocomplete="off" placeholder="1.0"><button type="button" class="xn-btn" id="nbSiteVerSave">Save version</button><span class="nb-status" id="nbVerStatus" role="status"></span></div>
+      <p class="nb-hint">Shown on the board. New news is filed under it, and each version gets a dot on the Main page's version timeline.</p>
+    </div>
+    <form class="nb-form" id="nbForm">
+      <div class="nb-two">
+        <label><span class="xn-label">Type</span>
+          <select class="xn-input" id="nbKind"><option value="update">Update</option><option value="notice">Notice</option><option value="feature">New feature</option><option value="fix">Fix</option></select></label>
+        <label><span class="xn-label">Title</span>
+          <input class="xn-input" id="nbTitleIn" maxlength="120" autocomplete="off" placeholder="For example, Music player released"></label>
+      </div>
+      <label><span class="xn-label">Message</span>
+        <textarea class="xn-input nb-text" id="nbBody" rows="4" maxlength="2000" required placeholder="The first line shows on the Main page; the rest opens when someone clicks it."></textarea></label>
+      <div class="nb-looks">
+        <div class="nb-look"><span class="xn-label">Thumbnail</span>
+          <div class="nb-thumb-row"><span class="nb-thumb" id="nbThumbBox"><img id="nbThumbImg" alt="" hidden><span id="nbThumbNone">None</span></span>
+            <input type="file" id="nbThumbFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+            <button type="button" class="xn-btn" id="nbThumbPick">Upload</button><button type="button" class="xn-btn" id="nbThumbDel" hidden>Remove</button></div></div>
+        <label class="nb-look"><span class="xn-label">Font</span>
+          <select class="xn-input" id="nbFont"><option value="">Site font</option><option value="sans" data-font="sans">Clean</option><option value="serif" data-font="serif">Serif</option><option value="rounded" data-font="rounded">Rounded</option><option value="mono" data-font="mono">Typewriter</option><option value="display" data-font="display">Bold display</option><option value="hand" data-font="hand">Handwritten</option></select></label>
+        <div class="nb-look"><span class="xn-label">Color</span>
+          <div class="nb-color-row"><label class="nb-pin"><input type="checkbox" id="nbColorOn"> Own color</label><input type="color" id="nbColor" value="#a78bfa" aria-label="News color" disabled></div></div>
+        <label class="nb-look"><span class="xn-label">Version</span>
+          <input class="xn-input" id="nbVersion" maxlength="20" autocomplete="off" placeholder="Now"></label>
+      </div>
+      <p class="nb-preview-wrap"><span class="xn-label">Preview</span><span class="nb-preview" id="nbPreview">Title</span></p>
+      <div class="nb-row">
+        <label class="nb-pin"><input type="checkbox" id="nbPinned"> Pin to the top</label>
+        <span class="nb-count" id="nbCount">0 / 2000</span>
+      </div>
+      <div class="nb-row">
+        <span class="nb-status" id="nbStatus" role="status"></span>
+        <button type="button" class="xn-btn" id="nbCancel" hidden>Cancel</button>
+        <button type="submit" class="xn-btn xn-btn-primary" id="nbSave">Post</button>
+      </div>
+    </form>
+    <ol class="nb-list" id="nbList" aria-live="polite"><li class="fa-empty">Loading news…</li></ol>
+  </section>
 </main>
+<script>
+  // News board: post, edit, pin and delete what the Main page shows (/site/news).
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    const form = $("nbForm"), list = $("nbList"), title = $("nbTitleIn"), body = $("nbBody"), pinned = $("nbPinned"), kind = $("nbKind");
+    const font = $("nbFont"), color = $("nbColor"), colorOn = $("nbColorOn"), version = $("nbVersion"), preview = $("nbPreview");
+    const thumbFile = $("nbThumbFile"), thumbImg = $("nbThumbImg"), thumbNone = $("nbThumbNone"), thumbDel = $("nbThumbDel");
+    const siteVer = $("nbSiteVer"), verStatus = $("nbVerStatus");
+    let thumb = "", current = "1.0";
+    const save = $("nbSave"), cancel = $("nbCancel"), status = $("nbStatus"), count = $("nbCount");
+    let items = [];
+    let editing = 0;
+    const KINDS = { update: "Update", notice: "Notice", feature: "New feature", fix: "Fix" };
+    const when = (ms) => new Date(ms).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text == null ? "" : text });
+
+    function show(next) {
+      items = next;
+      if (!items.length) { list.replaceChildren(make("li", "fa-empty", "No news yet. Write the first one above.")); return; }
+      list.replaceChildren(...items.map((n) => {
+        const li = make("li", "nb-item" + (n.pinned ? " is-pinned" : "") + (n.id === editing ? " is-editing" : ""));
+        li.dataset.id = n.id;
+        const text = make("div", "nb-item-text");
+        const tags = make("div", "nb-tags");
+        const k = KINDS[n.kind] ? n.kind : "update";
+        const tag = make("span", "nb-kind", KINDS[k]);
+        tag.dataset.kind = k;
+        tags.append(tag);
+        if (n.pinned) tags.append(make("span", "nb-badge", "Pinned"));
+        tags.append(make("span", "nb-badge nb-vbadge", "v" + (n.version || "1.0")));
+        text.append(tags);
+        if (n.title) {
+          const t = make("strong", "nb-item-title", n.title);
+          if (n.font) t.dataset.font = n.font;
+          if (n.color) t.style.color = n.color;
+          text.append(t);
+        }
+        text.append(make("p", "nb-item-body", n.body), make("p", "nb-item-meta", n.author + " · " + when(n.at) + (n.edited ? " · edited " + when(n.edited) : "")));
+        const acts = make("div", "nb-acts");
+        acts.append(make("button", "xn-btn nb-edit", "Edit"), make("button", "xn-btn nb-pinbtn", n.pinned ? "Unpin" : "Pin"), make("button", "xn-btn nb-del", "Delete"));
+        acts.querySelectorAll("button").forEach((b) => { b.type = "button"; });
+        if (n.thumb) { const im = make("img", "nb-item-thumb"); im.src = "/newspic/" + n.thumb; im.alt = ""; li.append(im); }
+        li.append(text, acts);
+        return li;
+      }));
+    }
+    async function send(payload) {
+      const res = await fetch("/site/news", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save that.");
+      const d = await res.json();
+      if (d.version) setCurrent(d.version);
+      show(d.items || []);
+    }
+    function setCurrent(v) { current = v; siteVer.value = v; version.placeholder = "Now (" + v + ")"; }
+    function setThumb(name) {
+      thumb = name || "";
+      thumbImg.hidden = !thumb;
+      thumbNone.hidden = !!thumb;
+      thumbDel.hidden = !thumb;
+      if (thumb) thumbImg.src = "/newspic/" + thumb; else thumbImg.removeAttribute("src");
+    }
+    function paintPreview() {
+      preview.textContent = title.value.trim() || "Title";
+      if (font.value) preview.dataset.font = font.value; else delete preview.dataset.font;
+      preview.style.color = colorOn.checked ? color.value : "";
+      color.disabled = !colorOn.checked;
+    }
+    [title, font, color, colorOn].forEach((el) => el.addEventListener("input", paintPreview));
+    colorOn.addEventListener("change", paintPreview);
+    $("nbThumbPick").addEventListener("click", () => thumbFile.click());
+    thumbDel.addEventListener("click", () => setThumb(""));
+    thumbFile.addEventListener("change", async () => {
+      const f = thumbFile.files[0];
+      thumbFile.value = "";
+      if (!f) return;
+      const fd = new FormData();
+      fd.append("image", f);
+      status.textContent = "Uploading the thumbnail…";
+      try {
+        const res = await fetch("/site/news/thumb", { method: "POST", body: fd });
+        if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't upload it.");
+        setThumb((await res.json()).name);
+        status.textContent = "";
+      } catch (error) { status.textContent = error.message; }
+    });
+    $("nbSiteVerSave").addEventListener("click", async () => {
+      verStatus.textContent = "";
+      try {
+        await send({ action: "setVersion", version: siteVer.value });
+        verStatus.textContent = "Saved. The board shows v" + current + ".";
+      } catch (error) { verStatus.textContent = error.message; }
+    });
+    siteVer.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("nbSiteVerSave").click(); } });
+    function reset() {
+      editing = 0;
+      form.reset();
+      save.textContent = "Post";
+      cancel.hidden = true;
+      count.textContent = "0 / 2000";
+      setThumb("");
+      paintPreview();
+      list.querySelectorAll(".is-editing").forEach((li) => li.classList.remove("is-editing"));
+    }
+    body.addEventListener("input", () => { count.textContent = body.value.length + " / 2000"; });
+    body.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+    cancel.addEventListener("click", () => { reset(); status.textContent = ""; });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!body.value.trim()) { status.textContent = "Write something first."; return; }
+      save.disabled = true;
+      status.textContent = "";
+      const payload = { title: title.value, body: body.value, kind: kind.value, pinned: pinned.checked, thumb, font: font.value, color: colorOn.checked ? color.value : "", version: version.value };
+      try {
+        await send(editing ? { action: "edit", id: editing, ...payload } : { action: "post", ...payload });
+        status.textContent = editing ? "Saved. The Main page shows it now." : "Posted. Everyone sees it on the Main page.";
+        reset();
+      } catch (error) { status.textContent = error.message; }
+      finally { save.disabled = false; }
+    });
+    list.addEventListener("click", async (e) => {
+      const li = e.target.closest(".nb-item");
+      if (!li) return;
+      const n = items.find((x) => x.id === Number(li.dataset.id));
+      if (!n) return;
+      if (e.target.closest(".nb-edit")) {
+        editing = n.id;
+        title.value = n.title || "";
+        body.value = n.body;
+        pinned.checked = !!n.pinned;
+        kind.value = KINDS[n.kind] ? n.kind : "update";
+        font.value = n.font || "";
+        colorOn.checked = !!n.color;
+        if (n.color) color.value = n.color;
+        version.value = n.version || "";
+        setThumb(n.thumb);
+        paintPreview();
+        count.textContent = body.value.length + " / 2000";
+        save.textContent = "Save changes";
+        cancel.hidden = false;
+        status.textContent = "Editing the news from " + when(n.at) + ".";
+        list.querySelectorAll(".nb-item").forEach((x) => x.classList.toggle("is-editing", x === li));
+        form.scrollIntoView({ behavior: "smooth", block: "center" });
+        body.focus({ preventScroll: true });
+        return;
+      }
+      try {
+        if (e.target.closest(".nb-pinbtn")) await send({ action: "pin", id: n.id, pinned: !n.pinned });
+        const del = e.target.closest(".nb-del");
+        if (del) {
+          if (del.dataset.sure !== "1") {
+            del.dataset.sure = "1";
+            del.textContent = "Sure?";
+            setTimeout(() => { del.dataset.sure = ""; del.textContent = "Delete"; }, 3000);
+            return;
+          }
+          if (editing === n.id) reset();
+          await send({ action: "delete", id: n.id });
+        }
+      } catch (error) { status.textContent = error.message; }
+    });
+    fetch("/site/news", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { if (d.version) setCurrent(d.version); show(d.items || []); })
+      .catch(() => list.replaceChildren(make("li", "fa-empty", "Couldn't load the news.")));
+  })();
+</script>
 <script>
   // Stats: views per day, top pages, accounts with their numbers.
   (function () {

@@ -8,15 +8,26 @@
 (function () {
   document.documentElement.classList.add("xn-js");
 
+  // Firefox (and older Safari) can't animate from one page to the next on
+  // their own (cross-document view transitions, "pagereveal"). oled.css gives
+  // them their own page change under html.xn-no-vt. html.xn-ff marks
+  // Firefox, which also scrolls the wheel smoothly by itself.
+  if (!("onpagereveal" in window)) document.documentElement.classList.add("xn-no-vt");
+  if (/Firefox\//.test(navigator.userAgent)) document.documentElement.classList.add("xn-ff");
+
   // The desktop app's server runs on this computer (it sets this cookie).
   // The app has the same top bar as the website, without the phone tab bar.
   const LOCAL_SERVER = /(?:^|;\s*)xn_local=1(?:;|$)/.test(document.cookie);
   if (LOCAL_SERVER) document.documentElement.classList.add("xn-desk");
 
-  // Wide screens and the desktop app keep every page behind the menu button
-  // next to the logo (html.xn-menu in oled.css). Phones use the tab bar.
+  // Wide screens, the desktop app and iPhones/iPads (Safari and the iOS app)
+  // keep every page behind the menu button next to the logo (html.xn-menu in
+  // oled.css). Other phones use the tab bar.
   const WIDE = window.matchMedia("(min-width: 768px)");
-  const syncMenu = () => document.documentElement.classList.toggle("xn-menu", LOCAL_SERVER || WIDE.matches);
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || /Geek4uApp\/[^ ]* \(iOS\)/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (IOS) document.documentElement.classList.add("xn-ios");
+  const syncMenu = () => document.documentElement.classList.toggle("xn-menu", LOCAL_SERVER || IOS || WIDE.matches);
   syncMenu();
   WIDE.addEventListener("change", syncMenu);
   
@@ -263,7 +274,7 @@
   // Geek rank: 5 tiers, one point per Graph session and per Forum post.
   // The names match geekTiers in UploadDownload.go. The label next to a
   // name is the tier name; look is the account's rankLook (color, style, icon).
-  const RANKS = ["Fresh Geek", "Geek", "Big Geek", "Mega Geek", "Geek⁴"];
+  const RANKS = ["Fresh Geek", "Noob", "Refined Geeker", "Mythical Tweaker", "Twea(king)"];
   const HEX = /^#[0-9a-f]{6}$/i;
   window.xnRank = {
     NAMES: RANKS,
@@ -296,6 +307,27 @@
       return el;
     },
   };
+
+  // Rank name lettering (Level pack, mommy 2026-11-01): Fresh Geek and
+  // Refined Geeker move letter by letter, so their names are split into
+  // one <i> per letter (oled.css .xn-rn).
+  window.xnRank.letter = function (root) {
+    (root || document).querySelectorAll(".xn-rn:not(.is-split)").forEach((el) => {
+      const t = el.dataset.tier;
+      if (t !== "1" && t !== "3") return;
+      const text = el.textContent;
+      el.textContent = "";
+      Array.from(text).forEach((c, i) => {
+        const s = document.createElement("i");
+        s.style.setProperty("--i", String(i));
+        s.textContent = c;
+        el.append(s);
+      });
+      el.classList.add("is-split");
+    });
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => window.xnRank.letter());
+  else window.xnRank.letter();
 
   // The letter next to the logo: comments other people left on your
   // Forum posts. It shows only while some are unread.
@@ -590,7 +622,7 @@
     });
 
     if (LOCAL_SERVER) initPrerender();
-    else initTabs(nav, links);
+    else if (!IOS) initTabs(nav, links);
     if (!toggle) return;
 
     // The tiles open under the menu button, each one dropping in after the
@@ -775,6 +807,8 @@
   // inner scroll boxes and "reduce motion" all keep the browser's own scrolling.
   function initSmoothWheel() {
     if (!window.matchMedia("(pointer: fine)").matches) return;
+    // Firefox already eases each wheel notch itself; doing it twice feels slow.
+    if (document.documentElement.classList.contains("xn-ff")) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const root = document.scrollingElement || document.documentElement;
