@@ -84,6 +84,13 @@
     @keyframes jr-drop{ from{ opacity:0; transform:translateY(-4px); } }
     @media (max-width:640px){ .jr-classpick, .jr-class-btn{ display:flex; width:100%; } .jr-classes{ width:100%; } }
     .jr-chip:focus-visible{ outline:2px solid var(--oled-accent); outline-offset:1px; }
+    /* Wikipedia-style portal over the molecule background (mommy 2026-11-02, see DruginfoPage.css). */
+    body:has(.jr-portal){ background:#07090c; }
+    .xn-card.jr-portal{ --oled-surface: rgba(16,20,24,.94); background:rgba(16,20,24,.94); border-color:#2a2e35; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+    .jr-title{ --oled-font:"Linux Libertine", Georgia, "Times New Roman", Times, serif; font-weight:400 !important; letter-spacing:0 !important; font-size:clamp(1.8rem,3.4vw,2.5rem) !important; }
+    .jr-tagline{ --oled-font:"Linux Libertine", Georgia, "Times New Roman", Times, serif; margin:2px 0 10px; font-size:1.05rem; color:#c8ccd1; }
+    .jr-tagline a{ color:#88a3e8; text-decoration:none; }
+    .jr-portal .jr-head{ padding-bottom:14px; border-bottom:1px solid #3a3f47; }
     .jr-count{ margin:12px 0 0; font-size:12px; color:var(--muted); }
     .jr-count:empty{ display:none; }
     @media (max-width:640px){ .jr-search{ max-width:none; } .bottombar .xn-btn{ flex:1; } }
@@ -100,6 +107,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/DruginfoPage.css" />
   <link rel="stylesheet" href="/oled.css" />
   <script src="/nav.js"></script>
   <link rel="stylesheet" href="/classicons.css" />
@@ -127,13 +135,15 @@
   <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
   <div class="xn-hatch" aria-hidden="true"></div>
 
+  <div class="wk-backdrop" aria-hidden="true"></div>
   <main class="xn-page">
-    <section class="xn-card">
+    <section class="xn-card jr-portal">
       <div class="jr-head">
         <div>
           <p class="xn-eyebrow">Journal</p>
-          <h1 class="xn-h1">Browse substances</h1>
-          <p class="xn-sub">Search and explore substances from the PsychonautWiki catalog.</p>
+          <h1 class="xn-h1 jr-title">Welcome to the Journal,</h1>
+          <p class="jr-tagline">the substance encyclopedia that <a href="/Profile">you</a> can keep.</p>
+          <p class="xn-sub">Search and explore substances from the PsychonautWiki catalog. Each page has doses, combinations from Mixtures.info and pictures from Wikimedia Commons.</p>
         </div>
         <label class="jr-search">
           <span class="xn-sr">Search substances</span>

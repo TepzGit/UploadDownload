@@ -399,6 +399,7 @@ func main() {
 	http.HandleFunc("/music/cover/", requireLogin(musicCover))
 	http.HandleFunc("/music/offline", requireLogin(musicOffline))
 	http.HandleFunc("/admin/stats", requireAdminLogin(adminStats))
+	http.HandleFunc("/admin/level", requireAdminLogin(adminSetLevel))
 	http.HandleFunc("/admin/server", requireAdminLogin(adminServer))
 	http.HandleFunc("/site/picture", requireAdminLogin(sitePictureUpload))
 	http.HandleFunc("/site/main-look", requireAdminLogin(saveMainLook))
@@ -534,7 +535,7 @@ func main() {
 	// createdAt and lastSeen (ms) feed the Admin page's account list.
 	// graphsMade and postsMade count every Graph session and Forum post ever made
 	// (for the geek rank), so deleting or the session limit doesn't lower it.
-	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0", "bio TEXT NOT NULL DEFAULT ''", "rankLook TEXT NOT NULL DEFAULT ''", "shelf TEXT NOT NULL DEFAULT ''", "shelfColor TEXT NOT NULL DEFAULT ''"} {
+	for _, column := range []string{"profileLayout TEXT NOT NULL DEFAULT ''", "pathToBackground TEXT NOT NULL DEFAULT ''", "siteColor TEXT NOT NULL DEFAULT ''", "widgetClear INTEGER NOT NULL DEFAULT 0", "nameColor TEXT NOT NULL DEFAULT ''", "notesSeenAt INTEGER NOT NULL DEFAULT 0", "siteBg TEXT NOT NULL DEFAULT ''", "siteBgImage TEXT NOT NULL DEFAULT ''", "siteBgDim INTEGER NOT NULL DEFAULT 40", "plotStyle TEXT NOT NULL DEFAULT ''", "siteLook TEXT NOT NULL DEFAULT ''", "createdAt INTEGER NOT NULL DEFAULT 0", "lastSeen INTEGER NOT NULL DEFAULT 0", "graphsMade INTEGER NOT NULL DEFAULT 0", "postsMade INTEGER NOT NULL DEFAULT 0", "bio TEXT NOT NULL DEFAULT ''", "rankLook TEXT NOT NULL DEFAULT ''", "levelBonus INTEGER NOT NULL DEFAULT 0", "shelf TEXT NOT NULL DEFAULT ''", "shelfColor TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the profile layout columns: " + err.Error())
 		}
@@ -554,8 +555,9 @@ func main() {
 	registerLinkDownloads()
 	registerChat()
 	registerFriendsBar()
+	registerSubstanceExtras()
 	// News board items got a title, a pin and an edit time.
-	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''"} {
+	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''", "tag TEXT NOT NULL DEFAULT ''", "tag_color TEXT NOT NULL DEFAULT ''", "size TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE site_news ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			panic("cannot add the news columns: " + err.Error())
 		}
@@ -649,25 +651,35 @@ func Main(w http.ResponseWriter, r *http.Request) {
 
 // newsItem is one message admins broadcast on the Main page.
 type newsItem struct {
-	ID      int64  `json:"id"`
-	Author  string `json:"author"`
-	Title   string `json:"title"`
-	Body    string `json:"body"`
-	Pinned  bool   `json:"pinned"`
-	Kind    string `json:"kind"`    // a key of newsKinds: the tag before the title
-	Thumb   string `json:"thumb"`   // file name of the thumbnail in sitePicturesDir, "" for none
-	Font    string `json:"font"`    // a key of newsFonts, "" for the site font
-	Color   string `json:"color"`   // #rrggbb for the title and marker, "" for the site color
-	Version string `json:"version"` // the Geek⁴u version it belongs to, like 1.4
-	At      int64  `json:"at"`      // unix ms
-	Edited  int64  `json:"edited"`  // unix ms of the last edit, 0 when never edited
+	ID       int64  `json:"id"`
+	Author   string `json:"author"`
+	Title    string `json:"title"`
+	Body     string `json:"body"`
+	Pinned   bool   `json:"pinned"`
+	Kind     string `json:"kind"`     // a key of newsKinds: the tag before the title
+	Thumb    string `json:"thumb"`    // file name of the thumbnail in sitePicturesDir, "" for none
+	Font     string `json:"font"`     // a key of newsFonts, "" for the site font
+	Color    string `json:"color"`    // #rrggbb for the title and marker, "" for the site color
+	Version  string `json:"version"`  // the Geek⁴u version it belongs to, like 1.4
+	Tag      string `json:"tag"`      // the admin's own tag text, "" for the type's name
+	TagColor string `json:"tagColor"` // #rrggbb for the tag, "" for the type's color
+	Size     string `json:"size"`     // a key of newsSizes: "" small, "medium" long text, "large" big thumbnail
+	At       int64  `json:"at"`       // unix ms
+	Edited   int64  `json:"edited"`   // unix ms of the last edit, 0 when never edited
 }
 
 // newsKinds are the tags a news can carry on the Main page's announcements board.
 var newsKinds = map[string]string{"update": "Update", "notice": "Notice", "feature": "New feature", "fix": "Fix"}
 
 // newsFonts are the fonts an admin can give a news (CSS in Main.html, data-font).
-var newsFonts = map[string]bool{"": true, "sans": true, "serif": true, "rounded": true, "mono": true, "display": true, "hand": true}
+var newsFonts = map[string]bool{"": true, "sans": true, "serif": true, "rounded": true, "mono": true, "display": true, "hand": true,
+	"grotesk": true, "code": true, "bubbly": true, "slab": true, "condensed": true, "elegant": true, "comic": true}
+
+// newsSizes are the card sizes on the Main page's board: small is one row, medium shows a long text,
+// large is about three rows high with a big thumbnail.
+var newsSizes = map[string]bool{"": true, "medium": true, "large": true}
+
+const newsTagMax = 24
 
 var newsThumbName = regexp.MustCompile(`^news-[0-9a-f]{12}\.(jpg|png|gif|webp)$`)
 var newsVersionText = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z._ -]{0,19}$`)
@@ -687,6 +699,14 @@ func (n newsItem) Day() string { return time.UnixMilli(n.At).Format("02.01.06") 
 // KindLabel is the tag text, like "New feature".
 func (n newsItem) KindLabel() string { return newsKinds[cleanNewsKind(n.Kind)] }
 
+// TagText is what the tag shows: the admin's own text, else the type's name.
+func (n newsItem) TagText() string {
+	if n.Tag != "" {
+		return n.Tag
+	}
+	return n.KindLabel()
+}
+
 // ThumbURL is the link to the thumbnail, "" when there is none.
 func (n newsItem) ThumbURL() string {
 	if n.Thumb == "" {
@@ -697,10 +717,14 @@ func (n newsItem) ThumbURL() string {
 
 // Style is the news' own color as CSS variables, "" for the site color.
 func (n newsItem) Style() template.CSS {
-	if !hexColor.MatchString(n.Color) {
-		return ""
+	var parts []string
+	if hexColor.MatchString(n.Color) {
+		parts = append(parts, "--ann-color: "+n.Color)
 	}
-	return template.CSS("--ann-color: " + n.Color)
+	if hexColor.MatchString(n.TagColor) {
+		parts = append(parts, "--ann-tag: "+n.TagColor)
+	}
+	return template.CSS(strings.Join(parts, "; "))
 }
 
 const newsShown = 20
@@ -716,15 +740,21 @@ func siteVersion() string {
 	return v
 }
 
-const newsColumns = "id, author, title, body, pinned, kind, thumb, font, color, version, created_at, edited_at"
+const newsColumns = "id, author, title, body, pinned, kind, thumb, font, color, version, tag, tag_color, size, created_at, edited_at"
 
 func scanNews(rows *sql.Rows) []newsItem {
 	out := []newsItem{}
 	defer rows.Close()
 	for rows.Next() {
 		var n newsItem
-		if rows.Scan(&n.ID, &n.Author, &n.Title, &n.Body, &n.Pinned, &n.Kind, &n.Thumb, &n.Font, &n.Color, &n.Version, &n.At, &n.Edited) == nil {
+		if rows.Scan(&n.ID, &n.Author, &n.Title, &n.Body, &n.Pinned, &n.Kind, &n.Thumb, &n.Font, &n.Color, &n.Version, &n.Tag, &n.TagColor, &n.Size, &n.At, &n.Edited) == nil {
 			n.Kind = cleanNewsKind(n.Kind)
+			if !newsSizes[n.Size] {
+				n.Size = ""
+			}
+			if !hexColor.MatchString(n.TagColor) {
+				n.TagColor = ""
+			}
 			if !newsFonts[n.Font] {
 				n.Font = ""
 			}
@@ -820,16 +850,19 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var in struct {
-			Action  string `json:"action"`
-			Title   string `json:"title"`
-			Body    string `json:"body"`
-			Pinned  bool   `json:"pinned"`
-			Kind    string `json:"kind"`
-			Thumb   string `json:"thumb"`
-			Font    string `json:"font"`
-			Color   string `json:"color"`
-			Version string `json:"version"`
-			ID      int64  `json:"id"`
+			Action   string `json:"action"`
+			Title    string `json:"title"`
+			Body     string `json:"body"`
+			Pinned   bool   `json:"pinned"`
+			Kind     string `json:"kind"`
+			Thumb    string `json:"thumb"`
+			Font     string `json:"font"`
+			Color    string `json:"color"`
+			Version  string `json:"version"`
+			Tag      string `json:"tag"`
+			TagColor string `json:"tagColor"`
+			Size     string `json:"size"`
+			ID       int64  `json:"id"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&in); err != nil {
 			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
@@ -866,6 +899,17 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 			if !hexColor.MatchString(in.Color) {
 				in.Color = ""
 			}
+			in.Tag = strings.TrimSpace(strings.Join(strings.Fields(in.Tag), " "))
+			if utf8.RuneCountInString(in.Tag) > newsTagMax {
+				http.Error(w, fmt.Sprintf("Keep the tag under %d characters.", newsTagMax), http.StatusBadRequest)
+				return
+			}
+			if !hexColor.MatchString(in.TagColor) {
+				in.TagColor = ""
+			}
+			if !newsSizes[in.Size] {
+				in.Size = ""
+			}
 			if in.Thumb != "" {
 				if _, err := os.Stat(filepath.Join(sitePicturesDir, in.Thumb)); !newsThumbName.MatchString(in.Thumb) || err != nil {
 					http.Error(w, "That thumbnail is gone. Upload it again.", http.StatusBadRequest)
@@ -875,8 +919,8 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 		}
 		switch in.Action {
 		case "post":
-			if _, err := db.Exec("INSERT INTO site_news (author, title, body, pinned, kind, thumb, font, color, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-				session.OriginalUsername, title, body, in.Pinned, cleanNewsKind(in.Kind), in.Thumb, in.Font, in.Color, version, time.Now().UnixMilli()); err != nil {
+			if _, err := db.Exec("INSERT INTO site_news (author, title, body, pinned, kind, thumb, font, color, version, tag, tag_color, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				session.OriginalUsername, title, body, in.Pinned, cleanNewsKind(in.Kind), in.Thumb, in.Font, in.Color, version, in.Tag, in.TagColor, in.Size, time.Now().UnixMilli()); err != nil {
 				fmt.Println(err)
 				http.Error(w, "Couldn't post it.", http.StatusInternalServerError)
 				return
@@ -884,8 +928,8 @@ func siteNews(w http.ResponseWriter, r *http.Request) {
 		case "edit":
 			var oldThumb string
 			db.QueryRow("SELECT thumb FROM site_news WHERE id = ?", in.ID).Scan(&oldThumb)
-			res, err := db.Exec("UPDATE site_news SET title = ?, body = ?, pinned = ?, kind = ?, thumb = ?, font = ?, color = ?, version = ?, edited_at = ? WHERE id = ?",
-				title, body, in.Pinned, cleanNewsKind(in.Kind), in.Thumb, in.Font, in.Color, version, time.Now().UnixMilli(), in.ID)
+			res, err := db.Exec("UPDATE site_news SET title = ?, body = ?, pinned = ?, kind = ?, thumb = ?, font = ?, color = ?, version = ?, tag = ?, tag_color = ?, size = ?, edited_at = ? WHERE id = ?",
+				title, body, in.Pinned, cleanNewsKind(in.Kind), in.Thumb, in.Font, in.Color, version, in.Tag, in.TagColor, in.Size, time.Now().UnixMilli(), in.ID)
 			if err != nil {
 				fmt.Println(err)
 				http.Error(w, "Couldn't save it.", http.StatusInternalServerError)
@@ -6256,7 +6300,7 @@ func notifications(w http.ResponseWriter, r *http.Request) {
 // ---- Site backgrounds ----
 
 // siteScenes are the backgrounds an account can pick for every page.
-var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars": true, "grid": true, "pills": true, "waves": true, "custom": true}
+var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars": true, "grid": true, "pills": true, "waves": true, "sunset": true, "custom": true}
 
 // ---- Geek rank ----
 
@@ -6342,8 +6386,24 @@ func (g geekRank) BarPct() int {
 	return int(math.Round((float64(g.Tier-1) + in/float64(to-from)) * 100 / float64(n-1)))
 }
 
-func makeRank(graphs, posts int) geekRank {
+// pointsForLevel is how many points reaching level l takes in total.
+func pointsForLevel(l int) int {
+	n := 0
+	for i := 0; i < l && i < rankMaxLevel; i++ {
+		n += rankStep(i)
+	}
+	return n
+}
+
+// makeRank: bonus is the admin's level change (users.levelBonus, points, may be negative).
+func makeRank(graphs, posts int, bonus ...int) geekRank {
 	g := geekRank{Graphs: graphs, Posts: posts, Score: graphs + posts}
+	for _, b := range bonus {
+		g.Score += b
+	}
+	if g.Score < 0 {
+		g.Score = 0
+	}
 	left := g.Score
 	for g.Level < rankMaxLevel && left >= rankStep(g.Level) {
 		left -= rankStep(g.Level)
@@ -6386,16 +6446,16 @@ func allRanks() map[string]geekRank {
 		return ranks
 	}
 	m := map[string]geekRank{}
-	rows, err := db.Query("SELECT username, graphsMade, postsMade, rankLook FROM users")
+	rows, err := db.Query("SELECT username, graphsMade, postsMade, rankLook, levelBonus FROM users")
 	if err != nil {
 		fmt.Println(err)
 		return ranks
 	}
 	for rows.Next() {
 		var name, look string
-		var graphs, posts int
-		if rows.Scan(&name, &graphs, &posts, &look) == nil {
-			g := makeRank(graphs, posts)
+		var graphs, posts, bonus int
+		if rows.Scan(&name, &graphs, &posts, &look, &bonus) == nil {
+			g := makeRank(graphs, posts, bonus)
 			if look != "" && json.Unmarshal([]byte(look), &g.Look) == nil {
 				g.Look = g.Look.clean()
 			}
@@ -6765,7 +6825,7 @@ func adminStats(w http.ResponseWriter, r *http.Request) {
 	}
 	users := []userRow{}
 	rows, err := db.Query(`SELECT u.id, u.originalUsername, u.authority, u.pathToProfilePic, u.createdAt, u.lastSeen,
-		u.graphsMade, u.postsMade,
+		u.graphsMade, u.postsMade, u.levelBonus,
 		(SELECT COUNT(*) FROM forum_comments c WHERE c.user_id = u.id),
 		(SELECT COUNT(*) FROM doses d WHERE d.user_id = u.id),
 		(SELECT COUNT(*) FROM liked_substances l WHERE l.user_id = u.id),
@@ -6781,7 +6841,8 @@ func adminStats(w http.ResponseWriter, r *http.Request) {
 		var u userRow
 		var authority, avatar string
 		var login sql.NullString
-		if err := rows.Scan(&u.ID, &u.Name, &authority, &avatar, &u.Joined, &u.LastSeen, &u.Graphs, &u.Posts, &u.Comments, &u.Doses, &u.Likes, &u.Friends, &login); err != nil {
+		var bonus int
+		if err := rows.Scan(&u.ID, &u.Name, &authority, &avatar, &u.Joined, &u.LastSeen, &u.Graphs, &u.Posts, &bonus, &u.Comments, &u.Doses, &u.Likes, &u.Friends, &login); err != nil {
 			fmt.Println(err)
 			continue
 		}
@@ -6796,7 +6857,7 @@ func adminStats(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		u.Rank = makeRank(u.Graphs, u.Posts)
+		u.Rank = makeRank(u.Graphs, u.Posts, bonus)
 		users = append(users, u)
 	}
 	rows.Close()
@@ -13694,4 +13755,678 @@ func newMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"items": out})
+}
+
+// adminSetLevel: POST {id, level} from the Admin accounts table (mommy 2026-11-02).
+// It sets users.levelBonus so the account lands at the start of that level;
+// new Graph sessions and posts keep adding points from there.
+func adminSetLevel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		ID    int `json:"id"`
+		Level int `json:"level"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil || in.Level < 0 || in.Level > rankMaxLevel {
+		http.Error(w, "Pick a level from 0 to 100.", http.StatusBadRequest)
+		return
+	}
+	var graphs, posts int
+	if err := db.QueryRow("SELECT graphsMade, postsMade FROM users WHERE id = ?", in.ID).Scan(&graphs, &posts); err != nil {
+		http.Error(w, "No such account.", http.StatusNotFound)
+		return
+	}
+	bonus := pointsForLevel(in.Level) - graphs - posts
+	if _, err := db.Exec("UPDATE users SET levelBonus = ? WHERE id = ?", bonus, in.ID); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save the level.", http.StatusInternalServerError)
+		return
+	}
+	staleRanks()
+	writeJSON(w, makeRank(graphs, posts, bonus))
+}
+
+// ---- Journal extras: Wikimedia Commons pictures and Mixtures.info (mommy 2026-11-02) ----
+// The drug page (/journal/Drug) asks our server, which fetches, trims and caches the
+// answers in ext_cache so pages stay fast and still show something when an API is down.
+// GEEK4U_COMMONS_API / GEEK4U_MIXTURES_API swap the addresses (used by the tests).
+
+const extCacheSchema = `
+CREATE TABLE IF NOT EXISTS ext_cache (
+	key TEXT PRIMARY KEY,
+	body BLOB NOT NULL,
+	at INTEGER NOT NULL
+);`
+
+var extClient = &http.Client{Timeout: 15 * time.Second}
+
+const extUserAgent = "Geek4u/1.0 (self-hosted substance journal; https://github.com/)"
+
+func registerSubstanceExtras() {
+	if _, err := db.Exec(extCacheSchema); err != nil {
+		panic("cannot create the ext_cache table: " + err.Error())
+	}
+	http.HandleFunc("/journal/api/pictures", requireLogin(substancePictures))
+	http.HandleFunc("/journal/api/mixtures", requireLogin(substanceMixtures))
+	http.HandleFunc("/journal/api/combo", requireLogin(substanceCombo))
+	http.HandleFunc("/journal/api/picture", requireLogin(commonsFile))
+}
+
+func extBase(env, def string) string {
+	if v := strings.TrimRight(os.Getenv(env), "/"); v != "" {
+		return v
+	}
+	return def
+}
+
+// extCached runs fetch at most once per ttl for key. A failed fetch serves the
+// last good copy when there is one. ok=false means "nothing found" (cached too).
+func extCached(key string, ttl time.Duration, fetch func() ([]byte, bool, error)) ([]byte, bool, error) {
+	var body []byte
+	var at int64
+	have := db.QueryRow("SELECT body, at FROM ext_cache WHERE key = ?", key).Scan(&body, &at) == nil
+	if have && time.Since(time.UnixMilli(at)) < ttl {
+		return body, len(body) > 0, nil
+	}
+	fresh, ok, err := fetch()
+	if err != nil {
+		if have {
+			return body, len(body) > 0, nil
+		}
+		return nil, false, err
+	}
+	if !ok {
+		fresh = nil
+	}
+	db.Exec("INSERT INTO ext_cache (key, body, at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET body = excluded.body, at = excluded.at", key, fresh, time.Now().UnixMilli())
+	return fresh, ok, nil
+}
+
+func extGet(link string) ([]byte, int, error) {
+	req, err := http.NewRequest("GET", link, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("User-Agent", extUserAgent)
+	req.Header.Set("Accept", "application/json")
+	res, err := extClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	return body, res.StatusCode, err
+}
+
+var extTags = regexp.MustCompile(`<[^>]*>`)
+var extSpaces = regexp.MustCompile(`[ \t\r\f\v]+`)
+
+// extText turns the HTML bits in Commons metadata into plain text.
+func extText(s string, max int) string {
+	s = strings.NewReplacer("<br>", "\n", "<br/>", "\n", "<br />", "\n", "</p>", "\n").Replace(s)
+	s = html.UnescapeString(extTags.ReplaceAllString(s, ""))
+	s = strings.TrimSpace(extSpaces.ReplaceAllString(s, " "))
+	if r := []rune(s); len(r) > max {
+		s = string(r[:max]) + "…"
+	}
+	return s
+}
+
+func extQuery(r *http.Request) string {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if r := []rune(q); len(r) > 80 {
+		q = string(r[:80])
+	}
+	return q
+}
+
+type commonsPicture struct {
+	File    string `json:"file"` // the Commons file name, for /journal/api/picture
+	Title   string `json:"title"`
+	Thumb   string `json:"thumb"`
+	URL     string `json:"url"`
+	Page    string `json:"page"`
+	Desc    string `json:"desc,omitempty"`
+	Artist  string `json:"artist,omitempty"`
+	License string `json:"license,omitempty"`
+	Width   int    `json:"width,omitempty"`
+	Height  int    `json:"height,omitempty"`
+	Mime    string `json:"mime,omitempty"`
+}
+
+// substancePictures: GET /journal/api/pictures?q=MDMA -> {items: [commonsPicture]}
+// from a Commons file search (plants, mushrooms, molecules, tablets, lab gear, drawings).
+func substancePictures(w http.ResponseWriter, r *http.Request) {
+	q := extQuery(r)
+	if q == "" {
+		writeJSON(w, map[string]any{"items": []commonsPicture{}})
+		return
+	}
+	body, ok, err := extCached("commons:"+strings.ToLower(q), 7*24*time.Hour, func() ([]byte, bool, error) {
+		v := url.Values{}
+		v.Set("action", "query")
+		v.Set("generator", "search")
+		v.Set("gsrsearch", q+" filetype:bitmap|drawing")
+		v.Set("gsrnamespace", "6")
+		v.Set("gsrlimit", "16")
+		v.Set("prop", "imageinfo")
+		v.Set("iiprop", "url|extmetadata|size|mime")
+		v.Set("iiurlwidth", "480")
+		v.Set("iiextmetadatafilter", "ImageDescription|Artist|LicenseShortName|ObjectName")
+		v.Set("format", "json")
+		raw, status, err := extGet(extBase("GEEK4U_COMMONS_API", "https://commons.wikimedia.org/w/api.php") + "?" + v.Encode())
+		if err != nil {
+			return nil, false, err
+		}
+		if status != http.StatusOK {
+			return nil, false, fmt.Errorf("commons answered %d", status)
+		}
+		var data struct {
+			Query struct {
+				Pages map[string]struct {
+					Index     int    `json:"index"`
+					Title     string `json:"title"`
+					ImageInfo []struct {
+						URL            string `json:"url"`
+						ThumbURL       string `json:"thumburl"`
+						DescriptionURL string `json:"descriptionurl"`
+						Width          int    `json:"width"`
+						Height         int    `json:"height"`
+						Mime           string `json:"mime"`
+						Ext            map[string]struct {
+							Value any `json:"value"`
+						} `json:"extmetadata"`
+					} `json:"imageinfo"`
+				} `json:"pages"`
+			} `json:"query"`
+		}
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, false, err
+		}
+		type ranked struct {
+			i int
+			p commonsPicture
+		}
+		list := []ranked{}
+		for _, page := range data.Query.Pages {
+			if len(page.ImageInfo) == 0 {
+				continue
+			}
+			ii := page.ImageInfo[0]
+			if !strings.HasPrefix(ii.Mime, "image/") || ii.ThumbURL == "" {
+				continue
+			}
+			meta := func(k string, max int) string {
+				if m, ok := ii.Ext[k]; ok {
+					if s, ok := m.Value.(string); ok {
+						return extText(s, max)
+					}
+				}
+				return ""
+			}
+			title := strings.TrimPrefix(page.Title, "File:")
+			if dot := strings.LastIndex(title, "."); dot > 0 {
+				title = title[:dot]
+			}
+			if n := meta("ObjectName", 120); n != "" {
+				title = n
+			}
+			list = append(list, ranked{page.Index, commonsPicture{
+				File: strings.TrimPrefix(page.Title, "File:"), Title: title, Thumb: ii.ThumbURL, URL: ii.URL, Page: ii.DescriptionURL,
+				Desc: meta("ImageDescription", 300), Artist: meta("Artist", 120), License: meta("LicenseShortName", 40),
+				Width: ii.Width, Height: ii.Height, Mime: ii.Mime,
+			}})
+		}
+		sort.Slice(list, func(a, b int) bool { return list[a].i < list[b].i })
+		items := make([]commonsPicture, 0, len(list))
+		for _, x := range list {
+			items = append(items, x.p)
+		}
+		out, err := json.Marshal(map[string]any{"items": items})
+		return out, len(items) > 0, err
+	})
+	if err != nil {
+		http.Error(w, "Couldn't reach Wikimedia Commons.", http.StatusBadGateway)
+		return
+	}
+	if !ok {
+		writeJSON(w, map[string]any{"items": []commonsPicture{}})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
+}
+
+type mixturesCombo struct {
+	With       string `json:"with"`
+	Risk       int    `json:"risk"`
+	Synergy    int    `json:"synergy"`
+	RiskRel    int    `json:"riskReliability"`
+	EffectsRel int    `json:"effectsReliability"`
+	Draft      bool   `json:"draft,omitempty"`
+	RiskText   string `json:"riskText,omitempty"`
+	EffectText string `json:"effectText,omitempty"`
+	URL        string `json:"url,omitempty"`
+	Slugs      string `json:"slugs,omitempty"` // "a+b", for /journal/api/combo
+}
+
+var mixturesSlugClean = regexp.MustCompile(`[^a-z0-9]+`)
+
+func mixturesSlug(s string) string {
+	return strings.Trim(mixturesSlugClean.ReplaceAllString(strings.ToLower(strings.TrimSpace(s)), "-"), "-")
+}
+
+// substanceMixtures: GET /journal/api/mixtures?q=MDMA[&alt=Ecstasy&alt=...] ->
+// {found, name, aliases, category, description, risks, effects, url, combos: [mixturesCombo]}
+// The name and alt names go through Mixtures' search (/api/v1/search/<name>/, which
+// matches their slugs, names and aliases) first; plain slug guesses come after.
+func substanceMixtures(w http.ResponseWriter, r *http.Request) {
+	q := extQuery(r)
+	base := extBase("GEEK4U_MIXTURES_API", "http://mixtures.info")
+	names := append([]string{q}, r.URL.Query()["alt"]...)
+	tries := []string{}
+	seen := map[string]bool{}
+	add := func(slug string) {
+		if slug != "" && !seen[slug] && len(tries) < 8 {
+			seen[slug] = true
+			tries = append(tries, slug)
+		}
+	}
+	for i, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" || i > 3 {
+			continue
+		}
+		body, ok, err := extCached("mixsearch:"+strings.ToLower(name), 7*24*time.Hour, func() ([]byte, bool, error) {
+			raw, status, err := extGet(base + "/api/v1/search/" + url.PathEscape(name) + "/")
+			if err != nil {
+				return nil, false, err
+			}
+			if status == http.StatusNotFound {
+				return nil, false, nil
+			}
+			if status != http.StatusOK {
+				return nil, false, fmt.Errorf("mixtures search answered %d", status)
+			}
+			var hit struct {
+				Slug string `json:"slug"`
+			}
+			if json.Unmarshal(raw, &hit) != nil || hit.Slug == "" {
+				return nil, false, nil
+			}
+			return []byte(hit.Slug), true, nil
+		})
+		if err == nil && ok {
+			add(mixturesSlug(string(body)))
+		}
+	}
+	for _, name := range names {
+		add(mixturesSlug(name))
+	}
+	failed := false
+	for _, slug := range tries {
+		body, ok, err := extCached("mixtures:"+slug, 7*24*time.Hour, func() ([]byte, bool, error) {
+			raw, status, err := extGet(base + "/en/api/v1/substance/" + url.PathEscape(slug) + "/")
+			if err != nil {
+				return nil, false, err
+			}
+			if status == http.StatusNotFound {
+				return nil, false, nil
+			}
+			if status != http.StatusOK {
+				return nil, false, fmt.Errorf("mixtures answered %d", status)
+			}
+			var data struct {
+				Name         string   `json:"name"`
+				Slug         string   `json:"slug"`
+				Aliases      []string `json:"aliases"`
+				SiteURL      string   `json:"site_url"`
+				Category     string   `json:"category"`
+				Description  string   `json:"description"`
+				Risks        string   `json:"risks"`
+				Effects      string   `json:"effects"`
+				Interactions map[string]struct {
+					Interactants      []string `json:"interactants"`
+					IsDraft           bool     `json:"is_draft"`
+					SiteURL           string   `json:"site_url"`
+					Risk              int      `json:"risk"`
+					Synergy           int      `json:"synergy"`
+					RiskReliability   int      `json:"risk_reliability"`
+					EffectReliability int      `json:"effects_reliability"`
+					RiskDescription   string   `json:"risk_description"`
+					EffectDescription string   `json:"effect_description"`
+				} `json:"interactions"`
+			}
+			if err := json.Unmarshal(raw, &data); err != nil {
+				return nil, false, err
+			}
+			if data.Name == "" {
+				return nil, false, nil
+			}
+			combos := []mixturesCombo{}
+			for key, in := range data.Interactions {
+				with := ""
+				for _, n := range in.Interactants {
+					if !strings.EqualFold(n, data.Name) {
+						with = n
+					}
+				}
+				if with == "" && len(in.Interactants) > 0 {
+					with = in.Interactants[0]
+				}
+				combos = append(combos, mixturesCombo{
+					With: with, Risk: in.Risk, Synergy: in.Synergy, RiskRel: in.RiskReliability, EffectsRel: in.EffectReliability,
+					Draft: in.IsDraft, RiskText: extText(in.RiskDescription, 4000), EffectText: extText(in.EffectDescription, 4000), URL: in.SiteURL,
+					Slugs: strings.ReplaceAll(key, "_", "+"),
+				})
+			}
+			sort.Slice(combos, func(a, b int) bool {
+				if combos[a].Risk != combos[b].Risk {
+					return combos[a].Risk > combos[b].Risk
+				}
+				return strings.ToLower(combos[a].With) < strings.ToLower(combos[b].With)
+			})
+			out, err := json.Marshal(map[string]any{
+				"found": true, "name": data.Name, "slug": data.Slug, "aliases": data.Aliases, "category": data.Category,
+				"description": extText(data.Description, 6000), "risks": extText(data.Risks, 6000), "effects": extText(data.Effects, 6000),
+				"url": data.SiteURL, "combos": combos,
+			})
+			return out, true, err
+		})
+		if err != nil {
+			failed = true
+			continue
+		}
+		if ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(body)
+			return
+		}
+	}
+	if failed {
+		http.Error(w, "Couldn't reach Mixtures.info.", http.StatusBadGateway)
+		return
+	}
+	writeJSON(w, map[string]any{"found": false})
+}
+
+var comboSlugs = regexp.MustCompile(`^[a-z0-9-]+(\+[a-z0-9-]+){1,4}$`)
+
+// substanceCombo: GET /journal/api/combo?slugs=mdma+ketamine -> the full write-up of one
+// combination from Mixtures.info (/api/v1/combo/<a>+<b>/), opened from the Combinations table.
+// Known fields are trimmed; any other text field comes back in "more" so nothing is lost.
+func substanceCombo(w http.ResponseWriter, r *http.Request) {
+	slugs := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("slugs")))
+	slugs = strings.ReplaceAll(slugs, " ", "+") // a "+" in a query string arrives as a space
+	if !comboSlugs.MatchString(slugs) {
+		http.Error(w, "Give 2 to 5 substance slugs joined by +.", http.StatusBadRequest)
+		return
+	}
+	base := extBase("GEEK4U_MIXTURES_API", "http://mixtures.info")
+	body, ok, err := extCached("mixcombo:"+slugs, 7*24*time.Hour, func() ([]byte, bool, error) {
+		raw, status, err := extGet(base + "/en/api/v1/combo/" + slugs + "/")
+		if err != nil {
+			return nil, false, err
+		}
+		if status == http.StatusNotFound {
+			return nil, false, nil
+		}
+		if status != http.StatusOK {
+			return nil, false, fmt.Errorf("mixtures combo answered %d", status)
+		}
+		var data map[string]any
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, false, err
+		}
+		num := func(k string) int {
+			if f, ok := data[k].(float64); ok {
+				return int(f)
+			}
+			return 0
+		}
+		str := func(k string) string {
+			if s, ok := data[k].(string); ok {
+				return extText(s, 8000)
+			}
+			return ""
+		}
+		names := []string{}
+		if list, ok := data["interactants"].([]any); ok {
+			for _, it := range list {
+				switch v := it.(type) {
+				case string:
+					names = append(names, v)
+				case map[string]any:
+					if n, ok := v["name"].(string); ok {
+						names = append(names, n)
+					}
+				}
+			}
+		}
+		known := map[string]bool{"risk_description": true, "effect_description": true, "url": true, "site_url": true, "interactants": true, "is_draft": true, "risk": true, "synergy": true, "risk_reliability": true, "effects_reliability": true}
+		more := map[string]string{}
+		for k, v := range data {
+			if s, ok := v.(string); ok && !known[k] && strings.TrimSpace(s) != "" && !strings.HasPrefix(s, "http") {
+				label := strings.ReplaceAll(k, "_", " ")
+				more[strings.ToUpper(label[:1])+label[1:]] = extText(s, 4000)
+			}
+		}
+		out, err := json.Marshal(map[string]any{
+			"found": true, "interactants": names, "risk": num("risk"), "synergy": num("synergy"),
+			"riskReliability": num("risk_reliability"), "effectsReliability": num("effects_reliability"),
+			"draft": data["is_draft"] == true, "riskText": str("risk_description"), "effectText": str("effect_description"),
+			"url": str("site_url"), "more": more,
+		})
+		return out, true, err
+	})
+	if err != nil {
+		http.Error(w, "Couldn't reach Mixtures.info.", http.StatusBadGateway)
+		return
+	}
+	if !ok {
+		writeJSON(w, map[string]any{"found": false})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
+}
+
+// extFind walks decoded JSON and returns the first value under any of the keys.
+func extFind(v any, keys ...string) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for _, k := range keys {
+			if x, ok := t[k]; ok && x != nil {
+				return x
+			}
+		}
+		for _, x := range t {
+			if f := extFind(x, keys...); f != nil {
+				return f
+			}
+		}
+	case []any:
+		for _, x := range t {
+			if f := extFind(x, keys...); f != nil {
+				return f
+			}
+		}
+	}
+	return nil
+}
+
+// extString flattens a value into text: a string, {"*"/"value"/"text": ...}, or the
+// English (or first) entry of a language list.
+func extString(v any, max int) string {
+	switch t := v.(type) {
+	case string:
+		return extText(t, max)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case map[string]any:
+		for _, k := range []string{"en", "*", "value", "text", "#text", "default"} {
+			if x, ok := t[k]; ok {
+				if s := extString(x, max); s != "" {
+					return s
+				}
+			}
+		}
+		if x, ok := t["language"]; ok {
+			return extString(x, max)
+		}
+	case []any:
+		for _, x := range t {
+			if m, ok := x.(map[string]any); ok {
+				if c, _ := m["code"].(string); c == "en" {
+					return extString(m, max)
+				}
+			}
+		}
+		for _, x := range t {
+			if s := extString(x, max); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func extStrings(v any, max int) []string {
+	out := []string{}
+	switch t := v.(type) {
+	case []any:
+		for _, x := range t {
+			if s := extString(x, max); s != "" {
+				out = append(out, s)
+			}
+		}
+	case map[string]any:
+		for _, k := range []string{"category", "categories", "item"} {
+			if x, ok := t[k]; ok {
+				return extStrings(x, max)
+			}
+		}
+		if s := extString(t, max); s != "" {
+			out = append(out, s)
+		}
+	case string:
+		if s := extText(t, max); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// commonsFile: GET /journal/api/picture?file=Some_picture.jpg -> what the Commons API for
+// re-users (commonsapi) says about one file: description, author, source, date, place,
+// categories and licences with their terms. Opened when a Gallery picture is tapped.
+func commonsFile(w http.ResponseWriter, r *http.Request) {
+	file := strings.TrimSpace(strings.TrimPrefix(r.URL.Query().Get("file"), "File:"))
+	if file == "" || len(file) > 240 || strings.ContainsAny(file, "|\n") {
+		http.Error(w, "Give one file name.", http.StatusBadRequest)
+		return
+	}
+	body, ok, err := extCached("commonsfile:"+file, 7*24*time.Hour, func() ([]byte, bool, error) {
+		v := url.Values{}
+		v.Set("image", file)
+		v.Set("thumbwidth", "1280")
+		v.Set("thumbheight", "1280")
+		v.Set("languages", "en|default")
+		v.Set("sdc", "")
+		v.Set("format", "json")
+		raw, status, err := extGet(extBase("GEEK4U_COMMONSAPI", "https://magnus-toolserver.toolforge.org/commonsapi") + "/?" + v.Encode())
+		if err != nil {
+			return nil, false, err
+		}
+		if status == http.StatusNotFound {
+			return nil, false, nil
+		}
+		if status != http.StatusOK {
+			return nil, false, fmt.Errorf("commonsapi answered %d", status)
+		}
+		var data any
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, false, err
+		}
+		if extFind(data, "error") != nil && extFind(data, "file") == nil {
+			return nil, false, nil
+		}
+		fileInfo := extFind(data, "file")
+		if fileInfo == nil {
+			fileInfo = data
+		}
+		licenses := []map[string]string{}
+		if lic := extFind(data, "licenses"); lic != nil {
+			var list []any
+			switch t := lic.(type) {
+			case []any:
+				list = t
+			case map[string]any:
+				if l, ok := t["license"].([]any); ok {
+					list = l
+				} else if l, ok := t["license"].(map[string]any); ok {
+					list = []any{l}
+				}
+			}
+			for _, it := range list {
+				m, ok := it.(map[string]any)
+				if !ok {
+					if s := extString(it, 80); s != "" {
+						licenses = append(licenses, map[string]string{"name": s})
+					}
+					continue
+				}
+				l := map[string]string{"name": extString(m["name"], 80)}
+				for _, k := range []string{"license_text_url", "license_info_url", "url"} {
+					if s, ok := m[k].(string); ok && strings.HasPrefix(s, "http") {
+						l["url"] = s
+						break
+					}
+				}
+				if l["name"] != "" {
+					licenses = append(licenses, l)
+				}
+			}
+		}
+		urls := extFind(fileInfo, "urls")
+		pick := func(k string) string {
+			if s, ok := extFind(urls, k).(string); ok {
+				return s
+			}
+			return ""
+		}
+		var lat, lon string
+		if loc := extFind(fileInfo, "location"); loc != nil {
+			lat, lon = extString(extFind(loc, "lat", "latitude"), 20), extString(extFind(loc, "lon", "longitude"), 20)
+		}
+		out, err := json.Marshal(map[string]any{
+			"found": true, "file": file,
+			"title":       extString(extFind(fileInfo, "title", "name"), 200),
+			"description": extString(extFind(data, "description"), 2000),
+			"caption":     extString(extFind(data, "captions", "caption", "labels"), 300),
+			"author":      extString(extFind(fileInfo, "author"), 300),
+			"source":      extString(extFind(fileInfo, "source"), 300),
+			"date":        extString(extFind(fileInfo, "date"), 60),
+			"uploader":    extString(extFind(fileInfo, "uploader"), 80),
+			"width":       extString(extFind(fileInfo, "width"), 10),
+			"height":      extString(extFind(fileInfo, "height"), 10),
+			"lat":         lat, "lon": lon,
+			"categories": extStrings(extFind(data, "categories"), 120),
+			"licenses":   licenses,
+			"thumb":      pick("thumbnail"), "url": pick("file"), "page": pick("description"),
+		})
+		return out, true, err
+	})
+	if err != nil {
+		http.Error(w, "Couldn't reach the Commons API.", http.StatusBadGateway)
+		return
+	}
+	if !ok {
+		writeJSON(w, map[string]any{"found": false})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
 }

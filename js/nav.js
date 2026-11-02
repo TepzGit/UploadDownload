@@ -112,7 +112,7 @@
   };
   // Site background: "" = the drifting colors, a preset, or "custom" (own picture).
   const SCENE_KEY = "xn_site_bg";
-  const SCENES = ["none", "aurora", "stars", "grid", "pills", "waves", "custom"];
+  const SCENES = ["none", "aurora", "stars", "grid", "pills", "waves", "sunset", "custom"];
   let scene = { scene: "", image: "", dim: 40 };
   try { if (signedIn) scene = Object.assign(scene, JSON.parse(localStorage.getItem(SCENE_KEY) || "{}")); } catch (_) {}
   if (!signedIn) { try { localStorage.removeItem(SCENE_KEY); } catch (_) {} }
@@ -135,6 +135,8 @@
       }
     } else if (name === "grid") {
       layer.innerHTML = '<span class="s1"></span><span class="s2"><i></i></span>';
+    } else if (name === "sunset") {
+      layer.innerHTML = '<span class="s1"></span>';
     } else if (name !== "none" && name !== "custom") {
       layer.innerHTML = '<span class="s1"></span><span class="s2"></span><span class="s3"></span>';
     }

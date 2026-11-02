@@ -396,6 +396,7 @@
         <button type="button" role="radio" class="pf-scene" data-scene="grid"><span class="pf-scene-thumb" data-thumb="grid"></span><span>Grid</span></button>
         <button type="button" role="radio" class="pf-scene" data-scene="pills"><span class="pf-scene-thumb" data-thumb="pills"></span><span>Pills</span></button>
         <button type="button" role="radio" class="pf-scene" data-scene="waves"><span class="pf-scene-thumb" data-thumb="waves"></span><span>Waves</span></button>
+        <button type="button" role="radio" class="pf-scene" data-scene="sunset" title="Theme: rings over a purple to orange gradient, which also becomes the main color"><span class="pf-scene-thumb" data-thumb="sunset"></span><span>Sunset theme</span></button>
         <button type="button" role="radio" class="pf-scene" data-scene="none"><span class="pf-scene-thumb" data-thumb="none"></span><span>Black</span></button>
         <button type="button" role="radio" class="pf-scene" data-scene="custom"><span class="pf-scene-thumb" data-thumb="custom"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span>Your picture</span></button>
       </div>
@@ -1005,10 +1006,23 @@
       item.innerHTML = '<span class="pf-ico"><svg aria-hidden="true"><use href="#i-pill"/></svg></span><span class="pf-main"><strong></strong><span></span></span><span></span>';
       item.querySelector("strong").textContent = name;
       item.querySelector(".pf-main span").textContent = detail;
+      drugIcon(item.firstElementChild, name);
       const last = item.lastElementChild;
       last.className = endClass;
       last.textContent = end;
       return item;
+    }
+
+    // The drug's own icon (classicons.js, same as the Journal and Graph) in place of
+    // the plain pill; the pill stays when no icon fits the name.
+    let drugs = null;
+    function drugIcon(box, name) {
+      if (!window.xnClass) return;
+      drugs = drugs || import("/notedrugs.js").catch(() => null);
+      drugs.then((m) => (m ? m.substanceFor(name) : null)).catch(() => null).then((sub) => {
+        const key = window.xnClass.keyFor(sub || { name });
+        box.append(window.xnClass.icon(key, "pf-drug-ico", name));
+      });
     }
 
     function empty(box, html) {

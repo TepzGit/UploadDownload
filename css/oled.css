@@ -1809,3 +1809,38 @@ html.xn-ios .xn > .xn-chat-btn { display: none; }
 .xn-friend-foot { display: flex; gap: 8px; margin-top: 10px; }
 .xn-friend-foot a { flex: 1; display: grid; place-items: center; min-height: 36px; border: 1px solid var(--oled-line-strong); border-radius: 9px; color: var(--oled-text); font-weight: 600; text-decoration: none; }
 .xn-friend-foot a:first-child { border-color: transparent; background: var(--oled-accent); color: #0b0716; }
+
+/* ---- Sunset theme (mommy 2026-11-02): her pattern as the site background, and
+   the purple to orange gradient as the main color. Picked as "Sunset theme" in
+   Profile > Preferences > Site background (scene "sunset"). !important on the
+   color so it wins over the Site color picker, which nav.js sets inline. ---- */
+html[data-scene="sunset"] {
+  --xn-accent-rgb: 132, 124, 255 !important;
+  --xn-sunset: linear-gradient(90deg, #444CF7, #DD780C);
+  --xn-sunset-soft: linear-gradient(90deg, rgba(68, 76, 247, .22), rgba(221, 120, 12, .22));
+}
+.xn-scene[data-scene="sunset"] { background: #000; }
+.xn-scene[data-scene="sunset"] .s1 {
+  inset: 0;
+  background-color: #E5E5F7;
+  background-image: repeating-radial-gradient(circle at 0 0, black 0, #00000087 10px), repeating-linear-gradient(#444CF7, #DD780C);
+  opacity: 0.8;
+  will-change: auto;
+}
+/* Solid main-color fills become the gradient, with white text on top. */
+html[data-scene="sunset"] :is(.xn-btn-primary, .xn-btn-primary:hover, .gp-btn-primary, .gp-login button, .xn-friend-foot a:first-child, .pa-btn.is-run, .ch-send) {
+  background: var(--xn-sunset); border-color: transparent; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+html[data-scene="sunset"] :is(.xn-chat-count, .xn-friend-dot, .xn-mail-count, .ch-badge, .st-page-bar i, .sv-meter i, .st-key-views, .pf-rank-meter i, .sy-bar span, .nt-note-bar, .cal-dots i, .gp-ver-item.is-now .gp-ver-pt) {
+  background: var(--xn-sunset); color: #fff;
+}
+/* Small labels and links in the gradient too. */
+html[data-scene="sunset"] .xn-eyebrow {
+  background: var(--xn-sunset); -webkit-background-clip: text; background-clip: text; color: transparent;
+  width: fit-content;
+}
+html[data-scene="sunset"] :is(.xn-links a[aria-current="page"], .xn-tab[aria-selected="true"], [role="tab"][aria-selected="true"]) {
+  background-image: var(--xn-sunset-soft);
+}
+html[data-scene="sunset"] ::selection { background: rgba(221, 120, 12, .45); color: #fff; }
+html[data-scene="sunset"] { accent-color: #DD780C; }

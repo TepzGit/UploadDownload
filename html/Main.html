@@ -746,6 +746,48 @@
       .gp-member, .gp-member:hover { transition: none; transform: none; }
       .gp-hint { animation: none; }
     }
+    /* News cards (mommy 2026-11-02 21:49): own tag text and color, three sizes, more fonts,
+       smaller board title, colored version chip. Small = the standard row; medium shows a long
+       text; large is about 3 rows high and leads with a big thumbnail. */
+    .gp-ann-title { font-size: 0.62rem; letter-spacing: 0.22em; }
+    .gp-ann-ver { border-color: rgba(var(--xn-accent-rgb), 0.5); background: linear-gradient(90deg, rgba(var(--xn-accent-rgb), 0.2), rgba(var(--xn-accent-rgb), 0.05)); }
+    .gp-ann-ver-name { color: rgba(var(--xn-accent-rgb), 0.95); filter: brightness(1.35); font-weight: 600; }
+    .gp-ann-ver-v { padding: 1px 8px; border-radius: 999px; background: var(--xn-sunset, linear-gradient(135deg, var(--oled-accent), #f0abfc)); color: #0b0b10; font-weight: 700; letter-spacing: 0.03em; }
+    .gp-ann-ver svg { color: var(--oled-accent); }
+    @media (hover: hover) { .gp-ann-ver:hover { border-color: var(--oled-accent); background: linear-gradient(90deg, rgba(var(--xn-accent-rgb), 0.3), rgba(var(--xn-accent-rgb), 0.08)); } }
+    .gp-ann-kind { min-width: 0; max-width: calc(100% - 20px); }
+    .gp-ann-kind-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gp-news-item[data-tagc] .gp-ann-kind { --kind-dot: var(--ann-tag); color: var(--ann-tag) !important; border-color: color-mix(in srgb, var(--ann-tag) 55%, transparent) !important; background: color-mix(in srgb, var(--ann-tag) 12%, transparent) !important; }
+    .gp-news-item[data-size="medium"] .gp-ann-row { min-height: 136px; padding: 16px 0; }
+    .gp-news-item[data-size="medium"] .gp-ann-thumb { width: 76px; height: 76px; border-radius: 10px; }
+    .gp-news-item[data-size="medium"] .gp-ann-text { gap: 6px; }
+    .gp-news-item[data-size="medium"] .gp-news-title { font-size: 1.02rem; }
+    .gp-news-item[data-size="medium"] .gp-ann-sum { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; white-space: pre-line; line-height: 1.5; }
+    .gp-news-item[data-size="large"] .gp-ann-row { min-height: 204px; padding: 16px 0; align-items: center; }
+    .gp-news-item[data-size="large"] .gp-ann-main { gap: 22px; align-items: center; }
+    .gp-news-item[data-size="large"] .gp-ann-thumb { width: min(44%, 340px); height: 172px; border-radius: 14px; }
+    .gp-news-item[data-size="large"] .gp-ann-text { gap: 8px; }
+    .gp-news-item[data-size="large"] .gp-news-title { font-size: 1.3rem; line-height: 1.25; }
+    .gp-news-item[data-size="large"] .gp-ann-sum { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; white-space: pre-line; line-height: 1.5; font-size: 0.9rem; }
+    .gp-news-item[data-size="large"] .gp-ann-pic { display: none; }
+    .gp-ann-row[aria-expanded="true"] .gp-ann-sum { display: none !important; }
+    .gp-news-item[data-font="grotesk"] .gp-ann-text, .gp-news-item[data-font="grotesk"] .gp-news-body { --oled-font: "Space Grotesk", system-ui, sans-serif; }
+    .gp-news-item[data-font="code"] .gp-ann-text, .gp-news-item[data-font="code"] .gp-news-body { --oled-font: "JetBrains Mono", ui-monospace, Consolas, monospace; }
+    .gp-news-item[data-font="bubbly"] .gp-ann-text, .gp-news-item[data-font="bubbly"] .gp-news-body { --oled-font: "Fredoka", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif; }
+    .gp-news-item[data-font="slab"] .gp-ann-text, .gp-news-item[data-font="slab"] .gp-news-body { --oled-font: Rockwell, "Roboto Slab", "Zilla Slab", "Courier New", Georgia, serif; }
+    .gp-news-item[data-font="condensed"] .gp-ann-text, .gp-news-item[data-font="condensed"] .gp-news-body { --oled-font: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif; font-stretch: condensed; }
+    .gp-news-item[data-font="condensed"] .gp-news-title { text-transform: uppercase; letter-spacing: 0.04em; }
+    .gp-news-item[data-font="elegant"] .gp-ann-text, .gp-news-item[data-font="elegant"] .gp-news-body { --oled-font: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
+    .gp-news-item[data-font="elegant"] .gp-news-title { font-style: italic; font-weight: 600; }
+    .gp-news-item[data-font="comic"] .gp-ann-text, .gp-news-item[data-font="comic"] .gp-news-body { --oled-font: "Comic Sans MS", "Comic Neue", "Chalkboard SE", cursive; }
+    @media (max-width: 640px) {
+      .gp-ann-title { font-size: 0.58rem; letter-spacing: 0.16em; }
+      .gp-ann-kind { max-width: 60vw; }
+      .gp-news-item[data-size="medium"] .gp-ann-row, .gp-news-item[data-size="large"] .gp-ann-row { min-height: 0; }
+      .gp-news-item[data-size="large"] .gp-ann-main { flex-direction: column; align-items: stretch; gap: 12px; }
+      .gp-news-item[data-size="large"] .gp-ann-thumb { width: 100%; height: 170px; }
+      .gp-news-item[data-size="medium"] .gp-ann-thumb { width: 60px; height: 60px; }
+    }
   </style>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -794,12 +836,12 @@
           </div>
         </div>
         <ol class="gp-news-list" id="gpNewsList">
-          {{range $i, $n := .News}}<li class="gp-news-item{{if .Pinned}} is-pinned{{end}}{{if ge $i 4}} is-more{{end}}" data-id="{{.ID}}" data-kind="{{.Kind}}"{{if .Font}} data-font="{{.Font}}"{{end}}{{with .Style}} style="{{.}}"{{end}}>
+          {{range $i, $n := .News}}<li class="gp-news-item{{if .Pinned}} is-pinned{{end}}{{if ge $i 4}} is-more{{end}}" data-id="{{.ID}}" data-kind="{{.Kind}}"{{if .Font}} data-font="{{.Font}}"{{end}}{{if .Size}} data-size="{{.Size}}"{{end}}{{if .TagColor}} data-tagc{{end}}{{with .Style}} style="{{.}}"{{end}}>
             <button type="button" class="gp-ann-row" aria-expanded="false" aria-controls="gpAnnMore{{.ID}}">
               <time class="gp-ann-date" data-at="{{.At}}" title="{{.When}}">{{.Day}}</time>
               <span class="gp-ann-bar" aria-hidden="true"></span>
-              <span class="gp-ann-kind" data-kind="{{.Kind}}">{{.KindLabel}}</span>
-              <span class="gp-ann-main">{{with .ThumbURL}}<img class="gp-ann-thumb" src="{{.}}" alt="" loading="lazy">{{end}}<span class="gp-ann-text"><span class="gp-news-title">{{if .Title}}{{.Title}}{{else}}{{.KindLabel}}{{end}}{{if .Pinned}}<span class="gp-news-pin">Pinned</span>{{end}}</span><span class="gp-ann-sum">{{.Body}}</span></span></span>
+              <span class="gp-ann-kind" data-kind="{{.Kind}}" title="{{.TagText}}"><span class="gp-ann-kind-t">{{.TagText}}</span></span>
+              <span class="gp-ann-main">{{with .ThumbURL}}<img class="gp-ann-thumb" src="{{.}}" alt="" loading="lazy">{{end}}<span class="gp-ann-text"><span class="gp-news-title">{{if .Title}}{{.Title}}{{else}}{{.TagText}}{{end}}{{if .Pinned}}<span class="gp-news-pin">Pinned</span>{{end}}</span><span class="gp-ann-sum">{{.Body}}</span></span></span>
               <svg class="gp-ann-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
             </button>
             <div class="gp-ann-more" id="gpAnnMore{{.ID}}" hidden>{{with .ThumbURL}}<img class="gp-ann-pic" src="{{.}}" alt="" loading="lazy">{{end}}<p class="gp-news-body">{{.Body}}</p><p class="gp-news-meta">{{.Author}} · {{.When}} · v{{.Version}}{{if .Edited}} · edited{{end}}</p></div>
@@ -862,7 +904,8 @@
           var opener = document.getElementById('gpAnnVer');
           document.body.appendChild(view); // out of the panel, so position: fixed covers the screen
           var KINDS = { update: 'Update', notice: 'Notice', feature: 'New feature', fix: 'Fix' };
-          var FONTS = { sans: 1, serif: 1, rounded: 1, mono: 1, display: 1, hand: 1 };
+          var FONTS = { sans: 1, serif: 1, rounded: 1, mono: 1, display: 1, hand: 1, grotesk: 1, code: 1, bubbly: 1, slab: 1, condensed: 1, elegant: 1, comic: 1 };
+          var SIZES = { medium: 1, large: 1 };
           var pad = function (n) { return (n < 10 ? '0' : '') + n; };
           var day = function (ms) { var d = new Date(ms); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + String(d.getFullYear()).slice(2); };
           var when = function (ms) { return new Date(ms).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
@@ -875,13 +918,16 @@
             li.dataset.kind = kind;
             if (FONTS[n.font]) li.dataset.font = n.font;
             if (/^#[0-9a-f]{6}$/i.test(n.color || '')) li.style.setProperty('--ann-color', n.color);
+            if (SIZES[n.size]) li.dataset.size = n.size;
+            if (/^#[0-9a-f]{6}$/i.test(n.tagColor || '')) { li.style.setProperty('--ann-tag', n.tagColor); li.dataset.tagc = ''; }
+            var tagText = n.tag || KINDS[kind];
             var btn = el('button', 'gp-ann-row'); btn.type = 'button'; btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', 'gpVerMore' + n.id);
             var date = el('time', 'gp-ann-date', day(n.at)); date.title = when(n.at);
             var bar = el('span', 'gp-ann-bar'); bar.setAttribute('aria-hidden', 'true');
-            var tag = el('span', 'gp-ann-kind', KINDS[kind]); tag.dataset.kind = kind;
+            var tag = el('span', 'gp-ann-kind'); tag.dataset.kind = kind; tag.title = tagText; tag.appendChild(el('span', 'gp-ann-kind-t', tagText));
             var main = el('span', 'gp-ann-main');
             if (n.thumb) { var im = el('img', 'gp-ann-thumb'); im.src = '/newspic/' + n.thumb; im.alt = ''; im.loading = 'lazy'; main.appendChild(im); }
-            var text = el('span', 'gp-ann-text'), title = el('span', 'gp-news-title', n.title || KINDS[kind]);
+            var text = el('span', 'gp-ann-text'), title = el('span', 'gp-news-title', n.title || tagText);
             if (n.pinned) title.appendChild(el('span', 'gp-news-pin', 'Pinned'));
             text.append(title, el('span', 'gp-ann-sum', n.body));
             main.appendChild(text);

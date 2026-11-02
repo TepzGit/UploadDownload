@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Drug info · Geek⁴u</title>
+  <title>Journal · Geek⁴u</title>
   <link rel="stylesheet" href="/DruginfoPage.css">
   <meta name="theme-color" content="#000000" />
   <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/classicons.css" />
   <script src="/classicons.js"></script>
   <script src="/likes.js"></script>
+  <script src="/media.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 </head>
@@ -35,29 +36,98 @@
 <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
 <div class="xn-hatch" aria-hidden="true"></div>
 
-<main class="xn-page di">
-  <section class="xn-card di-head">
-    <a href="/journal" class="di-back">← Journal</a>
-    <div class="di-top">
-      <span class="di-thumb" id="diThumb" hidden></span>
-      <div class="di-titles">
-        <p class="xn-eyebrow" id="diClass">Drug info</p>
-        <div class="di-name-row"><i id="diIcon" class="sc-icon di-icon" aria-hidden="true" hidden></i><h1 class="xn-h1 DrugInfoName">Loading…</h1></div>
+<div class="wk-backdrop" id="wkBackdrop" aria-hidden="true"><span class="wk-backdrop-img" id="wkBackdropImg"></span></div>
+
+<main class="xn-page di wk">
+  <div class="wk-layout">
+    <nav class="wk-toc" id="wkToc" aria-label="Contents" hidden>
+      <details open>
+        <summary>Contents</summary>
+        <ol id="wkTocList"></ol>
+      </details>
+    </nav>
+
+    <article class="wk-sheet" aria-labelledby="diTitle">
+      <div class="wk-topbar">
+        <a href="/journal" class="di-back wk-crumb">← Journal</a>
+        <div class="wk-tabs" id="diLinks" hidden>
+          <button type="button" class="wk-tab di-like" id="diLike"><span data-like-label>Like</span></button>
+          <a class="wk-tab" id="diWiki" target="_blank" rel="noopener noreferrer">PsychonautWiki ↗</a>
+          <a class="wk-tab" id="diTripsit" target="_blank" rel="noopener noreferrer">TripSit ↗</a>
+        </div>
       </div>
-    </div>
-    <p class="di-summary" id="diSummary" hidden></p>
-    <div class="di-links" id="diLinks" hidden>
-      <button type="button" class="xn-btn di-like" id="diLike"><span data-like-label>Like</span></button>
-      <a class="xn-btn" id="diWiki" target="_blank" rel="noopener noreferrer">PsychonautWiki ↗</a>
-      <a class="xn-btn" id="diTripsit" target="_blank" rel="noopener noreferrer">TripSit ↗</a>
-    </div>
-  </section>
+      <header class="wk-title">
+        <h1 class="DrugInfoName" id="diTitle">Loading…</h1>
+        <p class="wk-from">From the Geek⁴u Journal, the substance encyclopedia</p>
+      </header>
 
-  <div class="di-info" id="diInfo" hidden></div>
+      <div class="wk-body">
+        <aside class="wk-infobox" id="wkInfobox" aria-label="Quick facts">
+          <div class="wk-ib-name"><i id="diIcon" class="sc-icon di-icon" aria-hidden="true" hidden></i><span id="wkIbName"></span></div>
+          <figure class="wk-ib-figure" id="wkIbFigure" hidden>
+            <button type="button" class="wk-ib-pic" id="wkIbPic" aria-label="See the picture full size"></button>
+            <figcaption id="wkIbCaption"></figcaption>
+          </figure>
+          <span class="di-thumb wk-ib-molecule" id="diThumb" hidden></span>
+          <p class="wk-ib-head">Classification</p>
+          <table class="wk-ib-table"><tbody id="wkIbRows"></tbody></table>
+        </aside>
 
-  <h2 class="xn-label di-section" id="diRoutesTitle" hidden>Dosing by route</h2>
-  <div class="DrugInfoIntakeMethods" aria-live="polite"></div>
-  <p class="di-note" id="diNote">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
+        <p class="xn-eyebrow wk-class" id="diClass">Drug info</p>
+        <p class="di-summary wk-lead" id="diSummary" hidden></p>
+
+        <div id="wkSections"></div>
+
+        <section class="wk-section" id="sec-dosing" data-toc="Dosing" hidden>
+          <h2 class="wk-h2" id="diRoutesTitle">Dosing</h2>
+          <div class="DrugInfoIntakeMethods" aria-live="polite"></div>
+          <p class="di-note wk-hatnote" id="diNote">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
+        </section>
+
+        <div class="di-info" id="diInfo" hidden></div>
+
+        <section class="wk-section" id="sec-combos" data-toc="Combinations" hidden>
+          <h2 class="wk-h2">Combinations</h2>
+          <p class="wk-hatnote">From <a id="mxLink" href="http://mixtures.info/" target="_blank" rel="noopener noreferrer">Mixtures.info</a>. Tap a row to read what is known. Risk and effect levels are rough and the evidence is often thin.</p>
+          <div class="wk-mx-tools">
+            <label class="wk-mx-find"><span class="xn-sr">Find a combination</span><input class="xn-input" id="mxFind" type="search" placeholder="Find a substance…" autocomplete="off" spellcheck="false"></label>
+            <div class="wk-legend" aria-hidden="true"><span class="wk-risk" data-risk="1">Low</span><span class="wk-risk" data-risk="2">Moderate</span><span class="wk-risk" data-risk="3">High</span><span class="wk-risk" data-risk="4">Dangerous</span></div>
+          </div>
+          <div class="wk-table-wrap"><table class="wikitable wk-mx-table" id="mxTable"></table></div>
+        </section>
+
+        <section class="wk-section" id="sec-gallery" data-toc="Gallery" hidden>
+          <h2 class="wk-h2">Gallery</h2>
+          <p class="wk-hatnote">Pictures from <a id="cmLink" href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>: plants, mushrooms, molecules, tablets, lab gear and drawings. Each one keeps its author's license.</p>
+          <ul class="wk-gallery" id="cmGallery"></ul>
+        </section>
+
+        <dialog class="wk-file" id="cmFile" aria-labelledby="cmFileTitle">
+          <div class="wk-file-in">
+            <button type="button" class="wk-file-x" id="cmFileClose" aria-label="Close">×</button>
+            <button type="button" class="wk-file-pic" id="cmFilePic" aria-label="See it full size"></button>
+            <div class="wk-file-text">
+              <p class="wk-file-kicker">File on Wikimedia Commons</p>
+              <h2 class="wk-h2" id="cmFileTitle"></h2>
+              <p class="wk-file-desc" id="cmFileDesc"></p>
+              <table class="wikitable wk-kv wk-file-table"><tbody id="cmFileRows"></tbody></table>
+              <p class="wk-h4" id="cmFileCatsHead" hidden>Categories</p>
+              <ul class="wk-inline wk-file-cats" id="cmFileCats"></ul>
+              <p class="wk-file-status" id="cmFileStatus" aria-live="polite"></p>
+              <div class="wk-file-actions"><button type="button" class="xn-btn" id="cmFileFull">Full size</button><a class="xn-btn" id="cmFileOpen" target="_blank" rel="noopener noreferrer">Open on Commons ↗</a></div>
+            </div>
+          </div>
+        </dialog>
+
+        <section class="wk-section wk-refs" id="sec-sources" data-toc="Sources">
+          <h2 class="wk-h2">Sources</h2>
+          <ol class="wk-reflist" id="wkRefs">
+            <li><a href="https://psychonautwiki.org/" target="_blank" rel="noopener noreferrer">PsychonautWiki</a>: summary, classes, doses, durations, tolerance, interactions and effects.</li>
+          </ol>
+        </section>
+      </div>
+    </article>
+  </div>
 </main>
 
 <script>
@@ -213,137 +283,167 @@ ${DETAIL_FIELDS}
     return out;
   }
 
-  function card(title) {
-    const box = el("section", "xn-card di-info-card");
-    box.append(el("h2", "xn-h2 di-info-title", title));
+
+  // ---------- Wikipedia-style article (mommy 2026-11-02) ----------
+  const cap = (text) => String(text).charAt(0).toUpperCase() + String(text).slice(1);
+  const $ = (id) => document.getElementById(id);
+
+  function section(id, title, where) {
+    const box = el("section", "wk-section");
+    box.id = "sec-" + id;
+    box.dataset.toc = title;
+    box.append(el("h2", "wk-h2", title));
+    (where || $("diInfo")).append(box);
+    $("diInfo").hidden = !$("diInfo").children.length;
     return box;
   }
 
-  function chips(names, className, link) {
-    const wrap = el("div", "di-chips");
+  function wikiList(names, className, link) {
+    const list = el("ul", "wk-inline " + (className || ""));
     names.forEach((item) => {
       const name = typeof item === "string" ? item : item?.name;
       if (!name) return;
-      const url = link && item?.url;
-      const chip = el(url ? "a" : "span", "di-chip " + (className || ""), name);
+      const li = el("li");
+      const url = link === true ? item?.url : link ? link(name) : "";
+      const node = el(url ? "a" : "span", "", name);
       if (url) {
-        chip.href = url;
-        chip.target = "_blank";
-        chip.rel = "noopener noreferrer";
+        node.href = url;
+        if (/^https?:/.test(url)) { node.target = "_blank"; node.rel = "noopener noreferrer"; }
       }
-      wrap.append(chip);
+      li.append(node);
+      list.append(li);
     });
-    return wrap;
+    return list;
+  }
+  const drugLink = (name) => "/journal/Drug?drug=" + encodeURIComponent(name);
+
+  // Infobox rows: [label, text, href]
+  const infoRows = [];
+  function infoRow(label, value, href) {
+    if (!value) return;
+    const old = infoRows.find((r) => r[0] === label);
+    if (old) { old[1] = value; old[2] = href; } else infoRows.push([label, value, href]);
+    const body = $("wkIbRows");
+    body.innerHTML = "";
+    infoRows.forEach(([l, v, h]) => {
+      const tr = el("tr");
+      const td = el("td", "", h ? "" : v);
+      if (h) { const a = el("a", "", v); a.href = h; td.append(a); }
+      tr.append(el("th", "", l), td);
+      body.append(tr);
+    });
   }
 
-  const cap = (text) => String(text).charAt(0).toUpperCase() + String(text).slice(1);
-
   function renderDetails(s) {
-    const box = document.getElementById("diInfo");
+    const box = $("diInfo");
     box.innerHTML = "";
 
-    // At a glance
-    const facts = [];
-    // Medicines: what is really in it, linked to that substance's own page.
-    if (s.ingredient) facts.push(["Active ingredient", s.ingredient, "/journal/Drug?drug=" + encodeURIComponent(s.ingredient.split(" + ")[0])]);
+    if (s.ingredient) infoRow("Active ingredient", s.ingredient, drugLink(s.ingredient.split(" + ")[0]));
     const names = [].concat(s.commonNames || []).filter((n) => n && n.toLowerCase() !== s.name.toLowerCase());
-    if (names.length) facts.push(["Also known as", names.join(", ")]);
-    if (s.systematicName) facts.push(["Systematic name", s.systematicName]);
-    if (s.class?.psychoactive?.length) facts.push(["Psychoactive class", s.class.psychoactive.join(", ")]);
-    if (s.class?.chemical?.length) facts.push(["Chemical class", s.class.chemical.join(", ")]);
-    if (s.addictionPotential) facts.push(["Addiction potential", cap(s.addictionPotential)]);
-    [].concat(s.toxicity || []).filter(Boolean).forEach((t, i) => facts.push([i ? "" : "Toxicity", cap(t)]));
-    if (facts.length) {
-      const c = card("At a glance");
-      const list = el("dl", "di-facts");
-      facts.forEach(([label, value, href]) => {
-        const row = el("div", "di-fact");
-        const dd = el("dd", "", href ? "" : value);
-        if (href) {
-          const link = el("a", "di-ingredient", value);
-          link.href = href;
-          dd.append(link);
-        }
-        row.append(el("dt", "", label), dd);
-        list.append(row);
-      });
-      c.append(list);
-      box.append(c);
-    }
+    if (names.length) infoRow("Also known as", names.join(", "));
+    if (s.systematicName) infoRow("Systematic name", s.systematicName);
+    if (s.class?.psychoactive?.length) infoRow("Psychoactive class", s.class.psychoactive.join(", "));
+    if (s.class?.chemical?.length) infoRow("Chemical class", s.class.chemical.join(", "));
+    if (s.addictionPotential) infoRow("Addiction potential", cap(s.addictionPotential));
+    const tox = [].concat(s.toxicity || []).filter(Boolean);
+    if (tox.length) infoRow("Toxicity", tox.map(cap).join(" "));
 
-    // Custom entries: half-life, risks, notes and the full timeline
     if (s.custom) {
-      const c = card("Safety");
+      const c = section("safety", "Safety", $("wkSections"));
       const half = s.halfLife ? range(s.halfLife.min, s.halfLife.max) : "";
-      const list = el("dl", "di-list");
-      rows(list, [["Half-life", half ? half + " hours" : "Not given"]]);
-      c.append(list);
-      if (s.risks) c.append(el("h3", "xn-label di-sub", "Risks"), el("p", "di-card-note di-pre", s.risks));
-      if (s.notes) c.append(el("h3", "xn-label di-sub", "Notes"), el("p", "di-card-note di-pre", s.notes));
-      c.append(el("p", "di-card-note di-custom-note", s.ingredient
+      infoRow("Half-life", half ? half + " hours" : "");
+      if (s.risks) c.append(el("h3", "wk-h3", "Risks"), el("p", "di-pre", s.risks));
+      if (s.notes) c.append(el("h3", "wk-h3", "Notes"), el("p", "di-pre", s.notes));
+      c.append(el("p", "wk-hatnote", s.ingredient
         ? "A medicine entry made on this site, not from PsychonautWiki. Pills from outside a pharmacy are often fakes with other drugs in them, so test them."
         : "Added by an admin on this site, not from PsychonautWiki."));
-      box.append(c);
     }
 
-    // Tolerance
     const tol = s.tolerance || {};
     const tolRows = [["Full tolerance", tol.full], ["Half tolerance", tol.half], ["Back to baseline", tol.zero]].filter(([, v]) => v);
     const cross = [].concat(s.crossTolerances || []).filter(Boolean);
     if (tolRows.length || cross.length) {
-      const c = card("Tolerance");
+      const c = section("tolerance", "Tolerance");
       if (tolRows.length) {
-        const list = el("dl", "di-list");
-        rows(list, tolRows.map(([k, v]) => [k, cap(v)]));
-        c.append(list);
+        const t = el("table", "wikitable wk-kv");
+        tolRows.forEach(([k, v]) => { const tr = el("tr"); tr.append(el("th", "", k), el("td", "", cap(v))); t.append(tr); });
+        c.append(t);
       }
       if (cross.length) {
-        c.append(el("h3", "xn-label di-sub", "Cross-tolerance with"));
-        c.append(chips(cross.map(cap)));
+        const p = el("p", "", "Cross-tolerance with: ");
+        c.append(p, wikiList(cross.map(cap)));
       }
-      box.append(c);
     }
 
-    // Interactions, worst first
     const groups = [
       ["Dangerous", s.dangerousInteractions, "is-danger", "Don't combine."],
       ["Unsafe", s.unsafeInteractions, "is-unsafe", "Avoid, or take extra care."],
       ["Caution", s.uncertainInteractions, "is-caution", "Effects may be unpredictable."],
     ].filter(([, list]) => list && list.length);
     if (groups.length) {
-      const c = card("Interactions");
+      const c = section("interactions", "Interactions");
+      c.append(el("p", "wk-hatnote", "From PsychonautWiki. See Combinations below for the details per mix."));
       groups.forEach(([title, list, cls, hint]) => {
-        const head = el("h3", "xn-label di-sub di-int-head " + cls, title);
-        head.append(el("span", "di-int-hint", hint));
-        c.append(head, chips(list, cls));
+        const h = el("h3", "wk-h3 di-int-head " + cls, title);
+        h.append(el("span", "di-int-hint", " " + hint));
+        c.append(h, wikiList(list, "wk-int " + cls, drugLink));
       });
-      box.append(c);
     }
 
-    // Effects
     const effects = [].concat(s.effects || []).filter((e) => e?.name);
     if (effects.length) {
-      const c = card("Effects");
-      c.append(el("p", "di-card-note", `${effects.length} listed on PsychonautWiki. Tap one to read about it.`));
-      c.append(chips(effects, "di-effect", true));
-      box.append(c);
+      const c = section("effects", "Effects");
+      c.append(el("p", "", `PsychonautWiki lists ${effects.length} effects. Each link opens its page there.`));
+      c.append(wikiList(effects, "wk-columns", true));
     }
-
-    box.hidden = !box.children.length;
   }
 
   function showMessage(text) {
     const box = document.querySelector(".DrugInfoIntakeMethods");
     box.innerHTML = "";
-    box.append(el("p", "xn-card di-empty", text));
+    box.append(el("p", "wk-empty di-empty", text));
+    $("sec-dosing").hidden = false;
+    buildToc();
+  }
+
+  function routeTable(roa, substance) {
+    const t = el("table", "wikitable wk-route DrugInfoIntakeMethod");
+    const bio = roa.bioavailability ? range(roa.bioavailability.min, roa.bioavailability.max) : "";
+    const capt = el("caption", "", cap(roa.name || "Unknown route"));
+    if (!substance.custom || bio) capt.append(el("span", "di-bio", "Bioavailability " + (bio ? bio + "%" : "N/A")));
+    t.append(capt);
+    const doses = doseEntries(roa.dose);
+    const durations = durationEntries(roa.duration);
+    const ext = roa.extended || {};
+    const pct = (v) => Math.round(Number(v) * 100) + "%";
+    const at = () => { const i = durations.findIndex(([label]) => label === "Offset"); return i < 0 ? durations.length : i; };
+    if (ext.comedown > 0) durations.splice(at(), 0, ["Come down", `${ext.comedown} hours, to ${pct(ext.comedownLevel ?? 0.35)} of the peak`]);
+    if (ext.peak2?.duration > 0) {
+      const p2 = ext.peak2;
+      durations.splice(durations.findIndex(([label]) => label === "Peak") + 1, 0, ["Second peak", `${p2.duration} hours at ${pct(p2.level ?? 1)}, ${p2.gap || 0} hours after the first (dips to ${pct(p2.dip ?? 0.5)})`]);
+    }
+    const group = (title, list, cls) => {
+      if (!list.length) return;
+      const head = el("tr", "wk-group");
+      const th = el("th", "", title);
+      th.colSpan = 2;
+      head.append(th);
+      t.append(head);
+      list.forEach(([k, v], i) => { const tr = el("tr", cls ? cls + " lv" + i : ""); tr.append(el("th", "", k), el("td", "", v)); t.append(tr); });
+    };
+    group("Dose", doses, "wk-dose");
+    group("Duration", durations);
+    if (!doses.length && !durations.length) { const tr = el("tr"); const td = el("td", "wk-empty", "No dose or duration data for this route."); td.colSpan = 2; tr.append(td); t.append(tr); }
+    return t;
   }
 
   function render(substance) {
     const name = substance.name;
-    document.title = name + " · Geek⁴u";
+    document.title = name + " · Geek⁴u Journal";
     document.querySelector(".DrugInfoName").textContent = name;
+    $("wkIbName").textContent = name;
     const iconKey = window.xnClass?.keyFor(substance) || "";
-    const icon = document.getElementById("diIcon");
+    const icon = $("diIcon");
     icon.dataset.class = iconKey;
     icon.title = window.xnClass?.LABELS[iconKey] || "";
     icon.hidden = !iconKey;
@@ -351,80 +451,375 @@ ${DETAIL_FIELDS}
     renderDetails(substance);
 
     const classes = [].concat(substance.class?.chemical || [], substance.class?.psychoactive || []);
-    if (classes.length) document.getElementById("diClass").textContent = classes.join(" · ");
+    if (classes.length) $("diClass").textContent = classes.join(" · ");
 
     if (substance.summary) {
-      const summary = document.getElementById("diSummary");
-      summary.textContent = substance.summary;
-      summary.hidden = false;
+      $("diSummary").textContent = substance.summary;
+      $("diSummary").hidden = false;
     }
 
     const thumbUrl = substance.images?.[0]?.thumb;
     if (thumbUrl) {
-      const thumb = document.getElementById("diThumb");
+      const thumb = $("diThumb");
       const img = el("img");
       img.src = thumbUrl;
-      img.alt = "";
+      img.alt = "Structure of " + name;
       img.onerror = () => { thumb.hidden = true; };
       thumb.append(img);
       thumb.hidden = false;
     }
 
-    // A medicine links out to its active ingredient (the first one of a combination).
     const outName = substance.ingredient ? substance.ingredient.split(" + ")[0] : name;
-    document.getElementById("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(outName.replace(/\s+/g, "_"));
-    document.getElementById("diWiki").hidden = !!substance.custom && !substance.ingredient;
-    if (substance.custom) document.getElementById("diNote").textContent = substance.ingredient
+    $("diWiki").href = "https://psychonautwiki.org/wiki/" + encodeURIComponent(outName.replace(/\s+/g, "_"));
+    $("diWiki").hidden = !!substance.custom && !substance.ingredient;
+    if (substance.custom) $("diNote").textContent = substance.ingredient
       ? "Doses are for the active ingredient, for adults without tolerance. They are a rough guide, not medical advice."
       : "Dose and duration data were added by an admin on this site and are a rough guide, not advice.";
-    document.getElementById("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(outName.toLowerCase().replace(/\s+/g, "-"));
-    document.getElementById("diLinks").hidden = false;
+    $("diTripsit").href = "https://drugs.tripsit.me/" + encodeURIComponent(outName.toLowerCase().replace(/\s+/g, "-"));
+    $("diLinks").hidden = false;
 
     const sub = { name, image: thumbUrl || "", class: classes.join(", ") };
     window.xnLikes.load().then((liked) => {
-      window.xnLikes.bind(document.getElementById("diLike"), sub, liked.has(window.xnLikes.key(name)));
+      window.xnLikes.bind($("diLike"), sub, liked.has(window.xnLikes.key(name)));
     });
 
-    const DrugInfoIntakeMethods = document.querySelector(".DrugInfoIntakeMethods");
-    DrugInfoIntakeMethods.innerHTML = "";
+    const routes = document.querySelector(".DrugInfoIntakeMethods");
+    routes.innerHTML = "";
     const roas = substance.roas || [];
-    document.getElementById("diRoutesTitle").hidden = !roas.length;
-    if (!roas.length) return showMessage("PsychonautWiki has no dose or duration data for this substance.");
+    $("sec-dosing").hidden = false;
+    if (!roas.length) showMessage("PsychonautWiki has no dose or duration data for this substance.");
+    else roas.forEach((roa) => routes.append(routeTable(roa, substance)));
 
-    roas.forEach((roa) => {
-      const card = el("section", "xn-card DrugInfoIntakeMethod");
-      const head = el("div", "di-roa-head");
-      head.append(el("h2", "xn-h2 di-roa-name", roa.name || "Unknown route"));
-      const bio = roa.bioavailability ? range(roa.bioavailability.min, roa.bioavailability.max) : "";
-      if (!substance.custom || bio) head.append(el("span", "di-bio", "Bioavailability: " + (bio ? bio + "%" : "N/A")));
-      card.append(head);
+    buildToc();
+    loadMixtures(outName, [].concat(substance.commonNames || []));
+    loadPictures(outName, substance);
+  }
 
-      const doses = doseEntries(roa.dose);
-      const durations = durationEntries(roa.duration);
-      // Custom entries can have a come-down and a second peak (Substances Importer).
-      const ext = roa.extended || {};
-      const pct = (v) => Math.round(Number(v) * 100) + "%";
-      const at = () => { const i = durations.findIndex(([label]) => label === "Offset"); return i < 0 ? durations.length : i; };
-      if (ext.comedown > 0) durations.splice(at(), 0, ["Come down", `${ext.comedown} hours, to ${pct(ext.comedownLevel ?? 0.35)} of the peak`]);
-      if (ext.peak2?.duration > 0) {
-        const p2 = ext.peak2;
-        durations.splice(durations.findIndex(([label]) => label === "Peak") + 1, 0, ["Second peak", `${p2.duration} hours at ${pct(p2.level ?? 1)}, ${p2.gap || 0} hours after the first (dips to ${pct(p2.dip ?? 0.5)})`]);
-      }
-      if (doses.length) {
-        card.append(el("h3", "xn-label di-sub", "Dose"));
-        const list = el("dl", "di-list di-doses");
-        rows(list, doses);
-        card.append(list);
-      }
-      if (durations.length) {
-        card.append(el("h3", "xn-label di-sub", "Duration"));
-        const list = el("dl", "di-list");
-        rows(list, durations);
-        card.append(list);
-      }
-      if (!doses.length && !durations.length) card.append(el("p", "xn-empty", "No dose or duration data for this route."));
-      DrugInfoIntakeMethods.append(card);
+  // ---------- Mixtures.info ----------
+  const RISK = ["Unknown", "Low", "Moderate", "High", "Dangerous"];
+  const dots = (n, max) => "●".repeat(Math.max(0, Math.min(max, n))) + "○".repeat(Math.max(0, max - Math.max(0, Math.min(max, n))));
+  let combos = [], comboSort = ["risk", -1];
+
+  function paragraphs(box, text) {
+    String(text || "").split(/\n{2,}|\n(?=\S)/).map((p) => p.trim()).filter(Boolean).forEach((p) => box.append(el("p", "", p.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, "$1"))));
+  }
+
+  async function loadMixtures(name, alts) {
+    const q = new URLSearchParams({ q: name });
+    alts.slice(0, 4).forEach((a) => q.append("alt", a));
+    let data;
+    try {
+      const res = await fetch("/journal/api/mixtures?" + q, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(res.status);
+      data = await res.json();
+    } catch (_) {
+      return;
+    }
+    if (!data || !data.found) return;
+    const url = data.url || "http://mixtures.info/";
+    $("mxLink").href = url;
+    if (data.aliases?.length) {
+      const have = (infoRows.find((r) => r[0] === "Also known as") || [])[1] || "";
+      const seen = new Set(have.toLowerCase().split(/,\s*/));
+      const extra = data.aliases.filter((a) => a && !seen.has(a.toLowerCase()));
+      if (extra.length) infoRow("Also known as", (have ? have + ", " : "") + extra.join(", "));
+    }
+    if (data.category) infoRow("Category", data.category);
+    if (data.description || data.effects || data.risks) {
+      const c = section("description", "Description", $("wkSections"));
+      $("wkSections").prepend(c);
+      if (data.description) paragraphs(c, data.description);
+      if (data.effects) { c.append(el("h3", "wk-h3", "Effects")); paragraphs(c, data.effects); }
+      if (data.risks) { c.append(el("h3", "wk-h3", "Risks")); paragraphs(c, data.risks); }
+      const note = el("p", "wk-hatnote", "Text from ");
+      const a = el("a", "", "Mixtures.info"); a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+      note.append(a, ".");
+      c.append(note);
+    }
+    combos = data.combos || [];
+    if (combos.length) {
+      $("sec-combos").hidden = false;
+      drawCombos();
+    }
+    addRef(url, "Mixtures.info", "description, aliases and what is known about " + combos.length + " combinations.");
+    buildToc();
+  }
+
+  function drawCombos() {
+    const t = $("mxTable");
+    const q = $("mxFind").value.trim().toLowerCase();
+    const [key, dir] = comboSort;
+    const list = combos.filter((c) => !q || c.with.toLowerCase().includes(q)).sort((a, b) => {
+      const va = key === "with" ? a.with.toLowerCase() : a[key], vb = key === "with" ? b.with.toLowerCase() : b[key];
+      return (va < vb ? -1 : va > vb ? 1 : 0) * dir || a.with.localeCompare(b.with);
     });
+    t.innerHTML = "";
+    const head = el("tr");
+    [["with", "Combined with"], ["risk", "Risk"], ["synergy", "Effect change"], ["riskReliability", "Evidence"]].forEach(([k, label]) => {
+      const th = el("th");
+      th.scope = "col";
+      th.setAttribute("aria-sort", k === key ? (dir > 0 ? "ascending" : "descending") : "none");
+      const b = el("button", "wk-sort", label + (k === key ? (dir > 0 ? " ▲" : " ▼") : ""));
+      b.type = "button";
+      b.dataset.sort = k;
+      th.append(b);
+      head.append(th);
+    });
+    const thead = el("thead"); thead.append(head);
+    const tbody = el("tbody");
+    list.forEach((c) => {
+      const tr = el("tr", "wk-mx-row");
+      tr.tabIndex = 0;
+      tr.setAttribute("aria-expanded", "false");
+      const who = el("th", "");
+      who.scope = "row";
+      const a = el("a", "", c.with); a.href = drugLink(c.with);
+      who.append(a);
+      if (c.draft) who.append(el("span", "wk-draft", "draft"));
+      const risk = el("td"); const pill = el("span", "wk-risk", RISK[c.risk] || "Unknown"); pill.dataset.risk = c.risk; risk.append(pill);
+      const syn = el("td", "wk-syn"); const bar = el("span", "wk-meter"); bar.style.setProperty("--v", (c.synergy / 5).toFixed(2)); bar.title = c.synergy + " of 5"; syn.append(bar, el("span", "wk-n", c.synergy + "/5"));
+      const ev = el("td", "wk-ev", dots(c.riskReliability, 3)); ev.title = "Evidence for the risk: " + c.riskReliability + " of 3, for the effects: " + c.effectsReliability + " of 3";
+      tr.append(who, risk, syn, ev);
+      const more = el("tr", "wk-mx-more");
+      more.hidden = true;
+      const td = el("td"); td.colSpan = 4;
+      if (c.riskText) { td.append(el("h4", "wk-h4", "Risk")); paragraphs(td, c.riskText); }
+      if (c.effectText) { td.append(el("h4", "wk-h4", "Effects")); paragraphs(td, c.effectText); }
+      if (!c.riskText && !c.effectText) td.append(el("p", "wk-empty", "No write-up yet for this combination."));
+      if (c.url) { const l = el("a", "wk-ext", "Read on Mixtures.info ↗"); l.href = c.url; l.target = "_blank"; l.rel = "noopener noreferrer"; td.append(l); }
+      more.append(td);
+      tbody.append(tr, more);
+    });
+    if (!list.length) { const tr = el("tr"); const td = el("td", "wk-empty", "No combination matches."); td.colSpan = 4; tr.append(td); tbody.append(tr); }
+    t.append(thead, tbody);
+  }
+  $("mxTable").addEventListener("click", (e) => {
+    const s = e.target.closest("[data-sort]");
+    if (s) {
+      const k = s.dataset.sort;
+      comboSort = k === comboSort[0] ? [k, -comboSort[1]] : [k, k === "with" ? 1 : -1];
+      drawCombos();
+      $("mxTable").querySelector('[data-sort="' + k + '"]').focus();
+      return;
+    }
+    if (e.target.closest("a")) return;
+    toggleRow(e.target.closest(".wk-mx-row"));
+  });
+  $("mxTable").addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("wk-mx-row")) { e.preventDefault(); toggleRow(e.target); }
+  });
+  function toggleRow(row) {
+    if (!row) return;
+    const more = row.nextElementSibling;
+    const open = more.hidden;
+    more.hidden = !open;
+    row.setAttribute("aria-expanded", String(open));
+    if (open) comboDetails(row, more);
+  }
+  // The full write-up from Mixtures' combo endpoint, the first time a row opens.
+  const comboCache = new Map();
+  async function comboDetails(row, more) {
+    const c = combos.find((x) => x.with === row.querySelector("th a").textContent);
+    if (!c || !c.slugs || more.dataset.loaded) return;
+    more.dataset.loaded = "1";
+    const td = more.firstElementChild;
+    const wait = el("p", "wk-empty wk-loading", "Loading the full write-up from Mixtures.info…");
+    td.append(wait);
+    try {
+      let data = comboCache.get(c.slugs);
+      if (!data) {
+        const res = await fetch("/journal/api/combo?slugs=" + encodeURIComponent(c.slugs), { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error(res.status);
+        data = await res.json();
+        comboCache.set(c.slugs, data);
+      }
+      wait.remove();
+      if (!data.found) return;
+      const longer = (a, b) => (String(b || "").length > String(a || "").length ? b : "");
+      const risk = longer(c.riskText, data.riskText), eff = longer(c.effectText, data.effectText);
+      if (risk || eff) {
+        td.querySelectorAll(".wk-h4, p:not(.wk-loading)").forEach((n) => n.remove());
+        const link = td.querySelector(".wk-ext");
+        const add = (title, text) => { if (!text) return; const h = el("h4", "wk-h4", title); td.insertBefore(h, link); const box = document.createDocumentFragment(); paragraphs({ append: (p) => box.append(p) }, text); td.insertBefore(box, link); };
+        add("Risk", risk || c.riskText);
+        add("Effects", eff || c.effectText);
+      }
+      Object.entries(data.more || {}).forEach(([label, text]) => {
+        const h = el("h4", "wk-h4", label);
+        const box = document.createDocumentFragment();
+        paragraphs({ append: (p) => box.append(p) }, text);
+        td.insertBefore(h, td.querySelector(".wk-ext"));
+        td.insertBefore(box, td.querySelector(".wk-ext"));
+      });
+      if (data.url && !td.querySelector(".wk-ext")) { const l = el("a", "wk-ext", "Read on Mixtures.info ↗"); l.href = data.url; l.target = "_blank"; l.rel = "noopener noreferrer"; td.append(l); }
+    } catch (_) {
+      wait.textContent = "Couldn't load more from Mixtures.info right now.";
+    }
+  }
+  $("mxFind").addEventListener("input", drawCombos);
+
+  // ---------- Wikimedia Commons ----------
+  async function loadPictures(name, substance) {
+    let items = [];
+    try {
+      const res = await fetch("/journal/api/pictures?q=" + encodeURIComponent(name), { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(res.status);
+      items = (await res.json()).items || [];
+    } catch (_) {
+      return;
+    }
+    if (!items.length) return;
+    const gallery = $("cmGallery");
+    gallery.innerHTML = "";
+    const big = items.map((p) => p.url);
+    items.forEach((p, i) => {
+      const li = el("li", "wk-gal-item");
+      const btn = el("button", "wk-gal-pic");
+      btn.type = "button";
+      btn.setAttribute("aria-label", "See " + p.title + " full size");
+      const img = el("img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = p.desc || p.title;
+      img.src = p.thumb;
+      img.onerror = () => li.remove();
+      if (/svg/.test(p.mime || "")) btn.classList.add("is-drawing");
+      btn.append(img);
+      btn.addEventListener("click", () => openFile(p, big, i));
+      const cap = el("p", "wk-gal-cap", p.title);
+      const credit = el("p", "wk-gal-credit");
+      const link = el("a", "", [p.artist, p.license].filter(Boolean).join(" · ") || "Wikimedia Commons");
+      link.href = p.page; link.target = "_blank"; link.rel = "noopener noreferrer";
+      credit.append(link);
+      li.append(btn, cap, credit);
+      gallery.append(li);
+    });
+    $("sec-gallery").hidden = false;
+    $("cmLink").href = "https://commons.wikimedia.org/w/index.php?search=" + encodeURIComponent(name) + "&title=Special:MediaSearch&type=image";
+
+    // Lead picture for the infobox and the page background: the first photo, not a drawing.
+    const lead = items.find((p) => /jpe?g|png|webp/.test(p.mime || "")) || items[0];
+    const fig = $("wkIbFigure");
+    const pic = $("wkIbPic");
+    const img = el("img");
+    img.alt = lead.desc || lead.title;
+    img.src = lead.thumb;
+    img.onerror = () => { fig.hidden = true; };
+    pic.replaceChildren(img);
+    if (/svg/.test(lead.mime || "")) pic.classList.add("is-drawing");
+    pic.onclick = () => openFile(lead, big, items.indexOf(lead));
+    $("wkIbCaption").textContent = lead.title;
+    fig.hidden = false;
+    const bgPic = items.find((p) => /jpe?g|webp/.test(p.mime || ""));
+    if (bgPic) {
+      const probe = new Image();
+      probe.onload = () => { $("wkBackdropImg").style.backgroundImage = 'url("' + bgPic.thumb.replace(/["\\]/g, "") + '")'; $("wkBackdrop").classList.add("has-pic"); };
+      probe.src = bgPic.thumb;
+    }
+    addRef($("cmLink").href, "Wikimedia Commons", items.length + " pictures, each with its author and license.");
+    buildToc();
+  }
+
+  // ---------- One Commons file: what the Commons API for re-users says about it ----------
+  const fileCache = new Map();
+  let fileNow = null;
+  function fileRows(p, d) {
+    const rows = $("cmFileRows");
+    rows.innerHTML = "";
+    const add = (label, value, href) => {
+      if (!value) return;
+      const tr = el("tr");
+      const td = el("td", "", href ? "" : value);
+      if (href) { const a = el("a", "", value); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; td.append(a); }
+      tr.append(el("th", "", label), td);
+      rows.append(tr);
+    };
+    add("Author", d.author || p.artist);
+    add("Source", d.source);
+    add("Date", d.date);
+    add("Uploaded by", d.uploader);
+    const w = d.width || p.width, h = d.height || p.height;
+    if (w && h) add("Size", w + " × " + h + " pixels");
+    if (d.lat && d.lon) add("Taken at", d.lat + ", " + d.lon, "https://www.openstreetmap.org/?mlat=" + encodeURIComponent(d.lat) + "&mlon=" + encodeURIComponent(d.lon) + "#map=12/" + encodeURIComponent(d.lat) + "/" + encodeURIComponent(d.lon));
+    const lic = (d.licenses && d.licenses.length) ? d.licenses : (p.license ? [{ name: p.license }] : []);
+    lic.forEach((l, i) => add(i ? "" : (lic.length > 1 ? "Licences" : "Licence"), l.name, l.url));
+    const cats = $("cmFileCats");
+    cats.innerHTML = "";
+    (d.categories || []).slice(0, 24).forEach((c) => {
+      const li = el("li"); const a = el("a", "", c.replace(/^Category:/, ""));
+      a.href = "https://commons.wikimedia.org/wiki/Category:" + encodeURIComponent(c.replace(/^Category:/, "").replace(/ /g, "_"));
+      a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); cats.append(li);
+    });
+    $("cmFileCatsHead").hidden = !cats.children.length;
+  }
+  async function openFile(p, big, index) {
+    fileNow = p;
+    const dlg = $("cmFile");
+    $("cmFileTitle").textContent = p.title;
+    $("cmFileDesc").textContent = p.desc || "";
+    const img = el("img");
+    img.alt = p.desc || p.title;
+    img.src = p.thumb;
+    $("cmFilePic").replaceChildren(img);
+    $("cmFilePic").classList.toggle("is-drawing", /svg/.test(p.mime || ""));
+    $("cmFileFull").onclick = () => window.xnViewer ? window.xnViewer.open(big, index) : window.open(p.url, "_blank", "noopener");
+    $("cmFileOpen").href = p.page;
+    fileRows(p, {});
+    $("cmFileStatus").textContent = p.file ? "Loading the file's details…" : "";
+    if (!dlg.open) dlg.showModal();
+    if (!p.file) return;
+    try {
+      let d = fileCache.get(p.file);
+      if (!d) {
+        const res = await fetch("/journal/api/picture?file=" + encodeURIComponent(p.file), { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error(res.status);
+        d = await res.json();
+        fileCache.set(p.file, d);
+      }
+      if (fileNow !== p) return;
+      $("cmFileStatus").textContent = "";
+      if (!d.found) return;
+      if (d.description) $("cmFileDesc").textContent = d.description;
+      else if (d.caption) $("cmFileDesc").textContent = d.caption;
+      if (d.thumb) { const better = new Image(); better.onload = () => { if (fileNow === p) img.src = d.thumb; }; better.src = d.thumb; }
+      if (d.page) $("cmFileOpen").href = d.page;
+      fileRows(p, d);
+    } catch (_) {
+      if (fileNow === p) $("cmFileStatus").textContent = "Couldn't load more about this file right now.";
+    }
+  }
+  $("cmFileClose").addEventListener("click", () => $("cmFile").close());
+  $("cmFile").addEventListener("click", (e) => { if (e.target === $("cmFile")) $("cmFile").close(); });
+  $("cmFile").addEventListener("close", () => { fileNow = null; });
+
+  function addRef(href, title, text) {
+    const li = el("li");
+    const a = el("a", "", title); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer";
+    li.append(a, ": " + text);
+    $("wkRefs").append(li);
+  }
+
+  // Contents box, in page order, for every section that shows.
+  function buildToc() {
+    const list = $("wkTocList");
+    list.innerHTML = "";
+    const secs = [...document.querySelectorAll(".wk-section")].filter((s) => !s.hidden && s.dataset.toc);
+    const top = el("li"); const ta = el("a", "", "(Top)"); ta.href = "#"; top.append(ta); list.append(top);
+    secs.forEach((s) => { const li = el("li"); const a = el("a", "", s.dataset.toc); a.href = "#" + s.id; li.append(a); list.append(li); });
+    $("wkToc").hidden = secs.length < 2;
+    // Narrow screens: the contents box starts folded so the article comes first.
+    if (!buildToc.done && matchMedia("(max-width: 1100px)").matches) $("wkToc").querySelector("details").open = false;
+    buildToc.done = true;
+  }
+  // Highlight the section being read.
+  if ("IntersectionObserver" in window) {
+    const seen = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (!en.isIntersecting) return;
+        document.querySelectorAll("#wkTocList a").forEach((a) => a.classList.toggle("is-here", a.getAttribute("href") === "#" + en.target.id));
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    new MutationObserver(() => document.querySelectorAll(".wk-section").forEach((s) => seen.observe(s))).observe($("wkTocList"), { childList: true });
   }
 
   const drugName = new URLSearchParams(window.location.search).get("drug");
@@ -436,7 +831,10 @@ ${DETAIL_FIELDS}
       const substance = info?.data?.substances?.[0];
       if (!substance) {
         document.querySelector(".DrugInfoName").textContent = drugName;
-        return showMessage("PsychonautWiki doesn't have this substance.");
+        showMessage("PsychonautWiki doesn't have this substance.");
+        loadMixtures(drugName, []);
+        loadPictures(drugName, {});
+        return;
       }
       render(substance);
     }).catch((error) => {
@@ -445,6 +843,7 @@ ${DETAIL_FIELDS}
       showMessage(!/offline and not saved/.test(error && error.message)
         ? "Couldn't reach PsychonautWiki. Check your connection and try again."
         : "You're offline, and this substance isn't saved on this phone yet. Open the Graph once with internet to save every substance.");
+      if (navigator.onLine) { loadMixtures(drugName, []); loadPictures(drugName, {}); }
     });
   }
 </script>

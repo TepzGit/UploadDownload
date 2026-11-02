@@ -96,3 +96,12 @@ export function markDrugs(el, text) {
     el.replaceChildren(frag);
   });
 }
+
+/** The substance (or substance-like {name, class}) a dose name points at, or null.
+    Used by the Profile Recent intake and Totals rows for their icons. */
+export async function substanceFor(name) {
+  const { terms } = await getIndex();
+  const n = String(name || "").trim().toLowerCase();
+  if (!n) return null;
+  return terms.get(n) || terms.get(n.replace(/\s*\(.*\)\s*$/, "")) || null;
+}

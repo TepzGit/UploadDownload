@@ -33,6 +33,62 @@
 <div class="xn-hatch" aria-hidden="true"></div>
 
 <main class="xn-page adm">
+  <section class="xn-card adm-card" id="newsBoard" aria-labelledby="nbTitle">
+    <p class="xn-eyebrow">Main page</p>
+    <h2 class="xn-h1 adm-h2" id="nbTitle">News board</h2>
+    <p class="xn-sub">The System announcements box on the Main page, under Log in and Weather. Each one gets a type tag; pinned ones stay on top.</p>
+    <div class="nb-ver">
+      <label for="nbSiteVer"><span class="xn-label">Geek⁴u version now</span></label>
+      <div class="nb-ver-row"><span class="nb-ver-v" aria-hidden="true">v</span><input class="xn-input" id="nbSiteVer" maxlength="20" autocomplete="off" placeholder="1.0"><button type="button" class="xn-btn" id="nbSiteVerSave">Save version</button><span class="nb-status" id="nbVerStatus" role="status"></span></div>
+      <p class="nb-hint">Shown on the board. New news is filed under it, and each version gets a dot on the Main page's version timeline.</p>
+    </div>
+    <form class="nb-form" id="nbForm">
+      <div class="nb-two">
+        <label><span class="xn-label">Type</span>
+          <select class="xn-input" id="nbKind"><option value="update">Update</option><option value="notice">Notice</option><option value="feature">New feature</option><option value="fix">Fix</option></select></label>
+        <label><span class="xn-label">Title</span>
+          <input class="xn-input" id="nbTitleIn" maxlength="120" autocomplete="off" placeholder="For example, Music player released"></label>
+      </div>
+      <label><span class="xn-label">Message</span>
+        <textarea class="xn-input nb-text" id="nbBody" rows="4" maxlength="2000" required placeholder="The first line shows on the Main page; the rest opens when someone clicks it."></textarea></label>
+      <div class="nb-looks">
+        <label class="nb-look"><span class="xn-label">Tag text</span>
+          <input class="xn-input" id="nbTag" maxlength="24" autocomplete="off" placeholder="Update"></label>
+        <div class="nb-look"><span class="xn-label">Tag color</span>
+          <div class="nb-color-row"><label class="nb-pin"><input type="checkbox" id="nbTagColorOn"> Own color</label><input type="color" id="nbTagColor" value="#f472b6" aria-label="Tag color" disabled></div></div>
+      </div>
+      <fieldset class="nb-sizes"><legend class="xn-label">Card size</legend>
+        <label class="nb-size"><input type="radio" name="nbSize" value="" checked><span class="nb-size-pic" data-size="" aria-hidden="true"><i></i></span><span><strong>Small</strong><small>One row, like now</small></span></label>
+        <label class="nb-size"><input type="radio" name="nbSize" value="medium"><span class="nb-size-pic" data-size="medium" aria-hidden="true"><i></i></span><span><strong>Medium</strong><small>Twice as high, long text</small></span></label>
+        <label class="nb-size"><input type="radio" name="nbSize" value="large"><span class="nb-size-pic" data-size="large" aria-hidden="true"><i></i></span><span><strong>Large</strong><small>3 times as high, big thumbnail</small></span></label>
+      </fieldset>
+      <div class="nb-looks">
+        <div class="nb-look"><span class="xn-label">Thumbnail</span>
+          <div class="nb-thumb-row"><span class="nb-thumb" id="nbThumbBox"><img id="nbThumbImg" alt="" hidden><span id="nbThumbNone">None</span></span>
+            <input type="file" id="nbThumbFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+            <button type="button" class="xn-btn" id="nbThumbPick">Upload</button><button type="button" class="xn-btn" id="nbThumbDel" hidden>Remove</button></div></div>
+        <label class="nb-look"><span class="xn-label">Font</span>
+          <select class="xn-input" id="nbFont"><option value="">Site font</option><option value="sans" data-font="sans">Clean</option><option value="serif" data-font="serif">Serif</option><option value="rounded" data-font="rounded">Rounded</option><option value="mono" data-font="mono">Typewriter</option><option value="display" data-font="display">Bold display</option><option value="hand" data-font="hand">Handwritten</option><option value="grotesk" data-font="grotesk">Grotesk</option><option value="code" data-font="code">Code</option><option value="bubbly" data-font="bubbly">Bubbly</option><option value="slab" data-font="slab">Slab</option><option value="condensed" data-font="condensed">Condensed</option><option value="elegant" data-font="elegant">Elegant italic</option><option value="comic" data-font="comic">Comic</option></select></label>
+        <div class="nb-look"><span class="xn-label">Color</span>
+          <div class="nb-color-row"><label class="nb-pin"><input type="checkbox" id="nbColorOn"> Own color</label><input type="color" id="nbColor" value="#a78bfa" aria-label="News color" disabled></div></div>
+        <label class="nb-look"><span class="xn-label">Version</span>
+          <input class="xn-input" id="nbVersion" maxlength="20" autocomplete="off" placeholder="Now"></label>
+      </div>
+      <div class="nb-preview-wrap"><span class="xn-label">Preview on the Main page</span>
+        <div class="nb-pv" id="nbPv"><span class="nb-pv-date">02.11.26</span><span class="nb-pv-tag" id="nbPvTag">Update</span><span class="nb-pv-main"><img class="nb-pv-thumb" id="nbPvThumb" alt="" hidden><span class="nb-pv-text"><span class="nb-preview" id="nbPreview">Title</span><span class="nb-pv-sum" id="nbPvSum">The message shows here.</span></span></span></div></div>
+      <div class="nb-row">
+        <label class="nb-pin"><input type="checkbox" id="nbPinned"> Pin to the top</label>
+        <span class="nb-count" id="nbCount">0 / 2000</span>
+      </div>
+      <div class="nb-row">
+        <span class="nb-status" id="nbStatus" role="status"></span>
+        <button type="button" class="xn-btn" id="nbCancel" hidden>Cancel</button>
+        <button type="submit" class="xn-btn xn-btn-primary" id="nbSave">Post</button>
+      </div>
+    </form>
+    <ol class="nb-list" id="nbList" aria-live="polite"><li class="fa-empty">Loading news…</li></ol>
+  </section>
+
   <section class="xn-card adm-card">
     <p class="xn-eyebrow">Admin</p>
     <h1 class="xn-h1">Admin panel</h1>
@@ -110,49 +166,6 @@
     <div class="fa-list" id="faList" aria-live="polite"><p class="fa-empty">Loading accounts…</p></div>
   </section>
 
-  <section class="xn-card adm-card" id="newsBoard" aria-labelledby="nbTitle">
-    <p class="xn-eyebrow">Main page</p>
-    <h2 class="xn-h1 adm-h2" id="nbTitle">News board</h2>
-    <p class="xn-sub">The System announcements box on the Main page, under Log in and Weather. Each one gets a type tag; pinned ones stay on top.</p>
-    <div class="nb-ver">
-      <label for="nbSiteVer"><span class="xn-label">Geek⁴u version now</span></label>
-      <div class="nb-ver-row"><span class="nb-ver-v" aria-hidden="true">v</span><input class="xn-input" id="nbSiteVer" maxlength="20" autocomplete="off" placeholder="1.0"><button type="button" class="xn-btn" id="nbSiteVerSave">Save version</button><span class="nb-status" id="nbVerStatus" role="status"></span></div>
-      <p class="nb-hint">Shown on the board. New news is filed under it, and each version gets a dot on the Main page's version timeline.</p>
-    </div>
-    <form class="nb-form" id="nbForm">
-      <div class="nb-two">
-        <label><span class="xn-label">Type</span>
-          <select class="xn-input" id="nbKind"><option value="update">Update</option><option value="notice">Notice</option><option value="feature">New feature</option><option value="fix">Fix</option></select></label>
-        <label><span class="xn-label">Title</span>
-          <input class="xn-input" id="nbTitleIn" maxlength="120" autocomplete="off" placeholder="For example, Music player released"></label>
-      </div>
-      <label><span class="xn-label">Message</span>
-        <textarea class="xn-input nb-text" id="nbBody" rows="4" maxlength="2000" required placeholder="The first line shows on the Main page; the rest opens when someone clicks it."></textarea></label>
-      <div class="nb-looks">
-        <div class="nb-look"><span class="xn-label">Thumbnail</span>
-          <div class="nb-thumb-row"><span class="nb-thumb" id="nbThumbBox"><img id="nbThumbImg" alt="" hidden><span id="nbThumbNone">None</span></span>
-            <input type="file" id="nbThumbFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
-            <button type="button" class="xn-btn" id="nbThumbPick">Upload</button><button type="button" class="xn-btn" id="nbThumbDel" hidden>Remove</button></div></div>
-        <label class="nb-look"><span class="xn-label">Font</span>
-          <select class="xn-input" id="nbFont"><option value="">Site font</option><option value="sans" data-font="sans">Clean</option><option value="serif" data-font="serif">Serif</option><option value="rounded" data-font="rounded">Rounded</option><option value="mono" data-font="mono">Typewriter</option><option value="display" data-font="display">Bold display</option><option value="hand" data-font="hand">Handwritten</option></select></label>
-        <div class="nb-look"><span class="xn-label">Color</span>
-          <div class="nb-color-row"><label class="nb-pin"><input type="checkbox" id="nbColorOn"> Own color</label><input type="color" id="nbColor" value="#a78bfa" aria-label="News color" disabled></div></div>
-        <label class="nb-look"><span class="xn-label">Version</span>
-          <input class="xn-input" id="nbVersion" maxlength="20" autocomplete="off" placeholder="Now"></label>
-      </div>
-      <p class="nb-preview-wrap"><span class="xn-label">Preview</span><span class="nb-preview" id="nbPreview">Title</span></p>
-      <div class="nb-row">
-        <label class="nb-pin"><input type="checkbox" id="nbPinned"> Pin to the top</label>
-        <span class="nb-count" id="nbCount">0 / 2000</span>
-      </div>
-      <div class="nb-row">
-        <span class="nb-status" id="nbStatus" role="status"></span>
-        <button type="button" class="xn-btn" id="nbCancel" hidden>Cancel</button>
-        <button type="submit" class="xn-btn xn-btn-primary" id="nbSave">Post</button>
-      </div>
-    </form>
-    <ol class="nb-list" id="nbList" aria-live="polite"><li class="fa-empty">Loading news…</li></ol>
-  </section>
 </main>
 <script>
   // News board: post, edit, pin and delete what the Main page shows (/site/news).
@@ -162,6 +175,10 @@
     const font = $("nbFont"), color = $("nbColor"), colorOn = $("nbColorOn"), version = $("nbVersion"), preview = $("nbPreview");
     const thumbFile = $("nbThumbFile"), thumbImg = $("nbThumbImg"), thumbNone = $("nbThumbNone"), thumbDel = $("nbThumbDel");
     const siteVer = $("nbSiteVer"), verStatus = $("nbVerStatus");
+    const tagIn = $("nbTag"), tagColor = $("nbTagColor"), tagColorOn = $("nbTagColorOn"), pv = $("nbPv"), pvTag = $("nbPvTag"), pvThumb = $("nbPvThumb"), pvSum = $("nbPvSum");
+    const sizeNow = () => (form.querySelector('input[name="nbSize"]:checked') || {}).value || "";
+    const setSize = (v) => { form.querySelectorAll('input[name="nbSize"]').forEach((r) => { r.checked = r.value === (v || ""); }); };
+    const SIZE_NAMES = { medium: "Medium", large: "Large" };
     let thumb = "", current = "1.0";
     const save = $("nbSave"), cancel = $("nbCancel"), status = $("nbStatus"), count = $("nbCount");
     let items = [];
@@ -179,9 +196,11 @@
         const text = make("div", "nb-item-text");
         const tags = make("div", "nb-tags");
         const k = KINDS[n.kind] ? n.kind : "update";
-        const tag = make("span", "nb-kind", KINDS[k]);
+        const tag = make("span", "nb-kind", n.tag || KINDS[k]);
         tag.dataset.kind = k;
+        if (n.tagColor) { tag.style.color = n.tagColor; tag.style.borderColor = n.tagColor; tag.style.background = "transparent"; }
         tags.append(tag);
+        if (SIZE_NAMES[n.size]) tags.append(make("span", "nb-badge", SIZE_NAMES[n.size]));
         if (n.pinned) tags.append(make("span", "nb-badge", "Pinned"));
         tags.append(make("span", "nb-badge nb-vbadge", "v" + (n.version || "1.0")));
         text.append(tags);
@@ -214,15 +233,29 @@
       thumbNone.hidden = !!thumb;
       thumbDel.hidden = !thumb;
       if (thumb) thumbImg.src = "/newspic/" + thumb; else thumbImg.removeAttribute("src");
+      paintPreview();
     }
     function paintPreview() {
       preview.textContent = title.value.trim() || "Title";
       if (font.value) preview.dataset.font = font.value; else delete preview.dataset.font;
       preview.style.color = colorOn.checked ? color.value : "";
       color.disabled = !colorOn.checked;
+      tagColor.disabled = !tagColorOn.checked;
+      tagIn.placeholder = KINDS[kind.value] || "Update";
+      pvTag.textContent = tagIn.value.trim() || KINDS[kind.value] || "Update";
+      pvTag.dataset.kind = kind.value;
+      pvTag.style.setProperty("--pv-tag", tagColorOn.checked ? tagColor.value : "");
+      pvTag.classList.toggle("is-own", tagColorOn.checked);
+      pv.dataset.size = sizeNow();
+      if (font.value) pv.dataset.font = font.value; else delete pv.dataset.font;
+      pvSum.textContent = body.value.trim() || "The message shows here.";
+      pvThumb.hidden = !thumb;
+      if (thumb) pvThumb.src = "/newspic/" + thumb; else pvThumb.removeAttribute("src");
     }
-    [title, font, color, colorOn].forEach((el) => el.addEventListener("input", paintPreview));
-    colorOn.addEventListener("change", paintPreview);
+    [title, font, color, colorOn, tagIn, tagColor, tagColorOn, kind, body].forEach((el) => el.addEventListener("input", paintPreview));
+    [colorOn, tagColorOn, kind].forEach((el) => el.addEventListener("change", paintPreview));
+    form.querySelectorAll('input[name="nbSize"]').forEach((r) => r.addEventListener("change", paintPreview));
+    paintPreview();
     $("nbThumbPick").addEventListener("click", () => thumbFile.click());
     thumbDel.addEventListener("click", () => setThumb(""));
     thumbFile.addEventListener("change", async () => {
@@ -253,8 +286,8 @@
       save.textContent = "Post";
       cancel.hidden = true;
       count.textContent = "0 / 2000";
+      setSize("");
       setThumb("");
-      paintPreview();
       list.querySelectorAll(".is-editing").forEach((li) => li.classList.remove("is-editing"));
     }
     body.addEventListener("input", () => { count.textContent = body.value.length + " / 2000"; });
@@ -265,7 +298,7 @@
       if (!body.value.trim()) { status.textContent = "Write something first."; return; }
       save.disabled = true;
       status.textContent = "";
-      const payload = { title: title.value, body: body.value, kind: kind.value, pinned: pinned.checked, thumb, font: font.value, color: colorOn.checked ? color.value : "", version: version.value };
+      const payload = { title: title.value, body: body.value, kind: kind.value, pinned: pinned.checked, thumb, font: font.value, color: colorOn.checked ? color.value : "", version: version.value, tag: tagIn.value, tagColor: tagColorOn.checked ? tagColor.value : "", size: sizeNow() };
       try {
         await send(editing ? { action: "edit", id: editing, ...payload } : { action: "post", ...payload });
         status.textContent = editing ? "Saved. The Main page shows it now." : "Posted. Everyone sees it on the Main page.";
@@ -288,8 +321,11 @@
         colorOn.checked = !!n.color;
         if (n.color) color.value = n.color;
         version.value = n.version || "";
+        tagIn.value = n.tag || "";
+        tagColorOn.checked = !!n.tagColor;
+        if (n.tagColor) tagColor.value = n.tagColor;
+        setSize(n.size);
         setThumb(n.thumb);
-        paintPreview();
         count.textContent = body.value.length + " / 2000";
         save.textContent = "Save changes";
         cancel.hidden = false;
@@ -438,7 +474,8 @@
       const body = list.map((u) => {
         const face = u.avatar ? '<img src="' + esc(u.avatar) + '" alt="" loading="lazy">' : esc(u.name.charAt(0).toUpperCase());
         const name = '<a class="ac-who" href="/u/' + encodeURIComponent(u.name) + '"><span class="ac-face">' + face + "</span><span>" + esc(u.name) + (u.admin ? ' <small class="ac-admin">Admin</small>' : "") + "</span></a>";
-        const rank = '<span class="xn-rank" data-tier="' + u.rank.tier + '" title="' + u.rank.score + ' points"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">' + esc(u.rank.name) + "</span>" + (u.rank.level ? '<span class="xn-level">Lv ' + u.rank.level + "</span>" : "") + "</span>";
+        const rank = '<span class="ac-rank"><span class="xn-rank" data-tier="' + u.rank.tier + '" title="' + u.rank.score + ' points"><span class="xn-rank-pips" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="xn-rank-name">' + esc(u.rank.name) + "</span></span>" +
+          '<label class="ac-lv">Lv <input type="number" inputmode="numeric" min="0" max="100" step="1" value="' + u.rank.level + '" data-id="' + u.id + '" aria-label="Geek level for ' + esc(u.name) + '"></label></span>';
         return "<tr><th scope=\"row\">" + name + "</th><td>" + rank + "</td><td>" + num(u.graphs) + "</td><td>" + num(u.posts) + "</td><td>" + num(u.comments) + "</td><td>" + num(u.doses) + "</td><td>" + num(u.likes) + "</td><td>" + num(u.friends) + "</td><td>" + (u.joined ? esc(new Date(u.joined).toLocaleDateString()) : "—") + "</td><td>" + esc(ago(u.lastSeen)) + "</td></tr>";
       }).join("");
       $("acTable").innerHTML = head + "<tbody>" + (body || '<tr><td colspan="10" class="st-none">No accounts match.</td></tr>') + "</tbody>";
@@ -454,6 +491,31 @@
       $("acTable").querySelector('[data-sort="' + k + '"]').focus();
     });
     $("acFind").addEventListener("input", table);
+    // Level editor: type a level 0-100 and press Enter or leave the box (POST /admin/level).
+    $("acTable").addEventListener("change", async (e) => {
+      const input = e.target.closest(".ac-lv input");
+      if (!input) return;
+      const box = input.parentElement, u = users.find((x) => x.id === +input.dataset.id);
+      const level = Math.round(Number(input.value));
+      box.classList.remove("is-saved", "is-bad");
+      if (!u || !Number.isFinite(level) || level < 0 || level > 100) { box.classList.add("is-bad"); input.title = "Pick a level from 0 to 100."; return; }
+      try {
+        const res = await fetch("/admin/level", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: u.id, level }) });
+        if (!res.ok) throw new Error((await res.text()).trim());
+        u.rank = Object.assign(u.rank, await res.json());
+        const badge = box.previousElementSibling;
+        badge.dataset.tier = u.rank.tier;
+        badge.title = u.rank.score + " points";
+        badge.querySelector(".xn-rank-name").textContent = u.rank.name;
+        input.value = u.rank.level;
+        input.title = "Saved";
+        box.classList.add("is-saved");
+      } catch (err) {
+        box.classList.add("is-bad");
+        input.title = err.message || "Couldn't save the level.";
+      }
+    });
+    $("acTable").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.closest(".ac-lv input")) e.target.blur(); });
 
     fetch("/admin/stats", { headers: { Accept: "application/json" } })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error())))
