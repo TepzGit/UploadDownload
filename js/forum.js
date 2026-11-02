@@ -35,9 +35,23 @@ export function paintName(el, who) {
   return el;
 }
 
-/** The small geek rank pips beside a name. */
+/** The geek level badge beside a name: the same hexagon as on Profile and the
+ * menu (mommy 2026-11-02). Pressing it opens the levels popup. */
 export function rankBadge(who) {
-  return who && who.rank && window.xnRank ? window.xnRank.badge(who.rank, true, who.level, who.rankLook) : null;
+  if (!who || !who.rank || !window.xnRank) return null;
+  if (!window.xnRank.hexb) return window.xnRank.badge(who.rank, true, who.level, who.rankLook);
+  const level = Math.max(0, Number(who.level) || 0);
+  const wrap = document.createElement("span");
+  wrap.className = "fm-lv";
+  wrap.dataset.levels = "";
+  wrap.dataset.level = String(level);
+  wrap.tabIndex = 0;
+  wrap.setAttribute("role", "button");
+  const name = (window.xnRank.NAMES || [])[who.rank - 1] || "Geek";
+  wrap.title = name + ", level " + level;
+  wrap.setAttribute("aria-label", name + " badge, level " + level);
+  wrap.append(window.xnRank.hexb(who.rank, level));
+  return wrap;
 }
 
 export function profileLink(name) {
@@ -369,9 +383,10 @@ export function postCard(post, { onRemoved } = {}) {
  * Loads posts into list, 20 at a time, newest first. more is the "Show older
  * posts" button and empty the note shown when there are none.
  */
-export function mountFeed({ list, more, empty, user = "", emptyText = "No posts yet." }) {
+export function mountFeed({ list, more, empty, user = "", group = 0, emptyText = "No posts yet." }) {
   let oldest = 0;
   let loaded = false;
+  let turn = 0; // a newer load (another wall) wins over an older one still on its way
 
   function checkEmpty() {
     empty.hidden = !loaded || list.children.length > 0;
@@ -383,10 +398,13 @@ export function mountFeed({ list, more, empty, user = "", emptyText = "No posts 
     const query = new URLSearchParams();
     if (oldest) query.set("before", String(oldest));
     if (user) query.set("user", user);
+    if (group) query.set("group", String(group));
+    const mine = ++turn;
     try {
       const res = await fetch("/forum/posts?" + query, { headers: { Accept: "application/json" } });
       if (!res.ok || !(res.headers.get("content-type") || "").includes("json")) throw new Error();
       const data = await res.json();
+      if (mine !== turn) return;
       (data.posts || []).forEach((post) => list.append(postCard(post, { onRemoved: checkEmpty })));
       if (data.posts && data.posts.length) oldest = data.posts[data.posts.length - 1].id;
       more.hidden = !data.more;
@@ -415,6 +433,28 @@ export function mountFeed({ list, more, empty, user = "", emptyText = "No posts 
       list.prepend(postCard(post, { onRemoved: checkEmpty }));
       checkEmpty();
     },
+    /** Shows another wall: group 0 is the public Forum, else a Friendz only group. */
+    show(nextGroup, nextEmpty) {
+      group = nextGroup || 0;
+      if (nextEmpty) emptyText = nextEmpty;
+      oldest = 0;
+      loaded = false;
+      turn++;
+      list.replaceChildren();
+      if (group < 0) { // no wall picked: nothing to load
+        loaded = true;
+        more.hidden = true;
+        list.setAttribute("aria-busy", "false");
+        checkEmpty();
+        return Promise.resolve();
+      }
+      list.setAttribute("aria-busy", "true");
+      more.hidden = true;
+      empty.hidden = false;
+      empty.textContent = "Loading posts…";
+      return load();
+    },
+    get group() { return group; },
   };
 }
 

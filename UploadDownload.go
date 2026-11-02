@@ -555,6 +555,7 @@ func main() {
 	registerLinkDownloads()
 	registerChat()
 	registerFriendsBar()
+	registerFriendGroups()
 	registerSubstanceExtras()
 	// News board items got a title, a pin and an edit time.
 	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''", "tag TEXT NOT NULL DEFAULT ''", "tag_color TEXT NOT NULL DEFAULT ''", "size TEXT NOT NULL DEFAULT ''"} {
@@ -4633,7 +4634,22 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		q := r.URL.Query()
 		before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
-		only, _ := strconv.ParseInt(q.Get("id"), 10, 64) // ?id= answers just that post (letter icon links)
+		only, _ := strconv.ParseInt(q.Get("id"), 10, 64)     // ?id= answers just that post (letter icon links)
+		group, _ := strconv.ParseInt(q.Get("group"), 10, 64) // ?group= answers a Friendz only wall
+		if only != 0 {
+			group = postGroup(only)
+		}
+		if group > 0 && !inFriendGroup(uid, group) {
+			if only != 0 {
+				writeJSON(w, map[string]any{"posts": []forumPost{}, "more": false})
+				return
+			}
+			http.Error(w, "You're not in that group.", http.StatusForbidden)
+			return
+		}
+		if group < 0 {
+			group = 0
+		}
 		owner := 0
 		if name := q.Get("user"); name != "" {
 			id, ok := userByName(name)
@@ -4648,9 +4664,9 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			(SELECT COUNT(*) FROM forum_comments c WHERE c.post_id = p.id)
 		FROM forum_posts p
 		JOIN users u ON u.id = p.user_id
-		WHERE (? = 0 OR p.id < ?) AND (? = 0 OR p.user_id = ?) AND (? = 0 OR p.id = ?)
+		WHERE (? = 0 OR p.id < ?) AND (? = 0 OR p.user_id = ?) AND (? = 0 OR p.id = ?) AND p.group_id = ?
 		ORDER BY p.id DESC
-		LIMIT ?`, before, before, owner, owner, only, only, postsPerPage+1)
+		LIMIT ?`, before, before, owner, owner, only, only, group, postsPerPage+1)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Couldn't load the posts.", http.StatusInternalServerError)
@@ -4695,6 +4711,11 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			}
 			defer r.MultipartForm.RemoveAll()
 			body := cleanMultiline(r.FormValue("body"), maxPostChars)
+			group, _ := strconv.ParseInt(r.FormValue("group"), 10, 64)
+			if group != 0 && !inFriendGroup(uid, group) {
+				http.Error(w, "You're not in that group.", http.StatusForbidden)
+				return
+			}
 			files := r.MultipartForm.File["image"]
 			if len(files) > picturesPerPost {
 				http.Error(w, "A post can have up to 4 pictures.", http.StatusBadRequest)
@@ -4738,7 +4759,7 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 			}
 			raw, _ := json.Marshal(saved)
 			now := time.Now().UnixMilli()
-			res, err := db.Exec("INSERT INTO forum_posts (user_id, body, pictures, created_at) VALUES (?, ?, ?, ?)", uid, body, string(raw), now)
+			res, err := db.Exec("INSERT INTO forum_posts (user_id, body, pictures, created_at, group_id) VALUES (?, ?, ?, ?, ?)", uid, body, string(raw), now, group)
 			if err == nil {
 				db.Exec("UPDATE users SET postsMade = postsMade + 1 WHERE id = ?", uid)
 			}
@@ -5028,6 +5049,8 @@ type siteLook struct {
 	Aura string `json:"aura"` // glow around the profile picture: "", glow, pulse, rainbow, fire
 	// Drug icons in the real color of the pill or powder instead of the site color.
 	OgIcons bool `json:"ogIcons"`
+	// Animations: "" on (also when the device asks for less motion), "device" follows the device, "off".
+	Motion string `json:"motion,omitempty"`
 }
 
 var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "consolas": true, "courier": true, "inter": true, "grotesk": true, "system": true, "verdana": true, "trebuchet": true, "rounded": true, "comic": true, "serif": true, "garamond": true}
@@ -5040,6 +5063,9 @@ func (l siteLook) clean() siteLook {
 	case "", "glow", "pulse", "rainbow", "fire":
 	default:
 		l.Aura = ""
+	}
+	if l.Motion != "device" && l.Motion != "off" {
+		l.Motion = ""
 	}
 	if l.Size < 80 || l.Size > 130 {
 		l.Size = 100
@@ -5437,6 +5463,10 @@ func forumComments(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		postID, _ := strconv.ParseInt(r.URL.Query().Get("post"), 10, 64)
+		if g := postGroup(postID); g > 0 && !inFriendGroup(me, g) {
+			http.Error(w, "That post was deleted.", http.StatusNotFound)
+			return
+		}
 		var postAuthorID int
 		if err := db.QueryRow("SELECT user_id FROM forum_posts WHERE id = ?", postID).Scan(&postAuthorID); err != nil {
 			http.Error(w, "That post was deleted.", http.StatusNotFound)
@@ -5488,6 +5518,10 @@ func forumComments(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			var postAuthorID int
+			if g := postGroup(in.Post); g > 0 && !inFriendGroup(me, g) {
+				http.Error(w, "That post was deleted.", http.StatusNotFound)
+				return
+			}
 			if err := db.QueryRow("SELECT user_id FROM forum_posts WHERE id = ?", in.Post).Scan(&postAuthorID); err != nil {
 				http.Error(w, "That post was deleted.", http.StatusNotFound)
 				return
@@ -13682,7 +13716,7 @@ func friendsBar(w http.ResponseWriter, r *http.Request) {
 			}
 			q.Close()
 		}
-		if q, err := db.Query("SELECT body, created_at FROM forum_posts WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC LIMIT 5", x.id, since); err == nil {
+		if q, err := db.Query("SELECT body, created_at FROM forum_posts WHERE user_id = ? AND created_at > ? AND group_id = 0 ORDER BY created_at DESC LIMIT 5", x.id, since); err == nil {
 			for q.Next() {
 				var body string
 				var at int64
@@ -14429,4 +14463,346 @@ func commonsFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
+}
+
+// ---- Friendz only: friend groups with their own Forum wall, and friends' activity ----
+// (mommy 2026-11-02 22:44). A host makes a group from their friends; only the
+// host and the members see the group's wall in the Forum's "Friendz only" tab.
+
+const friendGroupsSchema = `
+CREATE TABLE IF NOT EXISTS friend_groups (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	host_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS friend_group_members (
+	group_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	PRIMARY KEY(group_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS friend_group_members_by_user ON friend_group_members(user_id);`
+
+const (
+	friendGroupNameMax  = 40
+	friendGroupMax      = 50 // members besides the host
+	friendGroupsPerHost = 20
+)
+
+func registerFriendGroups() {
+	if _, err := db.Exec(friendGroupsSchema); err != nil {
+		panic("cannot create the friend group tables: " + err.Error())
+	}
+	db.Exec("ALTER TABLE forum_posts ADD COLUMN group_id INTEGER NOT NULL DEFAULT 0")
+	http.HandleFunc("/forum/groups", requireLogin(friendGroups))
+	http.HandleFunc("/friends/activity", requireLogin(friendsActivity))
+}
+
+// inFriendGroup: the account hosts the group or is one of its members.
+func inFriendGroup(uid int, group int64) bool {
+	var n int
+	db.QueryRow(`SELECT COUNT(*) FROM friend_groups g WHERE g.id = ? AND (g.host_id = ?
+		OR EXISTS (SELECT 1 FROM friend_group_members m WHERE m.group_id = g.id AND m.user_id = ?))`, group, uid, uid).Scan(&n)
+	return n > 0
+}
+
+// postGroup is the group a Forum post belongs to, 0 for the public Forum, -1 when it is gone.
+func postGroup(post int64) int64 {
+	var g int64
+	if db.QueryRow("SELECT group_id FROM forum_posts WHERE id = ?", post).Scan(&g) != nil {
+		return -1
+	}
+	return g
+}
+
+type friendGroup struct {
+	ID      int64        `json:"id"`
+	Name    string       `json:"name"`
+	Host    postAuthor   `json:"host"`
+	IsHost  bool         `json:"isHost"`
+	Members []postAuthor `json:"members"`
+	Posts   int          `json:"posts"`
+	Last    int64        `json:"last"` // newest post, unix ms
+}
+
+func myFriendGroups(uid int) []friendGroup {
+	out := []friendGroup{}
+	rows, err := db.Query(`SELECT g.id, g.name, g.host_id, u.originalUsername, u.pathToProfilePic, u.authority,
+		(SELECT COUNT(*) FROM forum_posts p WHERE p.group_id = g.id),
+		COALESCE((SELECT MAX(created_at) FROM forum_posts p WHERE p.group_id = g.id), g.created_at)
+		FROM friend_groups g JOIN users u ON u.id = g.host_id
+		WHERE g.host_id = ? OR EXISTS (SELECT 1 FROM friend_group_members m WHERE m.group_id = g.id AND m.user_id = ?)
+		ORDER BY 8 DESC`, uid, uid)
+	if err != nil {
+		fmt.Println(err)
+		return out
+	}
+	var hosts []int
+	for rows.Next() {
+		var g friendGroup
+		var host int
+		var name, avatar, auth string
+		if rows.Scan(&g.ID, &g.Name, &host, &name, &avatar, &auth, &g.Posts, &g.Last) == nil {
+			g.Host = person(name, avatar, auth)
+			g.IsHost = host == uid
+			g.Members = []postAuthor{}
+			out = append(out, g)
+			hosts = append(hosts, host)
+		}
+	}
+	rows.Close()
+	for i := range out {
+		if q, err := db.Query(`SELECT u.originalUsername, u.pathToProfilePic, u.authority FROM friend_group_members m
+			JOIN users u ON u.id = m.user_id WHERE m.group_id = ? ORDER BY u.username`, out[i].ID); err == nil {
+			for q.Next() {
+				var name, avatar, auth string
+				if q.Scan(&name, &avatar, &auth) == nil {
+					out[i].Members = append(out[i].Members, person(name, avatar, auth))
+				}
+			}
+			q.Close()
+		}
+	}
+	_ = hosts
+	return out
+}
+
+// friendGroups: GET {groups, friends}; POST JSON
+// {action: "create", name, members}, {action: "edit", id, name, members} (host),
+// {action: "delete", id} (host, removes the group's posts too), {action: "leave", id}.
+func friendGroups(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	answer := func() {
+		friends := []postAuthor{}
+		if q, err := db.Query(`SELECT u.originalUsername, u.pathToProfilePic, u.authority
+			FROM friendships f JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+			WHERE f.status = 'accepted' AND (f.requester_id = ? OR f.addressee_id = ?) ORDER BY u.username`, me, me, me); err == nil {
+			for q.Next() {
+				var name, avatar, auth string
+				if q.Scan(&name, &avatar, &auth) == nil {
+					friends = append(friends, person(name, avatar, auth))
+				}
+			}
+			q.Close()
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"groups": myFriendGroups(me), "friends": friends})
+	}
+	if r.Method == http.MethodGet {
+		answer()
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Use GET or POST.", http.StatusMethodNotAllowed)
+		return
+	}
+	var in struct {
+		Action  string   `json:"action"`
+		ID      int64    `json:"id"`
+		Name    string   `json:"name"`
+		Members []string `json:"members"`
+	}
+	if json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&in) != nil {
+		http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+		return
+	}
+	var host int
+	if in.Action != "create" {
+		if db.QueryRow("SELECT host_id FROM friend_groups WHERE id = ?", in.ID).Scan(&host) != nil {
+			http.Error(w, "That group is gone.", http.StatusNotFound)
+			return
+		}
+		if in.Action != "leave" && host != me {
+			http.Error(w, "Only the group's host can change it.", http.StatusForbidden)
+			return
+		}
+	}
+	// Members must be the host's friends.
+	members := func() ([]int, bool) {
+		ids := []int{}
+		seen := map[int]bool{}
+		for _, n := range in.Members {
+			id, ok := userByName(strings.TrimSpace(n))
+			if !ok || id == me || seen[id] {
+				continue
+			}
+			if friendState(me, id) != "friends" {
+				http.Error(w, n+" isn't your friend, so they can't join.", http.StatusBadRequest)
+				return nil, false
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+		if len(ids) > friendGroupMax {
+			http.Error(w, fmt.Sprintf("A group holds up to %d friends.", friendGroupMax), http.StatusBadRequest)
+			return nil, false
+		}
+		return ids, true
+	}
+	name := strings.TrimSpace(strings.Join(strings.Fields(in.Name), " "))
+	if (in.Action == "create" || in.Action == "edit") && (name == "" || utf8.RuneCountInString(name) > friendGroupNameMax) {
+		http.Error(w, fmt.Sprintf("Give the group a name (up to %d characters).", friendGroupNameMax), http.StatusBadRequest)
+		return
+	}
+	setMembers := func(gid int64, ids []int) {
+		db.Exec("DELETE FROM friend_group_members WHERE group_id = ?", gid)
+		for _, id := range ids {
+			db.Exec("INSERT OR IGNORE INTO friend_group_members(group_id, user_id) VALUES(?, ?)", gid, id)
+		}
+	}
+	switch in.Action {
+	case "create":
+		var n int
+		db.QueryRow("SELECT COUNT(*) FROM friend_groups WHERE host_id = ?", me).Scan(&n)
+		if n >= friendGroupsPerHost {
+			http.Error(w, fmt.Sprintf("You can host up to %d groups.", friendGroupsPerHost), http.StatusBadRequest)
+			return
+		}
+		ids, ok := members()
+		if !ok {
+			return
+		}
+		res, err := db.Exec("INSERT INTO friend_groups(host_id, name, created_at) VALUES(?, ?, ?)", me, name, time.Now().UnixMilli())
+		if err != nil {
+			http.Error(w, "Couldn't make the group.", http.StatusInternalServerError)
+			return
+		}
+		gid, _ := res.LastInsertId()
+		setMembers(gid, ids)
+	case "edit":
+		ids, ok := members()
+		if !ok {
+			return
+		}
+		db.Exec("UPDATE friend_groups SET name = ? WHERE id = ?", name, in.ID)
+		setMembers(in.ID, ids)
+	case "delete":
+		if rows, err := db.Query("SELECT id, user_id, pictures FROM forum_posts WHERE group_id = ?", in.ID); err == nil {
+			type gone struct {
+				id     int64
+				author int
+				pics   string
+			}
+			var list []gone
+			for rows.Next() {
+				var g gone
+				if rows.Scan(&g.id, &g.author, &g.pics) == nil {
+					list = append(list, g)
+				}
+			}
+			rows.Close()
+			for _, g := range list {
+				var links []string
+				json.Unmarshal([]byte(g.pics), &links)
+				for _, l := range links {
+					removeOwnPicture(l, g.author)
+				}
+				db.Exec("DELETE FROM forum_comments WHERE post_id = ?", g.id)
+			}
+		}
+		db.Exec("DELETE FROM forum_posts WHERE group_id = ?", in.ID)
+		db.Exec("DELETE FROM friend_group_members WHERE group_id = ?", in.ID)
+		db.Exec("DELETE FROM friend_groups WHERE id = ?", in.ID)
+	case "leave":
+		if host == me {
+			http.Error(w, "You host this group. Delete it instead.", http.StatusBadRequest)
+			return
+		}
+		db.Exec("DELETE FROM friend_group_members WHERE group_id = ? AND user_id = ?", in.ID, me)
+	default:
+		http.Error(w, "Unknown action.", http.StatusBadRequest)
+		return
+	}
+	answer()
+}
+
+type friendActivity struct {
+	Who  postAuthor `json:"who"`
+	Kind string     `json:"kind"` // report, post, group, friend
+	Text string     `json:"text"`
+	URL  string     `json:"url"`
+	At   int64      `json:"at"`
+}
+
+// friendsActivity: GET {items} — what your friends did in the last 14 days, newest first
+// (public trip reports, public Forum posts, posts in groups you are in, new friends).
+func friendsActivity(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	since := time.Now().Add(-14 * 24 * time.Hour).UnixMilli()
+	type friend struct {
+		id                 int
+		name, avatar, auth string
+	}
+	var list []friend
+	if rows, err := db.Query(`SELECT u.id, u.originalUsername, u.pathToProfilePic, u.authority
+		FROM friendships f JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+		WHERE f.status = 'accepted' AND (f.requester_id = ? OR f.addressee_id = ?) LIMIT 200`, me, me, me); err == nil {
+		for rows.Next() {
+			var x friend
+			if rows.Scan(&x.id, &x.name, &x.avatar, &x.auth) == nil {
+				list = append(list, x)
+			}
+		}
+		rows.Close()
+	}
+	out := []friendActivity{}
+	for _, x := range list {
+		who := person(x.name, x.avatar, x.auth)
+		if q, err := db.Query("SELECT id, title, updated_at FROM trip_reports WHERE user_id = ? AND public = 1 AND updated_at > ? ORDER BY updated_at DESC LIMIT 5", x.id, since); err == nil {
+			for q.Next() {
+				var id, at int64
+				var title string
+				if q.Scan(&id, &title, &at) == nil {
+					text := "posted a trip report"
+					if t := shortText(title, 50); t != "" {
+						text += ": " + t
+					}
+					out = append(out, friendActivity{who, "report", text, "/Notes?report=" + strconv.FormatInt(id, 10) + "#public", at})
+				}
+			}
+			q.Close()
+		}
+		if q, err := db.Query(`SELECT p.id, p.body, p.created_at, p.group_id, COALESCE(g.name, '') FROM forum_posts p
+			LEFT JOIN friend_groups g ON g.id = p.group_id
+			WHERE p.user_id = ? AND p.created_at > ? AND (p.group_id = 0 OR g.host_id = ?
+				OR EXISTS (SELECT 1 FROM friend_group_members m WHERE m.group_id = p.group_id AND m.user_id = ?))
+			ORDER BY p.created_at DESC LIMIT 5`, x.id, since, me, me); err == nil {
+			for q.Next() {
+				var id, at, gid int64
+				var body, gname string
+				if q.Scan(&id, &body, &at, &gid, &gname) == nil {
+					a := friendActivity{who, "post", "posted on the Forum", "/Forum?post=" + strconv.FormatInt(id, 10), at}
+					if gid != 0 {
+						a.Kind, a.Text, a.URL = "group", "posted in "+gname, "/Forum?group="+strconv.FormatInt(gid, 10)+"&post="+strconv.FormatInt(id, 10)
+					}
+					if b := shortText(body, 50); b != "" {
+						a.Text += ": " + b
+					}
+					out = append(out, a)
+				}
+			}
+			q.Close()
+		}
+		if q, err := db.Query(`SELECT u.originalUsername, f.created_at FROM friendships f
+			JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+			WHERE f.status = 'accepted' AND (f.requester_id = ? OR f.addressee_id = ?) AND f.created_at > ? AND u.id != ?
+			ORDER BY f.created_at DESC LIMIT 3`, x.id, x.id, x.id, since, me); err == nil {
+			for q.Next() {
+				var other string
+				var at int64
+				if q.Scan(&other, &at) == nil {
+					out = append(out, friendActivity{who, "friend", "is now friends with " + other, "/u/" + url.PathEscape(other), at})
+				}
+			}
+			q.Close()
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].At > out[j].At })
+	if len(out) > 30 {
+		out = out[:30]
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"items": out, "friends": len(list)})
 }

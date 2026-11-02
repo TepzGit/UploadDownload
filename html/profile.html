@@ -94,6 +94,10 @@
           <h1 class="xn-h1" id="username" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Username}}</h1>
         </div>
         <p class="pf-note pf-rank-how" id="rankHow" hidden>Every Graph session and Forum post you make is a point, and points raise your geek level from 0 to 100. The first level takes 5 points and each level after takes 3% more. Your level picks your rank: Fresh Geek (0), Noob (10), Refined Geeker (20), Tweaker (40), Dedicated Tweaker (50), Mythical Tweaker (80) and Twea(king) (100).{{if .Rank.NextRank}} {{.Rank.LevelsToRank}} more {{if eq .Rank.LevelsToRank 1}}level{{else}}levels{{end}} to {{.Rank.NextRank}}.{{end}}</p>
+        <section class="pf-activity" id="pfActivity" aria-labelledby="pfActTitle">
+          <div class="pf-act-head"><h2 class="pf-act-title" id="pfActTitle">Friends' activity</h2><span class="pf-note" id="pfActNote"></span></div>
+          <div class="pf-act-row" id="pfActRow" aria-busy="true"></div>
+        </section>
       </div>
     </div>
     <input type="file" class="pf-file" id="avatarFile" accept="image/jpeg,image/png,image/gif,image/webp,image/*" tabindex="-1" aria-hidden="true">
@@ -371,6 +375,13 @@
       </div>
       <span class="xn-label pf-ap-label">Menu</span>
       <label class="ps-check pr-check"><input type="checkbox" id="lkLogo" checked><span>Show the geek⁴u logo (menu and front page)</span></label>
+      <span class="xn-label pf-ap-label" id="lkMotionLabel">Animations</span>
+      <p class="pf-note">On plays every animation, also when your computer or phone is set to show less motion.</p>
+      <div class="pr-auras pr-motions" role="radiogroup" aria-labelledby="lkMotionLabel" id="lkMotions">
+        <button type="button" role="radio" class="pr-aura" data-motion=""><span class="pr-motion-dot" data-motion="on" aria-hidden="true"><i></i></span><span>On</span></button>
+        <button type="button" role="radio" class="pr-aura" data-motion="device"><span class="pr-motion-dot" data-motion="device" aria-hidden="true"><i></i></span><span>Follow my device</span></button>
+        <button type="button" role="radio" class="pr-aura" data-motion="off"><span class="pr-motion-dot" data-motion="off" aria-hidden="true"><i></i></span><span>Off</span></button>
+      </div>
       <span class="xn-label pf-ap-label">Drug icons</span>
       <label class="ps-check pr-check"><input type="checkbox" id="lkOg"><span>OG medication icons: each pill or powder in its real color instead of purple</span></label>
       <div class="pr-og-sample" id="lkOgSample" aria-hidden="true"></div>
@@ -1395,6 +1406,67 @@
     });
   })();
 
+  // ---------------- Friends' activity (mommy 2026-11-02) ----------------
+  (function friendsActivity() {
+    const row = document.getElementById("pfActRow"), note = document.getElementById("pfActNote");
+    if (!row) return;
+    const ago = (ms) => {
+      const m = Math.max(1, Math.round((Date.now() - ms) / 60000));
+      if (m < 60) return m + " min";
+      const h = Math.round(m / 60);
+      if (h < 24) return h + " h";
+      return Math.round(h / 24) + " d";
+    };
+    const ICON = { report: "M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20zM14 3.5V8h4M9.5 12h5M9.5 15.5h5", post: "M4 5.5h16v10H9l-5 4z", group: "M8.5 9a3 3 0 1 0 0-.1M16 10.2a2.4 2.4 0 1 0 0-.1M3 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M14 14.3c2.7-.4 5 .9 6 4.7", friend: "M12 20s-7-4.4-7-9.6A4 4 0 0 1 12 8a4 4 0 0 1 7 2.4C19 15.6 12 20 12 20z" };
+    function chip(a, i) {
+      const link = document.createElement("a");
+      link.className = "pf-act";
+      link.href = a.url;
+      link.style.setProperty("--i", String(Math.min(i, 10)));
+      const face = document.createElement("span");
+      face.className = "pf-act-face";
+      if (a.who.avatar) { const im = document.createElement("img"); im.src = a.who.avatar; im.alt = ""; im.loading = "lazy"; face.append(im); }
+      else face.textContent = a.who.initial || "?";
+      const ic = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      ic.setAttribute("viewBox", "0 0 24 24");
+      ic.setAttribute("class", "pf-act-ic");
+      ic.dataset.kind = a.kind;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", ICON[a.kind] || ICON.post);
+      ic.append(path);
+      face.append(ic);
+      const text = document.createElement("span");
+      text.className = "pf-act-text";
+      const who = document.createElement("strong");
+      who.textContent = a.who.name;
+      const what = document.createElement("span");
+      what.textContent = " " + a.text;
+      const when = document.createElement("small");
+      when.textContent = ago(a.at);
+      when.title = new Date(a.at).toLocaleString();
+      text.append(who, what);
+      link.append(face, text, when);
+      return link;
+    }
+    function empty(msg) {
+      const p = document.createElement("p");
+      p.className = "pf-act-empty";
+      p.textContent = msg;
+      row.replaceChildren(p);
+    }
+    fetch("/friends/activity", { headers: { Accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        const items = d.items || [];
+        row.removeAttribute("aria-busy");
+        note.textContent = items.length ? "last 2 weeks" : "";
+        if (!d.friends) return empty("Add friends to see what they post and do here.");
+        if (!items.length) return empty("Nothing new from your friends in the last 2 weeks.");
+        row.replaceChildren(...items.map(chip));
+      })
+      .catch(() => { row.removeAttribute("aria-busy"); empty("Couldn't load your friends' activity."); });
+  })();
+
   // ---------------- Site look (Preferences): font, text size, logo ----------------
   (function siteLook() {
     if (!window.xnLook) return;
@@ -1404,6 +1476,7 @@
     const fontCur = document.getElementById("lkFontCur");
     const preview = document.getElementById("lkPreview");
     const auras = [...document.querySelectorAll("#lkAuras .pr-aura")];
+    const motions = [...document.querySelectorAll("#lkMotions .pr-aura")];
     const avatar = document.getElementById("profile-pic");
     const size = document.getElementById("lkSize");
     const sizeOut = document.getElementById("lkSizeOut");
@@ -1430,6 +1503,11 @@
       preview.dataset.fontSample = look.font;
       auras.forEach((b) => {
         const on = b.dataset.aura === look.aura;
+        b.setAttribute("aria-checked", String(on));
+        b.tabIndex = on ? 0 : -1;
+      });
+      motions.forEach((b) => {
+        const on = b.dataset.motion === (look.motion || "");
         b.setAttribute("aria-checked", String(on));
         b.tabIndex = on ? 0 : -1;
       });
@@ -1511,13 +1589,24 @@
         next.click();
       });
     });
+    motions.forEach((b, i) => {
+      b.addEventListener("click", () => change({ motion: b.dataset.motion }, true));
+      b.addEventListener("keydown", (e) => {
+        const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const next = motions[(i + step + motions.length) % motions.length];
+        next.focus();
+        next.click();
+      });
+    });
     // The size applies when the slider is let go, so the window doesn't
     // jump around under the finger while dragging.
     size.addEventListener("input", () => { sizeOut.textContent = size.value + "%"; });
     size.addEventListener("change", () => change({ size: Number(size.value) }));
     logo.addEventListener("change", () => change({ logo: logo.checked }, true));
     og.addEventListener("change", () => change({ ogIcons: og.checked }, true));
-    document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true, aura: "", ogIcons: false }, true));
+    document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true, aura: "", ogIcons: false, motion: "" }, true));
     show(window.xnLook.get());
   })();
 

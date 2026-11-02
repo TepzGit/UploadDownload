@@ -1154,6 +1154,13 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 @media (hover: hover) { .pr-aura:hover { border-color: rgba(var(--xn-accent-rgb), 0.5); } }
 .pr-aura:active { transform: scale(0.97); }
 .pr-aura:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pr-motions { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.pr-motion-dot { position: relative; width: 30px; height: 30px; border-radius: 5px; background: rgba(var(--xn-accent-rgb), 0.12); box-shadow: 0 0 0 1px var(--oled-line); overflow: hidden; }
+.pr-motion-dot i { position: absolute; left: 6px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--oled-accent); }
+.pr-motion-dot[data-motion="on"] i { animation: pr-motion-go 1.4s cubic-bezier(0.6, 0, 0.4, 1) infinite alternate; }
+.pr-motion-dot[data-motion="device"] i { left: 11px; box-shadow: 0 0 0 3px rgba(var(--xn-accent-rgb), 0.25); }
+.pr-motion-dot[data-motion="off"] i { left: 11px; opacity: 0.45; }
+@keyframes pr-motion-go { to { translate: 10px 0; } }
 .pr-aura-dot { width: 30px; height: 30px; border-radius: 5px; background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), 0.5), #0d0a16); box-shadow: 0 0 0 1px var(--oled-line); }
 .pr-check { align-self: flex-start; }
 @media (max-width: 860px) {
@@ -1326,7 +1333,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
    under the picture shows only the bar until you hover (or tap) it. */
 .pf-banner > .pf-menu-wrap { position: absolute; top: 12px; left: 12px; z-index: 2; }
 .pf-banner > .pf-menu-wrap .pf-gear { border-color: rgba(255, 255, 255, 0.16); background: rgba(0, 0, 0, 0.55); color: var(--oled-text); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-.pf-name-row { flex-wrap: wrap; padding-bottom: 110px; }
+.pf-name-row { flex-wrap: wrap; padding-bottom: 0px; }
 /* "instead of padding top add padding bottom": the 110px moves from above the name to below it. */
 .pf-who { padding-top: 0; }
 
@@ -1352,3 +1359,30 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 /* Recent intake + Totals: the drug's own icon replaces the plain pill (mommy 2026-11-02). */
 .pf-ico .sc-icon.pf-drug-ico { width: 22px; height: 22px; margin: 0; vertical-align: 0; }
 .pf-ico:has(> .sc-icon:not([hidden])) > svg { display: none; }
+
+/* Friends' activity under the name (mommy 2026-11-02): a strip of what friends did lately. */
+.pf-activity { display: grid; gap: 8px; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--oled-line); border-radius: 14px; background: rgba(255, 255, 255, 0.025); }
+.pf-act-head { display: flex; align-items: baseline; gap: 10px; }
+.pf-act-title { margin: 0; color: var(--oled-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+.pf-act-row { display: flex; gap: 10px; min-height: 52px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; padding-bottom: 4px; mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+.pf-act-row[aria-busy="true"]::before { content: ""; flex: 0 0 260px; height: 52px; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.08), rgba(255,255,255,0.03)) 0 0 / 200% 100%; animation: pf-act-shimmer 1.2s linear infinite; }
+@keyframes pf-act-shimmer { to { background-position: -200% 0; } }
+.pf-act { display: flex; flex: none; align-items: center; gap: 10px; max-width: 320px; padding: 8px 12px 8px 8px; border: 1px solid var(--oled-line); border-radius: 12px; background: #2a2838cc; color: var(--oled-text); text-decoration: none; scroll-snap-align: start; transition: border-color 0.2s ease, background-color 0.2s ease, translate 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (hover: hover) { .pf-act:hover { border-color: rgba(var(--xn-accent-rgb), 0.5); background: #322f44; translate: 0 -2px; } }
+.pf-act:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pf-act-face { position: relative; display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: 26%; background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), 0.35), #0d0a16); font-size: 13px; font-weight: 600; }
+.pf-act-face img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.pf-act-ic { position: absolute; right: -5px; bottom: -5px; width: 16px; height: 16px; padding: 2px; border-radius: 50%; background: var(--oled-accent); fill: none; stroke: #0b0a10; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; box-shadow: 0 0 0 2px #1a1824; }
+.pf-act-ic[data-kind="report"] { background: #8bd5ca; }
+.pf-act-ic[data-kind="group"] { background: #f5a97f; }
+.pf-act-ic[data-kind="friend"] { background: #f5bde6; }
+.pf-act-text { overflow: hidden; font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.pf-act-text strong { font-weight: 700; }
+.pf-act-text span { color: #d4d0de; }
+.pf-act small { flex: none; align-self: flex-start; color: var(--oled-muted); font-size: 11px; }
+.pf-act-empty { margin: 0; align-self: center; color: var(--oled-muted); font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) {
+  .pf-act { animation: pf-act-in 0.5s cubic-bezier(0.16, 0.84, 0.24, 1) backwards; animation-delay: calc(var(--i, 0) * 60ms + 0.1s); }
+  @keyframes pf-act-in { from { opacity: 0; translate: 18px 0; } }
+}
+@media (max-width: 760px) { .pf-act { max-width: 78vw; } }

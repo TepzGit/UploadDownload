@@ -174,19 +174,78 @@
     },
   };
 
+  // Animations (mommy 2026-11-02 22:46, "nmr 1 priority"): her computer asks
+  // for less motion (Windows "Animation effects" off), which switched off almost
+  // every animation on the site. Profile > Preferences > Animations now picks:
+  // "" on (the default, even when the device asks for less motion), "device"
+  // follows the device, "off". It works by rewriting the
+  // (prefers-reduced-motion: ...) part of every @media rule in the page's
+  // stylesheets, and of matchMedia() questions scripts ask.
+  (function motion() {
+    const RM = /\(\s*prefers-reduced-motion\s*:\s*(no-preference|reduce)\s*\)/g;
+    const YES = "(min-width: 0px)";
+    const NO = "(min-width: 99999px)";
+    let mode = "";
+    const swap = (text) => (mode === "device" ? text : text.replace(RM, (_, kind) => ((mode === "off") === (kind === "reduce") ? YES : NO)));
+    const first = new WeakMap(); // rule -> its media text as written
+    function walk(rules) {
+      for (const rule of rules) {
+        if (rule instanceof CSSMediaRule) {
+          let text = first.get(rule);
+          if (text == null) { text = rule.media.mediaText; first.set(rule, text); }
+          if (/prefers-reduced-motion/.test(text)) {
+            const next = swap(text);
+            if (rule.media.mediaText !== next) rule.media.mediaText = next;
+          }
+        }
+        if (rule.cssRules) walk(rule.cssRules);
+      }
+    }
+    function sweep() {
+      for (const sheet of document.styleSheets) {
+        try { walk(sheet.cssRules); } catch (_) {} // another site's sheet
+      }
+    }
+    const ask = window.matchMedia.bind(window);
+    window.matchMedia = (query) => ask(swap(String(query)));
+    // Stylesheets that arrive later (links still loading, styles scripts add).
+    new MutationObserver((list) => {
+      let again = false;
+      for (const m of list) for (const n of m.addedNodes) {
+        if (n.nodeName === "STYLE") again = true;
+        else if (n.nodeName === "LINK") n.addEventListener("load", sweep, { once: true });
+      }
+      if (again) sweep();
+    }).observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener("DOMContentLoaded", sweep);
+    window.addEventListener("load", sweep);
+    window.xnMotion = {
+      get: () => mode,
+      set(next) {
+        mode = next === "device" || next === "off" ? next : "";
+        document.documentElement.dataset.motion = mode || "on";
+        sweep();
+        window.dispatchEvent(new CustomEvent("xn:motion"));
+      },
+      // True when the page should move (scripts that animate on their own).
+      on: () => !ask(swap("(prefers-reduced-motion: reduce)")).matches,
+    };
+  })();
+
   // Site look (Profile > Preferences): font, text size and the menu logo.
   // { font: "" | "jetbrains" | "inter" | "grotesk" | "system" | "serif" | "rounded", size: 80-130, logo: true }
   const LOOK_KEY = "xn_site_look";
   const LOOK_FONTS = ["", "jetbrains", "consolas", "courier", "inter", "grotesk", "system", "verdana", "trebuchet", "rounded", "comic", "serif", "garamond"];
   const LOOK_AURAS = ["", "glow", "pulse", "rainbow", "fire"];
   const cleanLook = (raw) => {
-    const look = { font: "", size: 100, logo: true, aura: "", ogIcons: false };
+    const look = { font: "", size: 100, logo: true, aura: "", ogIcons: false, motion: "" };
     if (raw && LOOK_FONTS.includes(raw.font)) look.font = raw.font;
     const size = Number(raw && raw.size);
     if (size >= 80 && size <= 130) look.size = Math.round(size / 5) * 5;
     if (raw && raw.logo === false) look.logo = false;
     if (raw && LOOK_AURAS.includes(raw.aura)) look.aura = raw.aura;
     if (raw && raw.ogIcons === true) look.ogIcons = true;
+    if (raw && (raw.motion === "device" || raw.motion === "off")) look.motion = raw.motion;
     return look;
   };
   let look = cleanLook(null);
@@ -198,6 +257,7 @@
     if (look.font) root.dataset.font = look.font;
     else delete root.dataset.font;
     root.classList.toggle("xn-nologo", !look.logo);
+    if (window.xnMotion) window.xnMotion.set(look.motion);
     // Drug icons in the pill's or powder's own color (classicons.css).
     root.classList.toggle("xn-og-icons", look.ogIcons);
     root.style.zoom = look.size === 100 ? "" : String(look.size / 100);
@@ -1190,6 +1250,64 @@
 
   initLeaveFade();
   initSmoothWheel();
+  initReveal();
+
+  // Cards further down a page float up as they scroll into view (oled.css
+  // .xn-rv). Only ones below the screen when they appear; the rest keep the
+  // page's own entrance.
+  function initReveal() {
+    if (!("IntersectionObserver" in window)) return;
+    const SEL = ".xn-page > .xn-card, .xn-page > section, main .pf-grid > *, .fm-feed > article, .gp-news-item, .nt-report, .nt-pubwall > *, .exp-card, .fx-list > .item, .mu-songs > li";
+    const shown = new WeakSet();
+    let batch = 0;
+    const io = new IntersectionObserver((entries) => {
+      let n = 0;
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const el = e.target;
+        io.unobserve(el);
+        el.style.setProperty("--rv-d", Math.min(n++, 6) * 70 + "ms");
+        el.classList.add("xn-rv-in");
+        const done = () => { el.classList.remove("xn-rv", "xn-rv-in"); el.style.removeProperty("--rv-d"); };
+        el.addEventListener("transitionend", (t) => { if (t.target === el && t.propertyName === "translate") done(); });
+        setTimeout(done, 1400);
+      }
+    }, { rootMargin: "0px 0px -6% 0px" });
+    function look(root) {
+      if (!window.xnMotion || !window.xnMotion.on()) return;
+      const list = [];
+      if (root.matches && root.matches(SEL)) list.push(root);
+      if (root.querySelectorAll) list.push(...root.querySelectorAll(SEL));
+      const bottom = window.innerHeight;
+      for (const el of list) {
+        if (shown.has(el) || el.closest("dialog, .xn-links, [popover]")) continue;
+        shown.add(el);
+        const r = el.getBoundingClientRect();
+        if (!r.height || r.top < bottom) continue; // on screen or not drawn
+        el.classList.add("xn-rv");
+        io.observe(el);
+      }
+    }
+    const added = new Set();
+    new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) added.add(n);
+      if (batch) return;
+      batch = requestAnimationFrame(() => {
+        batch = 0;
+        added.forEach(look);
+        added.clear();
+      });
+    }).observe(document.documentElement, { childList: true, subtree: true });
+    const start = () => look(document);
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+    else start();
+    // Turned off from Preferences: show everything still waiting.
+    window.addEventListener("xn:motion", () => {
+      if (window.xnMotion.on()) return;
+      document.querySelectorAll(".xn-rv").forEach((el) => { io.unobserve(el); el.classList.remove("xn-rv", "xn-rv-in"); });
+    });
+    window.addEventListener("beforeprint", () => document.querySelectorAll(".xn-rv").forEach((el) => el.classList.add("xn-rv-in")));
+  }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

@@ -1844,3 +1844,50 @@ html[data-scene="sunset"] :is(.xn-links a[aria-current="page"], .xn-tab[aria-sel
 }
 html[data-scene="sunset"] ::selection { background: rgba(221, 120, 12, .45); color: #fff; }
 html[data-scene="sunset"] { accent-color: #DD780C; }
+
+/* ------------------------------------------------------------
+   Motion v2 (mommy 2026-11-02 22:46: "improve the animations throughout
+   the site nmr 1 priority"). nav.js xnMotion turns the no-preference
+   blocks on even when the device asks for less motion (Profile >
+   Preferences > Animations: On / Follow my device / Off).
+   ------------------------------------------------------------ */
+@keyframes xn-vt-out { to { opacity: 0; transform: translateY(-8px) scale(0.985); filter: blur(2px); } }
+@keyframes xn-vt-in { from { opacity: 0; transform: translateY(18px) scale(0.99); filter: blur(3px); } }
+@media (prefers-reduced-motion: no-preference) {
+  /* Page change: the background crossfades, the page's content lifts away
+     and the next page's content glides up into place. */
+  body > main { view-transition-name: xn-main; }
+  ::view-transition-group(xn-main) { animation: none; }
+  ::view-transition-old(xn-main) { animation: xn-vt-out 0.2s cubic-bezier(0.4, 0, 1, 1) both; }
+  ::view-transition-new(xn-main) { animation: xn-vt-in 0.46s cubic-bezier(0.16, 0.84, 0.24, 1) 0.07s both; }
+  ::view-transition-old(root) { animation: xn-fade-out 0.24s ease-in both; }
+  ::view-transition-new(root) { animation: xn-fade-in 0.36s ease-out both; }
+  html:active-view-transition body > main { animation: none; }
+  html.xn-desk::view-transition-old(xn-main) { animation-duration: 0.1s; }
+  html.xn-desk::view-transition-new(xn-main) { animation-duration: 0.22s; animation-delay: 0s; }
+
+  /* Cards further down the page float up as they scroll into view
+     (nav.js adds .xn-rv, then .xn-rv-in when they show). */
+  .xn-rv { opacity: 0; translate: 0 26px; scale: 0.985; }
+  .xn-rv.xn-rv-in { opacity: 1; translate: 0 0; scale: 1; transition: opacity 0.55s ease var(--rv-d, 0s), translate 0.7s cubic-bezier(0.16, 0.84, 0.24, 1) var(--rv-d, 0s), scale 0.7s cubic-bezier(0.16, 0.84, 0.24, 1) var(--rv-d, 0s); }
+
+  /* Cards and posts lift a little toward the pointer. */
+  @media (hover: hover) {
+    .pf-box, .fm-feed > article, .nt-report, .xn-page > .xn-card { transition: border-color 0.2s ease, box-shadow 0.3s ease, background-color 0.2s ease, translate 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .pf-box:hover, .fm-feed > article:hover { translate: 0 -2px; }
+  }
+
+  /* Buttons press in with a soft spring instead of a hard snap. */
+  .xn-btn, .xn-toggle, .pr-aura, .gp-ann-row { transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .xn-btn-primary:not(:disabled):active { transform: scale(0.95); }
+
+  /* Things that open (details, hidden panels shown with [open]) slide down. */
+  details[open] > :not(summary) { animation: xn-row-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+
+  /* Dialogs close with a fade too, where the browser can (Chrome 117+). */
+  dialog { transition: opacity 0.18s ease, translate 0.18s ease, overlay 0.18s allow-discrete, display 0.18s allow-discrete; }
+  dialog:not([open]) { opacity: 0; translate: 0 8px; }
+}
+/* Animations: Off. Everything jumps straight to its end. */
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation-duration: 1ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
+html[data-motion="off"]::view-transition-group(*), html[data-motion="off"]::view-transition-old(*), html[data-motion="off"]::view-transition-new(*) { animation: none !important; }

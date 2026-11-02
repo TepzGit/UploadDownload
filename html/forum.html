@@ -40,8 +40,29 @@
     <h1 class="xn-h1">Geek Forum</h1>
     <p class="xn-sub">post anything you want :D</p>
   </header>
-
+  <div class="fm-tabs" role="tablist" aria-label="Which wall">
+    <span class="fm-tab-glow" aria-hidden="true"></span>
+    <button type="button" class="fm-tab" role="tab" id="tabAll" aria-selected="true" aria-controls="feed"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Everyone</button>
+    <button type="button" class="fm-tab" role="tab" id="tabFriendz" aria-selected="false" aria-controls="feed"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="9.5" r="2.5"/><path d="M3 19c.6-3.4 3-5.2 6-5.2s5.4 1.8 6 5.2M14.5 14.6c2.8-.4 5.4.9 6.2 4.4"/></svg>Friendz only</button>
+  </div>
   <div class="fm-layout">
+    <section class="xn-card fm-wall-head" id="wallHead" hidden aria-live="polite">
+      <div class="fm-no-groups" id="noGroups" hidden>
+        <h2 class="xn-h2">Your friend groups</h2>
+        <p class="xn-sub">Make a group from your friends. Only the people in it see its wall.</p>
+        <button type="button" class="xn-btn xn-btn-primary" id="noGroupsNew">Make a group</button>
+      </div>
+      <div id="wallInfo" hidden>
+        <div class="fm-group-head">
+          <h2 class="xn-h2" id="wallName"></h2>
+          <div class="fm-group-acts">
+            <button type="button" class="xn-btn" id="wallEdit" hidden>Edit group</button>
+            <button type="button" class="xn-btn" id="wallLeave" hidden>Leave</button>
+          </div>
+        </div>
+        <ul class="fm-group-who" id="wallWho"></ul>
+      </div>
+    </section>
     <form class="xn-card fm-compose" id="compose" novalidate>
       <div class="fm-compose-row">
         <span class="fm-avatar" aria-hidden="true">{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}{{.Initial}}{{end}}</span>
@@ -72,6 +93,25 @@
       <ul class="fm-member-list" id="members" aria-busy="true"></ul>
     </aside>
 
+    <aside class="xn-card fm-groups" id="groupsBox" aria-labelledby="groupsTitle">
+      <div class="fm-side-head">
+        <h2 class="xn-h2" id="groupsTitle">Groups</h2>
+        <button type="button" class="xn-btn fr-small" id="groupNew">New group</button>
+      </div>
+      <ul class="fm-group-list" id="groupList"></ul>
+      <form class="fm-group-form" id="groupForm" hidden>
+        <label><span class="xn-label">Group name</span>
+          <input class="xn-input" id="groupName" maxlength="40" autocomplete="off" placeholder="For example, Weekend crew"></label>
+        <span class="xn-label" id="pickLabel">Friends in it</span>
+        <div class="fm-pick-friends" id="groupPick" role="group" aria-labelledby="pickLabel"></div>
+        <div class="fm-group-acts">
+          <button type="submit" class="xn-btn xn-btn-primary" id="groupSave">Make group</button>
+          <button type="button" class="xn-btn" id="groupCancel">Cancel</button>
+          <button type="button" class="xn-btn" id="groupDelete" hidden>Delete group</button>
+        </div>
+        <p class="fm-count" id="groupStatus" role="status"></p>
+      </form>
+    </aside>
     <section class="fm-feed-wrap" aria-label="Posts">
       <div class="fm-feed" id="feed" aria-busy="true"></div>
       <p class="xn-empty fm-empty" id="feedEmpty">Loading posts…</p>
@@ -82,6 +122,7 @@
 
 <script type="module">
   import { mountFeed, avatar, profileLink, paintName, focusPost, rankBadge } from "/forum.js";
+  const startGroup = Number(new URLSearchParams(location.search).get("group")) || 0;
   import { renderRequests } from "/friends.js";
 
   const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
@@ -93,6 +134,7 @@
     more: document.getElementById("feedMore"),
     empty: document.getElementById("feedEmpty"),
     emptyText: "No posts yet. Write the first one above.",
+    group: startGroup,
   });
   focusPost(document.getElementById("feed"), new URLSearchParams(location.search).get("post"));
 
@@ -177,6 +219,7 @@
     try {
       const body = new FormData();
       body.append("body", text.value);
+      if (feed.group) body.append("group", String(feed.group));
       for (const picture of pictures) {
         const small = await window.xnShrinkPicture(picture.file, [1600, 1600]);
         body.append("image", small, small === picture.file ? picture.file.name : "picture.jpg");
@@ -190,7 +233,7 @@
       text.value = "";
       renderPreviews();
       toast("Posted.");
-      bumpMember();
+      if (!feed.group) bumpMember();
     } catch (error) {
       toast(error.message, true);
     } finally {
@@ -263,6 +306,212 @@
     }));
   }
   loadMembers();
+
+  // ---------------- Friendz only: walls for friend groups ----------------
+  (function friendz() {
+    const page = document.querySelector("main.fm");
+    const tabs = [document.getElementById("tabAll"), document.getElementById("tabFriendz")];
+    const glow = document.querySelector(".fm-tab-glow");
+    const head = document.getElementById("wallHead"), noGroups = document.getElementById("noGroups"), info = document.getElementById("wallInfo");
+    const list = document.getElementById("groupList"), gform = document.getElementById("groupForm"), gname = document.getElementById("groupName");
+    const pick = document.getElementById("groupPick"), gsave = document.getElementById("groupSave"), gdel = document.getElementById("groupDelete"), gstatus = document.getElementById("groupStatus");
+    let groups = [], friends = [], current = 0, editing = 0;
+    const wanted = startGroup;
+
+    function moveGlow() {
+      const on = tabs.find((t) => t.getAttribute("aria-selected") === "true");
+      glow.style.left = on.offsetLeft + "px";
+      glow.style.width = on.offsetWidth + "px";
+    }
+    function setUrl() {
+      const u = new URL(location.href);
+      if (page.classList.contains("is-friendz") && current) u.searchParams.set("group", String(current)); else u.searchParams.delete("group");
+      history.replaceState(null, "", u);
+    }
+    function faces(people, n) {
+      const box = document.createElement("span");
+      box.className = "fm-group-faces";
+      people.slice(0, n).forEach((p) => box.append(avatar(p)));
+      return box;
+    }
+    function drawList() {
+      list.replaceChildren(...groups.map((g) => {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "fm-group";
+        b.dataset.id = g.id;
+        b.setAttribute("aria-current", String(g.id === current && page.classList.contains("is-friendz")));
+        const t = document.createElement("span");
+        t.className = "fm-group-text";
+        const name = document.createElement("strong");
+        name.textContent = g.name;
+        const sub = document.createElement("small");
+        const n = g.members.length + 1;
+        sub.textContent = n + (n === 1 ? " person" : " people") + " · " + (g.posts === 1 ? "1 post" : g.posts + " posts");
+        t.append(name, sub);
+        b.append(faces([g.host, ...g.members], 3), t);
+        b.addEventListener("click", () => { if (!page.classList.contains("is-friendz")) mode(true); open(g.id); });
+        li.append(b);
+        return li;
+      }));
+      if (!groups.length) {
+        const li = document.createElement("li");
+        li.className = "fm-count";
+        li.textContent = "No groups yet.";
+        list.replaceChildren(li);
+      }
+    }
+    function drawHead() {
+      const g = groups.find((x) => x.id === current);
+      noGroups.hidden = !!g;
+      info.hidden = !g;
+      form.hidden = !g;
+      if (!g) return;
+      document.getElementById("wallName").textContent = g.name;
+      document.getElementById("wallEdit").hidden = !g.isHost;
+      document.getElementById("wallLeave").hidden = g.isHost;
+      document.getElementById("wallWho").replaceChildren(...[g.host, ...g.members].map((p, i) => {
+        const li = document.createElement("li");
+        if (i === 0) li.className = "is-host";
+        const a = document.createElement("a");
+        a.href = profileLink(p.name);
+        a.textContent = p.name;
+        a.style.color = "inherit";
+        a.style.textDecoration = "none";
+        li.append(avatar(p), a);
+        return li;
+      }));
+      text.placeholder = "Write to " + g.name + "…";
+    }
+    function open(id) {
+      current = id;
+      drawList();
+      drawHead();
+      setUrl();
+      feed.show(id, "No posts in this group yet. Write the first one above.");
+    }
+    function mode(friendz) {
+      page.classList.toggle("is-friendz", friendz);
+      tabs[0].setAttribute("aria-selected", String(!friendz));
+      tabs[1].setAttribute("aria-selected", String(friendz));
+      head.hidden = !friendz;
+      moveGlow();
+      if (!friendz) {
+        form.hidden = false;
+        text.placeholder = "Write something, " + myName + "…";
+        current = 0;
+        drawList();
+        setUrl();
+        feed.show(0, "No posts yet. Write the first one above.");
+        return;
+      }
+      if (!groups.some((g) => g.id === current)) current = groups.length ? groups[0].id : 0;
+      if (current) return open(current);
+      drawList();
+      drawHead();
+      setUrl();
+      feed.show(-1, "No group picked yet.");
+    }
+    function drawPick(chosen) {
+      if (!friends.length) {
+        const p = document.createElement("p");
+        p.className = "fm-count";
+        p.textContent = "You have no friends here yet. Add some from their profiles first.";
+        pick.replaceChildren(p);
+        return;
+      }
+      pick.replaceChildren(...friends.map((f) => {
+        const l = document.createElement("label");
+        l.className = "fm-pick";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = f.name;
+        box.checked = chosen.has(f.name.toLowerCase());
+        const nm = document.createElement("span");
+        nm.textContent = f.name;
+        l.append(box, avatar(f), nm);
+        return l;
+      }));
+    }
+    function showForm(g) {
+      editing = g ? g.id : 0;
+      gname.value = g ? g.name : "";
+      drawPick(new Set(g ? g.members.map((m) => m.name.toLowerCase()) : []));
+      gsave.textContent = g ? "Save group" : "Make group";
+      gdel.hidden = !g;
+      gdel.dataset.sure = "";
+      gdel.textContent = "Delete group";
+      gstatus.textContent = "";
+      gform.hidden = false;
+      gname.focus();
+    }
+    async function send(payload) {
+      const res = await fetch("/forum/groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't save that.");
+      const d = await res.json();
+      groups = d.groups || [];
+      friends = d.friends || [];
+    }
+    document.getElementById("groupNew").addEventListener("click", () => showForm(null));
+    document.getElementById("noGroupsNew").addEventListener("click", () => showForm(null));
+    document.getElementById("wallEdit").addEventListener("click", () => showForm(groups.find((g) => g.id === current)));
+    document.getElementById("groupCancel").addEventListener("click", () => { gform.hidden = true; });
+    gform.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const members = [...pick.querySelectorAll("input:checked")].map((b) => b.value);
+      gsave.disabled = true;
+      try {
+        const before = new Set(groups.map((g) => g.id));
+        const was = editing;
+        await send(was ? { action: "edit", id: was, name: gname.value, members } : { action: "create", name: gname.value, members });
+        const made = was || (groups.find((g) => !before.has(g.id)) || {}).id || 0;
+        gform.hidden = true;
+        toast(was ? "Group saved." : "Group made. Only its people see this wall.");
+        page.classList.add("is-friendz");
+        current = made;
+        mode(true);
+      } catch (error) { gstatus.textContent = error.message; }
+      finally { gsave.disabled = false; }
+    });
+    gdel.addEventListener("click", async () => {
+      if (gdel.dataset.sure !== "1") { gdel.dataset.sure = "1"; gdel.textContent = "Sure? Its posts go too"; return; }
+      try { await send({ action: "delete", id: editing }); gform.hidden = true; current = 0; toast("Group deleted."); mode(true); }
+      catch (error) { gstatus.textContent = error.message; }
+    });
+    document.getElementById("wallLeave").addEventListener("click", async (e) => {
+      const b = e.currentTarget;
+      if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Sure?"; setTimeout(() => { b.dataset.sure = ""; b.textContent = "Leave"; }, 3000); return; }
+      try { await send({ action: "leave", id: current }); current = 0; toast("You left the group."); mode(true); }
+      catch (error) { toast(error.message, true); }
+    });
+    tabs[0].addEventListener("click", () => mode(false));
+    tabs[1].addEventListener("click", () => mode(true));
+    tabs.forEach((t, i) => t.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      tabs[1 - i].focus();
+      tabs[1 - i].click();
+    }));
+    window.addEventListener("resize", moveGlow);
+    requestAnimationFrame(moveGlow);
+    if (wanted) { page.classList.add("is-friendz"); head.hidden = false; tabs[0].setAttribute("aria-selected", "false"); tabs[1].setAttribute("aria-selected", "true"); }
+    fetch("/forum/groups", { headers: { Accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : { groups: [], friends: [] }))
+      .then((d) => {
+        groups = d.groups || [];
+        friends = d.friends || [];
+        if (wanted) {
+          current = groups.some((g) => g.id === wanted) ? wanted : 0;
+          drawList();
+          drawHead();
+          moveGlow();
+          if (!current) mode(true);
+        } else drawList();
+      })
+      .catch(() => {});
+  })();
+
 </script>
 </body>
 </html>
