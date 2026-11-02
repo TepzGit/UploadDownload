@@ -290,3 +290,25 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 html.mu-shell-open body { overflow: hidden; }
 html.mu-shell-open .xn-tabs { display: none; }
 html.mu-shell-open .mu-player { left: 0; bottom: env(safe-area-inset-bottom); }
+
+/* ------------------------------------------------------------
+   Page layout (mommy 2026-11-02: "fix pages like the utility page").
+   Both columns run the full height of the screen, the open list gets a
+   colored header band, and songs sit in a clean list with lines.
+   ------------------------------------------------------------ */
+@media (min-width: 900px) {
+  .mu { --mu-full: calc(100dvh - var(--oled-nav-h) - var(--mu-player-h) - 64px); align-items: stretch; }
+  .mu-side { align-self: start; height: var(--mu-full); max-height: none; }
+  .mu-lists { flex: 1 1 auto; }
+  .mu-view { display: flex; flex-direction: column; min-height: var(--mu-full); padding-top: 0; overflow: hidden; }
+  .mu-head {
+    margin: 0 calc(-1 * clamp(16px, 2.5vw, 24px)) 18px; padding: clamp(20px, 3vw, 32px) clamp(16px, 2.5vw, 24px) 22px;
+    border-bottom: 1px solid var(--oled-line);
+    background: linear-gradient(180deg, rgba(var(--xn-accent-rgb), 0.26), rgba(var(--xn-accent-rgb), 0.04) 85%, transparent);
+  }
+  .mu-songs { border-top: 1px solid var(--oled-line); }
+  .mu-song { border-bottom: 1px solid var(--oled-line); }
+  .mu-song-main { min-height: 56px; }
+  .mu-song-text strong { font-size: 14px; }
+  .mu-song-text span { font-size: 12px; }
+}

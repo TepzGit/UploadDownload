@@ -46,19 +46,18 @@
       <div class="pf-side">
       <div class="profile-avatar pf-avatar-static"{{if .Aura}} data-aura="{{.Aura}}"{{end}}{{if .AuraColor}} style="--aura: {{.AuraColor}}"{{end}}>{{if .Avatar}}<img src="{{.Avatar}}" alt="">{{else}}<span class="pf-initial" aria-hidden="true">{{.Initial}}</span>{{end}}</div>
         <div class="pf-progress">
-          <div class="pf-lp"><span class="xn-hexb" data-tier="{{.Rank.Tier}}" data-level="{{.Rank.Level}}"{{if ge .Rank.Level 10}} data-level-big{{end}} role="img" aria-label="{{.Rank.Name}} badge, level {{.Rank.Level}}"><span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv">Level {{.Rank.Level}}</span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span></span><span class="xn-rn" data-tier="{{.Rank.Tier}}">{{.Rank.Name}}</span></div>
-          <span class="xn-lbar" data-tier="{{.Rank.Tier}}" style="--fill: {{.Rank.BarPct}}%" role="progressbar" aria-label="Rank progress this round, {{.Rank.ToNext}} points to {{.Rank.Next}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Rank.BarPct}}"><span class="xn-lbar-track"><span class="xn-lbar-fill"></span></span><span class="xn-lbar-mile" data-t="1" title="Fresh Geek"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="2" title="Noob"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="3" title="Refined Geeker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="4" title="Mythical Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="5" title="Twea(king)"><i class="xn-lp-ico"></i></span></span>
-          <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}}</small>
+          <div class="pf-lp"><span class="xn-rn" data-tier="{{.Rank.Tier}}">{{.Rank.Name}}</span></div>
+          <span class="xn-lbar" data-tier="{{.Rank.Tier}}" style="--fill: {{.Rank.BarPct}}%" role="progressbar" aria-label="Geek level {{.Rank.Level}} of 100" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Rank.BarPct}}"><span class="xn-lbar-track"><span class="xn-lbar-fill"></span></span><span class="xn-lbar-mile" data-t="1" title="Fresh Geek"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="2" title="Noob"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="3" title="Refined Geeker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="4" title="Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="5" title="Dedicated Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="6" title="Mythical Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="7" title="Twea(king)"><i class="xn-lp-ico"></i></span></span>
+          <small class="pf-rank-note">{{.Rank.Score}} {{if eq .Rank.Score 1}}point{{else}}points{{end}}{{if .Rank.Next}} · {{.Rank.ToNext}} more to {{.Rank.Next}}{{else}} · top level reached{{end}}</small>
         </div>
       </div>
       <div class="pf-who">
         <p class="xn-eyebrow">{{if .Admin}}Admin{{else}}Member{{end}}</p>
         <div class="pf-name-row">
+          <span class="xn-hexb pf-lvbadge" data-levels tabindex="0" title="See every level and badge" data-tier="{{.Rank.Tier}}" role="button" aria-label="{{.Rank.Name}} badge, level {{.Rank.Level}}"><span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv" data-digits="{{len (printf "%d" .Rank.Level)}}"><b>{{.Rank.Level}}</b></span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span></span>
           <h1 class="xn-h1" {{if .NameColor}}data-name-color="{{.NameColor}}"{{end}}>{{.Name}}</h1>
-          <span class="xn-rank" data-tier="{{.Rank.Tier}}" data-color="{{if eq .Rank.Look.Color "tier"}}tier{{end}}" data-style="{{.Rank.Look.Style}}" data-icon="{{if .Rank.Look.HideIcon}}0{{end}}" style="{{.Rank.Look.CSS}}"><span class="xn-rank-name">{{.Rank.Name}}</span>{{if .Rank.Level}}<span class="xn-level">Lv {{.Rank.Level}}</span>{{end}}</span>
         </div>
         <p class="xn-sub">{{if eq .Posts 1}}1 post{{else}}{{.Posts}} posts{{end}} · {{len .Liked}} liked substances</p>
-        {{if .Bio}}<p class="pf-bio-text">{{.Bio}}</p>{{end}}
       </div>
       <div class="pf-actions">
         {{if .IsSelf}}<a class="xn-btn xn-btn-primary" href="/Profile">Edit your profile</a>{{else}}<div class="pf-friend" id="friendButton" data-state="{{.Friend}}"></div><a class="xn-btn" href="/Chat?to={{.Name}}">Message</a>{{end}}

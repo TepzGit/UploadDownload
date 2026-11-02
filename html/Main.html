@@ -525,6 +525,32 @@
     .gp-top.is-me > .gp-ann .gp-ann-foot { margin-top: auto; }
     .gp-top.is-me > .gp-row { grid-area: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .gp-top.is-me > .gp-me-card { grid-area: me; }
+    /* Signed in: the news board runs the full height of the panel; the two small
+       tiles shrink and sit under your card in the right column. */
+    @media (min-width: 1024px) {
+      .gp-top.is-me { grid-template-rows: auto auto; grid-template-areas: "board me" "board row"; }
+      /* The list takes no height of its own, so the board is as tall as the right
+         column; every post is listed and the list scrolls when they don't fit. */
+      .gp-top.is-me > .gp-ann .gp-news-list { flex: 1 1 0; min-height: 120px; contain: size; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(var(--xn-accent-rgb), 0.4) transparent; }
+      .gp-top.is-me > .gp-ann .gp-news-item.is-more { display: block; }
+      .gp-top.is-me > .gp-ann .gp-ann-all { display: none; }
+      .gp-top.is-me > .gp-row { gap: 12px; }
+      .gp-top.is-me .gp-me-pic { aspect-ratio: 16 / 10; }
+      .gp-top.is-me > .gp-row .gp-tile { padding: 14px 10px; }
+      .gp-top.is-me > .gp-row .gp-label { font-size: 0.62rem; letter-spacing: 0.18em; }
+      .gp-top.is-me > .gp-row .gp-who { margin-top: 6px; font-size: 1.05rem; }
+      .gp-top.is-me > .gp-row .gp-role-line { margin-top: 2px; font-size: 0.75rem; }
+      .gp-top.is-me > .gp-row .gp-actions { gap: 6px; margin-top: 10px; }
+      .gp-top.is-me > .gp-row .gp-btn { min-width: 0; height: 32px; padding: 0 10px; font-size: 0.8rem; border-radius: 8px; }
+      .gp-top.is-me > .gp-row .gp-place { margin-top: 0; font-size: 0.9rem; }
+      .gp-top.is-me > .gp-row .gp-temp { margin: 8px 0 6px; font-size: 2rem; }
+      .gp-top.is-me > .gp-row .gp-cond { font-size: 0.8rem; }
+      .gp-top.is-me > .gp-row .gp-wind { margin-top: 2px; font-size: 0.72rem; }
+    }
+    /* Signed in: the panel scrolls up over the clock until it sits in the middle of the
+       screen, and the colors around the nav and the panel fade to black as it gets there. */
+    .gp-dark-fade .xn-fluid, .gp-dark-fade .xn-hatch, .gp-dark-fade .xn-scene { opacity: calc(1 - var(--gp-dark, 0)); }
+    html.gp-dark header.xn { background: #000; }
     .gp-me-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 12px 12px 18px; border: 1px solid var(--gp-line); border-radius: 16px; background: var(--gp-tile); }
     .gp-me-pic { display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; border-radius: 10px; background: #000; color: var(--oled-muted); font-size: 5rem; font-weight: 600; text-decoration: none; }
     .gp-me-pic img { width: 100%; height: 100%; object-fit: cover; }
@@ -542,6 +568,11 @@
     .gp-me-geek .xn-hexb { font-size: 52px; }
     .gp-me-geek-who { flex: 1; display: grid; justify-items: start; gap: 2px; min-width: 0; }
     .gp-me-geek-who .xn-rn { max-width: 100%; }
+    .gp-me-geek-who .xn-rn[data-tier="5"] { font-size: 1.05rem; }
+    .gp-me-geek-who .xn-rn[data-tier="6"] { font-size: .9rem; }
+    /* The geek level title in a nerd font, like a terminal prompt (mommy 2026-11-02). */
+    .gp-me-geek .gp-me-geek-label { --oled-font: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-weight: 600; letter-spacing: .04em; text-transform: none; font-size: .78rem; color: var(--oled-text, #e6e6e6); }
+    .gp-me-geek .gp-me-geek-label > span { color: var(--oled-accent); }
     .gp-me-geek .xn-lbar { --m: 30px; margin-block: 6px 2px; }
     .gp-me-next { margin: 0; font-size: 0.75rem; color: var(--oled-muted); }
     .gp-me-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin: 4px 0 0; }
@@ -971,21 +1002,20 @@
         {{if .Bio}}<p class="gp-me-bio">{{.Bio}}</p>{{end}}
         <div class="gp-me-geek">
           <button type="button" class="gp-me-geek-head" id="gpGeekBtn" aria-expanded="false" aria-controls="gpGeekMore">
-            <span class="xn-hexb is-small" data-tier="{{.Rank.Tier}}" data-level="{{.Rank.Level}}"{{if ge .Rank.Level 10}} data-level-big{{end}} role="img" aria-label="{{.Rank.Name}} badge, level {{.Rank.Level}}"><span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv">Level {{.Rank.Level}}</span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span></span>
-            <span class="gp-me-geek-who"><span class="gp-me-geek-label">Geek level {{.Rank.Level}}</span><span class="xn-rn" data-tier="{{.Rank.Tier}}">{{.Rank.Name}}</span></span>
+            <span class="xn-hexb" data-levels title="See every level and badge" data-tier="{{.Rank.Tier}}" role="img" aria-label="{{.Rank.Name}} badge, level {{.Rank.Level}}"><span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv" data-digits="{{len (printf "%d" .Rank.Level)}}"><b>{{.Rank.Level}}</b></span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span></span>
+            <span class="gp-me-geek-who"><span class="gp-me-geek-label"><span aria-hidden="true">❯</span> geek_level</span><span class="xn-rn" data-tier="{{.Rank.Tier}}">{{.Rank.Name}}</span></span>
             <svg class="gp-me-geek-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <span class="xn-lbar" data-tier="{{.Rank.Tier}}" style="--fill: {{.Rank.BarPct}}%" role="progressbar" aria-label="Rank progress this round, {{.Rank.ToNext}} points to {{.Rank.Next}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Rank.BarPct}}"><span class="xn-lbar-track"><span class="xn-lbar-fill"></span></span><span class="xn-lbar-mile" data-t="1" title="Fresh Geek"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="2" title="Noob"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="3" title="Refined Geeker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="4" title="Mythical Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="5" title="Twea(king)"><i class="xn-lp-ico"></i></span></span>
-          <p class="gp-me-next">{{.Rank.ToNext}} points to {{.Rank.Next}}</p>
+          <span class="xn-lbar" data-tier="{{.Rank.Tier}}" style="--fill: {{.Rank.BarPct}}%" role="progressbar" aria-label="Geek level {{.Rank.Level}} of 100" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Rank.BarPct}}"><span class="xn-lbar-track"><span class="xn-lbar-fill"></span></span><span class="xn-lbar-mile" data-t="1" title="Fresh Geek"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="2" title="Noob"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="3" title="Refined Geeker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="4" title="Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="5" title="Dedicated Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="6" title="Mythical Tweaker"><i class="xn-lp-ico"></i></span><span class="xn-lbar-mile" data-t="7" title="Twea(king)"><i class="xn-lp-ico"></i></span></span>
+          <p class="gp-me-next">{{if .Rank.Next}}{{.Rank.ToNext}} points to {{.Rank.Next}}{{if .Rank.NextRank}} · {{.Rank.NextRank}} in {{.Rank.LevelsToRank}} {{if eq .Rank.LevelsToRank 1}}level{{else}}levels{{end}}{{end}}{{else}}Top level reached{{end}}</p>
           <dl class="gp-me-stats" id="gpGeekMore" hidden>
             <div><dt>Level</dt><dd>{{.Rank.Level}}</dd></div>
-            <div><dt>Round</dt><dd>{{.Rank.Round}}</dd></div>
             <div><dt>Points</dt><dd>{{.Rank.Score}}</dd></div>
             <div><dt>Graph sessions</dt><dd>{{.Rank.Graphs}}</dd></div>
             <div><dt>Forum posts</dt><dd>{{.Rank.Posts}}</dd></div>
-            <div><dt>This round</dt><dd>{{.Rank.RoundSize}} points</dd></div>
+            <div><dt>This level</dt><dd>{{if .Rank.LevelSize}}{{.Rank.LevelSize}} points{{else}}top{{end}}</dd></div>
           </dl>
-          <p class="gp-me-how" id="gpGeekHow" hidden>You get 1 point for every Graph session and every Forum post. Reaching Twea(king) in a round adds a level, and each round needs a bit more points.</p>
+          <p class="gp-me-how" id="gpGeekHow" hidden>You get 1 point for every Graph session and every Forum post. Points raise your geek level from 0 to 100, each level takes a bit more, and your level picks your rank. Twea(king) is level 100.</p>
         </div>
       </aside>
       {{end}}
@@ -1009,18 +1039,7 @@
       </section>
       {{end}}
       </div>
-      {{if .IsAdmin}}
-      <button type="button" class="gp-custom-btn" id="gpCustomBtn" aria-expanded="false" aria-controls="gpCustom" title="Customize this container"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Customize</span></button>
-      <div class="gp-custom" id="gpCustom" role="dialog" aria-label="Customize the container" hidden>
-        <div class="gp-custom-head"><strong>Customize</strong><span class="gp-custom-note">Everyone sees this on the Main page.</span></div>
-        <label class="gp-c-row"><span>Walls</span><input type="color" data-k="panel"><input type="range" min="0" max="100" data-k="panelAlpha" aria-label="Walls opacity"><output data-o="panelAlpha"></output></label>
-        <label class="gp-c-row"><span>Boxes</span><input type="color" data-k="tile"><input type="range" min="0" max="100" data-k="tileAlpha" aria-label="Boxes opacity"><output data-o="tileAlpha"></output></label>
-        <label class="gp-c-row"><span>Edges</span><input type="color" data-k="border"></label>
-        <div class="gp-c-row"><span>Fire</span><div class="gp-c-seg" data-seg="fire"><button type="button" data-v="">Off</button><button type="button" data-v="flames">Burning</button><button type="button" data-v="inferno">Inferno</button></div></div>
-        <div class="gp-c-row"><span>Flame</span><div class="gp-c-seg" data-seg="fireColor"><button type="button" data-v="orange" class="is-orange">Orange</button><button type="button" data-v="blue" class="is-blue">Blue</button><button type="button" data-v="purple" class="is-purple">Purple</button><button type="button" data-v="green" class="is-green">Green</button></div></div>
-        <div class="gp-custom-foot"><button type="button" class="gp-btn" id="gpCustomReset">Reset</button><span class="gp-custom-status" id="gpCustomStatus" role="status"></span><button type="button" class="gp-btn gp-btn-primary" id="gpCustomDone">Done</button></div>
-      </div>
-      {{end}}
+      <!-- Customize button removed (mommy 2026-11-02); the saved look still applies. -->
     </section>
   </main>
 
@@ -1353,7 +1372,36 @@
       if (!hero || !inner || !panel) return;
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       let range = 1, ticking = false;
-      const measure = () => { range = Math.max(1, hero.offsetHeight * 0.65); };
+      // Signed in: the clock stays put and the panel keeps rising over it until it is
+      // centered on screen (the end of the page), and the background fades to black.
+      const me = !!panel.querySelector('.gp-top.is-me');
+      const main = hero.parentElement;
+      const root = document.documentElement;
+      let target = 1, dark = -1;
+      let spacer = null;
+      if (me) {
+        root.classList.add('gp-dark-fade');
+        spacer = document.createElement('div');
+        spacer.setAttribute('aria-hidden', 'true');
+        main.appendChild(spacer);
+      }
+      const measure = () => {
+        range = Math.max(1, hero.offsetHeight * 0.65);
+        if (!me) return;
+        const had = spacer.offsetHeight;
+        const nav = parseFloat(getComputedStyle(root).getPropertyValue('--oled-nav-h')) || 56;
+        const vh = window.innerHeight;
+        let top = 0;
+        for (let el = panel; el; el = el.offsetParent) top += el.offsetTop;
+        const room = vh - nav - panel.offsetHeight;
+        target = Math.max(range + 1, top - nav - Math.max(0, room / 2));
+        // The panel's slide-in offset would add to the page height, so measure without it.
+        const tf = panel.style.transform;
+        panel.style.transform = 'none';
+        const pad = Math.max(0, Math.ceil(target - (root.scrollHeight - had - vh)));
+        panel.style.transform = tf;
+        if (pad !== had) spacer.style.height = pad + 'px';
+      };
       const paint = () => {
         ticking = false;
         const y = Math.max(window.scrollY, 0);
@@ -1361,7 +1409,7 @@
         const p = s / range;
         const eased = 1 - Math.pow(1 - p, 2);
         // Past the range the clock scrolls away with the page, so the panel never covers it.
-        const shift = s / 2 + Math.max(0, y - range);
+        const shift = me ? s / 2 : s / 2 + Math.max(0, y - range);
         inner.style.transform = `translateY(${-shift}px) scale(${1 - 0.55 * eased})`;
         panel.style.opacity = String(0.4 + 0.6 * eased);
         // Slight blur while the clock is in view, none once it has scrolled away.
@@ -1369,9 +1417,21 @@
         panel.style.transform = `translateY(${(1 - eased) * 28}px)`;
         panel.style.setProperty('--gp-glow', (0.35 * eased).toFixed(3));
         if (hint) hint.style.opacity = String(Math.max(0, 1 - p * 4));
+        if (me) {
+          const d = Math.min(1, Math.max(0, (y - range * 0.5) / Math.max(1, target - range * 0.5)));
+          if (Math.abs(d - dark) > 0.002) {
+            dark = d;
+            root.style.setProperty('--gp-dark', d.toFixed(3));
+            inner.style.opacity = String(1 - d);
+            root.classList.toggle('gp-dark', d > 0.98);
+          }
+          panel.style.setProperty('--gp-glow', (0.35 * eased * (1 - d)).toFixed(3));
+        }
       };
       const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(paint); } };
       measure(); paint();
+      if (me && 'ResizeObserver' in window) new ResizeObserver(() => { measure(); onScroll(); }).observe(panel);
+      window.addEventListener('load', () => { measure(); onScroll(); });
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', () => { measure(); onScroll(); });
     })();

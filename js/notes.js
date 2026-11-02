@@ -180,6 +180,8 @@ function renderDoses() {
   const list = doseNotes.filter((n) => !q || n.substance.toLowerCase().includes(q) || n.note.toLowerCase().includes(q));
   $("doseCount").textContent = doseNotes.length ? `${list.length} ${list.length === 1 ? "note" : "notes"}` : "";
   box.replaceChildren();
+  const index = $("doseIndex");
+  if (index) index.replaceChildren();
   if (!doseNotes.length) {
     box.innerHTML = '<p class="nt-empty">No dose notes yet. On the <a href="/">Graph</a>, tap the pencil on a dose and write how it felt. Every note shows up here, sorted by substance.</p>';
     return;
@@ -231,6 +233,24 @@ function renderDoses() {
     });
     det.append(sum, ul);
     box.append(det);
+    // The list on the left: one row per substance, tap to jump to its notes.
+    if (index) {
+      const jump = document.createElement("button");
+      jump.type = "button";
+      jump.className = "nt-index-item";
+      const jn = document.createElement("span");
+      jn.textContent = g.name;
+      const jc = document.createElement("b");
+      jc.textContent = String(g.notes.length);
+      jump.append(jn, jc);
+      jump.addEventListener("click", () => {
+        det.open = true;
+        index.querySelectorAll(".nt-index-item").forEach((b) => b.removeAttribute("aria-current"));
+        jump.setAttribute("aria-current", "true");
+        det.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      });
+      index.append(jump);
+    }
   });
 }
 $("doseFind").addEventListener("input", renderDoses);
@@ -635,13 +655,18 @@ $("repDelete").addEventListener("click", async (event) => {
 
 let pubItems = [];
 let pubMore = false;
+let welcomes = null; // accounts made in the last 60 days, for welcome posts on the wall
 
 async function loadPublic({ older = false } = {}) {
   const last = pubItems[pubItems.length - 1];
   const url = "/notes/reports/public" + (older && last ? `?before=${last.happenedAt}_${last.id}` : "");
   $("pubMore").disabled = true;
   try {
-    const data = await api(url);
+    const [data, joined] = await Promise.all([api(url), welcomes ? Promise.resolve(null) : api("/notes/welcome").catch(() => ({ items: [] }))]);
+    if (joined) {
+      welcomes = joined.items || [];
+      renderNewMembers();
+    }
     pubItems = older ? [...pubItems, ...(data.items || [])] : data.items || [];
     pubMore = Boolean(data.more);
     renderPublic();
@@ -673,17 +698,119 @@ function renderPublic() {
   const q = $("pubFind").value.trim().toLowerCase();
   box.replaceChildren();
   $("pubMore").hidden = !pubMore;
-  if (!pubItems.length) {
-    box.innerHTML = '<p class="nt-empty">No public trip reports yet. Turn on Public when you save one of yours and it shows here.</p>';
+  // One wall: shared trip reports and a welcome post for every new account,
+  // newest first. While older reports are still to load, welcomes older than
+  // the last loaded report wait for them.
+  const oldest = pubItems.length ? pubItems[pubItems.length - 1].happenedAt : 0;
+  const hello = (welcomes || []).filter((m) => !pubMore || m.joined >= oldest);
+  const wall = [
+    ...pubItems.map((r) => ({ at: r.happenedAt, r })),
+    ...hello.map((m) => ({ at: m.joined, m })),
+  ].sort((a, b) => b.at - a.at);
+  if (!wall.length) {
+    box.innerHTML = '<p class="nt-empty">Nothing on the wall yet. Turn on Public when you save a trip report and it shows here.</p>';
     return;
   }
-  const list = pubItems.filter((r) => !q || [r.title, r.substances, r.setting, r.body, r.author.name].some((v) => (v || "").toLowerCase().includes(q)));
+  const list = wall.filter(({ r, m }) => !q || (r
+    ? [r.title, r.substances, r.setting, r.body, r.author.name].some((v) => (v || "").toLowerCase().includes(q))
+    : m.name.toLowerCase().includes(q) || "welcome".includes(q)));
   if (!list.length) {
     box.innerHTML = '<p class="nt-empty">Nothing matches that.</p>';
     return;
   }
-  list.forEach((r) => box.append(reportCard(r, { author: r.author })));
+  list.forEach(({ r, m }) => box.append(r ? reportCard(r, { author: r.author }) : welcomeCard(m)));
 }
+
+/** A welcome post on the wall for a new account. */
+function welcomeCard(m) {
+  const card = document.createElement("a");
+  card.className = "xn-card nt-welcome";
+  card.href = "/u/" + encodeURIComponent(m.name);
+  const wave = document.createElement("span");
+  wave.className = "nt-welcome-wave";
+  wave.setAttribute("aria-hidden", "true");
+  wave.textContent = "👋";
+  const text = document.createElement("span");
+  text.className = "nt-welcome-text";
+  const head = document.createElement("strong");
+  head.append(m.me ? "Welcome to Geek⁴u, " : "Say hi to ");
+  const name = document.createElement("span");
+  name.textContent = m.name;
+  paintName(name, m);
+  head.append(name, m.me ? "!" : ", new on Geek⁴u");
+  const sub = document.createElement("small");
+  sub.textContent = (m.me
+    ? "Glad you're here. Log a dose on the Graph, write a trip report, or find friends with the search. "
+    : "Open their profile and add them as a friend. ") + "Joined " + ago(m.joined) + ".";
+  text.append(head, sub);
+  const pic = document.createElement("span");
+  pic.className = "nt-welcome-pic";
+  pic.textContent = m.initial || m.name.charAt(0).toUpperCase();
+  if (m.avatar) {
+    const img = document.createElement("img");
+    img.src = m.avatar;
+    img.alt = "";
+    img.loading = "lazy";
+    img.addEventListener("load", () => { pic.textContent = ""; pic.append(img); }, { once: true });
+  }
+  card.append(wave, pic, text);
+  return card;
+}
+
+function personRow(p) {
+  const li = document.createElement("li");
+  const a = document.createElement("a");
+  a.className = "nt-person";
+  a.href = "/u/" + encodeURIComponent(p.name);
+  a.append(authorChip(p));
+  if (p.joined) {
+    const when = document.createElement("small");
+    when.textContent = ago(p.joined);
+    a.append(when);
+  }
+  li.append(a);
+  return li;
+}
+
+function renderNewMembers() {
+  const list = $("newList");
+  list.replaceChildren();
+  const items = (welcomes || []).slice(0, 8);
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.className = "nt-people-none";
+    li.textContent = "No new accounts lately.";
+    list.append(li);
+  }
+  items.forEach((m) => list.append(personRow(m)));
+}
+
+let peopleTimer = 0, peopleSeq = 0;
+$("peopleFind").addEventListener("input", () => {
+  clearTimeout(peopleTimer);
+  const q = $("peopleFind").value.trim();
+  const list = $("peopleList");
+  if (!q) { list.replaceChildren(); return; }
+  peopleTimer = setTimeout(async () => {
+    const seq = ++peopleSeq;
+    try {
+      const people = await api("/chat/people?q=" + encodeURIComponent(q));
+      if (seq !== peopleSeq) return;
+      list.replaceChildren();
+      const found = Array.isArray(people) ? people : people.people || people.items || [];
+      if (!found.length) {
+        const li = document.createElement("li");
+        li.className = "nt-people-none";
+        li.textContent = "Nobody called that.";
+        list.append(li);
+      }
+      found.slice(0, 12).forEach((p) => list.append(personRow(p)));
+    } catch (error) {
+      list.replaceChildren();
+      toast(error.message, true);
+    }
+  }, 220);
+});
 $("pubFind").addEventListener("input", renderPublic);
 $("pubMore").addEventListener("click", () => loadPublic({ older: true }));
 $("pubList").addEventListener("click", (event) => {

@@ -31,20 +31,6 @@
 .nt .xn-btn svg, .nt-dlg .xn-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .nt-icon-btn { width: 40px; padding: 0; justify-content: center; }
 
-#padEditor {
-  width: 1024px;
-  height: 850px;
-}
-.drug-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  width: 590px;
-  padding-left: 3rem;
-  text-align: right;
-}
-  
 
 
 /* By substance */
@@ -278,4 +264,82 @@
 @media (prefers-reduced-motion: no-preference) {
   .nt-like.is-pop svg { animation: nt-like-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
   @keyframes nt-like-pop { 0% { transform: scale(0.6); } 55% { transform: scale(1.3); } 100% { transform: none; } }
+}
+
+/* ------------------------------------------------------------
+   Page layout (mommy 2026-11-02: "fix pages like the utility page").
+   Title on the left with the tabs beside it, then each tab gets a real
+   layout: substances index + notes, report cards, notepad at full height.
+   ------------------------------------------------------------ */
+.nt { max-width: 1180px; }
+.nt-pane { min-height: calc(100svh - var(--oled-nav-h) - 230px); }
+
+.nt-doses { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; align-items: start; }
+.nt-index { position: sticky; top: calc(var(--oled-nav-h) + 12px); display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface); }
+.nt-index-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 4px 0; }
+.nt-index-list { display: flex; flex-direction: column; gap: 2px; max-height: calc(100svh - var(--oled-nav-h) - 200px); overflow-y: auto; scrollbar-width: thin; }
+.nt-index-list:empty { display: none; }
+.nt-index-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--oled-text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.nt-index-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-index-item b { flex: none; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--oled-surface-2); color: var(--oled-muted); font-size: 11px; font-weight: 600; text-align: center; }
+.nt-index-item[aria-current="true"] { border-color: var(--oled-line-strong); background: var(--oled-accent-soft); }
+.nt-index-item:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+@media (hover: hover) { .nt-index-item:hover { background: var(--oled-surface-2); } }
+.nt-groups .nt-group { scroll-margin-top: calc(var(--oled-nav-h) + 12px); }
+
+.nt-pad { align-items: stretch; }
+.nt-pad-side { align-self: start; }
+.nt-pad-main { min-height: calc(100svh - var(--oled-nav-h) - 240px); }
+.nt-pad-text { min-height: 0; }
+
+@media (min-width: 900px) {
+  .nt { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; row-gap: 18px; align-items: end; }
+  .nt > * { grid-column: 1 / -1; }
+  .nt > .nt-top { grid-column: 1; }
+  .nt > .nt-seg { grid-column: 2; align-self: end; }
+}
+@media (max-width: 760px) {
+  .nt-pane { min-height: 0; }
+  .nt-doses { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .nt-index { position: static; padding: 0; border: 0; background: none; }
+  .nt-index-head { display: none; }
+  /* Phones: the substances become a row of chips you can swipe. */
+  .nt-index-list { flex-direction: row; max-height: none; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .nt-index-item { flex: none; width: auto; min-height: 34px; border-color: var(--oled-line); border-radius: 999px; }
+  .nt-index-item span { overflow: visible; }
+  .nt-pad-main { min-height: calc(100svh - var(--oled-nav-h) - 200px); }
+}
+
+/* Public (mommy 2026-11-02): one wall of posts (shared trip reports and
+   welcomes for new accounts) with a people search beside it. */
+.nt-pubwall { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.nt-wall-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.nt-wall { display: flex; flex-direction: column; gap: 14px; max-width: 720px; width: 100%; }
+.nt-wall .nt-report { width: 100%; }
+.nt-wall .nt-report-cover { max-height: 340px; }
+.nt-welcome { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-color: rgba(var(--xn-accent-rgb), 0.35); background: linear-gradient(120deg, rgba(var(--xn-accent-rgb), 0.14), transparent 70%), var(--oled-surface); color: var(--oled-text); text-decoration: none; }
+.nt-welcome-wave { flex: none; font-size: 26px; transform-origin: 70% 70%; }
+@media (prefers-reduced-motion: no-preference) { .nt-welcome-wave { animation: nt-wave 2.4s ease-in-out 1; } }
+@keyframes nt-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } }
+.nt-welcome-pic { position: relative; display: grid; place-items: center; flex: none; width: 44px; height: 44px; overflow: hidden; border-radius: 10px; background: var(--oled-accent-soft); color: var(--oled-accent); font-size: 18px; font-weight: 700; }
+.nt-welcome-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.nt-welcome-text { display: grid; gap: 4px; min-width: 0; }
+.nt-welcome-text strong { font-size: 15px; line-height: 1.35; }
+.nt-welcome-text small { color: var(--oled-muted); font-size: 12px; line-height: 1.5; }
+@media (hover: hover) { .nt-welcome:hover { border-color: var(--oled-accent); } }
+.nt-welcome:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.nt-people { position: sticky; top: calc(var(--oled-nav-h) + 12px); display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface); }
+.nt-people h2 { margin: 0; }
+.nt-people-new { margin-top: 8px !important; }
+.nt-people-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.nt-people-list:empty { display: none; }
+.nt-person { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 4px 8px; border-radius: 9px; color: var(--oled-text); text-decoration: none; }
+.nt-person small { flex: none; color: var(--oled-muted); font-size: 11px; }
+@media (hover: hover) { .nt-person:hover { background: var(--oled-surface-2); } }
+.nt-person:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.nt-people-none { padding: 6px 8px; color: var(--oled-muted); font-size: 12.5px; }
+@media (max-width: 900px) {
+  .nt-pubwall { grid-template-columns: minmax(0, 1fr); }
+  .nt-people { position: static; order: -1; }
+  .nt-people-new, #newList { display: none; }
 }

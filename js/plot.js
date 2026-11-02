@@ -17,7 +17,7 @@ export function loadPlotly() {
 
   plotlyLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "/vendor/plotly-2.32.0.min.js";
+    script.src = "/vendor/plotly-basic-2.32.0.min.js";
     script.async = true;
     script.onload = () => resolve(window.Plotly);
     script.onerror = () => {

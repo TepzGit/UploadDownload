@@ -8,6 +8,11 @@
   width: 85%;
 } 
 
+
+#username {
+  min-width: 10rem;
+  text-align: center;
+}
 /* Banner, avatar, name and settings buttons */
 .xn-card.pf-head {
   --pf-pad: clamp(16px, 2.5vw, 24px);
@@ -1039,15 +1044,21 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-progress .pf-rank-meter { width: 100%; }
 /* Level pack (mommy 2026-11-01): hexagon badge with the level, rank name lettering, rank icon bar (oled.css). */
 .pf-lp { display: grid; justify-items: center; gap: 6px; padding-top: 4px; }
-.pf-lp .xn-hexb { font-size: 92px; }
+/* 2026-11-02 (mommy's picture): the badge with the level inside sits left of the name. */
+.pf-lvbtn { display: inline-grid; flex: none; padding: 0; border: 0; background: none; border-radius: 12px; }
+@media (hover: hover) { .pf-lvbtn:hover { background: none; transform: translateY(-1px); } }
+.pf-lvbtn .xn-hexb, .pf-lvbadge.xn-hexb { font-size: 64px; }
+.pf-name-row:has(.pf-lvbtn, .pf-lvbadge) { align-items: center; }
 .pf-lp .xn-rn { max-width: 100%; }
-.pf-lp .xn-rn[data-tier="4"] { font-size: .86rem; }
+.pf-lp .xn-rn[data-tier="5"] { font-size: .9rem; }
+.pf-lp .xn-rn[data-tier="6"] { font-size: .8rem; letter-spacing: .06em; }
 .pf-progress .xn-lbar { --m: 23px; margin-block: 4px 2px; }
 .pf-progress .pf-rank-note { text-align: center; }
 @media (max-width: 640px) {
-  .pf-lp .xn-hexb { font-size: 80px; }
+  .pf-lvbtn .xn-hexb, .pf-lvbadge.xn-hexb { font-size: 52px; }
   .pf-lp .xn-rn { font-size: 1.1rem; }
-  .pf-lp .xn-rn[data-tier="4"] { font-size: .74rem; letter-spacing: .06em; }
+  .pf-lp .xn-rn[data-tier="5"] { font-size: .78rem; }
+  .pf-lp .xn-rn[data-tier="6"] { font-size: .68rem; letter-spacing: .04em; }
   .pf-progress .xn-lbar { --m: 20px; }
 }
 @media (max-width: 640px) {
@@ -1308,3 +1319,24 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
   .pf-shelf { --row: 92px; flex: none; width: 100%; margin-left: 0; box-sizing: border-box; }
   .pf-shelf-items { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
 }
+
+/* mommy 2026-11-02 19:03: settings gear in the top left corner of the
+   banner, no shelf, name row wraps with room under it, and the level box
+   under the picture shows only the bar until you hover (or tap) it. */
+.pf-banner > .pf-menu-wrap { position: absolute; top: 12px; left: 12px; z-index: 2; }
+.pf-banner > .pf-menu-wrap .pf-gear { border-color: rgba(255, 255, 255, 0.16); background: rgba(0, 0, 0, 0.55); color: var(--oled-text); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.pf-name-row { flex-wrap: wrap; padding-bottom: 110px; }
+/* "instead of padding top add padding bottom": the 110px moves from above the name to below it. */
+.pf-who { padding-top: 0; }
+
+.pf-progress { gap: 0; cursor: default; transition: gap .3s ease, border-color .3s ease; }
+.pf-progress > .pf-lp, .pf-progress > .pf-rank-note { max-height: 0; padding-top: 0; opacity: 0; transform: translateY(-4px); overflow: hidden; transition: max-height .4s ease, padding .35s ease, opacity .3s ease, transform .35s ease; }
+.pf-progress > .pf-rank-note { line-height: 1.4; }
+.pf-progress:hover, .pf-progress:focus-within { gap: 7px; border-color: var(--oled-line-strong); }
+.pf-progress:hover > .pf-lp, .pf-progress:hover > .pf-rank-note,
+.pf-progress:focus-within > .pf-lp, .pf-progress:focus-within > .pf-rank-note { max-height: 6em; opacity: 1; transform: none; }
+.pf-progress:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pf-progress:hover > .pf-lp, .pf-progress:focus-within > .pf-lp { padding-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .pf-progress, .pf-progress > .pf-lp, .pf-progress > .pf-rank-note { transition: none; } }
+
+@media (max-width: 760px) { .pf-name-row { padding-bottom: 24px; } }

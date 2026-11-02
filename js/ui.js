@@ -747,7 +747,8 @@ function bindEvents() {
 
   els.addDoseButton.addEventListener("click", handleAddDose);
   els.resetButton.addEventListener("click", handleReset);
-  els.saveButton.addEventListener("click", handleSave);
+  // The Save data button was taken off the Graph (mommy 2026-11-02); sessions still save on their own.
+  if (els.saveButton) els.saveButton.addEventListener("click", handleSave);
 
   // event delegation for the per-dose edit / remove buttons rendered dynamically
   els.doseList.addEventListener("click", (event) => {
@@ -1969,7 +1970,7 @@ function renderDoseList() {
 
   els.doseList.replaceChildren();
   els.doseCount.textContent = addedDoses.length;
-  els.saveButton.disabled = addedDoses.length === 0;
+  if (els.saveButton) els.saveButton.disabled = addedDoses.length === 0;
 
   if (!addedDoses.length) {
     const empty = document.createElement("p");

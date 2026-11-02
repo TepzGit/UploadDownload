@@ -335,3 +335,47 @@
   .fx-heademoji { font-size: 34px; }
   .fx-headicon + .fx-titles { flex-basis: 0; }
 }
+
+/* ------------------------------------------------------------
+   Page layout (mommy 2026-11-02: "fix pages like the utility page").
+   Title and actions above, the file list filling the screen, and a
+   side card with what is in the folder.
+   ------------------------------------------------------------ */
+.fx { --fx-k1: #a67cff; --fx-k2: #f38ba8; --fx-k3: #94e2d5; --fx-k4: #6c7086; }
+.fx > .fx-head { padding: 0 0 18px; border-bottom: 0; }
+.fx-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.fx-layout > .fx-card { display: flex; flex-direction: column; min-height: calc(100svh - var(--oled-nav-h) - 190px); }
+.fx-layout > .fx-card > .fx-list { flex: 1 1 auto; }
+.fx-side { position: sticky; top: calc(var(--oled-nav-h) + 12px); display: flex; flex-direction: column; gap: 16px; }
+.fx-side h2 { margin: 0; }
+.fx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.fx-stats > div { padding: 10px 12px; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); }
+.fx-stats .fx-stat-wide { grid-column: 1 / -1; }
+.fx-stats dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--oled-muted); }
+.fx-stats dd { margin: 4px 0 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fx-mix { display: flex; gap: 2px; height: 8px; overflow: hidden; border-radius: 4px; background: var(--oled-surface-2); }
+.fx-mix i { min-width: 4px; }
+.fx-mix[hidden] { display: none; }
+.fx-kinds { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.fx-kinds:empty { display: none; }
+.fx-kinds li { display: flex; align-items: center; gap: 8px; }
+.fx-kinds .fx-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.fx-kind { flex: 1; }
+.fx-kind-n { color: var(--oled-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.fx-drop { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; color: var(--oled-text); text-decoration: none; }
+.fx-drop .fx-ico { color: var(--oled-accent); }
+.fx-drop span { display: flex; flex-direction: column; gap: 2px; }
+.fx-drop strong { font-size: 13.5px; }
+.fx-drop small { font-size: 11.5px; color: var(--oled-muted); }
+.fx-drop:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+@media (hover: hover) { .fx-drop:hover { border-color: var(--oled-accent); } }
+@media (max-width: 900px) {
+  .fx-layout { grid-template-columns: minmax(0, 1fr); }
+  .fx-layout > .fx-card { min-height: 0; }
+  .fx-side { position: static; }
+  .fx-side .fx-drop { display: none; }
+  .fx-side { gap: 12px; }
+  .fx-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .fx-stats .fx-stat-wide { grid-column: auto; }
+  .fx-stats dd { font-size: 16px; }
+}

@@ -30,37 +30,70 @@
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
   <style>
-    .ut { display: flex; flex-direction: column; gap: 20px; }
-    .ut-intro .xn-sub { margin-top: 6px; }
-    .ut-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; align-items: start; }
-    .ut-card { display: flex; flex-direction: column; gap: 12px; }
-    .ut-card .xn-h2 { margin: 0; }
-    .ut-hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--oled-muted); }
-    .ut-fields { display: flex; flex-direction: column; gap: 10px; }
-    .ut-field { display: flex; flex-direction: column; gap: 6px; }
-    .ut-in { display: flex; gap: 6px; align-items: center; }
-    .ut-in .xn-input { flex: 1; min-width: 0; }
-    .ut-in .ut-unit { flex: none; width: 76px; }
-    .ut-suffix { flex: none; width: 76px; text-align: center; font-size: 13px; color: var(--oled-muted); }
-    .ut-result { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 12px; background: var(--oled-accent-soft); font-size: 12px; color: var(--oled-muted); line-height: 1.5; }
-    .ut-result strong { font-size: 28px; color: var(--oled-text); font-variant-numeric: tabular-nums; }
-    .ut-presets { display: flex; flex-wrap: wrap; gap: 8px; }
-    .ut-chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--oled-line-strong); border-radius: 20px; background: transparent; color: var(--oled-text); font: inherit; font-size: 13px; cursor: pointer; }
+    /* Utility layout (mommy 2026-11-02: "looks like the designer put all the
+       elements into a div"): a header with the quick links, calculators on the
+       left, the redose timer on the right, portable apps along the bottom.
+       Every card starts with the same head: icon, title, one line of help. */
+    .ut { display: flex; flex-direction: column; gap: 28px; max-width: 1180px; }
+    .ut-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; padding-bottom: 20px; border-bottom: 1px solid var(--oled-line); }
+    .ut-head .xn-h1 { margin: 2px 0 0; }
+    .ut-head .xn-sub { margin: 6px 0 0; max-width: 56ch; }
+    .ut-links { display: flex; flex-wrap: wrap; gap: 10px; }
+    .ut-links[hidden] { display: none; }
+    .ut-link { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 16px 6px 8px; border: 1px solid var(--oled-line-strong); border-radius: 12px; background: var(--oled-surface); color: var(--oled-text); text-decoration: none; transition: border-color .15s, transform .1s; }
+    @media (hover: hover) { .ut-link:hover { border-color: var(--oled-accent); transform: translateY(-1px); } }
+    .ut-link:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+    .ut-link .ut-ico { width: 30px; height: 30px; border-radius: 8px; }
+    .ut-link strong { display: block; font-size: 14px; line-height: 1.2; }
+    .ut-link small { display: block; font-size: 11.5px; color: var(--oled-muted); }
+
+    .ut-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 20px; align-items: start; }
+    .ut-col { display: grid; gap: 20px; min-width: 0; }
+    .ut-side { position: sticky; top: 84px; }
+    .ut-sec-title { margin: 0 0 -8px; font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--oled-muted); }
+
+    .ut-card { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .ut-card-head { display: flex; align-items: flex-start; gap: 12px; }
+    .ut-card-head .xn-h2 { margin: 0; font-size: 17px; }
+    .ut-ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--oled-accent-soft); color: var(--oled-accent); }
+    .ut-ico svg { width: 55%; height: 55%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .ut-hint { margin: 2px 0 0; font-size: 12px; line-height: 1.55; color: var(--oled-muted); }
+
+    .ut-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .ut-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .ut-in { display: flex; align-items: stretch; min-width: 0; border: 1px solid var(--oled-line-strong); border-radius: 10px; background: var(--oled-surface-2); overflow: hidden; transition: border-color .15s; }
+    .ut-in:focus-within { border-color: var(--oled-accent); }
+    .ut-in .xn-input { flex: 1; min-width: 0; margin: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-size: 16px; font-variant-numeric: tabular-nums; }
+    .ut-in .xn-input:focus { outline: none; box-shadow: none; }
+    .ut-in .ut-unit { flex: none; width: 70px; border-left: 1px solid var(--oled-line); }
+    .ut-suffix { display: grid; place-items: center; flex: none; width: 52px; border-left: 1px solid var(--oled-line); font-size: 13px; color: var(--oled-muted); }
+
+    .ut-result { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 14px 16px; border: 1px solid rgba(var(--xn-accent-rgb), .35); border-radius: 12px; background: var(--oled-accent-soft); font-size: 12.5px; line-height: 1.5; color: var(--oled-muted); }
+    .ut-result strong { font-size: 30px; line-height: 1.1; color: var(--oled-text); font-variant-numeric: tabular-nums; }
+    .ut-result span { flex: 1 1 220px; }
+
+    /* Timer: a ring that empties as the wait runs out. */
+    .ut-ring { position: relative; display: grid; place-items: center; width: min(100%, 220px); aspect-ratio: 1; margin: 0 auto; }
+    .ut-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ut-ring circle { fill: none; stroke-width: 7; }
+    .ut-ring .ut-ring-bg { stroke: var(--oled-line); }
+    .ut-ring .ut-ring-fg { stroke: var(--oled-accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset .9s linear; }
+    .ut-ring-in { display: grid; justify-items: center; gap: 4px; padding: 0 18px; text-align: center; }
+    .ut-clock { margin: 0; font-size: 36px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--oled-text); }
+    .ut-clock.is-idle { font-size: 15px; font-weight: 600; color: var(--oled-muted); }
+    .ut-presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .ut-chip { min-height: 40px; padding: 0 4px; border: 1px solid var(--oled-line-strong); border-radius: 10px; background: transparent; color: var(--oled-text); font: inherit; font-size: 13px; cursor: pointer; }
     @media (hover: hover) { .ut-chip:hover { border-color: var(--oled-accent); } }
     .ut-chip:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
-    .ut-clock { margin: 4px 0 0; font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--oled-text); }
-    .ut-note { margin: 0; font-size: 11px; color: var(--oled-muted); text-align: center; }
-    .ut-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
-    .ut-link { display: flex; align-items: center; gap: 12px; padding: 14px 16px; color: var(--oled-text); text-decoration: none; }
-    @media (hover: hover) { .ut-link:hover { border-color: var(--oled-accent); } }
-    .ut-link svg { flex: none; width: 26px; height: 26px; fill: var(--oled-accent); }
-    .ut-link strong { display: block; font-size: 15px; }
-    .ut-link span span { display: block; margin-top: 2px; font-size: 12px; color: var(--oled-muted); }
-    .ut-apps { grid-column: 1 / -1; }
+    .ut-timer #timerStop { align-self: center; }
+    .ut-timer #timerStop[hidden] { display: none; }
+
     .ut-apps[hidden] { display: none; }
-    .pa-folder { display: flex; gap: 8px; align-items: center; }
-    .pa-folder .xn-input { flex: 1; min-width: 0; }
-    .pa-share { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--oled-line); border-radius: 2px; font-size: 13px; cursor: pointer; }
+    .ut-apps-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px; }
+    .pa-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 0 1 420px; }
+    .pa-folder { display: flex; flex: 1 1 220px; min-width: 0; }
+    .pa-folder .xn-input { flex: 1; min-width: 0; margin: 0; }
+    .pa-share { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--oled-line); border-radius: 10px; font-size: 13px; cursor: pointer; }
     .pa-share input { width: 16px; height: 16px; margin: 0; accent-color: var(--oled-accent); }
     .pa-share:has(input:checked) { border-color: rgba(var(--xn-accent-rgb), 0.5); background: var(--oled-accent-soft); }
     .pa-share[hidden] { display: none; }
@@ -73,7 +106,22 @@
     .pa-btn { display: inline-grid; place-items: center; min-width: 40px; height: 36px; padding: 0 10px; border: 1px solid var(--oled-line-strong); border-radius: 8px; background: transparent; color: var(--oled-text); font: inherit; font-size: 12.5px; text-decoration: none; cursor: pointer; }
     .pa-btn.is-run { border-color: transparent; background: var(--oled-accent); color: #120c1f; font-weight: 600; }
     .pa-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .pa-empty { margin: 0; padding: 18px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; font-size: 13px; color: var(--oled-muted); text-align: center; }
+    .pa-empty { grid-column: 1 / -1; margin: 0; padding: 22px; border: 1px dashed var(--oled-line-strong); border-radius: 12px; font-size: 13px; color: var(--oled-muted); text-align: center; }
+    .ut-note { margin: 0; font-size: 11px; color: var(--oled-muted); text-align: center; }
+
+    @media (max-width: 960px) {
+      .ut-layout { grid-template-columns: minmax(0, 1fr); }
+      .ut-side { position: static; }
+    }
+    @media (max-width: 640px) {
+      .ut { gap: 20px; }
+      .ut-head { padding-bottom: 14px; }
+      .ut-links, .ut-link { width: 100%; }
+      .ut-links { display: grid; grid-template-columns: 1fr 1fr; }
+      .ut-fields { grid-template-columns: minmax(0, 1fr); }
+      .ut-ring { width: min(100%, 180px); }
+      .ut-chip { font-size: 12px; }
+    }
   </style>
 </head>
 <body class="xn-bg">
@@ -93,60 +141,71 @@
 <div class="xn-hatch" aria-hidden="true"></div>
 
 <main class="xn-page ut">
-  <header class="ut-intro">
-    <h1 class="xn-h1">Utility</h1>
-    <p class="xn-sub">Small dosing tools. They run on your phone, so they work without internet too.</p>
+  <header class="ut-head">
+    <div>
+      <p class="xn-eyebrow">Tools</p>
+      <h1 class="xn-h1">Utility</h1>
+      <p class="xn-sub">Small dosing tools. They run on your phone, so they work without internet too.</p>
+    </div>
+    <nav class="ut-links" id="utLinks" aria-label="Notes" hidden>
+      <a class="ut-link" href="/Notes"><span class="ut-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><strong>Notes</strong><small>Dose notes, trip reports</small></span></a>
+      <a class="ut-link" href="/Notes#pad"><span class="ut-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16z"/></svg></span><span><strong>Notepad</strong><small>Saves as you type</small></span></a>
+    </nav>
   </header>
 
-  <div class="ut-links" id="utLinks" hidden>
-    <a class="xn-card ut-link" href="/Notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h9.2L20 7.3V20a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 5 20V4a1.5 1.5 0 0 1 1-1.5z"/></svg><span><strong>Notes</strong><span>Dose notes by substance, trip reports</span></span></a>
-    <a class="xn-card ut-link" href="/Notes#pad"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16z"/></svg><span><strong>Notepad</strong><span>Write anything, it saves as you type</span></span></a>
+  <div class="ut-layout">
+    <div class="ut-col">
+      <h2 class="ut-sec-title">Calculators</h2>
+      <section class="xn-card ut-card" aria-labelledby="volTitle">
+        <div class="ut-card-head"><span class="ut-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L5 18a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3"/><path d="M7.5 14h9"/></svg></span><div><h3 class="xn-h2" id="volTitle">Volumetric dosing</h3><p class="ut-hint">Dissolve a powder in a liquid so small doses can be measured with a syringe.</p></div></div>
+        <div class="ut-fields">
+          <label class="ut-field"><span class="xn-label">Powder</span><span class="ut-in"><input class="xn-input" id="volPowder" type="number" inputmode="decimal" min="0" step="any" value="100"><select class="xn-input ut-unit" id="volPowderUnit" aria-label="Powder unit"><option value="1000">g</option><option value="1" selected>mg</option><option value="0.001">µg</option></select></span></label>
+          <label class="ut-field"><span class="xn-label">Liquid</span><span class="ut-in"><input class="xn-input" id="volLiquid" type="number" inputmode="decimal" min="0" step="any" value="10"><span class="ut-suffix">ml</span></span></label>
+          <label class="ut-field"><span class="xn-label">Dose you want</span><span class="ut-in"><input class="xn-input" id="volDose" type="number" inputmode="decimal" min="0" step="any" value="10"><select class="xn-input ut-unit" id="volDoseUnit" aria-label="Dose unit"><option value="1000">g</option><option value="1" selected>mg</option><option value="0.001">µg</option></select></span></label>
+        </div>
+        <div class="ut-result" id="volResult" aria-live="polite"></div>
+      </section>
+
+      <section class="xn-card ut-card" aria-labelledby="convTitle">
+        <div class="ut-card-head"><span class="ut-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span><div><h3 class="xn-h2" id="convTitle">Unit converter</h3><p class="ut-hint">Type in any box and the others follow.</p></div></div>
+        <div class="ut-fields ut-conv">
+          <label class="ut-field"><span class="xn-label">Grams</span><span class="ut-in"><input class="xn-input" data-conv="1000" type="number" inputmode="decimal" min="0" step="any"><span class="ut-suffix">g</span></span></label>
+          <label class="ut-field"><span class="xn-label">Milligrams</span><span class="ut-in"><input class="xn-input" data-conv="1" type="number" inputmode="decimal" min="0" step="any" value="1"><span class="ut-suffix">mg</span></span></label>
+          <label class="ut-field"><span class="xn-label">Micrograms</span><span class="ut-in"><input class="xn-input" data-conv="0.001" type="number" inputmode="decimal" min="0" step="any"><span class="ut-suffix">µg</span></span></label>
+        </div>
+      </section>
+    </div>
+
+    <aside class="ut-col ut-side">
+      <h2 class="ut-sec-title">Timer</h2>
+      <section class="xn-card ut-card ut-timer" aria-labelledby="timerTitle">
+        <div class="ut-card-head"><span class="ut-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></span><div><h3 class="xn-h2" id="timerTitle">Redose timer</h3><p class="ut-hint">Wait it out before taking more. It keeps going if you leave this page.</p></div></div>
+        <div class="ut-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ut-ring-bg" cx="50" cy="50" r="45"/><circle class="ut-ring-fg" id="timerRing" cx="50" cy="50" r="45" pathLength="100"/></svg>
+          <div class="ut-ring-in"><p class="ut-clock is-idle" id="timerClock" aria-live="polite">No timer running</p><p class="ut-hint" id="timerEnds"></p></div>
+        </div>
+        <div class="ut-presets" role="group" aria-label="Wait for">
+          <button type="button" class="ut-chip" data-min="30">30 min</button>
+          <button type="button" class="ut-chip" data-min="60">1 h</button>
+          <button type="button" class="ut-chip" data-min="90">1.5 h</button>
+          <button type="button" class="ut-chip" data-min="120">2 h</button>
+          <button type="button" class="ut-chip" data-min="180">3 h</button>
+        </div>
+        <button type="button" class="xn-btn" id="timerStop" hidden>Stop timer</button>
+      </section>
+    </aside>
   </div>
 
-  <div class="ut-grid">
-    <section class="xn-card ut-card ut-apps" id="paCard" aria-labelledby="paTitle" hidden>
-      <h2 class="xn-h2" id="paTitle">Portable apps</h2>
-      <p class="ut-hint" id="paHint">The programs (.exe, .msi, .AppImage) in a Files folder you pick, ready to download.</p>
-      <label class="pa-folder"><span class="xn-sr">Apps folder</span><select class="xn-input" id="paFolder"></select></label>
-      <label class="pa-share" id="paShareRow" hidden><input type="checkbox" id="paShare"><span>Share this folder's apps with everyone</span></label>
-      <ul class="pa-list" id="paList"></ul>
-    </section>
-    <section class="xn-card ut-card" aria-labelledby="volTitle">
-      <h2 class="xn-h2" id="volTitle">Volumetric dosing</h2>
-      <p class="ut-hint">Dissolve a powder in a liquid so small doses can be measured with a syringe.</p>
-      <div class="ut-fields">
-        <label class="ut-field"><span class="xn-label">Powder</span><span class="ut-in"><input class="xn-input" id="volPowder" type="number" inputmode="decimal" min="0" step="any" value="100"><select class="xn-input ut-unit" id="volPowderUnit" aria-label="Powder unit"><option value="1000">g</option><option value="1" selected>mg</option><option value="0.001">µg</option></select></span></label>
-        <label class="ut-field"><span class="xn-label">Liquid</span><span class="ut-in"><input class="xn-input" id="volLiquid" type="number" inputmode="decimal" min="0" step="any" value="10"><span class="ut-suffix">ml</span></span></label>
-        <label class="ut-field"><span class="xn-label">Dose you want</span><span class="ut-in"><input class="xn-input" id="volDose" type="number" inputmode="decimal" min="0" step="any" value="10"><select class="xn-input ut-unit" id="volDoseUnit" aria-label="Dose unit"><option value="1000">g</option><option value="1" selected>mg</option><option value="0.001">µg</option></select></span></label>
+  <section class="xn-card ut-card ut-apps" id="paCard" aria-labelledby="paTitle" hidden>
+    <div class="ut-apps-head">
+      <div class="ut-card-head"><span class="ut-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span><div><h2 class="xn-h2" id="paTitle">Portable apps</h2><p class="ut-hint" id="paHint">The programs (.exe, .msi, .AppImage) in a Files folder you pick, ready to download.</p></div></div>
+      <div class="pa-tools">
+        <label class="pa-folder"><span class="xn-sr">Apps folder</span><select class="xn-input" id="paFolder"></select></label>
+        <label class="pa-share" id="paShareRow" hidden><input type="checkbox" id="paShare"><span>Share with everyone</span></label>
       </div>
-      <div class="ut-result" id="volResult" aria-live="polite"></div>
-    </section>
+    </div>
+    <ul class="pa-list" id="paList"></ul>
+  </section>
 
-    <section class="xn-card ut-card" aria-labelledby="convTitle">
-      <h2 class="xn-h2" id="convTitle">Unit converter</h2>
-      <p class="ut-hint">Type in any box and the others follow.</p>
-      <div class="ut-fields ut-conv">
-        <label class="ut-field"><span class="xn-label">Grams</span><span class="ut-in"><input class="xn-input" data-conv="1000" type="number" inputmode="decimal" min="0" step="any"><span class="ut-suffix">g</span></span></label>
-        <label class="ut-field"><span class="xn-label">Milligrams</span><span class="ut-in"><input class="xn-input" data-conv="1" type="number" inputmode="decimal" min="0" step="any" value="1"><span class="ut-suffix">mg</span></span></label>
-        <label class="ut-field"><span class="xn-label">Micrograms</span><span class="ut-in"><input class="xn-input" data-conv="0.001" type="number" inputmode="decimal" min="0" step="any"><span class="ut-suffix">µg</span></span></label>
-      </div>
-    </section>
-
-    <section class="xn-card ut-card" aria-labelledby="timerTitle">
-      <h2 class="xn-h2" id="timerTitle">Redose timer</h2>
-      <p class="ut-hint">Wait it out before taking more. The timer keeps going if you leave this page.</p>
-      <div class="ut-presets" role="group" aria-label="Wait for">
-        <button type="button" class="ut-chip" data-min="30">30 min</button>
-        <button type="button" class="ut-chip" data-min="60">1 h</button>
-        <button type="button" class="ut-chip" data-min="90">1.5 h</button>
-        <button type="button" class="ut-chip" data-min="120">2 h</button>
-        <button type="button" class="ut-chip" data-min="180">3 h</button>
-      </div>
-      <p class="ut-clock" id="timerClock" aria-live="polite">No timer running</p>
-      <p class="ut-hint" id="timerEnds"></p>  
-      <button type="button" class="xn-btn" id="timerStop" hidden>Stop timer</button>
-    </section>
-  </div>
   <p class="ut-note">These are calculators, not dosing advice. Always double-check with a scale.</p>
 </main>
 
@@ -199,6 +258,9 @@
 
   // Redose timer: the end time is kept on the phone, so it survives a reload.
   const KEY = "xn_redose_until";
+  const FROM = "xn_redose_from"; // when the wait started, for the ring
+  const readFrom = () => { try { return Number(localStorage.getItem(FROM)) || 0; } catch { return 0; } };
+  const ring = (frac) => { const r = $("timerRing"); if (!r) return; frac = Math.max(0, Math.min(1, frac)); r.style.strokeDashoffset = String(100 - frac * 100); r.style.opacity = frac > 0 ? "1" : "0"; };
   let tick = null;
   const read = () => { try { return Number(localStorage.getItem(KEY)) || 0; } catch { return 0; } };
   const write = (v) => { try { v ? localStorage.setItem(KEY, String(v)) : localStorage.removeItem(KEY); } catch {} };
@@ -207,16 +269,21 @@
     const left = until - Date.now();
     clearTimeout(tick);
     $("timerStop").hidden = !until;
+    $("timerClock").classList.toggle("is-idle", !until || left <= 0);
     if (!until) {
+      ring(0);
       $("timerClock").textContent = "No timer running";
       $("timerEnds").textContent = "";
       return;
     }
     if (left <= 0) {
+      ring(0);
       $("timerClock").textContent = "Time's up";
       $("timerEnds").textContent = "The wait you picked is over.";
       return;
     }
+    const from = readFrom();
+    ring(from && until > from ? left / (until - from) : 1);
     const s = Math.ceil(left / 1000);
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
     $("timerClock").textContent = (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(sec).padStart(2, "0");
@@ -224,6 +291,7 @@
     tick = setTimeout(showTimer, 1000 - (Date.now() % 1000) + 5);
   }
   document.querySelectorAll(".ut-chip").forEach((b) => b.addEventListener("click", () => {
+    try { localStorage.setItem(FROM, String(Date.now())); } catch {}
     write(Date.now() + Number(b.dataset.min) * 60000);
     showTimer();
   }));

@@ -233,7 +233,9 @@
     cursor: pointer;
     padding: 2px;
   }
-  .exp-spark path{ fill:none; stroke:var(--c); stroke-width:2.75; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+  /* Thicker lines with a soft glow so the curves read at a glance (mommy 2026-11-02). */
+  .exp-spark path{ fill:none; stroke:var(--c); stroke-width:4.5; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; filter:drop-shadow(0 0 4px color-mix(in srgb, var(--c) 55%, transparent)); }
+  .exp-big .exp-spark path{ stroke-width:5.5; }
   .exp-spark line{ stroke:var(--line); stroke-width:1; vector-effect:non-scaling-stroke; }
   .exp-subs{ display:flex; flex-wrap:wrap; gap:.15rem .7rem; font-size:12px; color:var(--text); }
   .exp-subs span{ display:inline-flex; align-items:center; gap:.35rem; min-width:0; }
@@ -782,7 +784,6 @@
     </section>
 
 
-    <button id="saveButton" type="button" disabled class="btn btn-sm h-12 order-6 xl:order-none bg-[var(--surface)] border-[var(--line)] text-[var(--text)] font-mono disabled:opacity-40">Save data</button>
   </aside>
 
   <aside class="contents xl:flex xl:flex-col xl:gap-5 xl:min-h-0 xl:col-start-3 xl:row-start-1">

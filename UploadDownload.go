@@ -553,6 +553,7 @@ func main() {
 	registerAppUpdates()
 	registerLinkDownloads()
 	registerChat()
+	registerFriendsBar()
 	// News board items got a title, a pin and an edit time.
 	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE site_news ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -572,7 +573,7 @@ func main() {
 
 	port := 8000
 	loadNameColors()
-	handler := countViews(http.DefaultServeMux)
+	handler := speedUp(countViews(http.DefaultServeMux))
 	if desktopServe != nil {
 		desktopServe(handler)
 		return
@@ -4561,7 +4562,7 @@ type postAuthor struct {
 	Admin    bool      `json:"admin"`
 	Color    string    `json:"color,omitempty"` // an admin's name color
 	Rank     int       `json:"rank,omitempty"`  // geek rank tier, 1 to 5
-	Level    int       `json:"level,omitempty"` // times the account reached Twea(king)
+	Level    int       `json:"level,omitempty"` // geek level, 0 to 100
 	RankLook *rankLook `json:"rankLook,omitempty"`
 }
 
@@ -4835,7 +4836,8 @@ func currentUser(w http.ResponseWriter, r *http.Request) {
 		nameColor = ""
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, map[string]string{"name": session.OriginalUsername, "avatar": existingPicture(avatar), "nameColor": nameColor})
+	rank := rankOf(session.OriginalUsername)
+	writeJSON(w, map[string]any{"name": session.OriginalUsername, "avatar": existingPicture(avatar), "nameColor": nameColor, "tier": rank.Tier, "level": rank.Level, "rank": rank.Name})
 }
 
 func profileAppearance(w http.ResponseWriter, r *http.Request) {
@@ -6259,23 +6261,24 @@ var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars"
 // ---- Geek rank ----
 
 // geekRank: every Graph session and every Forum post an account ever made is a point.
-// The five tiers make a round of rankRound points. Reaching Twea(king) earns a level,
-// and when the round is full the tiers start over from Fresh Geek, so the level
-// keeps counting up (Twea(king) once = level 1, twice = level 2, ...). Every round
-// needs rankHarder (10%) more points than the one before, tiers included.
+// Points buy levels 0 to 100 (mommy 2026-11-02): level l to l+1 takes rankStep(l)
+// points, 5 at first and 3% more each level (about 3000 points to reach 100).
+// The level picks the rank: Fresh Geek 0-9, Noob 10-19, Refined Geeker 20-39,
+// Tweaker 40-49, Dedicated Tweaker 50-79, Mythical Tweaker 80-99, Twea(king) 100.
 type geekRank struct {
-	Tier      int      `json:"tier"`
-	Name      string   `json:"name"`
-	Level     int      `json:"level"`     // times Twea(king) was reached
-	Round     int      `json:"round"`     // which round the account is in, from 1
-	RoundSize int      `json:"roundSize"` // points this round takes
-	Score     int      `json:"score"`
-	Graphs    int      `json:"graphs"`
-	Posts     int      `json:"posts"`
-	Next      string   `json:"next"`     // what comes next: a tier name or "a new round"
-	ToNext    int      `json:"toNext"`   // points still needed for it
-	Progress  int      `json:"progress"` // percent of the way from this tier to the next
-	Look      rankLook `json:"look"`     // how the account dressed its geek label
+	Tier         int      `json:"tier"` // 1 to 7, the index in geekTiers + 1
+	Name         string   `json:"name"`
+	Level        int      `json:"level"` // 0 to rankMaxLevel
+	Score        int      `json:"score"`
+	Graphs       int      `json:"graphs"`
+	Posts        int      `json:"posts"`
+	LevelSize    int      `json:"levelSize"`    // points this level takes (0 at the top level)
+	ToNext       int      `json:"toNext"`       // points still needed for the next level
+	Progress     int      `json:"progress"`     // percent of the way to the next level
+	Next         string   `json:"next"`         // "level N", or "" at the top
+	NextRank     string   `json:"nextRank"`     // the next rank's name, "" at the top
+	LevelsToRank int      `json:"levelsToRank"` // levels still needed for it
+	Look         rankLook `json:"look"`         // how the account dressed its geek label
 }
 
 // rankLook is how an account's geek label looks everywhere its name shows
@@ -6316,60 +6319,52 @@ func (l rankLook) ptr() *rankLook {
 	return &l
 }
 
-const rankRound = 150
-const rankHarder = 1.10
+const rankMaxLevel = 100
 
-// rankScale is how much bigger round r (0 = the first) is than the first.
-func rankScale(r int) float64 { return math.Pow(rankHarder, float64(r)) }
+// rankStep is how many points level l to l+1 takes.
+func rankStep(l int) int { return int(math.Round(5 * math.Pow(1.03, float64(l)))) }
 
-func scaled(points int, r int) int { return int(math.Round(float64(points) * rankScale(r))) }
-
+// geekTiers: From is the level the rank starts at (mommy 2026-11-02).
 var geekTiers = []struct {
 	Name string
 	From int
-}{{"Fresh Geek", 0}, {"Noob", 5}, {"Refined Geeker", 20}, {"Mythical Tweaker", 50}, {"Twea(king)", 120}} // names from mommy 2026-11-01 (were Geek, Big Geek, Mega Geek, Geek⁴)
+}{{"Fresh Geek", 0}, {"Noob", 10}, {"Refined Geeker", 20}, {"Tweaker", 40}, {"Dedicated Tweaker", 50}, {"Mythical Tweaker", 80}, {"Twea(king)", 100}}
 
-// BarPct is how full the rank icon bar is (Level pack, mommy 2026-11-01):
-// the five rank icons sit at 0, 25, 50, 75 and 100%, and the fill moves
-// between two icons as the account gets closer to the next rank.
+// BarPct is how full the rank icon bar is: the seven rank icons sit evenly
+// along it and the fill moves between two icons as the levels go up.
 func (g geekRank) BarPct() int {
-	if g.Tier >= len(geekTiers) {
+	n := len(geekTiers)
+	if g.Tier >= n {
 		return 100
 	}
-	p := (g.Tier-1)*25 + g.Progress/4
-	if p < 0 {
-		p = 0
-	}
-	return p
+	from, to := geekTiers[g.Tier-1].From, geekTiers[g.Tier].From
+	in := float64(g.Level-from) + float64(g.Progress)/100
+	return int(math.Round((float64(g.Tier-1) + in/float64(to-from)) * 100 / float64(n-1)))
 }
 
 func makeRank(graphs, posts int) geekRank {
 	g := geekRank{Graphs: graphs, Posts: posts, Score: graphs + posts}
-	rounds, in := 0, g.Score
-	for in >= scaled(rankRound, rounds) {
-		in -= scaled(rankRound, rounds)
-		rounds++
+	left := g.Score
+	for g.Level < rankMaxLevel && left >= rankStep(g.Level) {
+		left -= rankStep(g.Level)
+		g.Level++
 	}
-	g.Level = rounds
-	g.Round = rounds + 1
-	g.RoundSize = scaled(rankRound, rounds)
 	for i, t := range geekTiers {
-		if in >= scaled(t.From, rounds) {
+		if g.Level >= t.From {
 			g.Tier, g.Name = i+1, t.Name
 		}
 	}
-	if g.Tier == len(geekTiers) {
-		g.Level++
+	g.Progress = 100
+	if g.Level < rankMaxLevel {
+		g.LevelSize = rankStep(g.Level)
+		g.ToNext = g.LevelSize - left
+		g.Progress = left * 100 / g.LevelSize
+		g.Next = fmt.Sprintf("level %d", g.Level+1)
 	}
-	from := scaled(geekTiers[g.Tier-1].From, rounds)
-	to := g.RoundSize
-	g.Next = "a new round"
 	if g.Tier < len(geekTiers) {
-		to = scaled(geekTiers[g.Tier].From, rounds)
-		g.Next = geekTiers[g.Tier].Name
+		g.NextRank = geekTiers[g.Tier].Name
+		g.LevelsToRank = geekTiers[g.Tier].From - g.Level
 	}
-	g.ToNext = to - in
-	g.Progress = (in - from) * 100 / (to - from)
 	return g
 }
 
@@ -6457,6 +6452,98 @@ func viewedPage(r *http.Request) string {
 
 // countViews adds one view per page opened, and remembers each visitor once a day:
 // an account by its id, everyone else by a hash of their address and browser.
+// ---- Speed (mommy 2026-11-02, after the speed test) ----
+
+// speedUp gzips text answers (HTML, CSS, JS, JSON, SVG) for browsers that
+// accept it, and lets browsers keep the versioned files in /vendor and the
+// fonts for a year, so pages stop downloading them again.
+func speedUp(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		if strings.HasPrefix(p, "/vendor/") || strings.HasPrefix(p, "/fonts/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		if r.Method == http.MethodHead || r.Header.Get("Range") != "" || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		g := &gzWriter{ResponseWriter: w}
+		defer g.close()
+		next.ServeHTTP(g, r)
+	})
+}
+
+var gzPool = sync.Pool{New: func() any { z, _ := gzip.NewWriterLevel(io.Discard, 5); return z }}
+
+func gzipType(ct string) bool {
+	ct = strings.ToLower(ct)
+	for _, t := range []string{"text/", "application/javascript", "application/json", "image/svg+xml", "application/xml", "application/manifest+json"} {
+		if strings.HasPrefix(ct, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// gzWriter decides on the first header or write: only full 200 answers of a
+// text type and at least 1 KB get gzipped; everything else passes through.
+type gzWriter struct {
+	http.ResponseWriter
+	gz      *gzip.Writer
+	decided bool
+	on      bool
+}
+
+func (g *gzWriter) WriteHeader(code int) {
+	if !g.decided {
+		g.decided = true
+		h := g.Header()
+		n, err := strconv.Atoi(h.Get("Content-Length"))
+		small := err == nil && n < 1024
+		if code == http.StatusOK && h.Get("Content-Encoding") == "" && h.Get("Content-Range") == "" && gzipType(h.Get("Content-Type")) && !small {
+			g.on = true
+			h.Del("Content-Length")
+			h.Set("Content-Encoding", "gzip")
+			h.Add("Vary", "Accept-Encoding")
+			g.gz = gzPool.Get().(*gzip.Writer)
+			g.gz.Reset(g.ResponseWriter)
+		}
+	}
+	g.ResponseWriter.WriteHeader(code)
+}
+
+func (g *gzWriter) Write(b []byte) (int, error) {
+	if !g.decided {
+		if g.Header().Get("Content-Type") == "" {
+			g.Header().Set("Content-Type", http.DetectContentType(b))
+		}
+		g.WriteHeader(http.StatusOK)
+	}
+	if g.on {
+		return g.gz.Write(b)
+	}
+	return g.ResponseWriter.Write(b)
+}
+
+// Flush keeps long-poll and streamed answers moving.
+func (g *gzWriter) Flush() {
+	if g.on {
+		g.gz.Flush()
+	}
+	if f, ok := g.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (g *gzWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
+
+func (g *gzWriter) close() {
+	if g.on {
+		g.gz.Close()
+		gzPool.Put(g.gz)
+	}
+}
+
 func countViews(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if page := viewedPage(r); page != "" {
@@ -6729,7 +6816,7 @@ func adminStats(w http.ResponseWriter, r *http.Request) {
 	for i, t := range geekTiers {
 		tiers = append(tiers, map[string]any{"tier": i + 1, "name": t.Name, "from": t.From})
 	}
-	writeJSON(w, map[string]any{"days": days, "pages": pages, "users": users, "totals": totals, "tiers": tiers, "round": rankRound})
+	writeJSON(w, map[string]any{"days": days, "pages": pages, "users": users, "totals": totals, "tiers": tiers, "maxLevel": rankMaxLevel})
 }
 
 // clearAlpha: the card opacities for a widget transparency, worked out here so
@@ -13419,4 +13506,192 @@ func GetSportifyFileFromLink(w http.ResponseWriter, r *http.Request) {
 	if _, err := io.Copy(w, resp.Body); err != nil {
 		return
 	}
+}
+
+// ---------------------------------------------------------------- friends bar
+// mommy 2026-11-02: friends sit in the top bar as square pictures with when
+// they were last online under them, and a dot for news from them (public trip
+// reports, Forum posts, chat messages to you). GET /friends/bar lists them;
+// POST {seen: name} marks that friend's news as seen. GET /notes/welcome lists
+// accounts made in the last 60 days for the Notes Public wall.
+
+const friendsBarSchema = `
+CREATE TABLE IF NOT EXISTS friend_seen (
+	user_id INTEGER NOT NULL,
+	friend_id INTEGER NOT NULL,
+	seen_at INTEGER NOT NULL,
+	PRIMARY KEY(user_id, friend_id)
+);`
+
+type friendNews struct {
+	Kind string `json:"kind"` // report, post, message
+	Text string `json:"text"`
+	URL  string `json:"url"`
+	At   int64  `json:"at"`
+}
+
+type friendBarItem struct {
+	postAuthor
+	LastSeen int64        `json:"lastSeen"`
+	New      int          `json:"new"`
+	News     []friendNews `json:"news"`
+}
+
+func shortText(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return s
+}
+
+func registerFriendsBar() {
+	if _, err := db.Exec(friendsBarSchema); err != nil {
+		panic("cannot create the friends bar table: " + err.Error())
+	}
+	http.HandleFunc("/friends/bar", requireLogin(friendsBar))
+	http.HandleFunc("/notes/welcome", requireLogin(newMembers))
+}
+
+func friendsBar(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	me := session.UserId
+	now := time.Now().UnixMilli()
+	// Open pages ask for this, so it also keeps "last online" fresh.
+	db.Exec("UPDATE users SET lastSeen = ? WHERE id = ? AND lastSeen < ?", now, me, now-60000)
+	if r.Method == http.MethodPost {
+		var in struct {
+			Seen string `json:"seen"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in) != nil || in.Seen == "" {
+			http.Error(w, "Say whose news you saw.", http.StatusBadRequest)
+			return
+		}
+		var fid int
+		db.QueryRow("SELECT id FROM users WHERE username = ?", strings.ToLower(in.Seen)).Scan(&fid)
+		if fid != 0 {
+			db.Exec("INSERT INTO friend_seen(user_id, friend_id, seen_at) VALUES(?, ?, ?) ON CONFLICT(user_id, friend_id) DO UPDATE SET seen_at = excluded.seen_at", me, fid, now)
+		}
+		writeJSON(w, map[string]bool{"ok": true})
+		return
+	}
+	rows, err := db.Query(`SELECT u.id, u.originalUsername, u.pathToProfilePic, u.authority, u.lastSeen,
+		COALESCE((SELECT seen_at FROM friend_seen s WHERE s.user_id = ? AND s.friend_id = u.id), 0),
+		f.created_at
+		FROM friendships f JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+		WHERE f.status = 'accepted' AND (f.requester_id = ? OR f.addressee_id = ?)
+		ORDER BY u.lastSeen DESC LIMIT 24`, me, me, me, me)
+	if err != nil {
+		http.Error(w, "Couldn't load your friends.", http.StatusInternalServerError)
+		return
+	}
+	type row struct {
+		id                   int
+		name, avatar, auth   string
+		last, seen, friended int64
+	}
+	list := []row{}
+	for rows.Next() {
+		var x row
+		if rows.Scan(&x.id, &x.name, &x.avatar, &x.auth, &x.last, &x.seen, &x.friended) == nil {
+			list = append(list, x)
+		}
+	}
+	rows.Close()
+	out := []friendBarItem{}
+	week := now - 7*24*3600*1000
+	for _, x := range list {
+		item := friendBarItem{postAuthor: person(x.name, x.avatar, x.auth), LastSeen: x.last, News: []friendNews{}}
+		// News starts at the later of a week ago and the day you became friends.
+		since := week
+		if x.friended > since {
+			since = x.friended
+		}
+		if q, err := db.Query("SELECT id, title, happened_at, updated_at FROM trip_reports WHERE user_id = ? AND public = 1 AND updated_at > ? ORDER BY updated_at DESC LIMIT 5", x.id, since); err == nil {
+			for q.Next() {
+				var id, happened, updated int64
+				var title string
+				if q.Scan(&id, &title, &happened, &updated) == nil {
+					if title == "" {
+						title = "a trip report"
+					}
+					item.News = append(item.News, friendNews{"report", "Posted a trip report: " + shortText(title, 60), "/Notes?report=" + strconv.FormatInt(id, 10) + "#public", updated})
+				}
+			}
+			q.Close()
+		}
+		if q, err := db.Query("SELECT body, created_at FROM forum_posts WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC LIMIT 5", x.id, since); err == nil {
+			for q.Next() {
+				var body string
+				var at int64
+				if q.Scan(&body, &at) == nil {
+					text := "Posted on the Forum"
+					if b := shortText(body, 60); b != "" {
+						text += ": " + b
+					}
+					item.News = append(item.News, friendNews{"post", text, "/u/" + url.PathEscape(x.name), at})
+				}
+			}
+			q.Close()
+		}
+		// Messages from them in chats you are in, that you have not read yet.
+		if q, err := db.Query(`SELECT m.chat_id, m.body, m.image, m.created_at FROM chat_messages m
+			JOIN chat_members cm ON cm.chat_id = m.chat_id AND cm.user_id = ?
+			WHERE m.user_id = ? AND m.deleted = 0 AND m.created_at > cm.last_read AND m.created_at > ?
+			ORDER BY m.created_at DESC LIMIT 5`, me, x.id, week); err == nil {
+			for q.Next() {
+				var chat, at int64
+				var body, image string
+				if q.Scan(&chat, &body, &image, &at) == nil {
+					text := "Sent you a message"
+					if b := shortText(body, 60); b != "" {
+						text += ": " + b
+					} else if image != "" {
+						text = "Sent you a picture"
+					}
+					item.News = append(item.News, friendNews{"message", text, "/Chat#" + strconv.FormatInt(chat, 10), at})
+				}
+			}
+			q.Close()
+		}
+		sort.Slice(item.News, func(i, j int) bool { return item.News[i].At > item.News[j].At })
+		if len(item.News) > 6 {
+			item.News = item.News[:6]
+		}
+		for _, n := range item.News {
+			if n.At > x.seen {
+				item.New++
+			}
+		}
+		out = append(out, item)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"friends": out, "now": now})
+}
+
+type newMember struct {
+	postAuthor
+	Joined int64 `json:"joined"`
+	Me     bool  `json:"me,omitempty"`
+}
+
+func newMembers(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	since := time.Now().Add(-60 * 24 * time.Hour).UnixMilli()
+	rows, err := db.Query("SELECT id, originalUsername, pathToProfilePic, authority, createdAt FROM users WHERE createdAt > ? ORDER BY createdAt DESC LIMIT 40", since)
+	out := []newMember{}
+	if err == nil {
+		for rows.Next() {
+			var id int
+			var name, avatar, auth string
+			var at int64
+			if rows.Scan(&id, &name, &avatar, &auth, &at) == nil {
+				out = append(out, newMember{person(name, avatar, auth), at, id == session.UserId})
+			}
+		}
+		rows.Close()
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"items": out})
 }

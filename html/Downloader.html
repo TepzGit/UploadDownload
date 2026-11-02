@@ -50,7 +50,6 @@
 </svg>
 
 <main class="xn-page fx">
-  <section class="xn-card fx-card">
     <div class="fx-head">
       {{if .Icon.Image}}<span class="fx-headicon"><img src="{{.Icon.Image}}" alt=""></span>{{else if .Icon.Emoji}}<span class="fx-headicon fx-heademoji" aria-hidden="true">{{.Icon.Emoji}}</span>{{end}}
       <div class="fx-titles">
@@ -65,6 +64,9 @@
         {{if .CanEdit}}<a href="/Uploader" class="xn-btn xn-btn-primary"><svg class="fx-ico" aria-hidden="true"><use href="#i-upload"/></svg>Upload</a>{{end}}
       </div>
     </div>
+
+  <div class="fx-layout">
+  <section class="xn-card fx-card">
 
     <div class="fx-toolbar">
       <button type="button" class="xn-btn" id="fxNewFolder" aria-label="New folder"{{if not .CanEdit}} hidden{{end}}><svg class="fx-ico" aria-hidden="true"><use href="#i-plus"/></svg><span>New folder</span></button>
@@ -101,7 +103,56 @@
       {{end}}
     </div>
   </section>
+
+  <!-- What is in this folder: filled in from the rows above by the script below. -->
+  <aside class="xn-card fx-side" id="fxSide" aria-labelledby="fxSideTitle">
+    <h2 class="xn-label" id="fxSideTitle">In this folder</h2>
+    <dl class="fx-stats">
+      <div><dt>Folders</dt><dd id="fxNDirs">0</dd></div>
+      <div><dt>Files</dt><dd id="fxNFiles">0</dd></div>
+      <div class="fx-stat-wide"><dt>Size</dt><dd id="fxBytes">0 B</dd></div>
+    </dl>
+    <div class="fx-mix" id="fxMix" aria-hidden="true"></div>
+    <ul class="fx-kinds" id="fxKinds"></ul>
+    {{if .CanEdit}}<a href="/Uploader" class="fx-drop"><svg class="fx-ico" aria-hidden="true"><use href="#i-upload"/></svg><span><strong>Add files</strong><small>Pictures, videos, music or anything else</small></span></a>{{end}}
+  </aside>
+  </div>
 </main>
+<script>
+  (function fxSummary() {
+    const rows = [...document.querySelectorAll('#itemsresults > .item')];
+    const kinds = { Image: ['Pictures', 'var(--fx-k1)'], Video: ['Videos', 'var(--fx-k2)'], Audio: ['Music', 'var(--fx-k3)'], None: ['Other files', 'var(--fx-k4)'] };
+    const sum = { Image: [0, 0], Video: [0, 0], Audio: [0, 0], None: [0, 0] };
+    let dirs = 0, bytes = 0;
+    rows.forEach((r) => {
+      const t = r.dataset.type;
+      if (t === 'Dir') { dirs++; return; }
+      const b = +(r.querySelector('.filesize')?.dataset.bytes || 0);
+      const k = sum[t] ? t : 'None';
+      sum[k][0]++; sum[k][1] += b; bytes += b;
+    });
+    const size = (b) => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; } return (i ? b.toFixed(b < 10 ? 1 : 0) : b) + ' ' + u[i]; };
+    const files = rows.length - dirs;
+    document.getElementById('fxNDirs').textContent = dirs;
+    document.getElementById('fxNFiles').textContent = files;
+    document.getElementById('fxBytes').textContent = size(bytes);
+    const mix = document.getElementById('fxMix'), list = document.getElementById('fxKinds');
+    Object.keys(kinds).forEach((k) => {
+      const [n, b] = sum[k];
+      if (!n) return;
+      const seg = document.createElement('i');
+      seg.style.cssText = `flex:${Math.max(b, bytes / 50) || 1};background:${kinds[k][1]}`;
+      mix.append(seg);
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="fx-dot"></span><span class="fx-kind"></span><span class="fx-kind-n"></span>';
+      li.firstChild.style.background = kinds[k][1];
+      li.children[1].textContent = kinds[k][0];
+      li.children[2].textContent = `${n} · ${size(b)}`;
+      list.append(li);
+    });
+    if (!files) mix.hidden = true;
+  })();
+</script>
 
 <div class="fx-menu" id="fxMenu" role="menu" hidden>
   <button type="button" role="menuitem" data-act="open">Open</button>

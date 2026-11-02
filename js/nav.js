@@ -271,10 +271,11 @@
   }
   window.xnPaintNames = paintNames;
 
-  // Geek rank: 5 tiers, one point per Graph session and per Forum post.
+  // Geek rank: 7 ranks picked by the geek level (0 to 100), one point per
+  // Graph session and per Forum post.
   // The names match geekTiers in UploadDownload.go. The label next to a
   // name is the tier name; look is the account's rankLook (color, style, icon).
-  const RANKS = ["Fresh Geek", "Noob", "Refined Geeker", "Mythical Tweaker", "Twea(king)"];
+  const RANKS = ["Fresh Geek", "Noob", "Refined Geeker", "Tweaker", "Dedicated Tweaker", "Mythical Tweaker", "Twea(king)"];
   const HEX = /^#[0-9a-f]{6}$/i;
   window.xnRank = {
     NAMES: RANKS,
@@ -289,12 +290,12 @@
       return el;
     },
     badge(tier, compact, level, look) {
-      tier = Math.min(5, Math.max(1, Number(tier) || 1));
+      tier = Math.min(RANKS.length, Math.max(1, Number(tier) || 1));
       const el = document.createElement("span");
       el.className = "xn-rank" + (compact ? " is-compact" : "");
       el.dataset.tier = String(tier);
       level = Math.max(0, Number(level) || 0);
-      el.title = "Geek rank " + tier + " of 5: " + RANKS[tier - 1] + (level ? ", level " + level : "");
+      el.title = "Geek rank " + tier + " of " + RANKS.length + ": " + RANKS[tier - 1] + (level ? ", level " + level : "");
       el.innerHTML = '<span class="xn-rank-name"></span>';
       el.querySelector(".xn-rank-name").textContent = RANKS[tier - 1];
       this.dress(el, look);
@@ -328,6 +329,80 @@
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => window.xnRank.letter());
   else window.xnRank.letter();
+
+  // Levels popup (mommy 2026-11-02): pressing a level badge shows every rank,
+  // its levels and its badge. Badges marked data-levels open it; their
+  // data-tier and data-level mark where the account is now.
+  const RANK_FROM = [0, 10, 20, 40, 50, 80, 100];
+  window.xnRank.hexb = function (tier, level) {
+    const b = document.createElement("span");
+    b.className = "xn-hexb";
+    b.dataset.tier = String(tier);
+    b.setAttribute("aria-hidden", "true");
+    b.innerHTML = '<span class="xn-hexb-hex"><span class="xn-hexb-ring"></span><span class="xn-hexb-face"><i class="xn-lp-ico"></i></span></span><span class="xn-hexb-lv"><b></b></span><span class="xn-hexb-fx"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></span>';
+    b.querySelector(".xn-hexb-lv").dataset.digits = String(String(level).length);
+    b.querySelector(".xn-hexb-lv b").textContent = String(level);
+    return b;
+  };
+  window.xnRank.showLevels = function (tier, level) {
+    tier = Number(tier) || 0;
+    level = Number(level) || 0;
+    let pop = document.getElementById("xnLvPop");
+    if (pop) pop.remove();
+    pop = document.createElement("div");
+    pop.id = "xnLvPop";
+    pop.className = "xn-lvpop";
+    pop.setAttribute("role", "dialog");
+    pop.setAttribute("aria-modal", "true");
+    pop.setAttribute("aria-labelledby", "xnLvPopTitle");
+    pop.innerHTML = '<div class="xn-lvpop-card"><div class="xn-lvpop-head"><div><h2 id="xnLvPopTitle">Geek levels</h2><p>Every Graph session and Forum post is a point. Points raise your level from 0 to 100, and your level picks your rank.</p></div><button type="button" class="xn-lvpop-x" aria-label="Close">×</button></div><ol class="xn-lvpop-list"></ol></div>';
+    const list = pop.querySelector("ol");
+    RANKS.forEach((name, i) => {
+      const t = i + 1, from = RANK_FROM[i], to = RANK_FROM[i + 1];
+      const li = document.createElement("li");
+      li.className = "xn-lvpop-row" + (t === tier ? " is-now" : t < tier ? " is-done" : "");
+      const badge = window.xnRank.hexb(t, t === tier ? level : from);
+      const text = document.createElement("div");
+      const nm = document.createElement("span");
+      nm.className = "xn-rn";
+      nm.dataset.tier = String(t);
+      nm.textContent = name;
+      const range = document.createElement("small");
+      range.textContent = to == null ? "Level " + from : "Levels " + from + " to " + (to - 1);
+      text.append(nm, range);
+      li.append(badge, text);
+      if (t === tier) {
+        const you = document.createElement("span");
+        you.className = "xn-lvpop-you";
+        you.textContent = "You, level " + level;
+        li.append(you);
+      }
+      list.append(li);
+    });
+    document.body.append(pop);
+    window.xnRank.letter(pop);
+    const last = document.activeElement;
+    const close = () => { pop.remove(); document.removeEventListener("keydown", key); if (last && last.focus) last.focus(); };
+    const key = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", key);
+    pop.addEventListener("click", (e) => { if (e.target === pop || e.target.closest(".xn-lvpop-x")) close(); });
+    pop.querySelector(".xn-lvpop-x").focus();
+    const now = pop.querySelector(".is-now");
+    if (now) now.scrollIntoView({ block: "nearest" });
+  };
+  // Capture phase, so a badge inside another button (Main card) opens the
+  // popup without also toggling that button.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest("[data-levels]");
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const hex = b.matches(".xn-hexb") ? b : b.querySelector(".xn-hexb");
+    window.xnRank.showLevels(hex && hex.dataset.tier, b.dataset.level || (hex && hex.querySelector(".xn-hexb-lv b") || {}).textContent);
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("span[data-levels]")) { e.preventDefault(); e.target.click(); }
+  });
 
   // The letter next to the logo: comments other people left on your
   // Forum posts. It shows only while some are unread.
@@ -415,7 +490,7 @@
     foot.className = "xn-menu-foot";
     foot.innerHTML =
       '<form method="post" action="/logout" class="xn-foot-out"><button type="submit" aria-label="Log out" title="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></svg></button></form>' +
-      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
+      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-lv" hidden></span><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
     box.append(foot);
     const face = foot.querySelector(".xn-foot-face");
     const name = foot.querySelector(".xn-foot-name");
@@ -436,6 +511,13 @@
       if (me.nameColor) {
         name.dataset.nameColor = me.nameColor;
         paintNames(foot);
+      }
+      // Your geek level badge beside your name (mommy 2026-11-02).
+      const lv = foot.querySelector(".xn-foot-lv");
+      if (lv && typeof me.level === "number" && window.xnRank && window.xnRank.hexb) {
+        lv.replaceChildren(window.xnRank.hexb(me.tier || 0, me.level));
+        lv.title = (me.rank || "Geek level") + ", level " + me.level;
+        lv.hidden = false;
       }
     };
     // Last seen values first so the row is filled at once, then the server's.
@@ -467,6 +549,166 @@
         try { localStorage.setItem("xn_me", JSON.stringify(me)); } catch {}
       })
       .catch(() => {});
+  }
+
+  // Friends in the top bar (mommy 2026-11-02): each friend as a square picture
+  // with when they were last online under it, and a dot for news from them
+  // (public trip reports, Forum posts, messages to you). Tapping one opens a
+  // small card with that news. GET /friends/bar, POST {seen} after opening.
+  function initFriendsBar(nav) {
+    if (!signedIn || nav.querySelector(".xn-friends")) return;
+    const strip = document.createElement("div");
+    strip.className = "xn-friends";
+    strip.setAttribute("role", "group");
+    strip.setAttribute("aria-label", "Friends");
+    strip.hidden = true;
+    const anchor = nav.querySelector(".xn-mail") || nav.querySelector(".xn-toggle") || nav.querySelector(".xn-brand");
+    if (anchor) anchor.after(strip); else nav.append(strip);
+    let card = null, openName = "", friends = [], now = Date.now();
+    const ago = (t) => {
+      if (!t) return "a while";
+      const s = Math.max(0, (now - t) / 1000);
+      if (s < 300) return "";
+      if (s < 3600) return Math.round(s / 60) + "m";
+      if (s < 86400) return Math.round(s / 3600) + "h";
+      if (s < 86400 * 30) return Math.round(s / 86400) + "d";
+      return Math.round(s / (86400 * 30)) + "mo";
+    };
+    const agoLong = (t) => {
+      const a = ago(t);
+      if (a === "") return "Online now";
+      if (a === "a while") return "Not online for a while";
+      const n = parseInt(a, 10), u = a.replace(/\d+/, "");
+      const word = { m: "minute", h: "hour", d: "day", mo: "month" }[u];
+      return "Last online " + n + " " + word + (n === 1 ? "" : "s") + " ago";
+    };
+    const ICON = {
+      report: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg>',
+      post: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+      message: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6"/></svg>',
+    };
+    const face = (f, cls) => {
+      const box = document.createElement("span");
+      box.className = cls;
+      if (f.avatar) {
+        const img = document.createElement("img");
+        img.src = f.avatar;
+        img.alt = "";
+        img.loading = "lazy";
+        img.addEventListener("error", () => { img.remove(); box.textContent = f.initial || f.name.charAt(0).toUpperCase(); }, { once: true });
+        box.append(img);
+      } else box.textContent = f.initial || f.name.charAt(0).toUpperCase();
+      return box;
+    };
+    const close = () => {
+      if (!card) return;
+      card.remove();
+      card = null;
+      strip.querySelectorAll(".xn-friend[aria-expanded]").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      openName = "";
+    };
+    const open = (f, btn) => {
+      if (openName === f.name) { close(); return; }
+      close();
+      openName = f.name;
+      btn.setAttribute("aria-expanded", "true");
+      card = document.createElement("div");
+      card.className = "xn-friend-card";
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-label", f.name);
+      const head = document.createElement("a");
+      head.className = "xn-friend-head";
+      head.href = "/u/" + encodeURIComponent(f.name);
+      const who = document.createElement("span");
+      who.className = "xn-friend-who";
+      const nm = document.createElement("strong");
+      nm.textContent = f.name;
+      if (f.color) nm.dataset.nameColor = f.color;
+      const seen = document.createElement("small");
+      seen.textContent = agoLong(f.lastSeen);
+      if (ago(f.lastSeen) === "") seen.className = "is-on";
+      who.append(nm, seen);
+      head.append(face(f, "xn-friend-face"), who);
+      const list = document.createElement("ul");
+      list.className = "xn-friend-news";
+      if (!f.news.length) {
+        const li = document.createElement("li");
+        li.className = "xn-friend-none";
+        li.textContent = "Nothing new from " + f.name + " this week.";
+        list.append(li);
+      }
+      f.news.forEach((n, i) => {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = n.url;
+        if (i < f.new) a.className = "is-new";
+        a.innerHTML = ICON[n.kind] || "";
+        const t = document.createElement("span");
+        t.textContent = n.text;
+        const when = document.createElement("small");
+        when.textContent = ago(n.at) === "" ? "just now" : ago(n.at) + " ago";
+        t.append(when);
+        a.append(t);
+        li.append(a);
+        list.append(li);
+      });
+      const foot = document.createElement("div");
+      foot.className = "xn-friend-foot";
+      foot.innerHTML = '<a href="/Chat?to=' + encodeURIComponent(f.name) + '">Message</a><a href="/u/' + encodeURIComponent(f.name) + '">Profile</a>';
+      card.append(head, list, foot);
+      document.body.append(card);
+      paintNames(card);
+      const r = btn.getBoundingClientRect();
+      const w = card.offsetWidth;
+      card.style.top = Math.round(r.bottom + 8) + "px";
+      card.style.left = Math.round(Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8))) + "px";
+      if (f.new) {
+        f.new = 0;
+        btn.classList.remove("has-news");
+        fetch("/friends/bar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seen: f.name }) }).catch(() => {});
+      }
+    };
+    const draw = () => {
+      strip.replaceChildren();
+      strip.hidden = !friends.length;
+      friends.forEach((f) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "xn-friend" + (f.new ? " has-news" : "");
+        b.setAttribute("aria-haspopup", "dialog");
+        b.setAttribute("aria-expanded", "false");
+        const a = ago(f.lastSeen);
+        b.setAttribute("aria-label", f.name + ", " + agoLong(f.lastSeen) + (f.new ? ", " + f.new + " new" : ""));
+        b.title = f.name;
+        b.append(face(f, "xn-friend-pic"));
+        const line = document.createElement("span");
+        line.className = "xn-friend-seen" + (a === "" ? " is-on" : "");
+        line.textContent = a === "" ? "online" : a;
+        b.append(line);
+        if (f.new) {
+          const dot = document.createElement("span");
+          dot.className = "xn-friend-dot";
+          dot.textContent = f.new > 9 ? "9+" : String(f.new);
+          b.append(dot);
+        }
+        b.addEventListener("click", (e) => { e.stopPropagation(); open(f, b); });
+        strip.append(b);
+      });
+    };
+    const load = () => fetch("/friends/bar", { headers: { Accept: "application/json" } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        now = data.now || Date.now();
+        friends = data.friends || [];
+        if (!card) draw();
+      })
+      .catch(() => {});
+    document.addEventListener("pointerdown", (e) => { if (card && !card.contains(e.target) && !strip.contains(e.target)) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && card) close(); });
+    window.addEventListener("resize", close);
+    load();
+    setInterval(() => { if (!document.hidden) load(); }, 60000);
   }
 
   function initMail(nav) {
@@ -610,6 +852,7 @@
     initMenuFoot(linkBox);
     initMail(nav);
     initChat(nav);
+    initFriendsBar(nav);
     initLogout(nav);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
