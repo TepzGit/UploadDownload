@@ -224,7 +224,34 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 .wk-pill-of { font-size: 12px; color: var(--wk-muted); }
 .wk-pill-add { margin-top: 2px; font-size: 13px; color: var(--wk-link); }
 
-/* Gallery */
+/* Gallery: one big picture, a row of 5, "View all" (mommy 2026-11-05) */
+.wk-gx { max-width: 760px; }
+.wk-gx[hidden] { display: none; }
+.wk-gx-main { display: block; width: 100%; aspect-ratio: 16 / 10; padding: 0; border: 1px solid var(--wk-line-soft); background: #0b0d10; cursor: zoom-in; overflow: hidden; }
+.wk-gx-main[hidden] { display: none; }
+.wk-gx-main img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.wk-gx-main:focus-visible, .wk-gx-thumb:focus-visible { outline: 2px solid var(--wk-link); outline-offset: 2px; }
+.wk-gx-cap { margin: 6px 2px 8px !important; font-size: 13px; color: var(--wk-muted); min-height: 1em; overflow-wrap: anywhere; }
+.wk-gx-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.wk-gx-thumb { aspect-ratio: 1; padding: 0; border: 1px solid var(--wk-line-soft); background: #0b0d10; cursor: pointer; overflow: hidden; transition: border-color 0.15s ease, transform 0.15s ease; }
+.wk-gx-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wk-gx-thumb.is-drawing img, .wk-gx-main.is-drawing img { object-fit: contain; background: #fff; }
+@media (hover: hover) { .wk-gx-thumb:hover { border-color: var(--wk-link); transform: translateY(-1px); } }
+.wk-gx-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.wk-gx-tools [hidden] { display: none; }
+.wk-gx-status { font-size: 13px; color: var(--wk-muted); }
+.wk-gx-all { width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 18px 20px 22px; border: 1px solid var(--wk-line-soft); background: #11141a; color: inherit; overflow: auto; }
+.wk-gx-all::backdrop { background: rgba(0, 0, 0, 0.72); }
+.wk-gx-all-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wk-gx-all-head .wk-file-x { position: static; flex: none; }
+.wk-gx-chip { display: inline-block; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--wk-link) 22%, transparent); color: var(--wk-link); font-size: 11px; font-weight: 600; vertical-align: 1px; }
+.wk-gal-item.is-preview { border-color: color-mix(in srgb, var(--wk-link) 45%, var(--wk-line-soft)); }
+.wk-gx-itemtools { display: flex; gap: 4px; margin-top: 6px; }
+.wk-gx-mini { min-width: 30px; height: 28px; padding: 0 8px; border: 1px solid var(--wk-line-soft); background: #0b0d10; color: inherit; font-size: 13px; cursor: pointer; }
+.wk-gx-mini:hover { border-color: var(--wk-link); }
+@media (max-width: 560px) { .wk-gx-row { gap: 5px; } .wk-gx-all { padding: 14px 12px 18px; } }
+
+/* Gallery grid (View all) */
 .wk-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
 .wk-gal-item { display: flex; flex-direction: column; min-width: 0; padding: 6px; border: 1px solid var(--wk-line-soft); background: #161a20; }
 .wk-gal-pic { display: block; height: 150px; padding: 0; border: 0; background: #0b0d10; cursor: zoom-in; overflow: hidden; }
@@ -299,3 +326,8 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 .sci-routes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .sci-route { padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); background: none; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
 .sci-route[aria-pressed="true"] { background: var(--violet, #a67cff); border-color: var(--violet, #a67cff); color: #fff; }
+
+/* Link to the Pill Database (/Pills) under the pictures, mommy 2026-11-05 */
+.wk-pills[hidden], .wk-pilldb[hidden], #sec-pills .wk-hatnote[hidden] { display: none; }
+.wk-pilldb { margin-top: 12px; }
+.wk-pilldb a { color: var(--oled-accent, #a67cff); font-weight: 600; }

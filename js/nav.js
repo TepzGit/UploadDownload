@@ -337,7 +337,7 @@
   // Graph session and per Forum post.
   // The names match geekTiers in UploadDownload.go. The label next to a
   // name is the tier name; look is the account's rankLook (color, style, icon).
-  const RANKS = ["Fresh Geek", "Noob", "Refined Geeker", "Tweaker", "Dedicated Tweaker", "Mythical Tweaker", "Twea(king)"];
+  const RANKS = ["Fresh Geeker", "Pothead", "Fiend", "Tweaker", "Dedicated Tweaker", "Crackhead", "Sensei Tweak", "Twea(king)"];
   const HEX = /^#[0-9a-f]{6}$/i;
   window.xnRank = {
     NAMES: RANKS,
@@ -371,8 +371,8 @@
     },
   };
 
-  // Rank name lettering (Level pack, mommy 2026-11-01): Fresh Geek and
-  // Refined Geeker move letter by letter, so their names are split into
+  // Rank name lettering (Level pack, mommy 2026-11-01): Fresh Geeker and
+  // Fiend move letter by letter, so their names are split into
   // one <i> per letter (oled.css .xn-rn).
   window.xnRank.letter = function (root) {
     (root || document).querySelectorAll(".xn-rn:not(.is-split)").forEach((el) => {
@@ -395,7 +395,7 @@
   // Levels popup (mommy 2026-11-02): pressing a level badge shows every rank,
   // its levels and its badge. Badges marked data-levels open it; their
   // data-tier and data-level mark where the account is now.
-  const RANK_FROM = [0, 10, 20, 40, 50, 80, 100];
+  const RANK_FROM = [0, 10, 20, 40, 50, 65, 80, 100];
   window.xnRank.hexb = function (tier, level) {
     const b = document.createElement("span");
     b.className = "xn-hexb";
@@ -909,6 +909,7 @@
     if (signedIn) addLink("/Chat", "Chat", "/Forum");
     addLink("/Music", "Music", signedIn ? "/Chat" : "/Forum");
     if (signedIn) addLink("/Notes", "Notes", "/journal");
+    if (signedIn) addLink("/Pills", "Pills", "/Notes");
     addIcons(linkBox);
     const links = nav.querySelectorAll(".xn-links a");
     initMenuFoot(linkBox);
@@ -998,7 +999,7 @@
   // under the name on the menu button's tiles.
   const TABS = [
     { href: "/", label: "Graph", desc: "Dose curves over time", icon: '<path d="M3.5 3v15.5A2.5 2.5 0 0 0 6 21h14.5" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7 16c2.3 0 2.9-9.5 5.8-9.5 2.6 0 2.7 6.3 5 6.3 1 0 1.7-.8 2.4-2.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' },
-    { href: "/journal", label: "Journal", desc: "Substances and saved doses", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
+    { href: "/journal", label: "Drugs", desc: "Every substance and its doses", icon: '<path d="M11 5.7C9.2 4.4 6.6 3.8 3.6 4A1.5 1.5 0 0 0 2.2 5.5v12.2c0 .9.8 1.6 1.7 1.5 2.7-.2 5 .4 7.1 1.7V5.7zM13 5.7v15.2c2.1-1.3 4.4-1.9 7.1-1.7.9.1 1.7-.6 1.7-1.5V5.5A1.5 1.5 0 0 0 20.4 4c-3-.2-5.6.4-7.4 1.7z"/>' },
     { href: "/Notes", label: "Notes", desc: "Trip reports and notepad", icon: '<path d="M6 2.5h8.6L19.5 7.4V19a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 19V5A2.5 2.5 0 0 1 6 2.5zm8 .9V7a1 1 0 0 0 1 1h3.6zM7.5 11.2a.9.9 0 0 0 0 1.8h8a.9.9 0 0 0 0-1.8zm0 3.8a.9.9 0 0 0 0 1.8h5.5a.9.9 0 0 0 0-1.8z" fill-rule="evenodd"/>' },
     { href: "/Forum", label: "Forum", desc: "Posts and comments", icon: '<path d="M4.5 3h10A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.2c-.5.4-1.3 0-1.3-.6V14A2.5 2.5 0 0 1 2 11.5v-6A2.5 2.5 0 0 1 4.5 3z"/><path d="M19 8.2a2.5 2.5 0 0 1 3 2.4v5.9a2.5 2.5 0 0 1-2 2.4v2c0 .6-.7 1-1.2.6L15.3 19H11a2.5 2.5 0 0 1-2.3-1.6l.9-.7h4.9A4.5 4.5 0 0 0 19 12.2z"/>' },
     { href: "/Chat", label: "Chat", desc: "Messages and groups", icon: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' },
@@ -1012,10 +1013,12 @@
   // name, and a line on what the page is for. Links that already hold a
   // picture are left as they are.
   const ADMIN = { icon: '<path d="M12 2.2 4.2 5.3v5.9c0 4.9 3.3 9.3 7.8 10.6 4.5-1.3 7.8-5.7 7.8-10.6V5.3z"/>', desc: "Accounts and site stats" };
+  // The Pill Database (/Pills) is in the menu but not a phone tab.
+  const PILLS = { icon: '<path d="M8.6 3.4a5.2 5.2 0 0 1 7.4 0l4.6 4.6a5.2 5.2 0 0 1-7.4 7.4l-4.6-4.6a5.2 5.2 0 0 1 0-7.4zm1.4 1.4a3.2 3.2 0 0 0 0 4.6l1.8 1.8 4.6-4.6-1.8-1.8a3.2 3.2 0 0 0-4.6 0z" fill-rule="evenodd"/><circle cx="7" cy="17" r="4.6"/>', desc: "Pictures of real pills" };
   const OTHER_ICON = '<circle cx="12" cy="12" r="5"/>';
   function addIcons(box) {
     if (!box) return;
-    const pages = { "/admin": ADMIN };
+    const pages = { "/admin": ADMIN, "/Pills": PILLS };
     TABS.forEach((tab) => { pages[tab.href] = tab; });
     box.querySelectorAll("a").forEach((a) => {
       if (a.querySelector("svg")) return;
@@ -1199,7 +1202,7 @@
   const IN_APP = /Geek4uApp/.test(navigator.userAgent);
   // The desktop app serves every page from this computer, so none need internet (LOCAL_SERVER).
   const ONLINE_ONLY = [
-    ...(IN_APP ? [] : [[/^\/journal(\/|$)/i, "the Journal"]]),
+    ...(IN_APP ? [] : [[/^\/journal(\/|$)/i, "the Drug Database"]]),
     [/^\/(Files\/|Uploader)/i, "Files"],
     [/^\/(Forum|u\/)/i, "the Forum"],
     ...(IN_APP ? [] : [[/^\/Music/i, "Music"]]),
@@ -1221,7 +1224,7 @@
       document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
       document.body.appendChild(offlineBox);
     }
-    offlineBox.querySelector("p").textContent = `Connect to Wi-Fi or mobile data to use ${what}. ${IN_APP ? "The Graph, Journal, your Profile and Utility" : "The Graph, your Profile and Utility"} work without internet.`;
+    offlineBox.querySelector("p").textContent = `Connect to Wi-Fi or mobile data to use ${what}. ${IN_APP ? "The Graph, Drug Database, your Profile and Utility" : "The Graph, your Profile and Utility"} work without internet.`;
     offlineBox.classList.add("is-on");
     offlineBox.querySelector("button").focus();
   }

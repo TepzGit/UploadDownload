@@ -121,7 +121,7 @@ function deleteButton(className, label, ask, onConfirm) {
 }
 
 function commentLabel(count) {
-  if (!count) return "Comment";
+  if (!count) return "No comments yet, write one";
   return count === 1 ? "1 comment" : count + " comments";
 }
 
@@ -166,20 +166,24 @@ function commentItem(comment, onRemoved) {
   return item;
 }
 
-/** The comment button under a post and the list + box it opens. */
+/** The small comment icon with its count (in the post's top row, mommy
+ * 2026-11-05: no more comment bar under every post) and the list + box it opens. */
 function commentsArea(post) {
   let count = post.comments || 0;
   let loaded = false;
-  const foot = document.createElement("div");
-  foot.className = "fm-post-foot";
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "fm-comment-toggle";
   toggle.setAttribute("aria-expanded", "false");
-  toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4v-14z"/></svg><span></span>';
+  toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4v-14z"/></svg><span class="fm-comment-count"></span>';
   const label = toggle.querySelector("span");
-  label.textContent = commentLabel(count);
-  foot.append(toggle);
+  const showCount = () => {
+    label.textContent = String(count);
+    toggle.setAttribute("aria-label", commentLabel(count));
+    toggle.title = commentLabel(count);
+    toggle.classList.toggle("has-comments", count > 0);
+  };
+  showCount();
 
   const area = document.createElement("div");
   area.className = "fm-comments";
@@ -204,7 +208,8 @@ function commentsArea(post) {
 
   const changed = (by) => {
     count = Math.max(0, count + by);
-    label.textContent = commentLabel(count);
+    showCount();
+    if (!count && loaded && !list.children.length) list.innerHTML = '<li class="fm-comment-note">No comments yet.</li>';
   };
   const grow = () => {
     text.style.height = "auto";
@@ -222,7 +227,7 @@ function commentsArea(post) {
       list.replaceChildren(...comments.map((c) => commentItem(c, () => changed(-1))));
       if (!comments.length) list.innerHTML = '<li class="fm-comment-note">No comments yet.</li>';
       count = comments.length;
-      label.textContent = commentLabel(count);
+      showCount();
       loaded = true;
     } catch (error) {
       list.innerHTML = "";
@@ -269,7 +274,7 @@ function commentsArea(post) {
       text.focus({ preventScroll: true });
     }
   });
-  return [foot, area];
+  return [toggle, area];
 }
 
 async function deletePost(id) {
@@ -311,6 +316,8 @@ export function postCard(post, { onRemoved } = {}) {
   when.title = new Date(post.createdAt).toLocaleString();
   when.textContent = postTime(post.createdAt);
   head.append(when);
+  const [commentButton, commentBox] = commentsArea(post);
+  head.append(commentButton);
 
   if (post.canDelete) {
     const del = document.createElement("button");
@@ -375,7 +382,7 @@ export function postCard(post, { onRemoved } = {}) {
     });
     card.append(pics);
   }
-  card.append(...commentsArea(post));
+  card.append(commentBox);
   return card;
 }
 

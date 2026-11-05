@@ -8,6 +8,7 @@
 // same code the Graph uses, so what you see is what the Graph draws.
 // ============================================================
 
+import { mountPreviewPics } from "/previewpics.js";
 import { effectPhases, effectHours, effectCurve } from "./curve.js";
 
 const $ = (id) => document.getElementById(id);
@@ -48,6 +49,7 @@ let loaded = false;
 let filter = "";
 let kind = "substance";
 let editingId = 0;
+const previewPics = mountPreviewPics(document.getElementById("sePreviews"));
 let open = false;
 let dirty = false;
 // Ingestion methods of a substance: route, doses and timeline each. The form shows one at a time.
@@ -1146,6 +1148,7 @@ function fillForm(entry, newKind) {
   $("feSaved").hidden = true;
   showError(null);
   sciFill(entry ? (isPill(e) ? null : e) : null);
+  previewPics.show(editingId && kind !== "pill" ? e.name : "");
   dirty = false;
   mainDirty = false;
   drawPreview();

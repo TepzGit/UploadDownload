@@ -1052,14 +1052,14 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-name-row:has(.pf-lvbtn, .pf-lvbadge) { align-items: center; }
 .pf-lp .xn-rn { max-width: 100%; }
 .pf-lp .xn-rn[data-tier="5"] { font-size: .9rem; }
-.pf-lp .xn-rn[data-tier="6"] { font-size: .8rem; letter-spacing: .06em; }
+.pf-lp .xn-rn[data-tier="7"] { font-size: .8rem; letter-spacing: .06em; }
 .pf-progress .xn-lbar { --m: 23px; margin-block: 4px 2px; }
 .pf-progress .pf-rank-note { text-align: center; }
 @media (max-width: 640px) {
   .pf-lvbtn .xn-hexb, .pf-lvbadge.xn-hexb { font-size: 52px; }
   .pf-lp .xn-rn { font-size: 1.1rem; }
   .pf-lp .xn-rn[data-tier="5"] { font-size: .78rem; }
-  .pf-lp .xn-rn[data-tier="6"] { font-size: .68rem; letter-spacing: .04em; }
+  .pf-lp .xn-rn[data-tier="7"] { font-size: .68rem; letter-spacing: .04em; }
   .pf-progress .xn-lbar { --m: 20px; }
 }
 @media (max-width: 640px) {

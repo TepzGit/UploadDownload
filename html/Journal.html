@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Journal · Geek⁴u</title>
+  <title>Drug Database · Geek⁴u</title>
   <link href="/vendor/daisyui-4.12.10.css" rel="stylesheet" type="text/css" />
   <style>
     :root{ --bg:#000000; --surface:#0a0a0c; --surface-2:#121216; --line:#23202b; --text:#f5f3fa; --muted:#9c96aa; --violet:var(--oled-accent); }
@@ -64,6 +64,17 @@
     .drugclass{ margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted); }
     /* "Medicine" / "Custom" tag after the name (journal.css isn't loaded on this page) */
     .drug-custom{ display:inline-block; margin-left:8px; padding:0 6px; border:1px solid var(--line); border-radius:2px; font-size:10px; font-weight:500; line-height:16px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); vertical-align:2px; }
+    /* Pill Database link in the intro (mommy 2026-11-05) */
+    .jr-portal .xn-sub a{ color:var(--oled-accent); text-decoration:underline; text-underline-offset:3px; }
+    /* Scrolling list: spacers stand in for the cards above and below the screen. */
+    .jr-spacer{ grid-column:1 / -1; pointer-events:none; }
+    .jr-spacer[hidden]{ display:none; }
+    .Drugs.is-settled > *{ animation:none !important; }
+    .bottombar[hidden]{ display:none; }
+    .jr-top{ position:fixed; z-index:40; right:max(16px, env(safe-area-inset-right)); bottom:calc(var(--xn-tabs-h, 0px) + 16px + env(safe-area-inset-bottom)); display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 14px; border-radius:999px; box-shadow:0 10px 28px -10px rgba(0,0,0,.9); }
+    .jr-top[hidden]{ display:none; }
+    .jr-top svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    @media (prefers-reduced-motion:no-preference){ .jr-top:not([hidden]){ animation:jr-drop .18s ease-out; } }
     .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
     /* Class dropdown: a button with the picked class, the list opens under it. */
     .jr-classpick{ position:relative; display:inline-block; margin-top:16px; z-index:30; }
@@ -128,7 +139,7 @@
   <a class="xn-brand" href="/Main" aria-label="Geek⁴u"><svg class="xn-logo" viewBox="-6 -166 358 191" width="56.2" height="30" aria-hidden="true" focusable="false"><defs><linearGradient id="xnNowGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity=".5"/><stop offset="1" style="stop-color:var(--logo-pill,#a67cff)" stop-opacity="0"/></linearGradient></defs><path fill="url(#xnNowGlow)" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92Z"/><path fill="none" style="stroke:var(--logo-pill,#a67cff)" stroke-width="5" stroke-linecap="round" d="M0,-92C40,-92 52,-150 96,-150H248C292,-150 306,-92 346,-92"/><path stroke="#fff" stroke-width="3" d="M196,-162V-92"/><circle cx="196" cy="-150" r="7" fill="#fff"/><path fill="currentColor" d="M5.79 -26.82V-25.79Q5.79 -20.05 7.28 -15.14Q8.76 -10.24 11.54 -6.66Q14.3 -3.09 18.22 -1.05Q22.15 0.98 27.06 0.98Q29.63 0.98 31.87 0.42Q34.11 -0.13 35.97 -1.14Q37.21 -1.83 38.3 -2.73Q39.39 -3.63 40.38 -4.72V-1.38Q40.38 1.46 39.57 3.71Q38.77 5.96 37.27 7.49Q35.65 9.14 33.27 9.99Q30.9 10.84 27.87 10.84Q26.02 10.84 24.27 10.48Q22.52 10.11 20.87 9.36Q19.18 8.6 17.62 7.41Q16.05 6.21 14.66 4.59L8.86 12.25Q10.58 14.53 13 16.15Q15.42 17.77 18.12 18.8Q20.8 19.83 23.52 20.32Q26.23 20.8 28.55 20.8Q33.99 20.8 38.5 19.32Q43.01 17.83 46.26 14.96Q49.46 12.09 51.25 7.92Q53.04 3.75 53.04 -1.59V-52.83H41.55L41.04 -47.65Q40.07 -48.86 38.92 -49.86Q37.78 -50.85 36.45 -51.58Q34.57 -52.69 32.26 -53.25Q29.95 -53.81 27.16 -53.81Q22.19 -53.81 18.24 -51.85Q14.3 -49.88 11.53 -46.32Q8.75 -42.75 7.27 -37.78Q5.79 -32.8 5.79 -26.82ZM18.45 -25.79V-26.82Q18.45 -30.25 19.16 -33.28Q19.87 -36.31 21.36 -38.61Q22.8 -40.86 25.03 -42.17Q27.25 -43.48 30.33 -43.48Q32.04 -43.48 33.49 -43.13Q34.94 -42.78 36.14 -42.15Q37.5 -41.44 38.56 -40.34Q39.61 -39.24 40.38 -37.81V-15.06Q39.65 -13.74 38.67 -12.67Q37.69 -11.6 36.42 -10.84Q35.18 -10.13 33.65 -9.74Q32.11 -9.35 30.23 -9.35Q27.17 -9.35 24.94 -10.64Q22.72 -11.93 21.28 -14.18Q19.83 -16.39 19.14 -19.37Q18.45 -22.36 18.45 -25.79Z M90.38 0.98Q98.05 0.98 103.59 -2.03Q109.13 -5.03 111.73 -8.77L105.21 -15.45Q102.83 -12.39 99.07 -10.78Q95.31 -9.17 91.13 -9.17Q88.13 -9.17 85.6 -10.16Q83.08 -11.14 81.16 -12.91Q79.29 -14.62 78.19 -16.76Q77.09 -18.9 76.48 -22.21V-22.4H112.72V-27.8Q112.72 -33.55 111.15 -38.35Q109.59 -43.14 106.56 -46.58Q103.5 -50.01 99.07 -51.91Q94.65 -53.81 88.93 -53.81Q83.62 -53.81 79.01 -51.84Q74.4 -49.87 70.99 -46.28Q67.57 -42.69 65.64 -37.68Q63.7 -32.66 63.7 -26.53V-24.56Q63.7 -19.2 65.62 -14.53Q67.53 -9.86 71.04 -6.44Q74.56 -2.99 79.47 -1Q84.39 0.98 90.38 0.98ZM88.86 -43.57Q91.63 -43.57 93.72 -42.67Q95.81 -41.76 97.24 -40.25Q98.67 -38.7 99.48 -36.61Q100.29 -34.52 100.29 -32.31V-31.37H76.73Q77.23 -34.18 78.29 -36.43Q79.34 -38.68 80.91 -40.28Q82.44 -41.88 84.45 -42.72Q86.47 -43.57 88.86 -43.57Z M148.38 0.98Q156.05 0.98 161.59 -2.03Q167.13 -5.03 169.73 -8.77L163.21 -15.45Q160.83 -12.39 157.07 -10.78Q153.31 -9.17 149.13 -9.17Q146.13 -9.17 143.6 -10.16Q141.08 -11.14 139.16 -12.91Q137.29 -14.62 136.19 -16.76Q135.09 -18.9 134.48 -22.21V-22.4H170.72V-27.8Q170.72 -33.55 169.15 -38.35Q167.59 -43.14 164.56 -46.58Q161.5 -50.01 157.07 -51.91Q152.65 -53.81 146.93 -53.81Q141.62 -53.81 137.01 -51.84Q132.4 -49.87 128.99 -46.28Q125.57 -42.69 123.64 -37.68Q121.7 -32.66 121.7 -26.53V-24.56Q121.7 -19.2 123.62 -14.53Q125.53 -9.86 129.04 -6.44Q132.56 -2.99 137.47 -1Q142.39 0.98 148.38 0.98ZM146.86 -43.57Q149.63 -43.57 151.72 -42.67Q153.81 -41.76 155.24 -40.25Q156.67 -38.7 157.48 -36.61Q158.29 -34.52 158.29 -32.31V-31.37H134.73Q135.23 -34.18 136.29 -36.43Q137.34 -38.68 138.91 -40.28Q140.44 -41.88 142.45 -42.72Q144.47 -43.57 146.86 -43.57Z M200.25 -22.42 216.16 0H231.72L208.61 -30.81L228.84 -52.83H213.64L198.47 -36.53L193.99 -31.49V-75H181.36V0H193.99V-16.56Z M303.77 0H315.21V-52.83H302.54V-15.6Q301.89 -14.24 300.96 -13.12Q300.04 -12.01 298.84 -11.22Q297.43 -10.29 295.56 -9.8Q293.69 -9.3 291.35 -9.3Q288.92 -9.3 287.19 -9.91Q285.47 -10.52 284.37 -11.95Q283.27 -13.34 282.76 -15.67Q282.25 -18.01 282.25 -21.45V-52.83H269.63V-21.55Q269.63 -15.57 270.96 -11.3Q272.3 -7.04 274.73 -4.31Q277.16 -1.53 280.57 -0.26Q283.97 1.02 288.09 1.02Q292.72 1.02 296.54 -1.22Q300.36 -3.45 303.04 -7.39Z"/><path style="fill:var(--logo-pill,#a67cff)" d="M256.2 -65.74V-88.97H249.04L233.5 -64.44L233.78 -60.02H249.14V-52H256.2V-60.02H260.49V-65.74ZM240.43 -65.74 248.45 -78.25 249.14 -79.47V-65.74Z"/></svg></a>
   <button class="xn-toggle" type="button" aria-expanded="false" aria-controls="xn-links" aria-label="Open menu"><span></span><span></span><span></span></button>
   <nav class="xn-links" id="xn-links" aria-label="Main">
-    <a href="/journal">Journal</a>
+    <a href="/journal">Drug Database</a>
     <a href="/">Graph</a>
     <a href="/Files/">Files</a>
     <a href="/Forum">Forum</a>
@@ -145,10 +156,10 @@
     <section class="xn-card jr-portal">
       <div class="jr-head">
         <div>
-          <p class="xn-eyebrow">Journal</p>
-          <h1 class="xn-h1 jr-title">Welcome to the Journal,</h1>
+          <p class="xn-eyebrow">Drug Database</p>
+          <h1 class="xn-h1 jr-title">Welcome to the Drug Database,</h1>
           <p class="jr-tagline">the substance encyclopedia that <a href="/Profile">you</a> can keep.</p>
-          <p class="xn-sub">Search and explore substances from the PsychonautWiki catalog. Each page has doses, combinations from Mixtures.info and pictures from Wikimedia Commons.</p>
+          <p class="xn-sub">Search and explore substances from the PsychonautWiki catalog. Each page has doses, combinations from Mixtures.info and pictures from Wikimedia Commons. Pills members have seen are in the <a href="/Pills">Pill Database</a>.</p>
         </div>
         <label class="jr-search">
           <span class="xn-sr">Search substances</span>
@@ -172,7 +183,7 @@
 
       <div class="Drugs" aria-live="polite"><p class="jr-status">Loading substances…</p></div>
 
-      <div class="bottombar">
+      <div class="bottombar" hidden>
         <button type="button" class="xn-btn" id="backBtn" onclick="previousPage()" disabled>← Back</button>
         <button type="button" class="xn-btn" id="nextBtn" onclick="nextPage()" disabled>Forward →</button>
       </div>
@@ -377,39 +388,8 @@
                 });
             }
 
-            let displaySeq = 0;
-
-            async function displaySubstances(offset, query = "") {
-                const seq = ++displaySeq;
-                const drugsDiv = document.querySelector(".Drugs");
-                try {
-                    let substances, more;
-                    const likesLoad = window.xnLikes.load();
-                    if (catalog) {
-                        const matches = filtered(query);
-                        if (offset >= matches.length) offset = Math.max(0, Math.floor((matches.length - 1) / PAGE) * PAGE);
-                        substances = matches.slice(offset, offset + PAGE);
-                        more = offset + PAGE < matches.length;
-                        const pages = Math.max(1, Math.ceil(matches.length / PAGE));
-                        const chip = document.querySelector(`.jr-chip[data-class="${CSS.escape(currentClass)}"]`);
-                        const what = currentClass && chip ? [...chip.childNodes].find((n) => n.nodeType === 3)?.textContent || "" : "";
-                        document.getElementById("classCount").textContent = (currentClass || query)
-                            ? `${matches.length} ${matches.length === 1 ? "substance" : "substances"}${what ? " in " + what : ""}${query ? ` matching “${query}”` : ""} · page ${Math.floor(offset / PAGE) + 1} of ${pages}`
-                            : "";
-                    } else if (!navigator.onLine) {
-                        throw new TypeError("offline"); // the saved list shows once loadCatalog has it
-                    } else {
-                        const result = await getSubstances(offset, query);
-                        substances = result?.data?.substances || [];
-                        more = !query && substances.length >= PAGE;
-                    }
-                    const liked = await likesLoad;
-                    const pills = await pillsLoad;
-                    if (seq !== displaySeq) return; // a newer search is on its way
-
-                    drugsDiv.innerHTML = "";
-
-                    substances.forEach(substance => {
+            /** One card: picture, name, class line and the heart beside it. */
+            function makeItem(substance, liked, pills) {
                         const drugDiv = document.createElement("a");
                         const imgUrl = substance?.images?.[0]?.thumb || '';
 
@@ -465,8 +445,292 @@
                         like.className = "xn-like drug-like";
                         window.xnLikes.bind(like, { name: DrugName, image: imgUrl, class: DrugClass }, liked.has(window.xnLikes.key(DrugName)));
                         item.append(drugDiv, like);
-                        drugsDiv.appendChild(item);
-                    });
+                        return item;
+            }
+
+            // ---- Scrolling list (mommy 2026-11-05): every substance is in one list
+            // you can scroll, but only the cards on screen plus a few rows above and
+            // below are on the page. Spacers above and below keep the scroll bar the
+            // size of the full list. The list scrolls in its own box (oled.css .Drugs),
+            // or with the page if the box style is taken away.
+            const virtualList = (function () {
+                const BUFFER_ROWS = 4;      // rows kept above and below what you see
+                const KEEP_BUILT = 240;     // cards remembered off the page, so scrolling back is instant
+                const SPOT_KEY = "xn_drugdb_spot_v1";
+                let items = [];
+                let make = null;
+                let built = new Map();      // index -> card
+                let from = 0, to = 0;       // cards [from, to) are on the page
+                let cols = 1, rowH = 0, gap = 8;
+                let frame = 0;
+                let listKey = "";
+                let restoreOnce = true;
+                const top = document.createElement("div");
+                const bottom = document.createElement("div");
+                top.className = bottom.className = "jr-spacer";
+                top.setAttribute("aria-hidden", "true");
+                bottom.setAttribute("aria-hidden", "true");
+                top.hidden = bottom.hidden = true;
+                const grid = () => document.querySelector(".Drugs");
+                // True when the list scrolls inside its own box.
+                const inBox = (el) => /^(auto|scroll)$/.test(getComputedStyle(el).overflowY);
+
+                function card(i) {
+                    let el = built.get(i);
+                    if (!el) {
+                        el = make(items[i]);
+                        el.dataset.i = String(i);
+                        built.set(i, el);
+                    }
+                    return el;
+                }
+                function forgetFar() {
+                    if (built.size <= KEEP_BUILT) return;
+                    const mid = (from + to) / 2;
+                    [...built.keys()].sort((x, y) => Math.abs(y - mid) - Math.abs(x - mid))
+                        .slice(0, built.size - KEEP_BUILT)
+                        .forEach((i) => { if (i < from || i >= to) built.delete(i); });
+                }
+                function columnsOf(el) {
+                    return Math.max(1, getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length);
+                }
+                // Row pitch (card height + gap), read from the cards on the page.
+                function measure(el) {
+                    gap = parseFloat(getComputedStyle(el).rowGap) || 0;
+                    const kids = [...el.children].filter((c) => c.classList.contains("drug-item"));
+                    if (kids.length > cols) {
+                        const h = kids[cols].getBoundingClientRect().top - kids[0].getBoundingClientRect().top;
+                        if (h > 20) return h;
+                    }
+                    if (kids.length) return kids[0].getBoundingClientRect().height + gap;
+                    return rowH || 128;
+                }
+                // The part of the list you can see, in px from the top of the first row.
+                function view(el) {
+                    const cs = getComputedStyle(el);
+                    const pad = parseFloat(cs.paddingTop) || 0;
+                    if (inBox(el)) return { start: el.scrollTop - pad, end: el.scrollTop - pad + el.clientHeight, box: true, pad };
+                    const t = el.getBoundingClientRect().top + (parseFloat(cs.borderTopWidth) || 0) + pad;
+                    return { start: -t, end: (window.innerHeight || document.documentElement.clientHeight) - t, box: false, pad };
+                }
+                function setSpacers(rows) {
+                    const above = Math.floor(from / cols);
+                    const below = Math.max(0, rows - Math.ceil(to / cols));
+                    top.hidden = !above;
+                    top.style.height = Math.max(0, above * rowH - gap) + "px";
+                    bottom.hidden = !below;
+                    bottom.style.height = Math.max(0, below * rowH - gap) + "px";
+                }
+                // Puts cards [a, b) on the page, keeping the ones already there.
+                function place(el, a, b) {
+                    const keep = document.activeElement;
+                    if (b <= from || a >= to || from === to) {
+                        const want = [];
+                        for (let i = a; i < b; i++) want.push(card(i));
+                        el.replaceChildren(top, ...want, bottom);
+                    } else {
+                        for (let i = from; i < Math.min(a, to); i++) built.get(i)?.remove();
+                        for (let i = Math.max(b, from); i < to; i++) built.get(i)?.remove();
+                        const head = [];
+                        for (let i = a; i < from; i++) head.push(card(i));
+                        if (head.length) top.after(...head);
+                        const tail = [];
+                        for (let i = Math.max(to, a); i < b; i++) tail.push(card(i));
+                        if (tail.length) bottom.before(...tail);
+                    }
+                    from = a; to = b;
+                    if (keep && keep !== document.activeElement && el.contains(keep)) keep.focus({ preventScroll: true });
+                }
+                function update() {
+                    frame = 0;
+                    const el = grid();
+                    if (!el || !items.length || !make || !rowH) return;
+                    const rows = Math.ceil(items.length / cols);
+                    const v = view(el);
+                    const firstRow = Math.max(0, Math.min(rows - 1, Math.floor(v.start / rowH) - BUFFER_ROWS));
+                    const lastRow = Math.max(firstRow + 1, Math.min(rows, Math.ceil(v.end / rowH) + BUFFER_ROWS));
+                    const a = firstRow * cols;
+                    const b = Math.min(items.length, lastRow * cols);
+                    if (a !== from || b !== to) {
+                        place(el, a, b);
+                        forgetFar();
+                    }
+                    setSpacers(rows);
+                }
+                function soon() {
+                    if (!frame && items.length) frame = requestAnimationFrame(update);
+                }
+                // The first card you can see, so the place can be kept (resize) or remembered (Back).
+                function spot() {
+                    const el = grid();
+                    if (!el || !rowH || !items.length) return null;
+                    const v = view(el);
+                    const row = Math.max(0, Math.floor(Math.max(0, v.start) / rowH));
+                    return { index: row * cols, offset: row * rowH - v.start };
+                }
+                function goTo(index, offset) {
+                    const el = grid();
+                    const y = Math.floor(index / cols) * rowH - offset;
+                    const v = view(el);
+                    if (v.box) el.scrollTop = Math.max(0, y + v.pad);
+                    else window.scrollTo(0, Math.max(0, window.scrollY - v.start + y));
+                    update();
+                }
+                function layout(keepSpot) {
+                    const el = grid();
+                    const was = keepSpot ? spot() : null;
+                    cols = columnsOf(el);
+                    // Keep whole rows so the cards stay in their columns.
+                    const a = Math.floor(Math.min(from, items.length) / cols) * cols;
+                    if (a !== from || to > items.length) place(el, a, Math.min(to, items.length));
+                    rowH = measure(el);
+                    setSpacers(Math.ceil(items.length / cols));
+                    if (was) goTo(was.index, was.offset);
+                    else update();
+                }
+
+                // Scrolling the page or the list's own box (scroll events don't bubble, so listen while they pass down).
+                document.addEventListener("scroll", soon, { passive: true, capture: true });
+                let lastWidth = 0;
+                window.addEventListener("resize", () => {
+                    const el = grid();
+                    const w = el ? el.clientWidth : 0;
+                    if (!items.length) { lastWidth = w; return; }
+                    if (w !== lastWidth) { lastWidth = w; layout(true); }
+                    else soon(); // only the height changed (phone toolbar)
+                });
+                // Remember the place when a substance is opened, so Back returns to it.
+                function remember() {
+                    const s = spot();
+                    if (!s) return;
+                    try { sessionStorage.setItem(SPOT_KEY, JSON.stringify({ key: listKey, index: s.index, offset: s.offset, n: items.length })); } catch (_) {}
+                }
+                document.addEventListener("click", (e) => { if (e.target.closest(".Drugs a.Drug")) remember(); });
+                window.addEventListener("pagehide", remember);
+
+                return {
+                    show(list, builder, key) {
+                        const el = grid();
+                        const same = key === listKey && list.length === items.length && list.every((s, i) => s === items[i]);
+                        items = list;
+                        make = builder;
+                        listKey = key;
+                        el.removeAttribute("aria-live"); // the count line above says what changed
+                        if (same) { layout(false); return; }
+                        built = new Map();
+                        from = to = 0;
+                        el.classList.remove("is-settled");
+                        // A new search or class starts at the top of the list.
+                        if (inBox(el)) el.scrollTop = 0;
+                        else if (el.getBoundingClientRect().top < 0) {
+                            const portal = document.querySelector(".jr-portal");
+                            if (portal) window.scrollTo(0, Math.max(0, portal.getBoundingClientRect().top + window.scrollY - 70));
+                        }
+                        // Draw two rows, measure them, then fill what you can see.
+                        cols = columnsOf(el);
+                        lastWidth = el.clientWidth;
+                        place(el, 0, Math.min(items.length, cols * 2));
+                        layout(false);
+                        // Cards rise in once; the ones added while scrolling just appear.
+                        clearTimeout(el._settle);
+                        el._settle = setTimeout(() => el.classList.add("is-settled"), 900);
+                        if (restoreOnce) {
+                            restoreOnce = false;
+                            try {
+                                const saved = JSON.parse(sessionStorage.getItem(SPOT_KEY) || "null");
+                                if (saved && saved.key === key && saved.n === items.length && saved.index > 0) {
+                                    el.classList.add("is-settled");
+                                    goTo(Math.min(saved.index, items.length - 1), saved.offset);
+                                }
+                            } catch (_) {}
+                        }
+                    },
+                    stop() { items = []; built = new Map(); from = to = 0; rowH = 0; listKey = ""; },
+                    // For the Top button: is the list scrolled well down, and back to its start.
+                    far() {
+                        const el = grid();
+                        if (!el || !items.length) return false;
+                        if (inBox(el)) {
+                            const r = el.getBoundingClientRect();
+                            return el.scrollTop > el.clientHeight * 1.5 && r.bottom > 80 && r.top < window.innerHeight - 80;
+                        }
+                        return window.scrollY > window.innerHeight * 1.5;
+                    },
+                    toTop(smooth) {
+                        const el = grid();
+                        const behavior = smooth ? "smooth" : "auto";
+                        if (inBox(el)) el.scrollTo({ top: 0, behavior });
+                        const portal = document.querySelector(".jr-portal");
+                        const y = portal ? portal.getBoundingClientRect().top + window.scrollY - 70 : 0;
+                        if (!inBox(el) || window.scrollY > y + 40) window.scrollTo({ top: Math.max(0, y), behavior });
+                    },
+                };
+            })();
+
+            // "Top" button: shows once the list is scrolled well down.
+            (function topButton() {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "xn-btn jr-top";
+                b.hidden = true;
+                b.setAttribute("aria-label", "Back to the top of the list");
+                b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span>Top</span>';
+                b.addEventListener("click", () => {
+                    virtualList.toTop(window.xnMotion ? window.xnMotion.on() : true);
+                    b.hidden = true;
+                    document.getElementById("input")?.focus({ preventScroll: true });
+                });
+                document.addEventListener("DOMContentLoaded", () => document.body.append(b));
+                let tick = 0;
+                document.addEventListener("scroll", () => {
+                    if (tick) return;
+                    tick = requestAnimationFrame(() => { tick = 0; b.hidden = !virtualList.far(); });
+                }, { passive: true, capture: true });
+            })();
+
+            let displaySeq = 0;
+
+            async function displaySubstances(offset, query = "") {
+                const seq = ++displaySeq;
+                const drugsDiv = document.querySelector(".Drugs");
+                try {
+                    let substances, more;
+                    const likesLoad = window.xnLikes.load();
+                    if (catalog) {
+                        // Every match in one scrolling list; only the cards near the screen are on the page.
+                        const matches = filtered(query);
+                        const liked = await likesLoad;
+                        const pills = await pillsLoad;
+                        if (seq !== displaySeq) return;
+                        const chip = document.querySelector(`.jr-chip[data-class="${CSS.escape(currentClass)}"]`);
+                        const what = currentClass && chip ? [...chip.childNodes].find((n) => n.nodeType === 3)?.textContent || "" : "";
+                        document.getElementById("classCount").textContent = `${matches.length} ${matches.length === 1 ? "substance" : "substances"}${what ? " in " + what : ""}${query ? ` matching “${query}”` : ""}`;
+                        currentOffset = 0;
+                        currentSearchQuery = query;
+                        document.querySelector(".bottombar").hidden = true;
+                        if (!matches.length) {
+                            virtualList.stop();
+                            drugsDiv.innerHTML = `<p class="jr-status"></p>`;
+                            drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”${currentClass ? " in this class" : ""}.` : currentClass ? "No substances in this class." : "No substances yet.";
+                            return;
+                        }
+                        virtualList.show(matches, (substance) => makeItem(substance, liked, pills), currentClass + "|" + query.toLowerCase());
+                        return;
+                    } else if (!navigator.onLine) {
+                        throw new TypeError("offline"); // the saved list shows once loadCatalog has it
+                    } else {
+                        const result = await getSubstances(offset, query);
+                        substances = result?.data?.substances || [];
+                        more = !query && substances.length >= PAGE;
+                    }
+                    const liked = await likesLoad;
+                    const pills = await pillsLoad;
+                    if (seq !== displaySeq) return; // a newer search is on its way
+
+                    virtualList.stop();
+                    drugsDiv.innerHTML = "";
+
+                    substances.forEach((substance) => drugsDiv.appendChild(makeItem(substance, liked, pills)));
                     if (!substances.length) {
                         drugsDiv.innerHTML = `<p class="jr-status"></p>`;
                         drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”${currentClass ? " in this class" : ""}.` : currentClass ? "No substances in this class." : "No substances on this page.";
@@ -508,6 +772,7 @@
                     displaySubstances(currentSearchQuery ? 0 : currentOffset, currentSearchQuery);
                 }).catch((error) => {
                     console.warn("Class filter unavailable:", error);
+                    document.querySelector(".bottombar").hidden = false; // page by page from the API instead
                     if (!navigator.onLine) document.querySelector(".Drugs").innerHTML = `<p class="jr-status">You're offline, and no substances are saved on this phone yet. Open the Graph once with internet to save them.</p>`;
                 });
 

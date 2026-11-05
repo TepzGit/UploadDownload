@@ -17,6 +17,10 @@ import (
 	"fmt"
 	"html"
 	"html/template"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"io/fs"
 	"math"
@@ -422,6 +426,7 @@ func main() {
 	http.HandleFunc("/Forum", requireLogin(Forum))
 	http.HandleFunc("/forum/posts", requireLogin(forumPosts))
 	http.HandleFunc("/forum/members", requireLogin(forumMembers))
+	http.HandleFunc("/forum/card", requireLogin(forumCard))
 	http.HandleFunc("/forum/comments", requireLogin(forumComments))
 	http.HandleFunc("/friends", requireLogin(friends))
 	http.HandleFunc("/experiences/people", requireLogin(experiencePeople))
@@ -563,6 +568,8 @@ func main() {
 	registerSubstanceEditor()
 	registerPsychonautWikiCopy()
 	registerPillPictures()
+	registerPreviewPictures()
+	registerPillDatabase()
 	// News board items got a title, a pin and an edit time.
 	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''", "tag TEXT NOT NULL DEFAULT ''", "tag_color TEXT NOT NULL DEFAULT ''", "size TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE site_news ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -4844,7 +4851,7 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := db.Query(`
 	SELECT u.id, u.originalUsername, u.pathToProfilePic, u.authority,
-		(SELECT COUNT(*) FROM forum_posts p WHERE p.user_id = u.id)
+		(SELECT COUNT(*) FROM forum_posts p WHERE p.user_id = u.id), u.lastSeen
 	FROM users u
 	ORDER BY lower(u.originalUsername)
 	LIMIT 500`)
@@ -4855,9 +4862,11 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	type member struct {
 		postAuthor
-		Posts  int    `json:"posts"`
-		Friend string `json:"friend"`
-		Self   bool   `json:"self"`
+		Posts    int    `json:"posts"`
+		Friend   string `json:"friend"`
+		Self     bool   `json:"self"`
+		LastSeen int64  `json:"lastSeen"`
+		RankName string `json:"rankName"`
 	}
 	type found struct {
 		member
@@ -4867,14 +4876,15 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m found
 		var avatar, authority string
-		if err := rows.Scan(&m.id, &m.Name, &avatar, &authority, &m.Posts); err != nil {
+		if err := rows.Scan(&m.id, &m.Name, &avatar, &authority, &m.Posts, &m.LastSeen); err != nil {
 			continue
 		}
 		m.Initial = initialOf(m.Name)
 		m.Avatar = existingPicture(avatar)
 		m.Admin = authority == "admin"
 		m.Color = adminNameColor(m.Name, authority)
-		m.Rank, m.Level = rankOf(m.Name).Tier, rankOf(m.Name).Level
+		g := rankOf(m.Name)
+		m.Rank, m.Level, m.RankName, m.RankLook = g.Tier, g.Level, g.Name, g.Look.ptr()
 		list = append(list, m)
 	}
 	rows.Close()
@@ -4887,6 +4897,42 @@ func forumMembers(w http.ResponseWriter, r *http.Request) {
 		out = append(out, m.member)
 	}
 	writeJSON(w, out)
+}
+
+// forumCard: GET ?name= the small profile card the Forum shows when you
+// point at (or tap) someone (mommy 2026-11-05): picture, level, join date,
+// bio, friend status and a few numbers.
+func forumCard(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	var id int
+	var name, avatar, banner, authority, bio string
+	var created, lastSeen int64
+	err := db.QueryRow("SELECT id, originalUsername, pathToProfilePic, pathToBanner, authority, bio, createdAt, lastSeen FROM users WHERE username = ?",
+		strings.ToLower(strings.TrimSpace(r.URL.Query().Get("name")))).Scan(&id, &name, &avatar, &banner, &authority, &bio, &created, &lastSeen)
+	if err != nil {
+		http.Error(w, "No one has that name.", http.StatusNotFound)
+		return
+	}
+	// Older accounts have no sign-up time: their first post or comment stands in.
+	if created <= 0 {
+		db.QueryRow(`SELECT COALESCE(MIN(t), 0) FROM (SELECT MIN(created_at) AS t FROM forum_posts WHERE user_id = ?
+			UNION ALL SELECT MIN(created_at) FROM forum_comments WHERE user_id = ?) WHERE t IS NOT NULL`, id, id).Scan(&created)
+	}
+	var posts, comments, friendsN int
+	db.QueryRow("SELECT COUNT(*) FROM forum_posts WHERE user_id = ?", id).Scan(&posts)
+	db.QueryRow("SELECT COUNT(*) FROM forum_comments WHERE user_id = ?", id).Scan(&comments)
+	db.QueryRow("SELECT COUNT(*) FROM friendships WHERE status = 'accepted' AND (requester_id = ? OR addressee_id = ?)", id, id).Scan(&friendsN)
+	g := rankOf(name)
+	if utf8.RuneCountInString(bio) > 220 {
+		bio = string([]rune(bio)[:219]) + "…"
+	}
+	w.Header().Set("Cache-Control", "private, max-age=60")
+	writeJSON(w, map[string]any{
+		"author": person(name, avatar, authority), "banner": existingPicture(banner), "bio": bio,
+		"joined": created, "lastSeen": lastSeen, "rankName": g.Name,
+		"friend": friendStates(session.UserId)[id], "self": id == session.UserId,
+		"stats": map[string]int{"posts": posts, "comments": comments, "graphs": g.Graphs, "friends": friendsN},
+	})
 }
 
 // person is how an account is shown next to posts, comments and friends.
@@ -6362,10 +6408,11 @@ var siteScenes = map[string]bool{"": true, "none": true, "aurora": true, "stars"
 // geekRank: every Graph session and every Forum post an account ever made is a point.
 // Points buy levels 0 to 100 (mommy 2026-11-02): level l to l+1 takes rankStep(l)
 // points, 5 at first and 3% more each level (about 3000 points to reach 100).
-// The level picks the rank: Fresh Geek 0-9, Noob 10-19, Refined Geeker 20-39,
-// Tweaker 40-49, Dedicated Tweaker 50-79, Mythical Tweaker 80-99, Twea(king) 100.
+// The level picks the rank (names from mommy 2026-11-05): Fresh Geeker 0-9,
+// Pothead 10-19, Fiend 20-39, Tweaker 40-49, Dedicated Tweaker 50-64,
+// Crackhead 65-79, Sensei Tweak 80-99, Twea(king) 100.
 type geekRank struct {
-	Tier         int      `json:"tier"` // 1 to 7, the index in geekTiers + 1
+	Tier         int      `json:"tier"` // 1 to 8, the index in geekTiers + 1
 	Name         string   `json:"name"`
 	Level        int      `json:"level"` // 0 to rankMaxLevel
 	Score        int      `json:"score"`
@@ -6423,11 +6470,12 @@ const rankMaxLevel = 100
 // rankStep is how many points level l to l+1 takes.
 func rankStep(l int) int { return int(math.Round(5 * math.Pow(1.03, float64(l)))) }
 
-// geekTiers: From is the level the rank starts at (mommy 2026-11-02).
+// geekTiers: From is the level the rank starts at (mommy 2026-11-02; renamed and
+// Crackhead added at 65 on 2026-11-05).
 var geekTiers = []struct {
 	Name string
 	From int
-}{{"Fresh Geek", 0}, {"Noob", 10}, {"Refined Geeker", 20}, {"Tweaker", 40}, {"Dedicated Tweaker", 50}, {"Mythical Tweaker", 80}, {"Twea(king)", 100}}
+}{{"Fresh Geeker", 0}, {"Pothead", 10}, {"Fiend", 20}, {"Tweaker", 40}, {"Dedicated Tweaker", 50}, {"Crackhead", 65}, {"Sensei Tweak", 80}, {"Twea(king)", 100}}
 
 // BarPct is how full the rank icon bar is: the seven rank icons sit evenly
 // along it and the fill moves between two icons as the levels go up.
@@ -6555,7 +6603,7 @@ func viewedPage(r *http.Request) string {
 	}
 	p := r.URL.Path
 	switch {
-	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Utility":
+	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Utility" || p == "/Pills":
 		return p
 	case strings.HasPrefix(p, "/u/"):
 		return "/u/"
@@ -8666,8 +8714,14 @@ func adminCustomSubstances(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UnixMilli()
 		var err error
 		if id > 0 {
+			var oldName string
+			db.QueryRow("SELECT name FROM custom_substances WHERE id = ?", id).Scan(&oldName)
 			var res sql.Result
 			res, err = db.Exec("UPDATE custom_substances SET name = ?, data = ?, parent_id = ?, updated_at = ? WHERE id = ?", c.Name, string(body), parent, now, id)
+			// Journal preview pictures follow a renamed substance.
+			if err == nil && oldName != "" && previewKey(oldName) != previewKey(c.Name) {
+				db.Exec("UPDATE substance_previews SET name = ? WHERE name = ?", previewKey(c.Name), previewKey(oldName))
+			}
 			if err == nil {
 				if n, _ := res.RowsAffected(); n == 0 {
 					http.Error(w, "That entry was deleted meanwhile.", http.StatusNotFound)
@@ -15724,4 +15778,661 @@ func registerPillPictures() {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		http.ServeFile(w, r, filepath.Join(pillPicturesDir, file))
 	})
+}
+
+// ---- Journal gallery preview pictures (mommy 2026-11-05) ----
+// Admins upload preview pictures for any substance on its Journal page.
+// The gallery puts them first (big picture + 5 thumbnails); Wikimedia
+// Commons pictures fill the rest and stay under "View all".
+
+const previewSchema = `CREATE TABLE IF NOT EXISTS substance_previews (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	file TEXT NOT NULL,
+	caption TEXT NOT NULL DEFAULT '',
+	position INTEGER NOT NULL DEFAULT 0,
+	user_id INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS substance_previews_name ON substance_previews(name);`
+
+var previewDir = filepath.Join(UploadedFilesDirName, "previews")
+var previewFileName = regexp.MustCompile(`^prev-[0-9a-f]{12}\.(jpg|png|gif|webp)$`)
+
+type previewPicture struct {
+	ID      int64  `json:"id"`
+	URL     string `json:"url"`
+	Caption string `json:"caption"`
+	At      int64  `json:"at"`
+}
+
+func previewKey(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func registerPreviewPictures() {
+	if _, err := db.Exec(previewSchema); err != nil {
+		fmt.Println("substance_previews:", err)
+	}
+	http.HandleFunc("/journal/api/previews", requireLogin(previewPictures))
+	http.HandleFunc("/preview-pic/", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/preview-pic/")
+		if !previewFileName.MatchString(name) {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		http.ServeFile(w, r, filepath.Join(previewDir, name))
+	}))
+}
+
+func listPreviews(name string) []previewPicture {
+	out := []previewPicture{}
+	rows, err := db.Query("SELECT id, file, caption, created_at FROM substance_previews WHERE name = ? ORDER BY position, id", previewKey(name))
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p previewPicture
+		var file string
+		if rows.Scan(&p.ID, &file, &p.Caption, &p.At) == nil {
+			p.URL = "/preview-pic/" + file
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// previewPictures: GET ?q=<substance> lists them; admins POST multipart
+// (name, caption, image x up to 12) to add, or JSON {action: delete|move, id, dir}.
+func previewPictures(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		writeJSON(w, map[string]any{"items": listPreviews(r.URL.Query().Get("q"))})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	if session.Authority != "admin" {
+		http.Error(w, "Only admins can change preview pictures.", http.StatusForbidden)
+		return
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		var req struct {
+			Action string `json:"action"`
+			ID     int64  `json:"id"`
+			Dir    int    `json:"dir"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req) != nil {
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+		var name, file string
+		var pos int64
+		if db.QueryRow("SELECT name, file, position FROM substance_previews WHERE id = ?", req.ID).Scan(&name, &file, &pos) != nil {
+			http.Error(w, "That picture is gone.", http.StatusNotFound)
+			return
+		}
+		switch req.Action {
+		case "delete":
+			db.Exec("DELETE FROM substance_previews WHERE id = ?", req.ID)
+			if previewFileName.MatchString(file) {
+				os.Remove(filepath.Join(previewDir, file))
+			}
+		case "move":
+			// Renumber the list in its shown order, then swap with the neighbour.
+			list := listPreviews(name)
+			i := -1
+			for k, p := range list {
+				if p.ID == req.ID {
+					i = k
+				}
+			}
+			j := i + req.Dir
+			if i >= 0 && j >= 0 && j < len(list) && (req.Dir == 1 || req.Dir == -1) {
+				list[i], list[j] = list[j], list[i]
+				for k, p := range list {
+					db.Exec("UPDATE substance_previews SET position = ? WHERE id = ?", k, p.ID)
+				}
+			}
+		default:
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]any{"items": listPreviews(name)})
+		return
+	}
+	const most = 12
+	r.Body = http.MaxBytesReader(w, r.Body, most*(25<<20))
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		http.Error(w, "Those pictures are too big. Each must be under 25 MB.", http.StatusRequestEntityTooLarge)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	name := previewKey(r.FormValue("name"))
+	if name == "" || len(name) > 120 {
+		http.Error(w, "Which substance?", http.StatusBadRequest)
+		return
+	}
+	caption := strings.TrimSpace(r.FormValue("caption"))
+	if len(caption) > 200 {
+		caption = caption[:200]
+	}
+	files := r.MultipartForm.File["image"]
+	if len(files) == 0 {
+		http.Error(w, "Pick a picture first.", http.StatusBadRequest)
+		return
+	}
+	if len(files) > most {
+		http.Error(w, fmt.Sprintf("At most %d pictures at a time.", most), http.StatusBadRequest)
+		return
+	}
+	var next int64
+	db.QueryRow("SELECT COALESCE(MAX(position), -1) + 1 FROM substance_previews WHERE name = ?", name).Scan(&next)
+	for _, fh := range files {
+		if fh.Size > 25<<20 {
+			http.Error(w, fh.Filename+" is over 25 MB.", http.StatusRequestEntityTooLarge)
+			return
+		}
+		f, err := fh.Open()
+		if err != nil {
+			http.Error(w, "Couldn't read "+fh.Filename+".", http.StatusBadRequest)
+			return
+		}
+		file, status, msg := saveImageIn(f, previewDir, "prev")
+		f.Close()
+		if status != 0 {
+			http.Error(w, fh.Filename+": "+msg, status)
+			return
+		}
+		db.Exec("INSERT INTO substance_previews(name, file, caption, position, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+			name, file, caption, next, session.UserId, time.Now().UnixMilli())
+		next++
+	}
+	writeJSON(w, map[string]any{"items": listPreviews(name)})
+}
+
+// ---- Pill database (mommy 2026-11-05) ----
+//
+// Members add pictures of pills they have seen, with the brand, strength and
+// what the pill is said to contain. That is a report, never proof: the page
+// shows "Reported, not lab tested" on every entry, and only admins can add
+// lab-confirmed contents. New entries and edits wait for an admin (pending,
+// then approved or rejected). Members see approved entries plus their own.
+//
+// The fields stay separate (brand, strength, imprint, color, shape, form),
+// and search_text holds them in one lowercase line, so a later picture or AI
+// search can read the same rows without changing the table.
+
+const pillDBSchema = `
+CREATE TABLE IF NOT EXISTS pill_reports (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	brand TEXT NOT NULL,
+	strength TEXT NOT NULL DEFAULT '',
+	contents TEXT NOT NULL DEFAULT '',
+	lab_contents TEXT NOT NULL DEFAULT '',
+	lab_source TEXT NOT NULL DEFAULT '',
+	imprint TEXT NOT NULL DEFAULT '',
+	color TEXT NOT NULL DEFAULT '',
+	shape TEXT NOT NULL DEFAULT '',
+	form TEXT NOT NULL DEFAULT '',
+	country TEXT NOT NULL DEFAULT '',
+	notes TEXT NOT NULL DEFAULT '',
+	file TEXT NOT NULL,
+	image_hash TEXT NOT NULL DEFAULT '',
+	dupe_key TEXT NOT NULL DEFAULT '',
+	search_text TEXT NOT NULL DEFAULT '',
+	user_id INTEGER NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending',
+	mod_note TEXT NOT NULL DEFAULT '',
+	reviewed_by INTEGER NOT NULL DEFAULT 0,
+	reviewed_at INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pill_reports_status ON pill_reports(status);
+CREATE INDEX IF NOT EXISTS pill_reports_user ON pill_reports(user_id);
+CREATE INDEX IF NOT EXISTS pill_reports_hash ON pill_reports(image_hash);
+`
+
+var pillDBDir = filepath.Join(UploadedFilesDirName, "pilldb")
+var pillDBFileName = regexp.MustCompile(`^pill-[0-9a-f]{12}\.(jpg|png|gif|webp)$`)
+
+const pillDBMaxPicture = 10 << 20 // 10 MB
+const pillDBMaxPending = 30       // waiting entries per member
+
+// The choices the form offers; anything else is saved as "other".
+var pillColors = []string{"white", "off-white", "yellow", "orange", "red", "pink", "purple", "blue", "green", "brown", "grey", "black", "multi-color", "other"}
+var pillShapes = []string{"round", "oval", "oblong", "capsule", "triangle", "square", "rectangle", "diamond", "hexagon", "heart", "other"}
+var pillForms = []string{"tablet", "capsule", "film-coated tablet", "extended-release tablet", "chewable", "other"}
+
+type pillReport struct {
+	ID          int64      `json:"id"`
+	Brand       string     `json:"brand"`
+	Strength    string     `json:"strength"`
+	Contents    string     `json:"contents"`
+	LabContents string     `json:"labContents"`
+	LabSource   string     `json:"labSource"`
+	Imprint     string     `json:"imprint"`
+	Color       string     `json:"color"`
+	Shape       string     `json:"shape"`
+	Form        string     `json:"form"`
+	Country     string     `json:"country"`
+	Notes       string     `json:"notes"`
+	Picture     string     `json:"picture"`
+	Status      string     `json:"status"`
+	ModNote     string     `json:"modNote,omitempty"`
+	Uploader    postAuthor `json:"uploader"`
+	Mine        bool       `json:"mine"`
+	CreatedAt   int64      `json:"createdAt"`
+	UpdatedAt   int64      `json:"updatedAt"`
+}
+
+func registerPillDatabase() {
+	if _, err := db.Exec(pillDBSchema); err != nil {
+		fmt.Println("pill_reports:", err)
+	}
+	http.HandleFunc("/Pills", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFile(w, r, "html/pilldb.html")
+	}))
+	http.HandleFunc("/pilldb/api/list", requireLogin(pillDBList))
+	http.HandleFunc("/pilldb/api/item", requireLogin(pillDBItem))
+	http.HandleFunc("/pilldb/api/save", requireLogin(pillDBSave))
+	http.HandleFunc("/pilldb/api/action", requireLogin(pillDBAction))
+	http.HandleFunc("/pilldb/pic/", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/pilldb/pic/")
+		if !pillDBFileName.MatchString(name) {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		http.ServeFile(w, r, filepath.Join(pillDBDir, name))
+	}))
+}
+
+// pillDBFail answers {"error": msg} (and "duplicate": id when one exists).
+func pillDBFail(w http.ResponseWriter, status int, msg string, dupe int64) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	body := map[string]any{"error": msg}
+	if dupe > 0 {
+		body["duplicate"] = dupe
+	}
+	json.NewEncoder(w).Encode(body)
+}
+
+func pillDBClean(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if utf8.RuneCountInString(s) > max {
+		s = string([]rune(s)[:max])
+	}
+	return s
+}
+
+func pillDBChoice(v string, list []string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v == "" {
+		return ""
+	}
+	if slices.Contains(list, v) {
+		return v
+	}
+	return "other"
+}
+
+// pillDupeKey: brand + strength + imprint + color, letters and digits only.
+// Empty when there is no imprint (plain white rounds alone say too little).
+func pillDupeKey(brand, strength, imprint, color string) string {
+	only := func(s string) string {
+		var b strings.Builder
+		for _, r := range strings.ToLower(s) {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				b.WriteRune(r)
+			}
+		}
+		return b.String()
+	}
+	if only(imprint) == "" {
+		return ""
+	}
+	return only(brand) + "|" + only(strength) + "|" + only(imprint) + "|" + only(color)
+}
+
+const pillDBColumns = `p.id, p.brand, p.strength, p.contents, p.lab_contents, p.lab_source, p.imprint, p.color, p.shape, p.form, p.country, p.notes,
+	p.file, p.status, p.mod_note, p.user_id, p.created_at, p.updated_at, COALESCE(u.originalUsername, ''), COALESCE(u.pathToProfilePic, ''), COALESCE(u.authority, '')`
+
+func scanPillReport(rows interface{ Scan(...any) error }, me int, admin bool) (pillReport, error) {
+	var p pillReport
+	var file, name, avatar, authority string
+	var owner int
+	err := rows.Scan(&p.ID, &p.Brand, &p.Strength, &p.Contents, &p.LabContents, &p.LabSource, &p.Imprint, &p.Color, &p.Shape, &p.Form, &p.Country, &p.Notes,
+		&file, &p.Status, &p.ModNote, &owner, &p.CreatedAt, &p.UpdatedAt, &name, &avatar, &authority)
+	if err != nil {
+		return p, err
+	}
+	p.Picture = "/pilldb/pic/" + file
+	if name == "" {
+		name = "deleted account"
+	}
+	p.Uploader = person(name, avatar, authority)
+	p.Mine = owner == me
+	if !p.Mine && !admin {
+		p.ModNote = ""
+	}
+	return p, nil
+}
+
+// pillDBList: GET ?q=&color=&shape=&form=&status=&mine=1&offset=
+// Members see approved entries and their own; admins can ask for any status.
+func pillDBList(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	admin := session.Authority == "admin"
+	q := r.URL.Query()
+	where := []string{}
+	args := []any{}
+	status := q.Get("status")
+	switch {
+	case q.Get("mine") == "1":
+		where = append(where, "p.user_id = ?")
+		args = append(args, session.UserId)
+	case admin && (status == "pending" || status == "rejected" || status == "approved"):
+		where = append(where, "p.status = ?")
+		args = append(args, status)
+	case admin && status == "all":
+	default:
+		where = append(where, "(p.status = 'approved' OR p.user_id = ?)")
+		args = append(args, session.UserId)
+	}
+	for _, f := range []struct{ key, col string }{{"color", "p.color"}, {"shape", "p.shape"}, {"form", "p.form"}} {
+		if v := strings.ToLower(strings.TrimSpace(q.Get(f.key))); v != "" {
+			where = append(where, f.col+" = ?")
+			args = append(args, v)
+		}
+	}
+	if q.Get("lab") == "1" {
+		where = append(where, "p.lab_contents != ''")
+	}
+	// Every word must be somewhere in the entry ("elvanse 70", "oxycodone round").
+	for i, word := range strings.Fields(strings.ToLower(q.Get("q"))) {
+		if i >= 8 {
+			break
+		}
+		where = append(where, "p.search_text LIKE ? ESCAPE '\\'")
+		esc := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(word)
+		args = append(args, "%"+esc+"%")
+	}
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+	const page = 60
+	sqlWhere := ""
+	if len(where) > 0 {
+		sqlWhere = "WHERE " + strings.Join(where, " AND ")
+	}
+	var total int
+	db.QueryRow("SELECT COUNT(*) FROM pill_reports p "+sqlWhere, args...).Scan(&total)
+	rows, err := db.Query("SELECT "+pillDBColumns+" FROM pill_reports p LEFT JOIN users u ON u.id = p.user_id "+sqlWhere+
+		" ORDER BY p.updated_at DESC, p.id DESC LIMIT ? OFFSET ?", append(args, page, offset)...)
+	if err != nil {
+		pillDBFail(w, http.StatusInternalServerError, "Couldn't read the pill database.", 0)
+		return
+	}
+	defer rows.Close()
+	items := []pillReport{}
+	for rows.Next() {
+		if p, err := scanPillReport(rows, session.UserId, admin); err == nil {
+			items = append(items, p)
+		}
+	}
+	var pending int
+	if admin {
+		db.QueryRow("SELECT COUNT(*) FROM pill_reports WHERE status = 'pending'").Scan(&pending)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"items": items, "total": total, "more": offset+len(items) < total, "admin": admin, "pending": pending,
+		"colors": pillColors, "shapes": pillShapes, "forms": pillForms})
+}
+
+func pillDBGet(id int64, me int, admin bool) (pillReport, bool) {
+	row := db.QueryRow("SELECT "+pillDBColumns+" FROM pill_reports p LEFT JOIN users u ON u.id = p.user_id WHERE p.id = ?", id)
+	p, err := scanPillReport(row, me, admin)
+	if err != nil || (p.Status != "approved" && !p.Mine && !admin) {
+		return p, false
+	}
+	return p, true
+}
+
+// pillDBItem: GET ?id= one entry (approved, your own, or any for admins).
+func pillDBItem(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	p, ok := pillDBGet(id, session.UserId, session.Authority == "admin")
+	if !ok {
+		pillDBFail(w, http.StatusNotFound, "That pill isn't in the database.", 0)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, p)
+}
+
+// pillDBSave: POST multipart. Without id it adds an entry (picture needed);
+// with id it changes your own entry (admins: any), and the picture is optional.
+// A member's change sends the entry back to pending. Lab fields: admins only.
+func pillDBSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	admin := session.Authority == "admin"
+	r.Body = http.MaxBytesReader(w, r.Body, pillDBMaxPicture+(1<<20))
+	if err := r.ParseMultipartForm(4 << 20); err != nil {
+		pillDBFail(w, http.StatusRequestEntityTooLarge, "The picture is too big. Use one under 10 MB.", 0)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	f := r.FormValue
+	id, _ := strconv.ParseInt(f("id"), 10, 64)
+	brand := pillDBClean(f("brand"), 80)
+	strength := pillDBClean(f("strength"), 40)
+	contents := pillDBClean(f("contents"), 200)
+	imprint := pillDBClean(f("imprint"), 60)
+	color := pillDBChoice(f("color"), pillColors)
+	shape := pillDBChoice(f("shape"), pillShapes)
+	form := pillDBChoice(f("form"), pillForms)
+	country := pillDBClean(f("country"), 60)
+	notes := strings.TrimSpace(f("notes"))
+	if utf8.RuneCountInString(notes) > 1000 {
+		notes = string([]rune(notes)[:1000])
+	}
+	if brand == "" {
+		pillDBFail(w, http.StatusBadRequest, "Write the brand or name on the pack.", 0)
+		return
+	}
+	if contents == "" {
+		pillDBFail(w, http.StatusBadRequest, "Write what the pill is said to contain.", 0)
+		return
+	}
+
+	var old struct {
+		owner              int
+		file, status, hash string
+		lab, labSrc        string
+	}
+	if id > 0 {
+		if db.QueryRow("SELECT user_id, file, status, image_hash, lab_contents, lab_source FROM pill_reports WHERE id = ?", id).
+			Scan(&old.owner, &old.file, &old.status, &old.hash, &old.lab, &old.labSrc) != nil {
+			pillDBFail(w, http.StatusNotFound, "That pill isn't in the database.", 0)
+			return
+		}
+		if old.owner != session.UserId && !admin {
+			pillDBFail(w, http.StatusForbidden, "You can only change pills you added.", 0)
+			return
+		}
+	} else if !admin {
+		var waiting int
+		db.QueryRow("SELECT COUNT(*) FROM pill_reports WHERE user_id = ? AND status = 'pending'", session.UserId).Scan(&waiting)
+		if waiting >= pillDBMaxPending {
+			pillDBFail(w, http.StatusTooManyRequests, fmt.Sprintf("You have %d pills waiting for a check. Add more once some are checked.", waiting), 0)
+			return
+		}
+	}
+
+	// The picture: real image, under 10 MB, at least 80 px, not already here.
+	file, hash := old.file, old.hash
+	if fhs := r.MultipartForm.File["image"]; len(fhs) > 0 {
+		fh := fhs[0]
+		if fh.Size > pillDBMaxPicture {
+			pillDBFail(w, http.StatusRequestEntityTooLarge, "The picture is too big. Use one under 10 MB.", 0)
+			return
+		}
+		src, err := fh.Open()
+		if err != nil {
+			pillDBFail(w, http.StatusBadRequest, "Couldn't read the picture.", 0)
+			return
+		}
+		data, err := io.ReadAll(io.LimitReader(src, pillDBMaxPicture+1))
+		src.Close()
+		if err != nil || len(data) > pillDBMaxPicture {
+			pillDBFail(w, http.StatusRequestEntityTooLarge, "The picture is too big. Use one under 10 MB.", 0)
+			return
+		}
+		if kind := http.DetectContentType(data); kind != "image/webp" {
+			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+			if err != nil {
+				pillDBFail(w, http.StatusUnsupportedMediaType, "Use a JPG, PNG, GIF or WebP picture.", 0)
+				return
+			}
+			if cfg.Width < 80 || cfg.Height < 80 {
+				pillDBFail(w, http.StatusBadRequest, "The picture is too small. Use one at least 80 pixels wide and tall.", 0)
+				return
+			}
+		}
+		sum := sha256.Sum256(data)
+		newHash := hex.EncodeToString(sum[:])
+		var dupe int64
+		db.QueryRow("SELECT id FROM pill_reports WHERE image_hash = ? AND status != 'rejected' AND id != ?", newHash, id).Scan(&dupe)
+		if dupe > 0 {
+			pillDBFail(w, http.StatusConflict, "This picture is already in the pill database.", dupe)
+			return
+		}
+		name, status, msg := saveImageIn(bytes.NewReader(data), pillDBDir, "pill")
+		if status != 0 {
+			pillDBFail(w, status, msg, 0)
+			return
+		}
+		file, hash = name, newHash
+	} else if id == 0 {
+		pillDBFail(w, http.StatusBadRequest, "Add a picture of the pill.", 0)
+		return
+	}
+
+	dupeKey := pillDupeKey(brand, strength, imprint, color)
+	if dupeKey != "" {
+		var dupe int64
+		db.QueryRow("SELECT id FROM pill_reports WHERE dupe_key = ? AND status != 'rejected' AND id != ?", dupeKey, id).Scan(&dupe)
+		if dupe > 0 {
+			if file != old.file {
+				os.Remove(filepath.Join(pillDBDir, file))
+			}
+			pillDBFail(w, http.StatusConflict, "A pill with the same brand, strength, imprint and color is already in the database.", dupe)
+			return
+		}
+	}
+
+	lab, labSrc := old.lab, old.labSrc
+	if admin {
+		lab = pillDBClean(f("labContents"), 200)
+		labSrc = pillDBClean(f("labSource"), 200)
+	}
+	search := strings.ToLower(strings.Join([]string{brand, strength, contents, lab, imprint, color, shape, form, country}, " "))
+	now := time.Now().UnixMilli()
+	// Admins' own entries are approved at once; everything else waits.
+	status := "pending"
+	if admin && (id == 0 || old.status == "approved") {
+		status = "approved"
+	}
+	if id == 0 {
+		res, err := db.Exec(`INSERT INTO pill_reports(brand, strength, contents, lab_contents, lab_source, imprint, color, shape, form, country, notes,
+			file, image_hash, dupe_key, search_text, user_id, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			brand, strength, contents, lab, labSrc, imprint, color, shape, form, country, notes, file, hash, dupeKey, search, session.UserId, status, now, now)
+		if err != nil {
+			os.Remove(filepath.Join(pillDBDir, file))
+			pillDBFail(w, http.StatusInternalServerError, "Couldn't save the pill.", 0)
+			return
+		}
+		id, _ = res.LastInsertId()
+	} else {
+		_, err := db.Exec(`UPDATE pill_reports SET brand=?, strength=?, contents=?, lab_contents=?, lab_source=?, imprint=?, color=?, shape=?, form=?, country=?, notes=?,
+			file=?, image_hash=?, dupe_key=?, search_text=?, status=?, updated_at=? WHERE id=?`,
+			brand, strength, contents, lab, labSrc, imprint, color, shape, form, country, notes, file, hash, dupeKey, search, status, now, id)
+		if err != nil {
+			pillDBFail(w, http.StatusInternalServerError, "Couldn't save the pill.", 0)
+			return
+		}
+		if file != old.file && pillDBFileName.MatchString(old.file) {
+			os.Remove(filepath.Join(pillDBDir, old.file))
+		}
+	}
+	p, _ := pillDBGet(id, session.UserId, admin)
+	writeJSON(w, p)
+}
+
+// pillDBAction: POST JSON {action, id, note}. delete: the owner or an admin.
+// approve, reject, pending: admins only (note = why, shown to the owner).
+func pillDBAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	admin := session.Authority == "admin"
+	var req struct {
+		Action string `json:"action"`
+		ID     int64  `json:"id"`
+		Note   string `json:"note"`
+	}
+	if json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&req) != nil {
+		pillDBFail(w, http.StatusBadRequest, "Bad request.", 0)
+		return
+	}
+	var owner int
+	var file string
+	if db.QueryRow("SELECT user_id, file FROM pill_reports WHERE id = ?", req.ID).Scan(&owner, &file) != nil {
+		pillDBFail(w, http.StatusNotFound, "That pill isn't in the database.", 0)
+		return
+	}
+	switch req.Action {
+	case "delete":
+		if owner != session.UserId && !admin {
+			pillDBFail(w, http.StatusForbidden, "You can only delete pills you added.", 0)
+			return
+		}
+		db.Exec("DELETE FROM pill_reports WHERE id = ?", req.ID)
+		if pillDBFileName.MatchString(file) {
+			os.Remove(filepath.Join(pillDBDir, file))
+		}
+		writeJSON(w, map[string]any{"deleted": req.ID})
+		return
+	case "approve", "reject", "pending":
+		if !admin {
+			pillDBFail(w, http.StatusForbidden, "Only admins can check pills.", 0)
+			return
+		}
+		status := map[string]string{"approve": "approved", "reject": "rejected", "pending": "pending"}[req.Action]
+		db.Exec("UPDATE pill_reports SET status = ?, mod_note = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
+			status, pillDBClean(req.Note, 300), session.UserId, time.Now().UnixMilli(), req.ID)
+	default:
+		pillDBFail(w, http.StatusBadRequest, "Unknown action.", 0)
+		return
+	}
+	p, _ := pillDBGet(req.ID, session.UserId, admin)
+	writeJSON(w, p)
 }
