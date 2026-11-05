@@ -13,7 +13,10 @@
     .jr-search{ position:relative; width:100%; max-width:340px; }
     .jr-search svg{ position:absolute; left:11px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted); pointer-events:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; }
     .jr-search .xn-input{ padding-left:34px; }
-    .drug-item{ position:relative;  }
+    /* Rows keep the card's height even when only a few substances fill the box,
+       so each heart stays in the middle of its card. */
+    .Drugs{ align-content:start; }
+    .drug-item{ position:relative; align-self:start; }
     .drug-item .drug-like{ position:absolute; top:50%; right:8px; transform:translateY(-50%); }
     .Drug{ display:grid;
         grid-template-columns:100px minmax(0,1fr) 44px;
@@ -52,6 +55,7 @@
     .drug-thumb .ft-svg{ width:84%; height:84%; }
     /* Custom admin picture or a medicine's real pill picture covers the drawing. */
     .drug-thumb .drug-thumb-own{ display:none; }
+    .drug-thumb img.drug-pill{ filter:none; padding:7px; }
     .drug-thumb .drug-thumb-own.has-custom-image,
     .drug-thumb .drug-thumb-own[data-class^="pill-"]{ display:block; position:absolute; inset:10%; width:auto; height:auto; margin:0; }
     .drug-thumb:has(.drug-thumb-own.has-custom-image, .drug-thumb-own[data-class^="pill-"]) .ft-svg{ visibility:hidden; }
@@ -114,6 +118,7 @@
   <script src="/classicons.js"></script>
   <script src="/formthumbs.js"></script>
   <script src="/likes.js"></script>
+  <script src="/pills.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="stylesheet" href="/vendor/tailwind.css">
@@ -217,6 +222,9 @@
             const offlineStore = import("/offline.js").catch(() => null);
             // Custom substances (added by an admin in the Substances Importer) join the list, marked Custom.
             const customLoad = import("/logic.js").then((m) => m.customSubstances()).catch(() => []);
+            // Pictures of real pills (js/pills.js): a medicine shows its own pill.
+            const pillsLoad = Promise.all([window.xnPills ? window.xnPills.load() : [], customLoad])
+                .then(([pills, custom]) => window.xnPills.match(pills, custom)).catch(() => []);
             async function withCustom(all) {
                 const custom = await customLoad;
                 const taken = new Set(custom.map((c) => c.name.toLowerCase()));
@@ -396,6 +404,7 @@
                         more = !query && substances.length >= PAGE;
                     }
                     const liked = await likesLoad;
+                    const pills = await pillsLoad;
                     if (seq !== displaySeq) return; // a newer search is on its way
 
                     drugsDiv.innerHTML = "";
@@ -424,14 +433,23 @@
                         if (substance.custom) {
                             const tag = document.createElement("span");
                             tag.className = "drug-custom";
-                            tag.textContent = substance.ingredient ? "Medicine" : "Custom";
+                            tag.textContent = substance.kind === "pill" ? "Pill" : substance.ingredient ? "Medicine" : "Custom";
                             drugDiv.querySelector(".drugname").append(tag);
                         }
                         // A picture of the form it is most often taken in (js/formthumbs.js).
                         // An admin's custom drug icon or a medicine's own pill picture wins.
                         const thumb = drugDiv.querySelector(".drug-thumb");
                         const form = window.xnForm ? window.xnForm.thumb(substance) : null;
-                        if (form) {
+                        const pill = window.xnPills ? window.xnPills.pick(window.xnPills.forSubstance(pills, substance)) : null;
+                        if (pill) {
+                            const img = document.createElement("img");
+                            img.className = "drug-pill";
+                            img.src = pill.url;
+                            img.alt = "";
+                            img.loading = "lazy";
+                            thumb.append(img);
+                            thumb.title = window.xnPills.label(pill);
+                        } else if (form) {
                             thumb.innerHTML = form.svg;
                             thumb.title = form.label;
                             thumb.dataset.form = form.form;

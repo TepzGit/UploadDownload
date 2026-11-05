@@ -22,7 +22,121 @@ const state = {
   roas: [], // the substance's routes that have timings, e.g. oral, insufflated
   substanceColors: {},
   customColors: {}, // lowercased name -> color the account picked on Profile
+  scientific: !!globalThis.xnScience?.isOn(), // "Scientific graph" switch (js/science.js)
 };
+
+// ------------------------------------------------------------
+// Scientific graph: timelines from clinical studies (js/science.js).
+// A dose keeps its PsychonautWiki profile (saved sessions are unchanged);
+// when the switch is on it is drawn with the studies' timeline instead,
+// if there is one for that substance and route.
+// ------------------------------------------------------------
+
+/** The studies' durations for a substance on a route, or null. */
+export function scienceBase(name, route) {
+  const sci = globalThis.xnScience;
+  if (!sci) return null;
+  // Medicines have no route on older doses: their studies are for swallowed doses.
+  return sci.base(sci.find(name, String(route || "").toLowerCase() || "oral"));
+}
+
+/** The profile a dose is drawn with right now. */
+function drawProfile(dose) {
+  if (state.scientific && dose.sciBase) return { base: { ...dose.sciBase }, commonDose: dose.profile.commonDose };
+  return dose.profile;
+}
+
+function redrawDose(dose) {
+  const curve = buildDoseCurve(timeToHours(dose.time), dose.amount, dose.releaseHours, drawProfile(dose));
+  dose.x = curve.x;
+  dose.y = curve.y;
+}
+
+export function isScientific() {
+  return state.scientific;
+}
+
+// The scientific graph's other lines for one dose (js/science.js LINES): how
+// it feels, the medical effect, blood level, PsychonautWiki's timeline and,
+// for the site's own substances, this site's timeline. Same scale as the
+// main curve: percent of one common dose.
+function timesToBase(t, shape = "smooth") {
+  return { onset: t.onset, comeup: Math.max(0, t.peakStart - t.onset), peak: Math.max(0, t.peakEnd - t.peakStart), offset: Math.max(0, t.end - t.peakEnd), shape };
+}
+
+function scienceLines(dose) {
+  const sci = globalThis.xnScience;
+  if (!sci || !dose.sciBase || typeof sci.curveOf !== "function") return [];
+  const e = sci.find(dose.substance, String(dose.route || "").toLowerCase() || "oral");
+  if (!e) return [];
+  const start = timeToHours(dose.time);
+  const common = dose.profile.commonDose;
+  const curve = (base, level = 1) => {
+    const c = buildDoseCurve(start, dose.amount, dose.releaseHours, { base, commonDose: common });
+    return level === 1 ? c : { x: c.x, y: c.y.map((v) => v * level) };
+  };
+  const custom = !!customList?.some((s) => s.name === dose.substance);
+  // The studies' lines use exactly the Journal's curve (science.js curveOf):
+  // flat at the top from peak start to peak end, soft rise and fall. The
+  // studies measured the real product, so release type doesn't stretch them.
+  const studied = (t, level = 1) => {
+    const f = sci.curveOf(t, level);
+    const x = [], y = [];
+    const intensity = (dose.amount / common) * 100;
+    for (let i = 0; i <= 400; i++) { const h = (i / 400) * t.end; x.push(start + h); y.push(Math.max(0, f(h)) * intensity); }
+    return { x, y };
+  };
+  // PsychonautWiki's timeline for a site medicine's ingredient: straight lines, as on the Journal.
+  const studiedLinear = (t) => {
+    const f = sci.curveOf(t, 1, false);
+    const intensity = (dose.amount / common) * 100;
+    const x = [], y = [];
+    for (let i = 0; i <= 400; i++) { const h = (i / 400) * t.end; x.push(start + h); y.push(Math.max(0, f(h)) * intensity); }
+    return { x, y };
+  };
+  const out = [];
+  if (e.subj) out.push({ key: "subj", ...studied(e.subj, e.subjLevel ?? 1) });
+  if (e.ther) out.push({ key: "ther", ...studied(e.ther) });
+  const plasma = sci.plasmaOf(e);
+  if (plasma) {
+    const intensity = (dose.amount / common) * 100;
+    // Until about 1% is left, so the line ends at zero instead of dropping off.
+    const span = Math.min(96, (e.pk?.tmax || 1) + 7 * (e.pk?.thalf || 2));
+    const x = [], y = [];
+    for (let i = 0; i <= 300; i++) { const t = (i / 300) * span; x.push(start + t); y.push(i === 300 ? 0 : plasma(t) * intensity); }
+    out.push({ key: "pk", x, y });
+  }
+  if (custom) {
+    if (e.pw?.end > 0) out.push({ key: "pw", ...studiedLinear(e.pw) });
+    out.push({ key: "site", ...curve({ ...dose.profile.base }) });
+  } else {
+    out.push({ key: "pw", ...curve({ ...dose.profile.base }) });
+  }
+  return out;
+}
+
+/** How many substances are on the Graph (line buttons go neutral with several). */
+export function substanceCount() {
+  return new Set(state.addedDoses.map((dose) => dose.substance)).size;
+}
+
+/** The scientific lines on the Graph now (for its line buttons), in LINES order. */
+export function scienceLineKeys() {
+  if (!state.scientific) return [];
+  const keys = new Set();
+  state.addedDoses.forEach((dose) => scienceLines(dose).forEach((l) => keys.add(l.key)));
+  return (globalThis.xnScience?.LINES || []).map((l) => l.key).filter((k) => keys.has(k));
+}
+
+/** Turns the Scientific graph on or off and redraws every dose on the timeline. */
+export function setScientific(on) {
+  state.scientific = !!on;
+  // The editor's versions may have just arrived (js/science.js), so look again.
+  state.addedDoses.forEach((dose) => {
+    if (dose.substance) dose.sciBase = scienceBase(dose.substance, dose.route);
+    redrawDose(dose);
+  });
+}
 
 /**
  * Read-only snapshot of state for ui.js to render from.
@@ -38,6 +152,7 @@ export function getState() {
     baseDurations: state.baseDurations,
     currentRoa: state.currentRoa,
     roas: state.roas,
+    scientific: state.scientific,
   };
 }
 
@@ -70,7 +185,9 @@ let customList = null;
 export function customToSubstance(c) {
   const hours = (v) => (Number(v) > 0 ? { min: Number(v), max: Number(v), units: "hours" } : null);
   const range = (r) => (r && (r.min != null || r.max != null) ? { min: r.min ?? r.max, max: r.max ?? r.min } : null);
-  const named = (list) => (list || []).map((name) => ({ name }));
+  // Combination notes (Substances Editor) ride along on each name.
+  const notes = c.interactionNotes || {};
+  const named = (list) => (list || []).map((name) => ({ name, note: notes[String(name).toLowerCase()] || "" }));
   // The first ingestion method sits on the substance itself, more in methods.
   const methods = [{ route: c.route, dose: c.dose, durations: c.durations }, ...(Array.isArray(c.methods) ? c.methods : [])];
   const roa = (m) => {
@@ -89,7 +206,7 @@ export function customToSubstance(c) {
         onset: hours(d.onset), comeup: hours(d.comeup), peak: hours(d.peak), offset: hours(d.offset),
         total: hours(effectHours(d)),
       },
-      extended: { comedown: d.comedown, comedownLevel: d.comedownLevel, peak2: d.peak2 },
+      extended: { comedown: d.comedown, comedownLevel: d.comedownLevel, peak2: d.peak2, shape: d.shape },
     };
   };
   return {
@@ -98,9 +215,11 @@ export function customToSubstance(c) {
     customId: c.id,
     ingredient: c.ingredient || "", // medicines only: what is really in it
     icon: c.icon || "", // medicines only: a pill picture key (js/classicons.js)
+    kind: c.kind || "", // "pill": a product of a custom substance, named in parent
+    parent: c.parent || "",
     commonNames: c.aliases || [],
     class: { psychoactive: c.class ? [c.class] : [], chemical: c.chemicalClass ? [c.chemicalClass] : [] },
-    images: [],
+    images: c.image ? [{ thumb: c.image }] : [], // its own picture from the Substances Editor
     summary: c.summary || "",
     addictionPotential: c.addictionPotential || "",
     halfLife: c.halfLife || null,
@@ -468,6 +587,7 @@ function extendedBase(raw) {
   if (p2 && hours(p2.duration)) {
     out.peak2 = { gap: hours(p2.gap), dip: share(p2.dip, 0.5), duration: hours(p2.duration), level: share(p2.level, 1) };
   }
+  if (raw?.shape === "smooth") out.shape = "smooth"; // one soft curve, see curve.js
   return out;
 }
 
@@ -497,7 +617,9 @@ export function addDoseToState({ amount, time, formulation }) {
   const doseTime = time || currentTimeValue();
   // Kept on the dose so it can be redrawn after an edit, even once another substance is loaded.
   const profile = currentProfile();
-  const curve = buildDoseCurve(timeToHours(doseTime), numericAmount, formulation.releaseHours, profile);
+  const sciBase = scienceBase(state.currentSubstance.name, state.currentRoa?.name);
+  const drawWith = state.scientific && sciBase ? { base: { ...sciBase }, commonDose: profile.commonDose } : profile;
+  const curve = buildDoseCurve(timeToHours(doseTime), numericAmount, formulation.releaseHours, drawWith);
 
   const dose = {
     id: ++state.doseSequence,
@@ -512,6 +634,7 @@ export function addDoseToState({ amount, time, formulation }) {
     substance: state.currentSubstance.name,
     color: colorForSubstance(state.currentSubstance.name),
     profile,
+    sciBase,
   };
 
   state.addedDoses.push(dose);
@@ -529,12 +652,10 @@ export function updateDoseInState(id, { amount, time, note }) {
   if (!/^\d{1,2}:\d{2}$/.test(String(time || ""))) {
     throw new Error("Enter a time like 08:30.");
   }
-  const curve = buildDoseCurve(timeToHours(time), numericAmount, dose.releaseHours, dose.profile);
   dose.amount = numericAmount;
   dose.time = time;
   if (note !== undefined) dose.note = String(note).trim().slice(0, 2000);
-  dose.x = curve.x;
-  dose.y = curve.y;
+  redrawDose(dose);
   return dose;
 }
 
@@ -588,14 +709,14 @@ export function loadDoses(list) {
   state.addedDoses = [];
   state.substanceColors = {};
   (Array.isArray(list) ? list : []).map(savedDose).filter(Boolean).forEach((saved) => {
-    const curve = buildDoseCurve(timeToHours(saved.time), saved.amount, saved.releaseHours, saved.profile);
-    state.addedDoses.push({
+    const dose = {
       ...saved,
       id: ++state.doseSequence,
-      x: curve.x,
-      y: curve.y,
+      sciBase: scienceBase(saved.substance, saved.route),
       color: colorForSubstance(saved.substance),
-    });
+    };
+    redrawDose(dose);
+    state.addedDoses.push(dose);
   });
   return state.addedDoses;
 }
@@ -681,22 +802,53 @@ export function colorForSubstance(name) {
 export function computeTimeline() {
   if (!state.addedDoses.length) return null;
 
+  // Scientific graph on: each dose with studies draws every line that isn't
+  // hidden (the line buttons); the first one shown is the filled main curve.
+  const sci = globalThis.xnScience;
+  const lineInfo = Object.fromEntries((sci?.LINES || []).map((l, i) => [l.key, { ...l, order: i }]));
+  const sciByDose = new Map(); // dose -> visible lines
+  if (state.scientific && sci) {
+    state.addedDoses.forEach((dose) => {
+      const lines = scienceLines(dose).filter((l) => !sci.isHidden(l.key));
+      if (lines.length || scienceLines(dose).length) sciByDose.set(dose, lines);
+    });
+  }
+
   const allX = Array.from(
-    new Set(state.addedDoses.flatMap((dose) => dose.x.map((value) => Number(value.toFixed(4)))))
+    new Set([
+      ...state.addedDoses.filter((dose) => !sciByDose.has(dose)).flatMap((dose) => dose.x.map((value) => Number(value.toFixed(4)))),
+      ...[...sciByDose.values()].flat().flatMap((l) => l.x.map((value) => Number(value.toFixed(4)))),
+    ])
   ).sort((a, b) => a - b);
+  if (!allX.length) allX.push(...state.addedDoses[0].x.map((value) => Number(value.toFixed(4))));
 
   const names = [];
   state.addedDoses.forEach((dose) => {
     if (!names.includes(dose.substance)) names.push(dose.substance);
   });
 
-  const series = names.map((name) => {
+  const series = [];
+  names.forEach((name) => {
     const doses = state.addedDoses.filter((dose) => dose.substance === name);
-    return {
-      name,
-      color: colorForSubstance(name),
-      y: allX.map((point) => doses.reduce((sum, dose) => sum + interpolateDose(dose, point), 0)),
-    };
+    const plain = doses.filter((dose) => !sciByDose.has(dose));
+    const color = colorForSubstance(name);
+    if (plain.length) {
+      series.push({ name, color, y: allX.map((point) => plain.reduce((sum, dose) => sum + interpolateDose(dose, point), 0)) });
+    }
+    const keys = [...new Set(doses.flatMap((dose) => (sciByDose.get(dose) || []).map((l) => l.key)))].sort((a, b) => lineInfo[a].order - lineInfo[b].order);
+    keys.forEach((key, i) => {
+      const lines = doses.flatMap((dose) => (sciByDose.get(dose) || []).filter((l) => l.key === key));
+      // One substance: each line in its own color (as on its button). Several:
+      // the substance's color, told apart by the dash pattern.
+      const main = i === 0 && !plain.length;
+      series.push({
+        name: `${name} · ${lineInfo[key].label}`,
+        color: names.length === 1 ? lineInfo[key].color : color,
+        dash: main ? "" : lineInfo[key].dash || (names.length === 1 ? "solid" : "longdash"),
+        secondary: !main,
+        y: allX.map((point) => lines.reduce((sum, l) => sum + interpolateDose(l, point), 0)),
+      });
+    });
   });
 
   const hoverTimes = allX.map(formatChartTime);

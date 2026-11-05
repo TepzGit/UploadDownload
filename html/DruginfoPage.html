@@ -15,8 +15,10 @@
   <script src="/nav.js"></script>
   <link rel="stylesheet" href="/classicons.css" />
   <script src="/classicons.js"></script>
+  <script src="/science.js?v=3"></script>
   <script src="/likes.js"></script>
   <script src="/media.js"></script>
+  <script src="/pills.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 </head>
@@ -82,6 +84,18 @@
           <h2 class="wk-h2" id="diRoutesTitle">Dosing</h2>
           <div class="DrugInfoIntakeMethods" aria-live="polite"></div>
           <p class="di-note wk-hatnote" id="diNote">Dose and duration data come from PsychonautWiki and are a rough guide, not advice.</p>
+        </section>
+
+        <section class="wk-section" id="sec-pills" data-toc="Pills" hidden>
+          <h2 class="wk-h2">Pills</h2>
+          <p class="wk-hatnote">What the tablets and capsules look like. Tap Add to graph to put that dose on the Graph at the current time.</p>
+          <ul class="wk-pills" id="pillList"></ul>
+        </section>
+
+        <section class="wk-section" id="sec-science" data-toc="Scientific timeline" hidden>
+          <h2 class="wk-h2">Scientific timeline</h2>
+          <div class="sci-head" id="sciHead"></div>
+          <div id="sciBody"></div>
         </section>
 
         <div class="di-info" id="diInfo" hidden></div>
@@ -311,6 +325,8 @@ ${DETAIL_FIELDS}
         if (/^https?:/.test(url)) { node.target = "_blank"; node.rel = "noopener noreferrer"; }
       }
       li.append(node);
+      // A combination note from the Substances Editor.
+      if (item?.note) li.append(el("span", "di-int-note", item.note));
       list.append(li);
     });
     return list;
@@ -382,7 +398,7 @@ ${DETAIL_FIELDS}
     ].filter(([, list]) => list && list.length);
     if (groups.length) {
       const c = section("interactions", "Interactions");
-      c.append(el("p", "wk-hatnote", "From PsychonautWiki. See Combinations below for the details per mix."));
+      c.append(el("p", "wk-hatnote", s.custom ? "Set by the site's admins." : "From PsychonautWiki. See Combinations below for the details per mix."));
       groups.forEach(([title, list, cls, hint]) => {
         const h = el("h3", "wk-h3 di-int-head " + cls, title);
         h.append(el("span", "di-int-hint", " " + hint));
@@ -490,10 +506,158 @@ ${DETAIL_FIELDS}
     if (!roas.length) showMessage("PsychonautWiki has no dose or duration data for this substance.");
     else roas.forEach((roa) => routes.append(routeTable(roa, substance)));
 
+    renderScience(substance);
+    renderPills(substance);
     buildToc();
     loadMixtures(outName, [].concat(substance.commonNames || []));
     loadPictures(outName, substance);
   }
+
+  // ---------- Pills (js/pills.js): pictures of the real tablets ----------
+  function renderPills(substance) {
+    const box = $("sec-pills");
+    if (!box || !window.xnPills) return;
+    Promise.all([window.xnPills.load(), import("/logic.js").then((m) => m.customSubstances()).catch(() => [])])
+      .then(([pills, custom]) => {
+        const mine = window.xnPills.forSubstance(window.xnPills.match(pills, custom), substance);
+        box.hidden = !mine.length;
+        $("pillList").replaceChildren(...mine.map((p) => {
+          const li = el("li", "wk-pill");
+          const pic = el("span", "wk-pill-pic");
+          const img = el("img");
+          img.src = p.url;
+          img.alt = window.xnPills.label(p);
+          img.loading = "lazy";
+          pic.append(img);
+          const add = el("a", "wk-pill-add", "Add to graph");
+          add.href = "/?pill=" + encodeURIComponent(p.file);
+          li.append(pic, el("strong", "wk-pill-name", window.xnPills.label(p)));
+          if (p.substance.toLowerCase() !== String(substance.name).toLowerCase()) li.append(el("small", "wk-pill-of", p.substance));
+          li.append(add);
+          return li;
+        }));
+        buildToc();
+      })
+      .catch(() => {});
+  }
+
+  // ---------- Scientific timeline (js/science.js) ----------
+  // The same switch as on the Graph: off shows PsychonautWiki's timeline,
+  // on shows the timeline built from clinical studies, with its sources.
+  let sciSubstance = null;
+  function pwTimeline(substance, route) {
+    const roa = (substance.roas || []).find((r) => String(r.name || "").toLowerCase() === route) || null;
+    const d = roa?.duration;
+    if (!d) return null;
+    const hrs = (p) => {
+      if (!p) return 0;
+      const v = (Number(p.min || 0) + Number(p.max || p.min || 0)) / 2;
+      return p.units === "minutes" ? v / 60 : p.units === "seconds" ? v / 3600 : p.units === "days" ? v * 24 : v;
+    };
+    const onset = hrs(d.onset), peakStart = onset + hrs(d.comeup), peakEnd = peakStart + hrs(d.peak);
+    let end = d.total ? hrs(d.total) : peakEnd + hrs(d.offset);
+    if (end < peakEnd + 0.5) end = peakEnd + (hrs(d.offset) || 1);
+    return end > 0 ? { onset, peakStart, peakEnd, end } : null;
+  }
+  let sciRoute = "";
+  function renderScience(substance) {
+    const sci = window.xnScience;
+    const box = $("sec-science");
+    if (!sci || !box) return;
+    if (sciSubstance !== substance) sciRoute = "";
+    sciSubstance = substance;
+    const nameFor = sci.find(substance.name) ? substance.name : substance.ingredient || substance.name;
+    const routes = sci.routes(nameFor);
+    const entry = sci.find(nameFor, routes.includes(sciRoute) ? sciRoute : "");
+    const route = entry?.route || "oral";
+    const own = pwTimeline(substance, route);
+    // A site medicine: its own timeline next to PsychonautWiki's for the ingredient.
+    const pw = substance.custom ? entry?.pw || null : own || entry?.pw || null;
+    const site = substance.custom ? own : null;
+    const pwLabel = "PsychonautWiki";
+    const shown = pw || site;
+    const shownLabel = pw ? pwLabel : "Geek\u2074u timeline";
+    if (!entry && !shown) { box.hidden = true; return; }
+    box.hidden = false;
+    const head = $("sciHead");
+    if (!head.firstChild) head.append(sci.makeSwitch());
+    const on = sci.isOn();
+    const body = $("sciBody");
+    body.replaceChildren();
+    const note = (text, cls = "wk-hatnote") => { const p = el("p", cls, text); body.append(p); return p; };
+    if (!on) {
+      note(entry ? "Showing " + (site ? "this site's" : "PsychonautWiki's") + " " + route + " timeline. Turn on Scientific graph to see the timeline from clinical studies." : "Showing " + (site ? "this site's" : "PsychonautWiki's") + " " + route + " timeline.");
+      if (shown) body.append(sci.chart(null, site || pw, false, site ? "Geek\u2074u timeline" : pwLabel));
+      return;
+    }
+    if (!entry) {
+      note(sci.checkedNone(substance.name)
+        ? "No human studies with timings exist for this substance, so only " + shownLabel + " is shown."
+        : "No scientific graph has been added for this substance yet, so only " + shownLabel + " is shown.");
+      if (shown) body.append(sci.chart(null, shown, false, shownLabel));
+      return;
+    }
+    if (routes.length > 1) {
+      const bar = el("div", "sci-routes");
+      routes.forEach((r) => {
+        const b = el("button", "sci-route", r.charAt(0).toUpperCase() + r.slice(1));
+        b.type = "button";
+        b.setAttribute("aria-pressed", String(r === route));
+        b.addEventListener("click", () => { sciRoute = r; renderScience(substance); });
+        bar.append(b);
+      });
+      body.append(bar);
+    }
+    note("For " + route + " use" + (entry.studies.length ? ", from " + entry.studies.length + " source" + (entry.studies.length === 1 ? "" : "s") : "") + (entry.edited ? "" : ", each weighted by design and size") + ". Tap a line's name to hide or show it. The Graph uses the " + (entry.subj ? "\u201chow it feels\u201d" : "medical effect") + " curve.");
+    body.append(sci.chart(entry, pw, true, pwLabel, { site, siteLabel: "Geek\u2074u timeline" }));
+    const t = el("table", "wikitable sci-table");
+    const head2 = el("tr");
+    ["", "Starts", "Peak", "Ends"].forEach((h) => head2.append(el("th", "", h)));
+    t.append(head2);
+    const row = (label, x) => {
+      if (!x) return;
+      const tr = el("tr");
+      tr.append(el("th", "", label), el("td", "", sci.hours(x.onset)), el("td", "", sci.hours(x.peakStart) + " to " + sci.hours(x.peakEnd)), el("td", "", sci.hours(x.end)));
+      t.append(tr);
+    };
+    row("Medical effect", entry.ther);
+    row("How it feels", entry.subj);
+    if (entry.pk?.tmax) {
+      const tr = el("tr");
+      tr.append(el("th", "", "Blood level"), el("td", "", "\u2013"), el("td", "", sci.hours(entry.pk.tmax)), el("td", "", entry.pk.thalf ? "halves every " + sci.hours(entry.pk.thalf) : "\u2013"));
+      t.append(tr);
+    }
+    row(pwLabel, pw);
+    row("Geek\u2074u timeline", site);
+    const wrap = el("div", "wk-table-wrap");
+    wrap.append(t);
+    body.append(wrap);
+    [entry.extra, entry.pwNote, entry.noSubj].filter(Boolean).forEach((x) => note(x, "sci-extra"));
+    if (entry.studies.length) {
+      body.append(el("h3", "wk-h3", "Sources"));
+      const ol = el("ol", "sci-sources");
+      entry.studies.forEach((s) => {
+        const li = el("li");
+        const a = el("a", "", s.cite);
+        a.href = s.url || "https://scholar.google.com/scholar?q=" + encodeURIComponent(s.cite);
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        li.append(a);
+        if (s.v) li.append(el("span", "sci-tag " + (s.v === "v" ? "is-checked" : "is-lit"), s.v === "v" ? "checked" : "literature"));
+        const meta = [s.design + (s.n ? ", n = " + s.n : ""), s.w != null ? "weight " + s.w : "", s.note].filter(Boolean).join(". ");
+        if (meta) li.append(el("span", "sci-meta", " " + meta + (/[.!?]$/.test(meta) ? "" : ".")));
+        ol.append(li);
+      });
+      body.append(ol);
+    }
+    if (sci.reviewUrl && !entry.edited) {
+      const p = note("", "sci-extra");
+      const a = el("a", "", "Full evidence review");
+      a.href = sci.reviewUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+      p.append(a);
+    }
+  }
+  window.addEventListener("xn:science", () => { if (sciSubstance) { renderScience(sciSubstance); buildToc(); } });
 
   // ---------- Mixtures.info ----------
   const RISK = ["Unknown", "Low", "Moderate", "High", "Dangerous"];

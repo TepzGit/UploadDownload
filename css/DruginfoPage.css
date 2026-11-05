@@ -182,6 +182,9 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 .wk-int.is-danger a { color: #fd9a8b; }
 .wk-int.is-unsafe a { color: #f8b47c; }
 .wk-int.is-caution a { color: #edd07c; }
+/* A note an admin added to a combination (Substances Editor). */
+.di-int-note { color: #a8a2b6; font-size: 0.92em; }
+.di-int-note::before { content: ": "; }
 
 /* Combinations table */
 .wk-mx-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -211,6 +214,15 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 .wk-meter { display: inline-block; width: 70px; height: 6px; margin-right: 8px; border-radius: 3px; vertical-align: middle; background: linear-gradient(90deg, rgb(var(--xn-accent-rgb)) calc(var(--v, 0) * 100%), #2a2e35 0); }
 .wk-n { font-size: 12px; color: var(--wk-muted); }
 .wk-ev { letter-spacing: 2px; color: var(--wk-muted); white-space: nowrap; }
+
+/* Pills (js/pills.js) */
+.wk-pills { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.wk-pill { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 10px 8px; border: 1px solid var(--wk-line-soft); background: #161a20; text-align: center; }
+.wk-pill-pic { display: grid; place-items: center; width: 100%; height: 104px; background: radial-gradient(circle at 50% 45%, #1f232b, #0b0d10 75%); }
+.wk-pill-pic img { max-width: 86%; max-height: 92px; object-fit: contain; }
+.wk-pill-name { font-size: 14px; }
+.wk-pill-of { font-size: 12px; color: var(--wk-muted); }
+.wk-pill-add { margin-top: 2px; font-size: 13px; color: var(--wk-link); }
 
 /* Gallery */
 .wk-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
@@ -270,3 +282,20 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 }
 @media (prefers-reduced-motion: no-preference) { .wk-file[open] { animation: wk-file-in .22s ease-out; } }
 @keyframes wk-file-in { from { opacity: 0; transform: translateY(8px) scale(.99); } }
+
+/* Scientific timeline (js/science.js) */
+.sci-head { display: flex; justify-content: flex-end; margin: -6px 0 4px; }
+#sec-science .xn-sci-figure { color: var(--wk-text); margin: 6px 0 12px; }
+.wk-table-wrap { overflow-x: auto; max-width: 100%; }
+.sci-table td, .sci-table th { white-space: nowrap; }
+.sci-extra { margin: 6px 0; font-size: 14px; line-height: 1.55; }
+.sci-sources { margin: 4px 0 10px; padding-left: 1.4em; font-size: 13.5px; line-height: 1.5; }
+.sci-sources li { margin: 0 0 6px; }
+.sci-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; font-size: 11px; line-height: 1.5; vertical-align: 1px; }
+.sci-tag.is-checked { color: #46c486; }
+.sci-tag.is-lit { color: #e3a33a; }
+.sci-meta { opacity: .8; }
+
+.sci-routes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.sci-route { padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); background: none; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.sci-route[aria-pressed="true"] { background: var(--violet, #a67cff); border-color: var(--violet, #a67cff); color: #fff; }

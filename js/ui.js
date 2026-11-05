@@ -54,6 +54,9 @@ function init() {
   };
 
   bindEvents();
+  // First, so the "Scientific graph" switch is there even if a later step fails.
+  try { initScience(); } catch (error) { console.error(error); }
+  try { initPills(); } catch (error) { console.error(error); }
   renderDoseList();
   initConsent();
   initRecentControls();
@@ -725,6 +728,7 @@ function bindEvents() {
     clearTimeout(suggestionTimer);
     const value = els.input.value.trim();
     syncInputClass();
+    filterPills();
     if (value.length < 2) {
       els.suggestions.hidden = true;
       return;
@@ -1634,7 +1638,7 @@ function showSuggestions(substances) {
       }
       const tag = document.createElement("span");
       tag.className = "sug-custom";
-      tag.textContent = substance.ingredient ? "Medicine" : "Custom";
+      tag.textContent = substance.kind === "pill" ? "Pill" : substance.ingredient ? "Medicine" : "Custom";
       option.append(tag);
     }
     option.addEventListener("click", () => {
@@ -1721,11 +1725,93 @@ function syncInputClass() {
   els.input.classList.toggle("has-class", same && !els.inputClass.hidden);
 }
 
+// "Scientific graph" switch (js/science.js): timelines from clinical studies
+// where they exist, PsychonautWiki's otherwise. Saved sessions are unchanged.
+function initScience() {
+  const sci = window.xnScience;
+  const row = document.getElementById("sciRow");
+  if (!row) return;
+  if (!sci) {
+    // science.js didn't load (an old copy in the cache, or a hiccup): fetch it again.
+    if (!initScience.retried) {
+      initScience.retried = true;
+      const s = document.createElement("script");
+      s.src = "/science.js?v=" + Date.now();
+      s.onload = () => { initScience(); logic.setScientific(window.xnScience?.isOn()); refreshChart(); };
+      document.head.append(s);
+    }
+    return;
+  }
+  if (row.querySelector(".xn-sci-switch")) return;
+  row.hidden = false;
+  row.append(sci.makeSwitch());
+  window.addEventListener("xn:science", (ev) => {
+    logic.setScientific(ev.detail.on);
+    refreshChart();
+    const { currentSubstance, currentRoa } = logic.getState();
+    if (currentSubstance) renderDurations(currentSubstance, currentRoa);
+    updateScienceNote();
+  });
+  // A line button here or on the Journal hid or showed a line.
+  window.addEventListener("xn:sci-lines", () => refreshChart());
+  updateScienceNote();
+}
+
+/** The scientific graph's line buttons (same as the Journal): tap to hide or show a line. */
+function renderScienceLines() {
+  const sci = window.xnScience;
+  const row = document.getElementById("sciRow");
+  if (!sci || !row) return;
+  let box = document.getElementById("sciLines");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "sciLines";
+    box.className = "sci-lines xn-sci-legend";
+    box.setAttribute("role", "group");
+    box.setAttribute("aria-label", "Lines on the graph");
+    row.append(box);
+  }
+  const keys = logic.scienceLineKeys();
+  box.hidden = !keys.length;
+  box.replaceChildren();
+  keys.forEach((key) => {
+    const line = sci.LINES.find((l) => l.key === key);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "xn-sci-chip";
+    b.dataset.key = key;
+    b.title = "Hide or show this line";
+    b.setAttribute("aria-pressed", String(!sci.isHidden(key)));
+    const style = line.dash === "dot" ? "dotted" : line.dash ? "dashed" : "solid";
+    b.innerHTML = `<i style="border-top:3px ${style} ${logic.substanceCount() > 1 ? "currentColor" : line.color}"></i>`;
+    b.append(line.label);
+    b.addEventListener("click", () => sci.toggleLine(key));
+    box.append(b);
+  });
+}
+
+/** Which doses on the graph use studies and which still use PsychonautWiki. */
+function updateScienceNote() {
+  const note = document.getElementById("sciNote");
+  if (!note) return;
+  const { addedDoses, scientific } = logic.getState();
+  if (!scientific) {
+    note.textContent = "PsychonautWiki timelines";
+    return;
+  }
+  const names = [...new Set(addedDoses.map((d) => d.substance))];
+  const without = names.filter((n) => !addedDoses.find((d) => d.substance === n && d.sciBase));
+  note.textContent = !names.length ? "Clinical studies where they exist"
+    : !without.length ? "From clinical studies"
+    : `No studies for ${without.join(", ")}: PsychonautWiki shown`;
+}
+
 // Route of administration: one chip per route PsychonautWiki has timings for.
 // Picking one swaps in that route's durations and common dose.
 const routeName = (name) => (name ? name.charAt(0).toUpperCase() + name.slice(1) : "");
 
 function showRoute({ substance, roa, roas, commonDose, units }) {
+  filterPills(); // the search box may now hold the substance's full name
   els.doseInput.value = commonDose;
   els.doseUnit.textContent = units;
   els.status.textContent = `${substance.name} loaded · ${roa.name ? roa.name + " · " : ""}common dose ${commonDose} ${units}`;
@@ -1747,6 +1833,120 @@ function showRoute({ substance, roa, roas, commonDose, units }) {
     });
     picker.appendChild(chip);
   });
+}
+
+// ------------------------------------------------------------
+// Pill pictures (js/pills.js, assets/pills): one row of small boxes
+// (picture, name, dose) under the dose input that scrolls sideways;
+// the substance search filters it (mommy 2026-11-05). Tapping "Elvanse 70 mg" loads Elvanse (if it
+// isn't loaded) and adds 70 mg at the time in the Time field.
+// Before a substance is picked the box sits under the search.
+// ------------------------------------------------------------
+let pillList = [];
+
+async function initPills() {
+  const box = document.getElementById("pillBox");
+  if (!box || !window.xnPills) return;
+  const doseGrid = els.doseInput.closest(".grid");
+  // While the search shows suggestions the pills sit at the top of that list
+  // (it would cover them otherwise), then go back under the dose input.
+  const place = () => {
+    if (!els.suggestions.hidden) {
+      if (box.parentElement !== els.suggestions) els.suggestions.prepend(box);
+      return;
+    }
+    const anchor = els.dosePanel.hidden ? els.status : doseGrid;
+    if (anchor && box.previousElementSibling !== anchor) anchor.after(box);
+  };
+  place();
+  const watch = new MutationObserver(place);
+  watch.observe(els.dosePanel, { attributes: true, attributeFilter: ["hidden"] });
+  watch.observe(els.suggestions, { attributes: true, attributeFilter: ["hidden"] });
+  // A mouse wheel scrolls the row of pills sideways.
+  const grid = document.getElementById("pillGrid");
+  grid.addEventListener("wheel", (event) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || grid.scrollWidth <= grid.clientWidth) return;
+    event.preventDefault();
+    grid.scrollLeft += event.deltaY;
+  }, { passive: false });
+  const [pills, subs] = await Promise.all([window.xnPills.load(), logic.customSubstances()]);
+  pillList = window.xnPills.match(pills, subs);
+  renderPills();
+  // The Journal's "Add to graph" on a pill links here with ?pill=<file>.
+  const params = new URLSearchParams(location.search);
+  const wanted = params.get("pill");
+  if (wanted) {
+    params.delete("pill");
+    history.replaceState(history.state, "", location.pathname + (params.size ? "?" + params : "") + location.hash);
+    const pill = pillList.find((p) => p.file === wanted);
+    if (pill) usePill(pill, null);
+  }
+}
+
+function renderPills() {
+  const box = document.getElementById("pillBox");
+  const grid = document.getElementById("pillGrid");
+  if (!box || !grid) return;
+  box.hidden = !pillList.length;
+  if (!pillList.length) return;
+  grid.replaceChildren(...pillList.map((p) => {
+    const b = el("button", "pill-btn");
+    b.type = "button";
+    b.setAttribute("role", "listitem");
+    b.title = `Add ${window.xnPills.label(p)} to the graph`;
+    b._pill = p;
+    const pic = el("span", "pill-pic");
+    const img = el("img");
+    img.src = p.url;
+    img.alt = "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    pic.append(img);
+    b.append(pic, el("span", "pill-name", p.brandName), el("span", "pill-dose", window.xnPills.amount(p)));
+    b.addEventListener("click", () => usePill(p, b));
+    return b;
+  }));
+  filterPills();
+}
+
+/** The search box filters the pills too: "elvanse", "oxycodone", "80". */
+function filterPills() {
+  const box = document.getElementById("pillBox");
+  const grid = document.getElementById("pillGrid");
+  if (!box || !grid || !pillList.length) return;
+  const query = els.input.value;
+  let shown = 0;
+  for (const b of grid.children) {
+    const hit = window.xnPills.matches(b._pill, query);
+    b.hidden = !hit;
+    if (hit) shown++;
+  }
+  box.hidden = !shown;
+  grid.scrollLeft = 0;
+}
+
+async function usePill(p, button) {
+  button?.setAttribute("aria-busy", "true");
+  clearTimeout(suggestionTimer);
+  els.suggestions.hidden = true;
+  try {
+    const current = logic.getState().currentSubstance?.name || "";
+    if (current.toLowerCase() !== String(p.substance).toLowerCase() || els.dosePanel.hidden) {
+      const time = els.dosePanel.hidden ? "" : els.doseStartHour.value;
+      els.input.value = p.substance;
+      syncInputClass();
+      await handleSearch();
+      if (els.dosePanel.hidden) {
+        showToast(`Couldn't load ${p.substance}.`, true);
+        return;
+      }
+      if (time) els.doseStartHour.value = time; // keep a time the user had already set
+    }
+    els.doseInput.value = p.dose;
+    handleAddDose();
+  } finally {
+    button?.removeAttribute("aria-busy");
+  }
 }
 
 /** The add button takes the color this substance has (or will get) on the graph. */
@@ -1806,7 +2006,45 @@ function renderDurations(substance, roa) {
   });
   const total = formatRange(duration.total) || (sum ? `about ${formatHours(sum)}` : "");
   box.querySelector("[data-total]").textContent = total || "Unknown";
+  renderScienceTimes(box, substance, roa, total);
   box.hidden = false;
+}
+
+/** With the Scientific graph on, the duration box shows the studies' timeline. */
+function renderScienceTimes(box, substance, roa, pwTotal) {
+  const line = box.querySelector("[data-sci]");
+  const sci = window.xnScience;
+  if (!line || !sci) return;
+  line.hidden = true;
+  if (!logic.getState().scientific) return;
+  const entry = sci.find(substance.name, roa?.name || "oral");
+  const base = logic.scienceBase(substance.name, roa?.name);
+  const other = sci.routes(substance.name);
+  if (!base) {
+    line.textContent = other.length ? `The studies are for ${other.join(" and ")} use, so this route uses PsychonautWiki.`
+      : sci.checkedNone(substance.name) ? "No human studies with timings exist for this substance, so PsychonautWiki is shown."
+      : "No clinical studies have been added for this substance yet, so PsychonautWiki is shown.";
+    line.hidden = false;
+    return;
+  }
+  const hours = [base.onset, base.comeup, base.peak, base.offset];
+  const sum = hours.reduce((a, b) => a + b, 0);
+  PHASES.forEach(([key], i) => {
+    box.querySelector(`[data-phase="${key}"]`).textContent = formatHours(hours[i]) || "0 min";
+    const seg = box.querySelector(`[data-seg="${key}"]`);
+    seg.style.flexGrow = sum ? String(hours[i] / sum) : "1";
+    seg.hidden = !hours[i];
+  });
+  box.querySelector("[data-total]").textContent = `about ${formatHours(sum)}`;
+  box.querySelector("[data-route]").textContent = `${entry.route} · studies`;
+  const what = entry.subj ? "how it feels" : "the medical effect";
+  const whose = substance.custom ? "This site's own timeline" : "PsychonautWiki";
+  line.replaceChildren(`From ${entry.studies.length} sources, timing ${what}. ${whose} says ${pwTotal || "something else"}. `);
+  const more = document.createElement("a");
+  more.href = "/journal/Drug?drug=" + encodeURIComponent(substance.name) + "#sec-science";
+  more.textContent = "Studies";
+  line.append(more);
+  line.hidden = false;
 }
 
 function renderSubstanceInfo(substance, roa) {
@@ -1882,6 +2120,11 @@ function setPills(type, items) {
     const pill = document.createElement("span");
     pill.className = "pill";
     pill.textContent = item.name || item;
+    // Admins can add a note to a combination in the Substances Editor.
+    if (item.note) {
+      pill.classList.add("has-note");
+      pill.title = item.note;
+    }
     container.appendChild(pill);
   });
 }
@@ -1906,12 +2149,10 @@ function selectFormulation(selected) {
 }
 
 function selectedFormulation() {
-  const selected = els.formulationInputs.find((checkbox) => checkbox.checked) || els.formulationInputs[0];
-  return {
-    key: selected.value,
-    label: selected.dataset.label,
-    releaseHours: selected.value === "immediate" ? 0 : Number(els.releaseWindow.value),
-  };
+  // The "Medication release" picker was removed (mommy, 2026-11-04): every new
+  // dose is drawn as taken; a slow-release medicine has its own timeline.
+  const immediate = els.formulationInputs.find((checkbox) => checkbox.value === "immediate") || els.formulationInputs[0];
+  return { key: "immediate", label: immediate?.dataset.label || "Immediate release", releaseHours: 0 };
 }
 
 // ------------------------------------------------------------
@@ -2078,6 +2319,8 @@ function openDoseEditor(id, toNote = false) {
 // ------------------------------------------------------------
 
 function refreshChart() {
+  updateScienceNote();
+  renderScienceLines();
   const timeline = logic.computeTimeline();
   if (!timeline) {
     plot.clearPlot("myPlot");

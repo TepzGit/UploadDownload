@@ -376,7 +376,7 @@ func main() {
 	http.HandleFunc("/rename", requireFilesLogin(Rename))
 	http.HandleFunc("/getItems", requireFilesLogin(getItems))
 	http.HandleFunc("/admin/files-access", requireAdminLogin(adminFilesAccess))
-	// Substances Importer: admins add their own substances next to PsychonautWiki's.
+	// Substances Editor: admins add their own substances and pills next to PsychonautWiki's.
 	http.HandleFunc("/admin/substances", requireAdminLogin(SubstancesImporter))
 	http.HandleFunc("/admin/substances/api", requireAdminLogin(adminCustomSubstances))
 	http.HandleFunc("/admin/drug-icons", requireAdminLogin(AdminDrugIcons))
@@ -477,6 +477,9 @@ func main() {
 	}
 	for _, asset := range assets {
 		assetName := asset.Name()
+		if assetName == "pills" {
+			continue // served by registerPillPictures, so new pictures show without a restart
+		}
 
 		if asset.IsDir() {
 			subAssets, _ := os.ReadDir("assets/" + assetName)
@@ -557,6 +560,9 @@ func main() {
 	registerFriendsBar()
 	registerFriendGroups()
 	registerSubstanceExtras()
+	registerSubstanceEditor()
+	registerPsychonautWikiCopy()
+	registerPillPictures()
 	// News board items got a title, a pin and an edit time.
 	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''", "tag TEXT NOT NULL DEFAULT ''", "tag_color TEXT NOT NULL DEFAULT ''", "size TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE site_news ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -3734,6 +3740,7 @@ type experienceDose struct {
 			Comedown      float64     `json:"comedown,omitempty"`
 			ComedownLevel float64     `json:"comedownLevel,omitempty"`
 			Peak2         *secondPeak `json:"peak2,omitempty"`
+			Shape         string      `json:"shape,omitempty"` // "smooth": one soft curve (js/curve.js)
 		} `json:"base"`
 		CommonDose float64 `json:"commonDose"`
 	} `json:"profile"`
@@ -3768,6 +3775,9 @@ func cleanExperienceDoses(in []experienceDose) ([]experienceDose, bool) {
 		d.Formulation = cleanText(d.Formulation, 40)
 		d.Route = cleanText(d.Route, 30)
 		d.Note = cleanMultiline(d.Note, 2000)
+		if d.Profile.Base.Shape != "smooth" {
+			d.Profile.Base.Shape = ""
+		}
 		b := d.Profile.Base
 		if d.Substance == "" || !clockTime.MatchString(d.Time) ||
 			!inRange(d.Amount, 0.000001, 1e6) || !inRange(d.ReleaseHours, 0, 48) ||
@@ -5932,6 +5942,17 @@ func publicDrugIcons(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		http.Error(w, "Couldn't load drug icons.", http.StatusInternalServerError)
 		return
+	}
+	// Pictures set in the Substances Editor win over a Drug icon of the same name.
+	if more, err := db.Query("SELECT name, image, image_at FROM custom_substances WHERE image != ''"); err == nil {
+		for more.Next() {
+			var name, file string
+			var at int64
+			if more.Scan(&name, &file, &at) == nil {
+				icons[strings.ToLower(strings.TrimSpace(name))] = drugIconURL(file, at)
+			}
+		}
+		more.Close()
 	}
 	w.Header().Set("Cache-Control", "no-cache")
 	writeJSON(w, icons)
@@ -8203,6 +8224,118 @@ type customSubstance struct {
 	CreatedBy string          `json:"createdBy,omitempty"`
 	CreatedAt int64           `json:"createdAt,omitempty"`
 	UpdatedAt int64           `json:"updatedAt,omitempty"`
+	// Notes on the combinations above, by the lower-case name they go with.
+	InteractionNotes map[string]string `json:"interactionNotes,omitempty"`
+	// These four live in their own columns, not in data (see substanceEditor).
+	Kind     string `json:"kind,omitempty"`     // "pill", or "" for a substance
+	ParentID int64  `json:"parentId,omitempty"` // a pill's substance (custom_substances.id)
+	Parent   string `json:"parent,omitempty"`   // that substance's name, filled when read
+	Image    string `json:"image,omitempty"`    // link to its own picture, filled when read
+	// "psychonautwiki" while an entry is still exactly as it was copied from
+	// PsychonautWiki (pwImport); saving it in the editor clears it. The Graph
+	// and Journal keep reading PsychonautWiki itself for those.
+	Source string `json:"source,omitempty"`
+	// The scientific graph an admin entered (Substances Editor), or nil.
+	// nil: the evidence review's version (js/science.js); an empty list: none.
+	Science *[]scienceGraph `json:"science,omitempty"`
+}
+
+// scienceGraph is the timeline from clinical studies for one way of taking a
+// substance, as the Substances Editor saves it: when the medical effect and
+// the felt effect start, peak and end (hours), the blood level's peak time and
+// half-life, notes and sources. The Graph and Journal show it when their
+// "Scientific graph" switch is on; js/science.js has the evidence review's
+// versions for everything an admin hasn't changed.
+type scienceTimes struct {
+	Onset     float64 `json:"onset"`
+	PeakStart float64 `json:"peakStart"`
+	PeakEnd   float64 `json:"peakEnd"`
+	End       float64 `json:"end"`
+}
+
+type scienceSource struct {
+	Cite string `json:"cite"`
+	URL  string `json:"url,omitempty"`
+}
+
+type scienceGraph struct {
+	Route     string          `json:"route"`
+	Ther      *scienceTimes   `json:"ther,omitempty"`
+	Subj      *scienceTimes   `json:"subj,omitempty"`
+	SubjLevel *float64        `json:"subjLevel,omitempty"`
+	Tmax      *float64        `json:"tmax,omitempty"`
+	Thalf     *float64        `json:"thalf,omitempty"`
+	Notes     string          `json:"notes,omitempty"`
+	Sources   []scienceSource `json:"sources,omitempty"`
+}
+
+func (t *scienceTimes) clean(what string) string {
+	for _, v := range []float64{t.Onset, t.PeakStart, t.PeakEnd, t.End} {
+		if !inRange(v, 0, 240) {
+			return what + ": times must be between 0 and 240 hours."
+		}
+	}
+	if !(t.Onset <= t.PeakStart && t.PeakStart <= t.PeakEnd && t.PeakEnd < t.End) {
+		return what + ": the times must go in order (starts, peak starts, peak ends, ends) and it has to end after the peak."
+	}
+	return ""
+}
+
+// cleanScience checks the scientific graphs of an entry, one per route.
+func cleanScience(list []scienceGraph) ([]scienceGraph, string) {
+	if len(list) > 13 {
+		return nil, "A substance can have at most 13 scientific graphs."
+	}
+	seen := map[string]bool{}
+	out := []scienceGraph{}
+	for _, s := range list {
+		s.Route = strings.ToLower(cleanText(s.Route, 30))
+		if s.Route == "" {
+			s.Route = "oral"
+		}
+		label := "Scientific graph (" + s.Route + ")"
+		if seen[s.Route] {
+			return nil, label + " is there twice."
+		}
+		seen[s.Route] = true
+		if s.Ther != nil {
+			if msg := s.Ther.clean(label + ", medical effect"); msg != "" {
+				return nil, msg
+			}
+		}
+		if s.Subj != nil {
+			if msg := s.Subj.clean(label + ", how it feels"); msg != "" {
+				return nil, msg
+			}
+		}
+		if s.Ther == nil && s.Subj == nil {
+			return nil, label + ": fill in the medical effect or how it feels."
+		}
+		if s.SubjLevel != nil && !inRange(*s.SubjLevel, 0.05, 1) {
+			return nil, label + ": the feeling's strength must be between 5 and 100%."
+		}
+		if !okNumber(s.Tmax, 240) || !okNumber(s.Thalf, 24*365) {
+			return nil, label + ": blood level times must be hours from 0 up."
+		}
+		s.Notes = cleanMultiline(s.Notes, 4000)
+		src := []scienceSource{}
+		for _, x := range s.Sources {
+			x.Cite = cleanText(x.Cite, 300)
+			x.URL = strings.TrimSpace(x.URL)
+			if x.URL != "" && !strings.HasPrefix(x.URL, "https://") && !strings.HasPrefix(x.URL, "http://") {
+				x.URL = ""
+			}
+			if len(x.URL) > 500 {
+				x.URL = ""
+			}
+			if x.Cite != "" && len(src) < 40 {
+				src = append(src, x)
+			}
+		}
+		s.Sources = src
+		out = append(out, s)
+	}
+	return out, ""
 }
 
 type customDose struct {
@@ -8222,6 +8355,9 @@ type customDurations struct {
 	ComedownLevel float64     `json:"comedownLevel"`
 	Offset        float64     `json:"offset"`
 	Peak2         *secondPeak `json:"peak2,omitempty"`
+	// "smooth" draws one soft curve through these times instead of straight
+	// lines and a flat peak; "" is the usual shape.
+	Shape string `json:"shape,omitempty"`
 }
 
 // customMethod is one more way to take the substance (rectal, insufflated...)
@@ -8285,9 +8421,17 @@ func (c *customSubstance) clean() string {
 	c.Interactions.Dangerous = cleanList(c.Interactions.Dangerous, 60, 80)
 	c.Interactions.Unsafe = cleanList(c.Interactions.Unsafe, 60, 80)
 	c.Interactions.Uncertain = cleanList(c.Interactions.Uncertain, 60, 80)
+	c.InteractionNotes = cleanInteractionNotes(c.InteractionNotes, c.Interactions.Dangerous, c.Interactions.Unsafe, c.Interactions.Uncertain)
 	c.Units = cleanText(c.Units, 12)
 	if c.Units == "" {
 		c.Units = "mg"
+	}
+	if c.Science != nil {
+		list, msg := cleanScience(*c.Science)
+		if msg != "" {
+			return msg
+		}
+		c.Science = &list
 	}
 	if !okRange(c.HalfLife, 24*365) {
 		return "The half-life needs numbers from 0 up, with the lowest first."
@@ -8327,6 +8471,14 @@ func cleanCustomMethod(route *string, d *customDose, t *customDurations) string 
 	if (d.Common.Min != nil && *d.Common.Min <= 0) || (d.Common.Min == nil && *d.Common.Max <= 0) {
 		return "The common dose must be more than 0."
 	}
+	return cleanDurations(t)
+}
+
+// cleanDurations checks an effect timeline (hours, levels 0-1).
+func cleanDurations(t *customDurations) string {
+	if t.Shape != "smooth" {
+		t.Shape = ""
+	}
 	for _, v := range []float64{t.Onset, t.Comeup, t.Peak, t.Comedown, t.Offset} {
 		if !inRange(v, 0, 240) {
 			return "Durations must be between 0 and 240 hours."
@@ -8353,7 +8505,7 @@ func cleanCustomMethod(route *string, d *customDose, t *customDurations) string 
 }
 
 func loadCustomSubstances() ([]customSubstance, error) {
-	rows, err := db.Query(`SELECT c.id, c.data, c.created_at, c.updated_at, COALESCE(u.originalUsername, '')
+	rows, err := db.Query(`SELECT c.id, c.data, c.created_at, c.updated_at, COALESCE(u.originalUsername, ''), c.kind, c.parent_id, c.image, c.image_at
 		FROM custom_substances c LEFT JOIN users u ON u.id = c.created_by ORDER BY lower(c.name)`)
 	if err != nil {
 		return nil, err
@@ -8363,18 +8515,34 @@ func loadCustomSubstances() ([]customSubstance, error) {
 	for rows.Next() {
 		var c customSubstance
 		var data string
-		var id, created, updated int64
-		var by string
-		if err := rows.Scan(&id, &data, &created, &updated, &by); err != nil {
+		var id, created, updated, parent, imageAt int64
+		var by, kind, image string
+		if err := rows.Scan(&id, &data, &created, &updated, &by, &kind, &parent, &image, &imageAt); err != nil {
 			return nil, err
 		}
 		if json.Unmarshal([]byte(data), &c) != nil {
 			continue
 		}
 		c.ID, c.CreatedAt, c.UpdatedAt, c.CreatedBy = id, created, updated, by
+		c.Kind, c.ParentID, c.Parent, c.Image = kind, parent, "", ""
+		if image != "" {
+			c.Image = drugIconURL(image, imageAt)
+		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	names := map[int64]string{}
+	for _, c := range out {
+		names[c.ID] = c.Name
+	}
+	for i := range out {
+		if out[i].Kind == "pill" {
+			out[i].Parent = names[out[i].ParentID]
+		}
+	}
+	return out, nil
 }
 
 func SubstancesImporter(w http.ResponseWriter, r *http.Request) {
@@ -8394,14 +8562,50 @@ func publicCustomSubstances(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Couldn't load the custom substances.", http.StatusInternalServerError)
 		return
 	}
+	list = resolvePills(list)
+	out := list[:0]
 	for i := range list {
+		if list[i].Source == "psychonautwiki" {
+			continue // untouched copies: the site reads PsychonautWiki itself
+		}
 		list[i].CreatedBy = "" // who added it is for admins only
+		out = append(out, list[i])
 	}
-	writeJSON(w, list)
+	writeJSON(w, out)
 }
 
-// adminCustomSubstances: GET lists them; POST {..., id} creates (id 0) or
-// updates one; POST {id, delete: true} removes one.
+// publicScienceGraphs lists every scientific graph entered in the Substances
+// Editor (js/science.js reads it), by name and other names.
+func publicScienceGraphs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	list, err := loadCustomSubstances()
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't load the scientific graphs.", http.StatusInternalServerError)
+		return
+	}
+	type entry struct {
+		Name    string         `json:"name"`
+		Aliases []string       `json:"aliases"`
+		Science []scienceGraph `json:"science"`
+	}
+	out := []entry{}
+	for _, c := range list {
+		if c.Science != nil && c.Kind != "pill" {
+			out = append(out, entry{c.Name, c.Aliases, *c.Science})
+		}
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	writeJSON(w, out)
+}
+
+// adminCustomSubstances: GET lists them (pills as stored, with their
+// substance's name); POST {..., id} creates (id 0) or updates one, a pill when
+// kind is "pill"; POST {id, delete: true} removes one, and a substance's pills
+// too when withPills is set.
 func adminCustomSubstances(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -8416,61 +8620,343 @@ func adminCustomSubstances(w http.ResponseWriter, r *http.Request) {
 		session, _ := sessionFromRequest(r)
 		var in struct {
 			customSubstance
-			Delete bool `json:"delete"`
+			Delete      bool `json:"delete"`
+			WithPills   bool `json:"withPills"`
+			ScienceOnly bool `json:"scienceOnly"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&in); err != nil {
 			http.Error(w, "Couldn't read that substance.", http.StatusBadRequest)
 			return
 		}
 		if in.Delete {
-			if _, err := db.Exec("DELETE FROM custom_substances WHERE id = ?", in.ID); err != nil {
-				fmt.Println(err)
-				http.Error(w, "Couldn't delete that.", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, map[string]any{"id": in.ID, "deleted": true})
+			deleteCustomSubstance(w, in.ID, in.WithPills)
+			return
+		}
+		if in.ScienceOnly {
+			saveScienceOnly(w, in.ID, in.Science)
 			return
 		}
 		c := in.customSubstance
-		if msg := c.clean(); msg != "" {
+		c.Source = "" // edited by hand now
+		id := c.ID
+		if id > 0 {
+			// A pill stays a pill and a substance a substance.
+			var kind string
+			if err := db.QueryRow("SELECT kind FROM custom_substances WHERE id = ?", id).Scan(&kind); err != nil {
+				http.Error(w, "That entry was deleted meanwhile.", http.StatusNotFound)
+				return
+			}
+			c.Kind = kind
+		}
+		var msg string
+		if c.Kind == "pill" {
+			msg = c.cleanPill(id)
+		} else {
+			c.Kind, c.ParentID = "", 0
+			msg = c.clean()
+		}
+		if msg != "" {
 			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
-		id := c.ID
+		kind, parent := c.Kind, c.ParentID
 		c.ID, c.CreatedBy, c.CreatedAt, c.UpdatedAt = 0, "", 0, 0
+		c.Kind, c.ParentID, c.Parent, c.Image = "", 0, "", ""
 		body, _ := json.Marshal(c)
 		now := time.Now().UnixMilli()
 		var err error
 		if id > 0 {
 			var res sql.Result
-			res, err = db.Exec("UPDATE custom_substances SET name = ?, data = ?, updated_at = ? WHERE id = ?", c.Name, string(body), now, id)
+			res, err = db.Exec("UPDATE custom_substances SET name = ?, data = ?, parent_id = ?, updated_at = ? WHERE id = ?", c.Name, string(body), parent, now, id)
 			if err == nil {
 				if n, _ := res.RowsAffected(); n == 0 {
-					http.Error(w, "That substance was deleted meanwhile.", http.StatusNotFound)
+					http.Error(w, "That entry was deleted meanwhile.", http.StatusNotFound)
 					return
 				}
 			}
 		} else {
 			var res sql.Result
-			res, err = db.Exec("INSERT INTO custom_substances (name, data, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-				c.Name, string(body), session.UserId, now, now)
+			res, err = db.Exec("INSERT INTO custom_substances (name, data, created_by, created_at, updated_at, kind, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+				c.Name, string(body), session.UserId, now, now, kind, parent)
 			if err == nil {
 				id, _ = res.LastInsertId()
 			}
 		}
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "unique") {
-				http.Error(w, "There is already a custom substance called "+c.Name+".", http.StatusConflict)
+				http.Error(w, "There is already a substance or pill called "+c.Name+".", http.StatusConflict)
 				return
 			}
 			fmt.Println(err)
 			http.Error(w, "Couldn't save that substance.", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"id": id, "name": c.Name})
+		writeJSON(w, map[string]any{"id": id, "name": c.Name, "kind": kind})
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// ---- Substances Editor: pills and pictures ----
+//
+// A pill is a row in custom_substances with kind "pill" and parent_id pointing
+// at the substance it contains. It keeps only its own name, other names,
+// description, icon, picture, half-life (optional) and timeline; everything
+// else (class, addiction potential, risks, combinations, units and doses) is
+// read from its substance when the list goes out (resolvePills), so it is
+// never stored twice and follows changes to the substance. Pictures of both
+// kinds are kept next to the Drug icons (UploadedFiles/drug-icons) and show
+// wherever a drug icon shows (/drug-icons), and in the Journal and Drug info.
+
+func registerSubstanceEditor() {
+	for _, column := range []string{"kind TEXT NOT NULL DEFAULT ''", "parent_id INTEGER NOT NULL DEFAULT 0", "image TEXT NOT NULL DEFAULT ''", "image_at INTEGER NOT NULL DEFAULT 0"} {
+		if _, err := db.Exec("ALTER TABLE custom_substances ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			panic("cannot add the substance editor columns: " + err.Error())
+		}
+	}
+	db.Exec("CREATE INDEX IF NOT EXISTS custom_substances_by_parent ON custom_substances(parent_id)")
+	http.HandleFunc("/admin/substances/image", requireAdminLogin(adminSubstanceImage))
+}
+
+// cleanInteractionNotes keeps a note only for a name in one of the lists.
+func cleanInteractionNotes(notes map[string]string, lists ...[]string) map[string]string {
+	if len(notes) == 0 {
+		return nil
+	}
+	in := map[string]string{}
+	for k, v := range notes {
+		in[strings.ToLower(strings.TrimSpace(k))] = v
+	}
+	out := map[string]string{}
+	for _, list := range lists {
+		for _, name := range list {
+			key := strings.ToLower(name)
+			if note := cleanText(in[key], 300); note != "" {
+				out[key] = note
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// cleanPill checks a pill from the editor. self is its id (0 when new).
+func (c *customSubstance) cleanPill(self int64) string {
+	c.Kind = "pill"
+	c.Name = cleanText(c.Name, 80)
+	if c.Name == "" {
+		return "Give the pill a name."
+	}
+	if c.ParentID <= 0 || c.ParentID == self {
+		return "Pick the substance this pill contains."
+	}
+	var parentKind, parentData string
+	if err := db.QueryRow("SELECT kind, data FROM custom_substances WHERE id = ?", c.ParentID).Scan(&parentKind, &parentData); err != nil {
+		return "The substance you picked isn't there any more. Pick another one."
+	}
+	if parentKind == "pill" {
+		return "A pill has to contain a substance, not another pill."
+	}
+	var parent customSubstance
+	json.Unmarshal([]byte(parentData), &parent)
+	c.Aliases = cleanList(c.Aliases, 20, 80)
+	if c.Icon = strings.ToLower(strings.TrimSpace(c.Icon)); !iconKeyPattern.MatchString(c.Icon) {
+		c.Icon = ""
+	}
+	c.Summary = cleanMultiline(c.Summary, 4000)
+	c.Notes = cleanMultiline(c.Notes, 4000)
+	if !okRange(c.HalfLife, 24*365) {
+		return "The half-life needs numbers from 0 up, with the lowest first."
+	}
+	if c.HalfLife != nil && c.HalfLife.Min == nil && c.HalfLife.Max == nil {
+		c.HalfLife = nil
+	}
+	// The route has to be one the substance has doses for.
+	c.Route = strings.ToLower(cleanText(c.Route, 30))
+	ok := c.Route == parent.Route
+	for _, m := range parent.Methods {
+		ok = ok || m.Route == c.Route
+	}
+	if !ok {
+		c.Route = parent.Route
+	}
+	if msg := cleanDurations(&c.Durations); msg != "" {
+		return msg
+	}
+	// Everything else comes from the substance.
+	c.Ingredient, c.Class, c.ChemicalClass, c.AddictionPotential, c.Risks, c.Units = "", "", "", "", "", ""
+	c.Interactions.Dangerous, c.Interactions.Unsafe, c.Interactions.Uncertain = nil, nil, nil
+	c.InteractionNotes, c.Dose, c.Methods = nil, customDose{}, nil
+	return ""
+}
+
+// resolvePills fills every pill in from its substance, for the Graph, the
+// Journal and Drug info. A pill whose substance is gone is left out.
+func resolvePills(list []customSubstance) []customSubstance {
+	byID := map[int64]customSubstance{}
+	for _, c := range list {
+		if c.Kind != "pill" {
+			byID[c.ID] = c
+		}
+	}
+	out := make([]customSubstance, 0, len(list))
+	for _, c := range list {
+		if c.Kind == "pill" {
+			p, ok := byID[c.ParentID]
+			if !ok {
+				continue
+			}
+			c.Parent = p.Name
+			c.Ingredient = p.Ingredient
+			if c.Ingredient == "" {
+				c.Ingredient = p.Name
+			}
+			c.Class, c.ChemicalClass, c.AddictionPotential, c.Risks = p.Class, p.ChemicalClass, p.AddictionPotential, p.Risks
+			c.Interactions, c.InteractionNotes = p.Interactions, p.InteractionNotes
+			if c.Summary == "" {
+				c.Summary = p.Summary
+			}
+			if c.HalfLife == nil {
+				c.HalfLife = p.HalfLife
+			}
+			c.Units = p.Units
+			route, dose := p.Route, p.Dose
+			for _, m := range p.Methods {
+				if m.Route == c.Route {
+					route, dose = m.Route, m.Dose
+				}
+			}
+			c.Route, c.Dose, c.Methods = route, dose, nil
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+func removeSubstancePicture(file string) {
+	if file == "" {
+		return
+	}
+	if err := os.Remove(filepath.Join(drugIconsDir, filepath.Base(file))); err != nil && !os.IsNotExist(err) {
+		fmt.Println(err)
+	}
+}
+
+// deleteCustomSubstance removes an entry and its picture. A substance with
+// pills is only removed with withPills, and its pills go with it.
+func deleteCustomSubstance(w http.ResponseWriter, id int64, withPills bool) {
+	var pills []string
+	rows, err := db.Query("SELECT name FROM custom_substances WHERE parent_id = ? AND kind = 'pill' ORDER BY lower(name)", id)
+	if err == nil {
+		for rows.Next() {
+			var name string
+			if rows.Scan(&name) == nil {
+				pills = append(pills, name)
+			}
+		}
+		rows.Close()
+	}
+	if len(pills) > 0 && !withPills {
+		http.Error(w, fmt.Sprintf("It has %d pill(s): %s. Delete them too, or link them to another substance first.", len(pills), strings.Join(pills, ", ")), http.StatusConflict)
+		return
+	}
+	var files []string
+	if rows, err := db.Query("SELECT image FROM custom_substances WHERE (id = ? OR (parent_id = ? AND kind = 'pill')) AND image != ''", id, id); err == nil {
+		for rows.Next() {
+			var f string
+			if rows.Scan(&f) == nil {
+				files = append(files, f)
+			}
+		}
+		rows.Close()
+	}
+	tx, err := db.Begin()
+	if err == nil {
+		_, err = tx.Exec("DELETE FROM custom_substances WHERE parent_id = ? AND kind = 'pill'", id)
+		if err == nil {
+			_, err = tx.Exec("DELETE FROM custom_substances WHERE id = ?", id)
+		}
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			tx.Rollback()
+		}
+	}
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't delete that.", http.StatusInternalServerError)
+		return
+	}
+	for _, f := range files {
+		removeSubstancePicture(f)
+	}
+	writeJSON(w, map[string]any{"id": id, "deleted": true, "pills": len(pills)})
+}
+
+// adminSubstanceImage: multipart POST id + image (a picture) or remove=1.
+// Answers {"image": "<link or empty>"}.
+func adminSubstanceImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxDrugIconBytes+(64<<10))
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "That picture is too big. Pick one under 10 MB.", http.StatusRequestEntityTooLarge)
+		} else {
+			http.Error(w, "Couldn't read the picture upload.", http.StatusBadRequest)
+		}
+		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
+	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	var oldFile string
+	if err := db.QueryRow("SELECT image FROM custom_substances WHERE id = ?", id).Scan(&oldFile); err != nil {
+		http.Error(w, "That entry was deleted meanwhile.", http.StatusNotFound)
+		return
+	}
+	if r.FormValue("remove") == "1" {
+		if _, err := db.Exec("UPDATE custom_substances SET image = '', image_at = ? WHERE id = ?", time.Now().UnixMilli(), id); err != nil {
+			fmt.Println(err)
+			http.Error(w, "Couldn't remove the picture.", http.StatusInternalServerError)
+			return
+		}
+		removeSubstancePicture(oldFile)
+		writeJSON(w, map[string]any{"image": ""})
+		return
+	}
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "Choose a picture to upload.", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	if header.Size > maxDrugIconBytes {
+		http.Error(w, "That picture is too big. Pick one under 10 MB.", http.StatusRequestEntityTooLarge)
+		return
+	}
+	fileName, status, message := saveImageIn(file, drugIconsDir, "sub")
+	if status != 0 {
+		http.Error(w, message, status)
+		return
+	}
+	now := time.Now().UnixMilli()
+	if _, err := db.Exec("UPDATE custom_substances SET image = ?, image_at = ? WHERE id = ?", fileName, now, id); err != nil {
+		fmt.Println(err)
+		removeSubstancePicture(fileName)
+		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
+		return
+	}
+	if oldFile != fileName {
+		removeSubstancePicture(oldFile)
+	}
+	writeJSON(w, map[string]any{"image": drugIconURL(fileName, now)})
 }
 
 // ---- Medicines ----
@@ -14805,4 +15291,437 @@ func friendsActivity(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"items": out, "friends": len(list)})
+}
+
+// saveScienceOnly changes just the scientific graph of an entry (nil removes
+// it), so a PsychonautWiki copy stays a copy and needs no other fields.
+func saveScienceOnly(w http.ResponseWriter, id int64, s *[]scienceGraph) {
+	if s != nil {
+		list, msg := cleanScience(*s)
+		if msg != "" {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+		s = &list
+	}
+	var name, data string
+	if err := db.QueryRow("SELECT name, data FROM custom_substances WHERE id = ?", id).Scan(&name, &data); err != nil {
+		http.Error(w, "That entry was deleted meanwhile.", http.StatusNotFound)
+		return
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &raw); err != nil {
+		http.Error(w, "Couldn't read that entry.", http.StatusInternalServerError)
+		return
+	}
+	if s == nil {
+		delete(raw, "science")
+	} else {
+		b, _ := json.Marshal(s)
+		raw["science"] = b
+	}
+	body, _ := json.Marshal(raw)
+	if _, err := db.Exec("UPDATE custom_substances SET data = ?, updated_at = ? WHERE id = ?", string(body), time.Now().UnixMilli(), id); err != nil {
+		fmt.Println(err)
+		http.Error(w, "Couldn't save the scientific graph.", http.StatusInternalServerError)
+		return
+	}
+	var kind string
+	db.QueryRow("SELECT kind FROM custom_substances WHERE id = ?", id).Scan(&kind)
+	writeJSON(w, map[string]any{"id": id, "name": name, "kind": kind})
+}
+
+// ---- PsychonautWiki copy ----
+//
+// Every PsychonautWiki substance is copied into custom_substances once (marked
+// source "psychonautwiki"), so admins find all of them in the Substances
+// Editor and can add a scientific graph to each. Names the site already has
+// are left alone. The copy runs at startup until it has worked once, and again
+// from the editor's "Add missing from PsychonautWiki" button.
+
+var pwImportMu sync.Mutex
+
+func psychonautWikiURL() string {
+	if u := os.Getenv("PW_API_URL"); u != "" {
+		return u // tests point this at a local copy
+	}
+	return "https://api.psychonautwiki.org"
+}
+
+type pwRange struct {
+	Min   *float64 `json:"min"`
+	Max   *float64 `json:"max"`
+	Units string   `json:"units"`
+}
+
+type pwSubstance struct {
+	Name               string   `json:"name"`
+	CommonNames        []string `json:"commonNames"`
+	Summary            string   `json:"summary"`
+	AddictionPotential string   `json:"addictionPotential"`
+	Toxicity           []string `json:"toxicity"`
+	CrossTolerances    []string `json:"crossTolerances"`
+	Tolerance          *struct {
+		Full string `json:"full"`
+		Half string `json:"half"`
+		Zero string `json:"zero"`
+	} `json:"tolerance"`
+	Class *struct {
+		Psychoactive []string `json:"psychoactive"`
+		Chemical     []string `json:"chemical"`
+	} `json:"class"`
+	Dangerous []struct{ Name string } `json:"dangerousInteractions"`
+	Unsafe    []struct{ Name string } `json:"unsafeInteractions"`
+	Uncertain []struct{ Name string } `json:"uncertainInteractions"`
+	Roas      []struct {
+		Name string `json:"name"`
+		Dose *struct {
+			Units     string   `json:"units"`
+			Threshold *float64 `json:"threshold"`
+			Heavy     *float64 `json:"heavy"`
+			Light     *pwRange `json:"light"`
+			Common    *pwRange `json:"common"`
+			Strong    *pwRange `json:"strong"`
+		} `json:"dose"`
+		Duration *struct {
+			Onset  *pwRange `json:"onset"`
+			Comeup *pwRange `json:"comeup"`
+			Peak   *pwRange `json:"peak"`
+			Offset *pwRange `json:"offset"`
+			Total  *pwRange `json:"total"`
+		} `json:"duration"`
+	} `json:"roas"`
+}
+
+const pwImportFields = `name commonNames summary addictionPotential toxicity crossTolerances
+	tolerance { full half zero } class { psychoactive chemical }
+	dangerousInteractions { name } unsafeInteractions { name } uncertainInteractions { name }
+	roas { name
+		dose { units threshold heavy light { min max } common { min max } strong { min max } }
+		duration { onset { min max units } comeup { min max units } peak { min max units } offset { min max units } total { min max units } } }`
+
+// fetchPsychonautWiki reads every substance, 250 at a time.
+func fetchPsychonautWiki() ([]pwSubstance, error) {
+	client := &http.Client{Timeout: 90 * time.Second}
+	all := []pwSubstance{}
+	for offset := 0; offset < 5000; offset += 250 {
+		body, _ := json.Marshal(map[string]string{"query": fmt.Sprintf("{ substances(limit: 250 offset: %d) { %s } }", offset, pwImportFields)})
+		resp, err := client.Post(psychonautWikiURL(), "application/json", bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		raw, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+		resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("PsychonautWiki answered %s", resp.Status)
+		}
+		var out struct {
+			Data struct {
+				Substances []pwSubstance `json:"substances"`
+			} `json:"data"`
+			Errors []struct{ Message string } `json:"errors"`
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, err
+		}
+		if len(out.Errors) > 0 && len(out.Data.Substances) == 0 {
+			return nil, fmt.Errorf("PsychonautWiki: %s", out.Errors[0].Message)
+		}
+		all = append(all, out.Data.Substances...)
+		if len(out.Data.Substances) < 250 {
+			break
+		}
+	}
+	return all, nil
+}
+
+// pwHours is the middle of a PsychonautWiki time range, in hours.
+func pwHours(r *pwRange) float64 {
+	if r == nil || (r.Min == nil && r.Max == nil) {
+		return 0
+	}
+	var v float64
+	switch {
+	case r.Min != nil && r.Max != nil:
+		v = (*r.Min + *r.Max) / 2
+	case r.Min != nil:
+		v = *r.Min
+	default:
+		v = *r.Max
+	}
+	switch strings.ToLower(r.Units) {
+	case "seconds":
+		v /= 3600
+	case "minutes":
+		v /= 60
+	case "days":
+		v *= 24
+	}
+	v = math.Round(v*1000) / 1000
+	if v < 0 || v > 240 {
+		return 0
+	}
+	return v
+}
+
+func pwDoseRange(r *pwRange) *rangeValue {
+	if r == nil || (r.Min == nil && r.Max == nil) {
+		return nil
+	}
+	return &rangeValue{Min: r.Min, Max: r.Max}
+}
+
+// pwToCustom turns a PsychonautWiki substance into an editor entry.
+func pwToCustom(s pwSubstance) customSubstance {
+	c := customSubstance{Name: s.Name, Summary: s.Summary, AddictionPotential: s.AddictionPotential, Source: "psychonautwiki"}
+	for _, n := range s.CommonNames {
+		if !strings.EqualFold(strings.TrimSpace(n), s.Name) {
+			c.Aliases = append(c.Aliases, n)
+		}
+	}
+	if s.Class != nil {
+		c.Class = strings.Join(s.Class.Psychoactive, ", ")
+		c.ChemicalClass = strings.Join(s.Class.Chemical, ", ")
+	}
+	c.Risks = strings.Join(s.Toxicity, "\n")
+	notes := []string{}
+	if t := s.Tolerance; t != nil && (t.Full != "" || t.Half != "" || t.Zero != "") {
+		parts := []string{}
+		if t.Full != "" {
+			parts = append(parts, "full tolerance "+t.Full)
+		}
+		if t.Half != "" {
+			parts = append(parts, "half in "+t.Half)
+		}
+		if t.Zero != "" {
+			parts = append(parts, "back to zero in "+t.Zero)
+		}
+		notes = append(notes, "Tolerance: "+strings.Join(parts, ", ")+".")
+	}
+	if len(s.CrossTolerances) > 0 {
+		notes = append(notes, "Cross-tolerance with "+strings.Join(s.CrossTolerances, ", ")+".")
+	}
+	c.Notes = strings.Join(notes, "\n")
+	for _, i := range s.Dangerous {
+		c.Interactions.Dangerous = append(c.Interactions.Dangerous, i.Name)
+	}
+	for _, i := range s.Unsafe {
+		c.Interactions.Unsafe = append(c.Interactions.Unsafe, i.Name)
+	}
+	for _, i := range s.Uncertain {
+		c.Interactions.Uncertain = append(c.Interactions.Uncertain, i.Name)
+	}
+	seen := map[string]bool{}
+	methods := []customMethod{}
+	for _, roa := range s.Roas {
+		m := customMethod{Route: strings.ToLower(cleanText(roa.Name, 30))}
+		if m.Route == "" || seen[m.Route] || len(methods) >= 13 {
+			continue
+		}
+		seen[m.Route] = true
+		if d := roa.Dose; d != nil {
+			if c.Units == "" {
+				c.Units = cleanText(d.Units, 12)
+			}
+			m.Dose = customDose{Threshold: d.Threshold, Heavy: d.Heavy, Light: pwDoseRange(d.Light), Common: pwDoseRange(d.Common), Strong: pwDoseRange(d.Strong)}
+		}
+		if d := roa.Duration; d != nil {
+			m.Durations = customDurations{Onset: pwHours(d.Onset), Comeup: pwHours(d.Comeup), Peak: pwHours(d.Peak), Offset: pwHours(d.Offset)}
+			// Only a total given: the rest of it is the offset.
+			if total := pwHours(d.Total); total > 0 && m.Durations.Offset == 0 {
+				if rest := total - m.Durations.Onset - m.Durations.Comeup - m.Durations.Peak; rest > 0 {
+					m.Durations.Offset = math.Round(rest*1000) / 1000
+				}
+			}
+		}
+		methods = append(methods, m)
+	}
+	if c.Units == "" {
+		c.Units = "mg"
+	}
+	if len(methods) > 0 {
+		c.Route, c.Dose, c.Durations = methods[0].Route, methods[0].Dose, methods[0].Durations
+		c.Methods = methods[1:]
+	} else {
+		c.Route = "oral"
+	}
+	// The usual text limits, without the editor's "needs a dose and a timeline"
+	// rules: PsychonautWiki doesn't have those for every substance.
+	c.Name = cleanText(c.Name, 80)
+	c.Aliases = cleanList(c.Aliases, 20, 80)
+	c.Class = cleanText(c.Class, 60)
+	c.ChemicalClass = cleanText(c.ChemicalClass, 60)
+	c.Summary = cleanMultiline(c.Summary, 4000)
+	c.AddictionPotential = cleanText(c.AddictionPotential, 120)
+	c.Risks = cleanMultiline(c.Risks, 4000)
+	c.Notes = cleanMultiline(c.Notes, 4000)
+	c.Interactions.Dangerous = cleanList(c.Interactions.Dangerous, 60, 80)
+	c.Interactions.Unsafe = cleanList(c.Interactions.Unsafe, 60, 80)
+	c.Interactions.Uncertain = cleanList(c.Interactions.Uncertain, 60, 80)
+	return c
+}
+
+// importPsychonautWiki adds every PsychonautWiki substance the site doesn't
+// have yet. It returns how many were added and how many were already there.
+func importPsychonautWiki() (added, skipped, total int, err error) {
+	pwImportMu.Lock()
+	defer pwImportMu.Unlock()
+	list, err := fetchPsychonautWiki()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	now := time.Now().UnixMilli()
+	tx, err := db.Begin()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	defer tx.Rollback()
+	for _, s := range list {
+		c := pwToCustom(s)
+		if c.Name == "" {
+			continue
+		}
+		total++
+		body, _ := json.Marshal(c)
+		res, err := tx.Exec("INSERT OR IGNORE INTO custom_substances (name, data, created_by, created_at, updated_at) VALUES (?, ?, 0, ?, ?)", c.Name, string(body), now, now)
+		if err != nil {
+			return 0, 0, total, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			added++
+		} else {
+			skipped++
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, total, err
+	}
+	return added, skipped, total, nil
+}
+
+// registerPsychonautWikiCopy copies PsychonautWiki once in the background
+// (retrying hourly while it can't be reached) and adds the editor's button.
+func registerPsychonautWikiCopy() {
+	http.HandleFunc("/admin/substances/import-pw", requireAdminLogin(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		added, skipped, total, err := importPsychonautWiki()
+		if err != nil {
+			fmt.Println("psychonautwiki copy:", err)
+			http.Error(w, "Couldn't reach PsychonautWiki: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		db.Exec("INSERT OR REPLACE INTO custom_seeded (key, substance_id, data) VALUES ('psychonautwiki-copy', 0, ?)", strconv.FormatInt(time.Now().Unix(), 10))
+		writeJSON(w, map[string]int{"added": added, "skipped": skipped, "total": total})
+	}))
+	http.HandleFunc("/substances/science", publicScienceGraphs)
+	go func() {
+		time.Sleep(20 * time.Second) // after the rest of startup is done with the database
+		for try := 0; ; try++ {
+			var done string
+			if db.QueryRow("SELECT data FROM custom_seeded WHERE key = 'psychonautwiki-copy'").Scan(&done) == nil {
+				return
+			}
+			added, skipped, total, err := importPsychonautWiki()
+			if err == nil && total > 0 {
+				db.Exec("INSERT OR REPLACE INTO custom_seeded (key, substance_id, data) VALUES ('psychonautwiki-copy', 0, ?)", strconv.FormatInt(time.Now().Unix(), 10))
+				fmt.Printf("psychonautwiki copy: %d added, %d already here (%d in all)\n", added, skipped, total)
+				return
+			}
+			if err != nil {
+				fmt.Println("psychonautwiki copy:", err, "(trying again later)")
+			}
+			if try < 5 {
+				time.Sleep(2 * time.Minute) // a busy database or a short network hiccup
+			} else {
+				time.Sleep(time.Hour)
+			}
+		}
+	}()
+}
+
+// ---- Pill pictures (mommy 2026-11-05) ----
+// Pictures of real pills sit in assets/pills, named brand + dose
+// ("elvanse70.png", "oxycontin 80mg.png"). The Journal shows them and the
+// Graph page has a box of them: tapping one adds that dose. A picture
+// dropped in the folder shows up without a restart.
+
+const pillPicturesDir = "assets/pills"
+
+var pillNamePattern = regexp.MustCompile(`(?i)^(.*?[a-z][^0-9]*?)[\s_-]*(\d+(?:[.,]\d+)?)\s*(mg|mcg|µg|ug|g)?\.(png|jpe?g|webp|gif|avif)$`)
+
+type pillPicture struct {
+	File  string  `json:"file"`
+	URL   string  `json:"url"`
+	Brand string  `json:"brand"`
+	Dose  float64 `json:"dose"`
+	Unit  string  `json:"unit"`
+}
+
+// pillFromName reads brand and dose from a file name; ok is false when the
+// name has no dose in it.
+func pillFromName(name string) (pillPicture, bool) {
+	m := pillNamePattern.FindStringSubmatch(name)
+	if m == nil {
+		return pillPicture{}, false
+	}
+	brand := strings.TrimSpace(strings.Trim(m[1], " _-"))
+	dose, err := strconv.ParseFloat(strings.Replace(m[2], ",", ".", 1), 64)
+	if brand == "" || err != nil || dose <= 0 {
+		return pillPicture{}, false
+	}
+	unit := strings.ToLower(m[3])
+	if unit == "" || unit == "ug" {
+		if unit == "ug" {
+			unit = "µg"
+		} else {
+			unit = "mg"
+		}
+	}
+	return pillPicture{File: name, URL: "/pills/" + url.PathEscape(name), Brand: strings.ToLower(brand), Dose: dose, Unit: unit}, true
+}
+
+func registerPillPictures() {
+	http.HandleFunc("/pill-pictures", func(w http.ResponseWriter, r *http.Request) {
+		list := []pillPicture{}
+		entries, _ := os.ReadDir(pillPicturesDir)
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			if p, ok := pillFromName(e.Name()); ok {
+				list = append(list, p)
+			}
+		}
+		sort.Slice(list, func(i, j int) bool {
+			if list[i].Brand != list[j].Brand {
+				return list[i].Brand < list[j].Brand
+			}
+			return list[i].Dose < list[j].Dose
+		})
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-cache")
+		json.NewEncoder(w).Encode(list)
+	})
+	http.HandleFunc("/pills/", func(w http.ResponseWriter, r *http.Request) {
+		file := strings.TrimPrefix(r.URL.Path, "/pills/")
+		if file == "" || filepath.Base(file) != file || strings.HasPrefix(file, ".") {
+			http.NotFound(w, r)
+			return
+		}
+		switch strings.ToLower(filepath.Ext(file)) {
+		case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif":
+		default:
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		http.ServeFile(w, r, filepath.Join(pillPicturesDir, file))
+	})
 }

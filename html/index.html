@@ -47,6 +47,26 @@
   .dose-edit-note textarea:focus{ outline:none; border-color:var(--violet); }
   .dose-card .dose-note{ margin:.3rem 0 0; font-size:12.5px; line-height:1.45; color:var(--text); opacity:.85; white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   /* Duration tiles in the substance panel */
+  .sci-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.25rem .75rem; margin:-.25rem 0 .5rem; }
+  .sci-note{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .sci-row .xn-sci-switch{ margin-left:auto; }
+  .sci-row .sci-lines{ order:3; flex-basis:100%; }
+  .sci-row .sci-lines[hidden]{ display:none; }
+  /* Pill pictures (js/pills.js): one row of small boxes that scrolls sideways; the search filters it. */
+  .pill-box[hidden]{ display:none; }
+  .pill-grid{ display:flex; gap:6px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; padding-bottom:4px; scrollbar-width:thin; }
+  .pill-btn{ flex:none; display:flex; flex-direction:column; align-items:center; gap:2px; width:68px; padding:5px 4px 4px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--text); cursor:pointer; scroll-snap-align:start; }
+  .pill-btn[hidden]{ display:none; }
+  .pill-btn:hover, .pill-btn:focus-visible{ border-color:color-mix(in srgb, var(--violet) 60%, var(--line)); background:color-mix(in srgb, var(--violet) 8%, var(--surface-2)); }
+  .pill-btn:active{ transform:scale(.95); }
+  .pill-pic{ display:grid; place-items:center; width:36px; height:36px; }
+  .pill-pic img{ display:block; width:36px; height:36px; max-width:none; object-fit:contain; pointer-events:none; }
+  .pill-name{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; line-height:1.2; color:var(--muted); }
+  .pill-dose{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; line-height:1.1; }
+  .pill-btn[aria-busy="true"]{ opacity:.5; pointer-events:none; }
+  #sug > .pill-box{ padding:8px 8px 4px; border-bottom:1px solid var(--line); }
+  .sub-times-sci{ margin-top:.65rem; font-size:12px; line-height:1.45; color:var(--muted); }
+  .sub-times-sci a{ color:var(--text); text-decoration:underline; text-underline-offset:2px; }
   .sub-times{ padding:.85rem .9rem; border:1px solid var(--line); background:var(--bg); }
   .sub-times-head{ display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; margin-bottom:.65rem; }
   .sub-times-head h4{ font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; }
@@ -75,6 +95,7 @@
   }
   .pill{ display:inline-block; margin:0 .3rem .3rem 0; padding:.2rem .55rem; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text); }
   .pill.empty{ color:var(--muted); background:transparent; }
+  .pill.has-note{ border-style:dashed; cursor:help; }
   .dose-list-empty{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); padding:.5rem 0; }
   .toast{ position:fixed; left:50%; bottom:calc(1.25rem + env(safe-area-inset-bottom)); max-width:calc(100vw - 2rem); text-align:center; transform:translate(-50%,20px); background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:.6rem 1rem; border-radius:.125rem; opacity:0; pointer-events:none; transition:.25s ease; z-index:60; }
   .toast{ width:max-content; white-space:normal; line-height:1.5; }
@@ -436,7 +457,7 @@
   /* Full screen graph */
   html.plot-expanded-open{ overflow:hidden; }
   #chartCard.plot-expanded{ position:fixed; inset:0; z-index:1200; margin:0; padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); border-radius:0; background:#000; display:flex; flex-direction:column; }
-  #chartCard.plot-expanded > :not(.plot-tools):not(#myPlot){ display:none !important; }
+  #chartCard.plot-expanded > :not(.plot-tools):not(#myPlot):not(.sci-row){ display:none !important; }
   #chartCard.plot-expanded #myPlot{ flex:1; height:auto !important; min-height:0; }
   .chart-empty:not([hidden]) + #myPlot{ display:none; }
   .suggestion{ min-height:44px; }
@@ -594,6 +615,8 @@
   <script src="/nav.js"></script>
   <link rel="stylesheet" href="/classicons.css" />
   <script src="/classicons.js"></script>
+  <script src="/science.js?v=3"></script>
+  <script src="/pills.js"></script>
   <script>if (window.matchMedia("(max-width: 767px)").matches) document.documentElement.classList.add("gp-phone");</script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -663,6 +686,7 @@
 
     <section id="chartCard" class="glass rounded-sm p-3 sm:p-5 order-1 xl:order-none min-w-0 xl:flex-1 scroll-mt-20">
 
+      <div id="sciRow" class="sci-row"><span id="sciNote" class="sci-note"></span></div>
       <div id="chartEmpty" class="chart-empty">
         <p class="gp-hint"><strong>No doses yet</strong>Tap + to add one and draw the graph.</p>
 
@@ -729,7 +753,11 @@
           </label>
         </div>
 
-        <details id="releaseDetails" class="release-details">
+        <section id="pillBox" class="pill-box" aria-label="Pills: tap one to add that dose" hidden>
+          <div id="pillGrid" class="pill-grid" role="list"></div>
+        </section>
+
+        <details id="releaseDetails" class="release-details" hidden>
           <summary class="flex items-center justify-between cursor-pointer select-none border border-[var(--line)] rounded-sm bg-[var(--surface-2)] px-3 h-9 font-mono text-[11px] text-[var(--muted)]">
             <span>Medication release: <strong id="releaseSummary" class="text-[var(--text)] font-medium">Immediate</strong></span>
             <svg class="release-chevron w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
@@ -762,7 +790,7 @@
           <input id="releaseWindow" type="number" min="0.5" max="8760" step="0.5" value="12" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
         </label>
 
-        <p class="font-mono text-[10px] text-[var(--muted)] leading-relaxed border-t border-[var(--line)] pt-2">Visual estimate, not dosing guidance. Modified-release behavior varies by product and route.</p>
+        <p class="font-mono text-[10px] text-[var(--muted)] leading-relaxed border-t border-[var(--line)] pt-2">Visual estimate, not dosing guidance.</p>
         <button id="addDoseButton" type="button" class="btn btn-sm bg-[var(--violet)] hover:bg-[var(--violet)] hover:brightness-110 border-none text-[#160f24] font-mono font-medium">+ Add dose to timeline</button>
       </section>
     <div id="doseBlock" class="mt-4 pt-4 border-t border-[var(--line)] flex flex-col min-h-0 xl:flex-1">
@@ -811,6 +839,7 @@
           <div><dt><i class="sub-key" data-key="offset"></i>Offset</dt><dd data-phase="offset"></dd></div>
           <div class="wide"><dt>Total</dt><dd data-total></dd></div>
         </dl>
+        <p class="sub-times-sci" data-sci hidden></p>
       </section>
       <p id="substanceSummary" class="text-[#fff] text-sm leading-relaxed mb-6 p-3 border border-[var(--line)] bg-[var(--bg)]"></p>
       <p class="text-lg text-[var(--muted)] mb-6 pb-4 border-b-2 border-[var(--line)]">Addiction potential:<br><strong id="addictionPotential" class="text-[var(--text)]">Unknown</strong></p>

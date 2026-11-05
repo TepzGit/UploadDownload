@@ -1386,3 +1386,24 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
   @keyframes pf-act-in { from { opacity: 0; translate: 18px 0; } }
 }
 @media (max-width: 760px) { .pf-act { max-width: 78vw; } }
+
+/* Phones (mommy 2026-11-03 "fix mobile view, profile bugging out"): #container's 85% width
+   with the phone margins of 0 left a gap on the right; the page is full width and
+   centered again, the name sits next to its badge, and the activity strip wraps its note. */
+@media (max-width: 767px) {
+  #container { width: auto; }
+  #username { min-width: 0; text-align: left; }
+  .pf-name-row { gap: 12px; }
+  .pf-head-row { align-items: stretch; }
+  .pf-side { align-self: flex-start; }
+  .pf-activity { margin-top: 10px; padding: 10px 12px; }
+  .pf-act-row:has(.pf-act-empty) { mask-image: none; min-height: 0; }
+  .pf-act-empty { white-space: normal; }
+  .pf-add-row { justify-content: center; }
+}
+@media (max-width: 640px) {
+  .pf-banner { height: 200px; }
+  .pf-head-row { margin-top: -64px; gap: 12px; }
+  .profile-avatar { width: 128px; height: 128px; }
+  .pf-initial { font-size: 52px; }
+}

@@ -13,6 +13,10 @@
 //                                 - optional second peak: `gap` hours after the
 //                                   first peak ends (falling to `dip`, then rising
 //                                   again), it holds at `level` for `duration`
+//   shape                         - optional: "smooth" draws one soft curve that
+//                                   rises and falls through the same times
+//                                   (top in the middle of the peak) instead of
+//                                   straight lines with a flat peak
 // ============================================================
 
 /** Phases in order: { name, hours, from, to } with levels 0-1. */
@@ -58,6 +62,7 @@ export function effectHours(base) {
  * step = hours between points.
  */
 export function effectCurve(base, startHour, intensity, step) {
+  if (base?.shape === "smooth") return smoothCurve(base, startHour, intensity, step);
   const x = [startHour];
   const y = [0];
   let cursor = startHour;
@@ -71,5 +76,69 @@ export function effectCurve(base, startHour, intensity, step) {
     }
     cursor += phase.hours;
   });
+  return { x, y };
+}
+
+/**
+ * The key points of a smooth curve, [hours, level]: flat until the onset ends,
+ * the top in the middle of each peak, the dip between two peaks, where the
+ * come-down ends, and 0 at the very end. Flat stretches become single points.
+ */
+function smoothPoints(base) {
+  const pts = [[0, 0]];
+  let at = 0;
+  let pendingTop = null;
+  effectPhases(base).forEach((p) => {
+    const start = at;
+    at += p.hours;
+    if (p.hours <= 0) return;
+    if (p.name === "onset") pts.push([at, 0]);
+    else if (p.name === "peak" || p.name === "peak2") pts.push([start + p.hours / 2, p.from]);
+    else if (p.name === "dip") pendingTop = [at, p.to];
+    else if (p.name === "rise2" && pendingTop) {
+      pts.push([pendingTop[0], pendingTop[1]]);
+      pendingTop = null;
+    } else if (p.name === "comedown") pts.push([at, p.to]);
+  });
+  if (pendingTop) pts.push(pendingTop);
+  // Nothing marks the top when the peak has no length: it's where the come-up ends.
+  if (!pts.some(([, y]) => y > 0)) {
+    const ph = effectPhases(base);
+    const top = ph.slice(0, 2).reduce((s, p) => s + p.hours, 0);
+    pts.push([top, 1]);
+  }
+  pts.push([at, 0]);
+  return pts.filter((p, i) => i === 0 || p[0] > pts[i - 1][0] + 1e-9);
+}
+
+/** effectCurve for shape "smooth": a monotone cubic through smoothPoints (no overshoot). */
+function smoothCurve(base, startHour, intensity, step) {
+  const pts = smoothPoints(base);
+  const n = pts.length;
+  const x = [startHour];
+  const y = [0];
+  if (n < 2) return { x, y };
+  const h = [], d = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    h.push(pts[i + 1][0] - pts[i][0]);
+    d.push((pts[i + 1][1] - pts[i][1]) / h[i]);
+  }
+  // Slopes (Fritsch-Carlson): flat at the ends, tops and bottoms.
+  const m = new Array(n).fill(0);
+  for (let i = 1; i < n - 1; i += 1) {
+    if (d[i - 1] * d[i] <= 0) continue;
+    const w1 = 2 * h[i] + h[i - 1], w2 = h[i] + 2 * h[i - 1];
+    m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]);
+  }
+  for (let i = 0; i < n - 1; i += 1) {
+    const count = Math.max(1, Math.ceil(h[i] / step));
+    const [x0, y0] = pts[i], y1 = pts[i + 1][1];
+    for (let k = 1; k <= count; k += 1) {
+      const t = k / count, t2 = t * t, t3 = t2 * t;
+      const level = (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * h[i] * m[i] + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h[i] * m[i + 1];
+      x.push(startHour + x0 + h[i] * t);
+      y.push(Math.max(0, level * 100 * intensity));
+    }
+  }
   return { x, y };
 }

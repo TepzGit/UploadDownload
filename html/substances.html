@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Substances Importer · Geek⁴u</title>
+  <title>Substances Editor · Geek⁴u</title>
   <link rel="stylesheet" href="/substances.css">
   <meta name="theme-color" content="#000000" />
   <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
@@ -15,6 +15,7 @@
   <script src="/nav.js"></script>
   <link rel="stylesheet" href="/classicons.css">
   <script src="/classicons.js"></script>
+  <script src="/science.js?v=3"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 </head>
@@ -34,189 +35,297 @@
 <div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
 <div class="xn-hatch" aria-hidden="true"></div>
 
-<main class="xn-page si">
+<main class="xn-page si se">
   <div class="si-top">
     <div>
       <a class="si-back" href="/admin">← Admin</a>
       <p class="xn-eyebrow">Admin</p>
-      <h1 class="xn-h1">Substances Importer</h1>
-      <p class="xn-sub">Add medications and other substances PsychonautWiki doesn't have. They show up in the Graph search, the Journal and Drug info, marked Custom, or Medicine when they have an active ingredient.</p>
+      <h1 class="xn-h1">Substances Editor</h1>
+      <p class="xn-sub">Every substance and pill added on the site. Pills link to a substance and take its safety info from it. Both show up in the Graph, the Journal and Drug info.</p>
     </div>
-    <button type="button" class="xn-btn" id="siNew"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New substance</button>
   </div>
 
-  <div class="si-grid">
-    <form class="xn-card si-form" id="siForm" novalidate>
-      <div class="si-form-head">
-        <h2 class="xn-h2" id="siFormTitle">New substance</h2>
-        <span class="si-badge" id="siEditing" hidden>Editing</span>
+  <div class="se-grid">
+    <!-- Overview -->
+    <section class="xn-card se-over" aria-labelledby="ovTitle">
+      <div class="se-over-head">
+        <h2 class="xn-h2" id="ovTitle">Substances Overview</h2>
+        <div class="se-new-mini">
+          <button type="button" class="se-mini-btn" data-new="substance" title="New substance"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Substance</button>
+          <button type="button" class="se-mini-btn" data-new="pill" title="New pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Pill</button>
+        </div>
+      </div>
+      <div class="se-tools">
+        <input class="xn-input se-find" id="ovFind" type="search" placeholder="Search names, classes, ingredients…" autocomplete="off" aria-label="Search substances and pills">
+        <div class="se-filters" role="group" aria-label="Show">
+          <button type="button" class="se-filter" data-filter="" aria-pressed="true">All <b id="ovNAll"></b></button>
+          <button type="button" class="se-filter" data-filter="substance" aria-pressed="false">Substances <b id="ovNSub"></b></button>
+          <button type="button" class="se-filter" data-filter="pill" aria-pressed="false">Pills <b id="ovNPill"></b></button>
+          <button type="button" class="se-filter" data-filter="sci" aria-pressed="false">Scientific graph <b id="ovNSci"></b></button>
+          <button type="button" class="se-filter" data-filter="pw" aria-pressed="false">PsychonautWiki <b id="ovNPw"></b></button>
+        </div>
+        <label class="se-sort"><span class="xn-sr">Sort by</span>
+          <select class="xn-input" id="ovSort" aria-label="Sort by">
+            <option value="name">Name A–Z</option>
+            <option value="new">Newest first</option>
+            <option value="half">Half-life</option>
+            <option value="type">Type</option>
+          </select>
+        </label>
+      </div>
+      <p class="se-pw-row"><button type="button" class="se-link" id="ovImport">Add missing from PsychonautWiki</button></p>
+      <div class="se-cols" aria-hidden="true"><span></span><span>Name</span><span>Half-life</span><span>Added</span><span>Type</span></div>
+      <ul class="se-list" id="ovList" aria-live="polite" aria-busy="true">
+        <li class="se-skel"></li><li class="se-skel"></li><li class="se-skel"></li><li class="se-skel"></li>
+      </ul>
+    </section>
+
+    <!-- Editor -->
+    <section class="se-editor" aria-label="Editor">
+      <div class="xn-card se-start" id="seStart">
+        <h2 class="xn-h2">Add to the database</h2>
+        <p class="si-hint">Pick what you're adding, or pick an entry in the overview to view and edit it.</p>
+        <div class="se-choices">
+          <button type="button" class="se-choice" data-new="substance">
+            <span class="se-choice-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8.5 2h7M7 15h10"/></svg></span>
+            <strong>New Substance</strong>
+            <span>The active compound: description, safety, combinations, doses and its timeline.</span>
+          </button>
+          <button type="button" class="se-choice" data-new="pill">
+            <span class="se-choice-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8" width="19" height="8" rx="4" transform="rotate(-35 12 12)"/><path d="m9.2 7.9 5.6 8.2"/></svg></span>
+            <strong>New Pill</strong>
+            <span>A product of a substance you already added, with its own picture and release timeline.</span>
+          </button>
+        </div>
       </div>
 
-      <fieldset class="si-section">
-        <legend class="si-legend">Basics</legend>
-        <div class="si-field">
-          <label class="xn-label" for="fName">Name <span class="si-req">required</span></label>
-          <input class="xn-input" id="fName" name="name" maxlength="80" autocomplete="off" required>
-        </div>
-        <div class="si-field">
-          <label class="xn-label" for="fAliases">Other names <span class="si-hint">comma separated</span></label>
-          <input class="xn-input" id="fAliases" maxlength="600" autocomplete="off" placeholder="Brand names, slang">
-        </div>
-        <div class="si-field">
-          <label class="xn-label" for="fIngredient">Active ingredient <span class="si-hint">medicines only, marks it Medicine</span></label>
-          <input class="xn-input" id="fIngredient" maxlength="80" autocomplete="off" placeholder="Alprazolam">
-        </div>
-        <div class="si-field">
-          <label class="xn-label" for="fIcon">Icon <span class="si-hint">a pill picture or shape; Automatic picks one from the name and class</span></label>
-          <div class="si-icon-pick"><select class="xn-input" id="fIcon"><option value="">Automatic</option></select><i class="sc-icon" id="fIconShow" aria-hidden="true"></i></div>
-        </div>
-        <div class="si-row">
-          <div class="si-field">
-            <label class="xn-label" for="fClass">Class</label>
-            <input class="xn-input" id="fClass" list="classList" maxlength="60" autocomplete="off" placeholder="Depressant">
-            <datalist id="classList">
-              <option>Depressant</option><option>Stimulant</option><option>Opioid</option><option>Benzodiazepine</option>
-              <option>Gabapentinoid</option><option>Antidepressant</option><option>Antipsychotic</option><option>Antihistamine</option>
-              <option>Hypnotic</option><option>Psychedelic</option><option>Dissociative</option><option>Entactogen</option>
-              <option>Cannabinoid</option><option>Nootropic</option><option>Analgesic</option><option>Deliriant</option><option>Eugeroic</option><option>Oneirogen</option>
-            </datalist>
+      <form class="xn-card si-form se-form" id="siForm" novalidate hidden>
+        <div class="se-form-head">
+          <div class="se-thumb" id="feThumb" aria-hidden="true"></div>
+          <div class="se-form-title">
+            <h2 class="xn-h2" id="siFormTitle">New substance</h2>
+            <p class="se-meta" id="feMeta"></p>
           </div>
-          <div class="si-field">
-            <label class="xn-label" for="fChem">Chemical class</label>
-            <input class="xn-input" id="fChem" maxlength="60" autocomplete="off">
-          </div>
+          <span class="se-type" id="feType">Substance</span>
+          <button type="button" class="si-x" id="feClose" aria-label="Close the editor">×</button>
         </div>
-        <div class="si-field">
-          <label class="xn-label" for="fSummary">Summary</label>
-          <textarea class="xn-input si-text" id="fSummary" rows="3" maxlength="4000"></textarea>
+        <div class="se-kind" id="feKind" role="radiogroup" aria-label="What are you adding?">
+          <button type="button" class="se-kind-btn" data-kind="substance" role="radio" aria-checked="true">Substance</button>
+          <button type="button" class="se-kind-btn" data-kind="pill" role="radio" aria-checked="false">Pill</button>
         </div>
-      </fieldset>
 
-      <fieldset class="si-section">
-        <legend class="si-legend">Safety</legend>
-        <div class="si-row">
-          <div class="si-field">
-            <label class="xn-label" for="fHalfMin">Half-life <span class="si-hint">hours, from</span></label>
-            <input class="xn-input" id="fHalfMin" type="number" inputmode="decimal" min="0" step="any">
+        <fieldset class="si-section">
+          <legend class="si-legend">Basics</legend>
+          <div class="se-basics">
+            <div class="se-pic">
+              <span class="xn-label">Picture</span>
+              <label class="se-pic-drop" id="fePicDrop">
+                <input type="file" id="fePic" accept="image/png,image/jpeg,image/webp,image/gif" class="xn-sr">
+                <span class="se-pic-show" id="fePicShow"></span>
+                <span class="se-pic-hint" id="fePicHint">Upload</span>
+              </label>
+              <button type="button" class="se-link" id="fePicRemove" hidden>Remove picture</button>
+            </div>
+            <div class="se-basics-fields">
+              <div class="si-field">
+                <label class="xn-label" for="fName">Name <span class="si-req">required</span></label>
+                <input class="xn-input" id="fName" name="name" maxlength="80" autocomplete="off" required>
+                <p class="se-dupe" id="feDupe" hidden></p>
+              </div>
+              <div class="si-field">
+                <label class="xn-label" for="fAliases">Other names <span class="si-hint">comma separated</span></label>
+                <input class="xn-input" id="fAliases" maxlength="600" autocomplete="off" placeholder="Brand names, slang">
+              </div>
+            </div>
           </div>
           <div class="si-field">
-            <label class="xn-label" for="fHalfMax"><span class="si-hint">to (optional)</span></label>
-            <input class="xn-input" id="fHalfMax" type="number" inputmode="decimal" min="0" step="any">
-          </div>
-        </div>
-        <div class="si-field">
-          <label class="xn-label" for="fAddiction">Addiction potential</label>
-          <input class="xn-input" id="fAddiction" maxlength="120" list="addictionList" autocomplete="off">
-          <datalist id="addictionList"><option>Low</option><option>Moderate</option><option>High</option><option>Very high</option></datalist>
-        </div>
-        <div class="si-field">
-          <label class="xn-label" for="fRisks">Risks</label>
-          <textarea class="xn-input si-text" id="fRisks" rows="3" maxlength="4000" placeholder="Overdose signs, who shouldn't take it, tolerance and withdrawal"></textarea>
-        </div>
-        <div class="si-field">
-          <label class="xn-label" for="fDangerous">Dangerous with <span class="si-hint">comma separated</span></label>
-          <input class="xn-input" id="fDangerous" maxlength="1200" autocomplete="off" placeholder="Alcohol, Opioids">
-        </div>
-        <div class="si-row">
-          <div class="si-field">
-            <label class="xn-label" for="fUnsafe">Unsafe with</label>
-            <input class="xn-input" id="fUnsafe" maxlength="1200" autocomplete="off">
+            <label class="xn-label" for="fIcon">Icon <span class="si-hint">shown when there's no picture; Automatic picks one from the name and class</span></label>
+            <div class="si-icon-pick"><select class="xn-input" id="fIcon"><option value="">Automatic</option></select><i class="sc-icon" id="fIconShow" aria-hidden="true"></i></div>
           </div>
           <div class="si-field">
-            <label class="xn-label" for="fUncertain">Caution with</label>
-            <input class="xn-input" id="fUncertain" maxlength="1200" autocomplete="off">
+            <label class="xn-label" for="fSummary">Description <span class="si-hint" id="feSumHint"></span></label>
+            <textarea class="xn-input si-text" id="fSummary" rows="3" maxlength="4000"></textarea>
           </div>
-        </div>
-      </fieldset>
+          <div data-only="substance">
+            <div class="si-field">
+              <label class="xn-label" for="fIngredient">Active ingredient <span class="si-hint">medicines only, marks it Medicine</span></label>
+              <input class="xn-input" id="fIngredient" maxlength="80" autocomplete="off" placeholder="Alprazolam">
+            </div>
+            <div class="si-row">
+              <div class="si-field">
+                <label class="xn-label" for="fClass">Class</label>
+                <input class="xn-input" id="fClass" list="classList" maxlength="60" autocomplete="off" placeholder="Depressant">
+                <datalist id="classList">
+                  <option>Depressant</option><option>Stimulant</option><option>Opioid</option><option>Benzodiazepine</option>
+                  <option>Gabapentinoid</option><option>Antidepressant</option><option>Antipsychotic</option><option>Antihistamine</option>
+                  <option>Hypnotic</option><option>Psychedelic</option><option>Dissociative</option><option>Entactogen</option>
+                  <option>Cannabinoid</option><option>Nootropic</option><option>Analgesic</option><option>Deliriant</option><option>Eugeroic</option><option>Oneirogen</option>
+                </datalist>
+              </div>
+              <div class="si-field">
+                <label class="xn-label" for="fChem">Chemical class</label>
+                <input class="xn-input" id="fChem" maxlength="60" autocomplete="off">
+              </div>
+            </div>
+          </div>
+        </fieldset>
 
-      <fieldset class="si-section">
-        <legend class="si-legend">Dosing</legend>
-        <div class="si-methods-head">
-          <span class="xn-label">Ingestion methods</span>
-          <span class="si-hint">Each one has its own doses and effect timeline.</span>
-        </div>
-        <div class="si-methods" id="siMethods" role="tablist" aria-label="Ingestion methods"></div>
-        <div class="si-row">
-          <div class="si-field">
-            <label class="xn-label" for="fRoute">Method</label>
-            <select class="xn-input" id="fRoute">
+        <fieldset class="si-section" data-only="pill">
+          <legend class="si-legend">Contains</legend>
+          <div class="si-field se-combo" id="feParentBox">
+            <label class="xn-label" for="feParent">Substance <span class="si-req">required</span></label>
+            <input class="xn-input" id="feParent" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="feParentList" placeholder="Search the substances you added…">
+            <ul class="se-pop" id="feParentList" role="listbox" hidden></ul>
+          </div>
+          <div class="se-inherit" id="feInherit" hidden></div>
+          <div class="si-field" id="fePillRouteBox" hidden>
+            <label class="xn-label" for="fePillRoute">Taken as <span class="si-hint">uses the substance's doses for this method</span></label>
+            <select class="xn-input" id="fePillRoute"></select>
+          </div>
+        </fieldset>
+
+        <fieldset class="si-section">
+          <legend class="si-legend">Safety</legend>
+          <div class="si-row">
+            <div class="si-field">
+              <label class="xn-label" for="fHalfMin">Half-life <span class="si-hint">hours, from</span></label>
+              <input class="xn-input" id="fHalfMin" type="number" inputmode="decimal" min="0" step="any">
+            </div>
+            <div class="si-field">
+              <label class="xn-label" for="fHalfMax"><span class="si-hint">to (optional)</span></label>
+              <input class="xn-input" id="fHalfMax" type="number" inputmode="decimal" min="0" step="any">
+            </div>
+          </div>
+          <p class="si-hint se-half-note" id="feHalfNote" hidden></p>
+          <div data-only="substance">
+            <div class="si-field">
+              <label class="xn-label" for="fAddiction">Addiction potential</label>
+              <input class="xn-input" id="fAddiction" maxlength="120" list="addictionList" autocomplete="off">
+              <datalist id="addictionList"><option>Low</option><option>Moderate</option><option>High</option><option>Very high</option></datalist>
+            </div>
+            <div class="si-field">
+              <label class="xn-label" for="fRisks">Risks</label>
+              <textarea class="xn-input si-text" id="fRisks" rows="3" maxlength="4000" placeholder="Overdose signs, who shouldn't take it, tolerance and withdrawal"></textarea>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="si-section" data-only="substance">
+          <legend class="si-legend">Combination warnings</legend>
+          <p class="si-hint se-int-intro">Pick from the substances on the site and PsychonautWiki, or type a name or group (like Opioids) and press Enter. Add a note to say why.</p>
+          <div class="se-ints" id="feInts"></div>
+        </fieldset>
+
+        <fieldset class="si-section" data-only="substance">
+          <legend class="si-legend">Dosing</legend>
+          <div class="si-methods-head">
+            <span class="xn-label">Ingestion methods</span>
+            <span class="si-hint">Each one has its own doses and effect timeline.</span>
+          </div>
+          <div class="si-methods" id="siMethods" role="tablist" aria-label="Ingestion methods"></div>
+          <div class="si-row">
+            <div class="si-field">
+              <label class="xn-label" for="fRoute">Method</label>
+              <select class="xn-input" id="fRoute">
               <option value="oral">Oral</option><option value="sublingual">Sublingual</option><option value="buccal">Buccal</option>
               <option value="insufflated">Insufflated</option><option value="smoked">Smoked</option><option value="vaporized">Vaporized</option>
               <option value="intravenous">Intravenous</option><option value="intramuscular">Intramuscular</option>
               <option value="subcutaneous">Subcutaneous</option><option value="rectal">Rectal</option><option value="transdermal">Transdermal</option>
-            </select>
+              </select>
+            </div>
+            <div class="si-field">
+              <label class="xn-label" for="fUnits">Units <span class="si-hint">all methods</span></label>
+              <select class="xn-input" id="fUnits"><option>mg</option><option>µg</option><option>g</option><option>mL</option><option>IU</option><option>drops</option></select>
+            </div>
           </div>
-          <div class="si-field">
-            <label class="xn-label" for="fUnits">Units <span class="si-hint">all methods</span></label>
-            <select class="xn-input" id="fUnits"><option>mg</option><option>µg</option><option>g</option><option>mL</option><option>IU</option><option>drops</option></select>
+          <div class="si-doses">
+            <div class="si-field"><label class="xn-label" for="dThreshold">Threshold</label><input class="xn-input" id="dThreshold" type="number" inputmode="decimal" min="0" step="any"></div>
+            <div class="si-field"><label class="xn-label" for="dLightMin">Light</label><div class="si-pair"><input class="xn-input" id="dLightMin" type="number" inputmode="decimal" min="0" step="any" aria-label="Light from"><span>–</span><input class="xn-input" id="dLightMax" type="number" inputmode="decimal" min="0" step="any" aria-label="Light to"></div></div>
+            <div class="si-field"><label class="xn-label" for="dCommonMin">Common <span class="si-req">required</span></label><div class="si-pair"><input class="xn-input" id="dCommonMin" type="number" inputmode="decimal" min="0" step="any" aria-label="Common from"><span>–</span><input class="xn-input" id="dCommonMax" type="number" inputmode="decimal" min="0" step="any" aria-label="Common to"></div></div>
+            <div class="si-field"><label class="xn-label" for="dStrongMin">Strong</label><div class="si-pair"><input class="xn-input" id="dStrongMin" type="number" inputmode="decimal" min="0" step="any" aria-label="Strong from"><span>–</span><input class="xn-input" id="dStrongMax" type="number" inputmode="decimal" min="0" step="any" aria-label="Strong to"></div></div>
+            <div class="si-field"><label class="xn-label" for="dHeavy">Heavy <span class="si-hint">from</span></label><input class="xn-input" id="dHeavy" type="number" inputmode="decimal" min="0" step="any"></div>
           </div>
-        </div>
-        <div class="si-doses">
-          <div class="si-field"><label class="xn-label" for="dThreshold">Threshold</label><input class="xn-input" id="dThreshold" type="number" inputmode="decimal" min="0" step="any"></div>
-          <div class="si-field"><label class="xn-label" for="dLightMin">Light</label><div class="si-pair"><input class="xn-input" id="dLightMin" type="number" inputmode="decimal" min="0" step="any" aria-label="Light from"><span>–</span><input class="xn-input" id="dLightMax" type="number" inputmode="decimal" min="0" step="any" aria-label="Light to"></div></div>
-          <div class="si-field"><label class="xn-label" for="dCommonMin">Common <span class="si-req">required</span></label><div class="si-pair"><input class="xn-input" id="dCommonMin" type="number" inputmode="decimal" min="0" step="any" aria-label="Common from"><span>–</span><input class="xn-input" id="dCommonMax" type="number" inputmode="decimal" min="0" step="any" aria-label="Common to"></div></div>
-          <div class="si-field"><label class="xn-label" for="dStrongMin">Strong</label><div class="si-pair"><input class="xn-input" id="dStrongMin" type="number" inputmode="decimal" min="0" step="any" aria-label="Strong from"><span>–</span><input class="xn-input" id="dStrongMax" type="number" inputmode="decimal" min="0" step="any" aria-label="Strong to"></div></div>
-          <div class="si-field"><label class="xn-label" for="dHeavy">Heavy <span class="si-hint">from</span></label><input class="xn-input" id="dHeavy" type="number" inputmode="decimal" min="0" step="any"></div>
-        </div>
-      </fieldset>
+        </fieldset>
 
-      <fieldset class="si-section">
-        <legend class="si-legend">Effect timeline <span class="si-hint" id="siTimeFor"></span></legend>
-        <div class="si-unit" role="group" aria-label="Time unit">
-          <button type="button" class="si-unit-btn" data-unit="min" aria-pressed="false">Minutes</button>
-          <button type="button" class="si-unit-btn" data-unit="h" aria-pressed="true">Hours</button>
+        <fieldset class="si-section">
+          <legend class="si-legend">Effect timeline <span class="si-hint" id="siTimeFor"></span></legend>
+          <div class="se-tl-tools">
+            <div class="si-unit" role="group" aria-label="Time unit">
+              <button type="button" class="si-unit-btn" data-unit="min" aria-pressed="false">Minutes</button>
+              <button type="button" class="si-unit-btn" data-unit="h" aria-pressed="true">Hours</button>
+            </div>
+            <div class="si-unit se-shape" role="group" aria-label="Curve shape">
+              <button type="button" class="se-shape-btn" data-shape="" aria-pressed="true" title="Straight rise, flat peak, straight fall">Linear</button>
+              <button type="button" class="se-shape-btn" data-shape="smooth" aria-pressed="false" title="One soft curve up and down through the same times">Smooth curve</button>
+            </div>
+            <button type="button" class="se-link" id="feCopyTimes" hidden></button>
+          </div>
+          <p class="si-hint se-shape-hint" id="feShapeHint" hidden>Smooth curve: rises and falls softly through the times below, highest in the middle of the peak.</p>
+          <div class="si-preview se-preview" aria-label="Preview">
+            <div class="si-pv-head"><span class="xn-label">The curve the Graph draws for one common dose</span><span class="si-pv-total" id="pvTotal"></span></div>
+            <div class="si-pv-chart" id="pvChart"></div>
+            <ol class="si-pv-legend" id="pvLegend"></ol>
+          </div>
+          <div class="si-sliders" id="siTimes"></div>
+          <label class="si-check"><input type="checkbox" id="fPeak2On"><span>Second peak <small>For biphasic or extended-release effects.</small></span></label>
+          <div class="si-sliders" id="siPeak2" hidden></div>
+        </fieldset>
+
+        <fieldset class="si-section se-sci" id="seSci" data-only="substance">
+          <legend class="si-legend">Scientific graph <span class="si-hint" id="sciState"></span></legend>
+          <p class="si-hint">What clinical studies measured. The Graph and Journal show it when people turn on &ldquo;Scientific graph&rdquo;. Times are hours after taking it.</p>
+          <div class="se-sci-routes" id="sciRoutes" role="group" aria-label="Scientific graph for"></div>
+          <div id="sciForm">
+            <div class="se-sci-chart" id="sciChart"></div>
+            <div class="se-sci-block">
+              <label class="si-check"><input type="checkbox" id="sci_ther_on"><span>Medical effect <small>When it works as a medicine.</small></span></label>
+              <div class="se-sci-times" data-times="ther"></div>
+            </div>
+            <div class="se-sci-block">
+              <label class="si-check"><input type="checkbox" id="sci_subj_on"><span>How it feels <small>The felt effect, high or drug liking.</small></span></label>
+              <div class="se-sci-times" data-times="subj"></div>
+              <div class="si-field se-sci-level"><label class="xn-label" for="sci_level">Strength <span class="si-hint">% of the medical effect's height</span></label><input class="xn-input" id="sci_level" type="number" inputmode="decimal" min="5" max="100" step="any"></div>
+            </div>
+            <div class="se-sci-block se-sci-pk">
+              <div class="si-field"><label class="xn-label" for="sci_tmax">Blood level peaks at <span class="si-hint">h</span></label><input class="xn-input" id="sci_tmax" type="number" inputmode="decimal" min="0" step="any"></div>
+              <div class="si-field"><label class="xn-label" for="sci_thalf">Half-life <span class="si-hint">h</span></label><input class="xn-input" id="sci_thalf" type="number" inputmode="decimal" min="0" step="any"></div>
+            </div>
+            <div class="si-field"><label class="xn-label" for="sci_notes">Notes</label><textarea class="xn-input si-text" id="sci_notes" rows="2" maxlength="4000"></textarea></div>
+            <div class="si-field"><label class="xn-label" for="sci_sources">Sources <span class="si-hint">one per line: citation | link</span></label><textarea class="xn-input si-text" id="sci_sources" rows="4" maxlength="12000" placeholder="Dolder 2017, Front Pharmacol | https://doi.org/…"></textarea></div>
+          </div>
+          <p class="si-hint" id="sciEmpty" hidden>No scientific graph for this substance. People see the usual timeline.</p>
+          <div class="se-sci-actions">
+            <button type="button" class="se-link" id="sciRemove">Remove this route</button>
+            <button type="button" class="se-link" id="sciReset" hidden>Use the evidence review's version</button>
+            <button type="button" class="se-link" id="sciNone">No scientific graph</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="si-section">
+          <legend class="si-legend">Notes</legend>
+          <textarea class="xn-input si-text" id="fNotes" rows="2" maxlength="4000" placeholder="Anything else, like sources"></textarea>
+        </fieldset>
+
+        <p class="si-error" id="siError" role="alert" hidden></p>
+        <div class="si-actions se-actions">
+          <button type="submit" class="xn-btn xn-btn-primary" id="siSave">Add substance</button>
+          <button type="button" class="xn-btn" id="siCancel">Cancel</button>
+          <span class="se-saved" id="feSaved" role="status" hidden>Saved</span>
+          <button type="button" class="xn-btn xn-btn-danger se-del" id="feDelete" hidden>Delete</button>
         </div>
-        <div class="si-sliders" id="siTimes"></div>
-        <label class="si-check"><input type="checkbox" id="fPeak2On"><span>Second peak <small>For biphasic or extended-release effects.</small></span></label>
-        <div class="si-sliders" id="siPeak2" hidden></div>
-      </fieldset>
-
-      <fieldset class="si-section">
-        <legend class="si-legend">Notes</legend>
-        <textarea class="xn-input si-text" id="fNotes" rows="2" maxlength="4000" placeholder="Anything else, like sources"></textarea>
-      </fieldset>
-
-      <p class="si-error" id="siError" role="alert" hidden></p>
-      <div class="si-actions">
-        <button type="submit" class="xn-btn xn-btn-primary" id="siSave">Add substance</button>
-        <button type="button" class="xn-btn" id="siCancel" hidden>Cancel editing</button>
-      </div>
-    </form>
-
-    <div class="si-side">
-      <section class="xn-card si-preview" aria-labelledby="pvTitle">
-        <div class="si-pv-head">
-          <h2 class="xn-h2" id="pvTitle">Preview</h2>
-          <span class="si-pv-total" id="pvTotal"></span>
-        </div>
-        <div class="si-pv-chart" id="pvChart"></div>
-        <ol class="si-pv-legend" id="pvLegend"></ol>
-        <p class="si-hint si-pv-note">The curve the Graph draws for one common dose taken at 0 h.</p>
-      </section>
-
-      <section class="xn-card si-list-card" aria-labelledby="lsTitle">
-        <div class="si-pv-head">
-          <h2 class="xn-h2" id="lsTitle">Custom substances</h2>
-          <span class="si-count" id="lsCount"></span>
-        </div>
-        <p class="si-hint">Only the ones added here. PsychonautWiki's substances aren't listed.</p>
-        <input class="xn-input si-find" id="lsFind" type="search" placeholder="Find…" autocomplete="off" aria-label="Find a custom substance">
-        <ul class="si-list" id="lsList" aria-live="polite"><li class="si-empty">Loading…</li></ul>
-      </section>
-    </div>
+      </form>
+    </section>
   </div>
 </main>
 
-<div class="si-modal" id="siInspect" role="dialog" aria-modal="true" aria-labelledby="inTitle" hidden>
-  <div class="si-modal-card xn-card">
-    <div class="si-pv-head">
-      <h2 class="xn-h2" id="inTitle"></h2>
-      <button type="button" class="si-x" data-close aria-label="Close">×</button>
-    </div>
-    <div id="inBody"></div>
+<div class="si-modal" id="seAsk" role="alertdialog" aria-modal="true" aria-labelledby="askTitle" aria-describedby="askText" hidden>
+  <div class="si-modal-card xn-card se-ask">
+    <h2 class="xn-h2" id="askTitle"></h2>
+    <p class="se-ask-text" id="askText"></p>
+    <ul class="se-ask-list" id="askList" hidden></ul>
     <div class="si-actions">
-      <button type="button" class="xn-btn xn-btn-primary" id="inEdit">Edit</button>
-      <button type="button" class="xn-btn xn-btn-danger" id="inDelete">Delete</button>
+      <button type="button" class="xn-btn" id="askNo">Cancel</button>
+      <button type="button" class="xn-btn xn-btn-danger" id="askYes">Delete</button>
     </div>
   </div>
 </div>

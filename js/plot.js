@@ -120,6 +120,8 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
   const yStep = top > 300 ? 100 : top > 150 ? 50 : 25;
   const width = Math.max(1, look.width - (narrow ? 1 : 0));
 
+  // Scientific graph: extra lines (series.secondary) are thinner, dashed and unfilled.
+  const mainSeries = timeline.series.filter((series) => !series.secondary);
   const traces = timeline.series.map((series) => ({
     x: timeline.x,
     y: series.y,
@@ -128,14 +130,19 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     type: "scatter",
     hovertext: timeline.hoverTimes,
     hovertemplate: `${series.name}<br>Time: %{hovertext}<br>Relative intensity: %{y:.0f}%<extra></extra>`,
-    line: look.shape === "sharp" ? { color: series.color, width, shape: "linear" } : { color: series.color, width, shape: "spline", smoothing: 0.35 },
-    fill: look.fill > 0 ? "tozeroy" : "none",
-    fillcolor: hexToRgba(series.color, (look.fill / 100) * (timeline.series.length > 1 ? 0.55 : 1)),
+    line: {
+      ...(look.shape === "sharp" ? { color: series.color, width, shape: "linear" } : { color: series.color, width, shape: "spline", smoothing: 0.35 }),
+      ...(series.secondary ? { width: Math.max(2, width * 0.45), dash: series.dash || "solid" } : {}),
+    },
+    fill: look.fill > 0 && !series.secondary ? "tozeroy" : "none",
+    // The Graph's line buttons name the extra lines, so the legend keeps to substances.
+    ...(series.secondary ? { showlegend: false } : {}),
+    fillcolor: hexToRgba(series.color, (look.fill / 100) * (mainSeries.length > 1 ? 0.55 : 1)),
   }));
-  const multi = traces.length > 1;
-  // Glow: a wide, faint copy of each line underneath it.
+  const multi = mainSeries.length > 1;
+  // Glow: a wide, faint copy of each main line underneath it.
   if (look.glow) {
-    const glows = timeline.series.map((series, i) => ({
+    const glows = timeline.series.map((series, i) => (series.secondary ? null : {
       x: timeline.x,
       y: series.y,
       mode: "lines",
@@ -144,7 +151,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
       hoverinfo: "skip",
       showlegend: false,
     }));
-    traces.unshift(...glows);
+    traces.unshift(...glows.filter(Boolean));
   }
   // A dot on the baseline at each dose: { x: hour on the timeline, color }.
   if (look.dots) {
@@ -205,7 +212,7 @@ export async function renderPlot(timeline, containerId = "myPlot", { live = fals
     },
     showlegend: multi,
     legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: "#f5f3fa" }, bgcolor: "rgba(0,0,0,0)" },
-    hovermode: multi ? "x unified" : "closest",
+    hovermode: timeline.series.length > 1 ? "x unified" : "closest",
   };
   if (multi) {
     layout.margin.t = (look.topHours ? 0 : -20) + (narrow ? 58 : 62);
