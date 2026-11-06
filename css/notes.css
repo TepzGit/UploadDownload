@@ -343,3 +343,25 @@
   .nt-people { position: static; order: -1; }
   .nt-people-new, #newList { display: none; }
 }
+
+/* ---- Buttons redone (mommy 2026-11-06) -------------------------------
+   Tabs carry an icon; every button on the page is a rounded tile that
+   lifts and glows a little on hover; the primary one has a soft gradient. */
+.nt-seg-btn { display: inline-flex; align-items: center; gap: 8px; }
+.nt-seg-btn svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.nt-seg-btn[aria-selected="true"] svg { opacity: 1; color: var(--oled-accent); }
+@media (hover: hover) { .nt-seg-btn:not([aria-selected="true"]):hover { color: var(--oled-text); } }
+.nt .xn-btn, .nt-dlg .xn-btn { gap: 8px; border-radius: 10px; background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,0)) var(--oled-surface-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease; }
+.nt .xn-btn-primary, .nt-dlg .xn-btn-primary { background: linear-gradient(135deg, var(--oled-accent), color-mix(in srgb, var(--oled-accent) 70%, #ff7ab8)); color: #160f24; border-color: transparent; font-weight: 600; }
+@media (hover: hover) {
+  .nt .xn-btn:not(:disabled):hover, .nt-dlg .xn-btn:not(:disabled):hover { transform: translateY(-2px); border-color: rgba(var(--xn-accent-rgb), .45); box-shadow: 0 8px 20px -10px rgba(var(--xn-accent-rgb), .8), inset 0 1px 0 rgba(255,255,255,.06); }
+  .nt .xn-btn-primary:not(:disabled):hover, .nt-dlg .xn-btn-primary:not(:disabled):hover { filter: brightness(1.08); }
+}
+.nt .xn-btn:not(:disabled):active, .nt-dlg .xn-btn:not(:disabled):active { transform: translateY(0) scale(.97); }
+.nt-icon-btn { width: 42px; border-radius: 12px; }
+.nt-tool { width: 38px; height: 38px; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); transition: transform .15s ease, color .2s ease, border-color .2s ease, background-color .2s ease; }
+@media (hover: hover) { .nt-tool:hover { transform: translateY(-2px); border-color: rgba(var(--xn-accent-rgb), .45); color: var(--oled-text); } }
+.nt-tool[aria-pressed="true"] { background: var(--oled-accent-soft); }
+.nt-tool.nt-del:hover { color: #fca5a5; border-color: rgba(252, 165, 165, .45); }
+.nt-more { padding-inline: 22px; border-radius: 999px; }
+

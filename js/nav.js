@@ -27,7 +27,18 @@
   const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || /Geek4uApp\/[^ ]* \(iOS\)/.test(navigator.userAgent)
     || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   if (IOS) document.documentElement.classList.add("xn-ios");
-  const syncMenu = () => document.documentElement.classList.toggle("xn-menu", LOCAL_SERVER || IOS || WIDE.matches);
+  // Menu style (Profile > Preferences, mommy 2026-11-06): "" the menu button,
+  // "top" every page as a link in the top bar, "side" a bar down the left.
+  // Only on wide screens; phones keep their tab bar or menu button.
+  let NAV_STYLE = "";
+  try { const saved = JSON.parse(localStorage.getItem("xn_site_look") || "null"); if (saved && (saved.nav === "top" || saved.nav === "side")) NAV_STYLE = saved.nav; } catch (_) {}
+  const syncMenu = () => {
+    const root = document.documentElement;
+    const bar = NAV_STYLE && WIDE.matches ? NAV_STYLE : "";
+    root.classList.toggle("xn-menu", !bar && (LOCAL_SERVER || IOS || WIDE.matches));
+    root.classList.toggle("xn-bar-top", bar === "top");
+    root.classList.toggle("xn-bar-side", bar === "side");
+  };
   syncMenu();
   WIDE.addEventListener("change", syncMenu);
   
@@ -238,7 +249,7 @@
   const LOOK_FONTS = ["", "jetbrains", "consolas", "courier", "inter", "grotesk", "system", "verdana", "trebuchet", "rounded", "comic", "serif", "garamond"];
   const LOOK_AURAS = ["", "glow", "pulse", "rainbow", "fire"];
   const cleanLook = (raw) => {
-    const look = { font: "", size: 100, logo: true, aura: "", ogIcons: false, motion: "" };
+    const look = { font: "", size: 100, logo: true, aura: "", ogIcons: false, motion: "", nav: "" };
     if (raw && LOOK_FONTS.includes(raw.font)) look.font = raw.font;
     const size = Number(raw && raw.size);
     if (size >= 80 && size <= 130) look.size = Math.round(size / 5) * 5;
@@ -246,6 +257,7 @@
     if (raw && LOOK_AURAS.includes(raw.aura)) look.aura = raw.aura;
     if (raw && raw.ogIcons === true) look.ogIcons = true;
     if (raw && (raw.motion === "device" || raw.motion === "off")) look.motion = raw.motion;
+    if (raw && (raw.nav === "top" || raw.nav === "side")) look.nav = raw.nav;
     return look;
   };
   let look = cleanLook(null);
@@ -261,6 +273,11 @@
     // Drug icons in the pill's or powder's own color (classicons.css).
     root.classList.toggle("xn-og-icons", look.ogIcons);
     root.style.zoom = look.size === 100 ? "" : String(look.size / 100);
+    if (NAV_STYLE !== look.nav) {
+      NAV_STYLE = look.nav;
+      syncMenu();
+      window.dispatchEvent(new CustomEvent("xn:nav-style"));
+    }
   }
   applyLook(look);
   window.xnLook = {
@@ -552,8 +569,12 @@
     foot.className = "xn-menu-foot";
     foot.innerHTML =
       '<form method="post" action="/logout" class="xn-foot-out"><button type="submit" aria-label="Log out" title="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></svg></button></form>' +
-      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-lv" hidden></span><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
+      // Admin sits next to Log out for admins, on every page (mommy 2026-11-06); it is no longer a tile.
+      (document.documentElement.classList.contains("xn-admin") ? '<form method="get" action="/admin" class="xn-foot-out xn-foot-admin"><button type="submit" aria-label="Admin" title="Admin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.8 5.6v5.6c0 4.5 3 8.5 7.2 9.8 4.2-1.3 7.2-5.3 7.2-9.8V5.6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg></button></form>' : "") +
+      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-rank" hidden></span><span class="xn-foot-lv" hidden></span><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
     box.append(foot);
+    // Go straight to /admin (a plain GET form would add a "?").
+    foot.querySelector(".xn-foot-admin")?.addEventListener("submit", (e) => { e.preventDefault(); location.assign("/admin"); });
     const face = foot.querySelector(".xn-foot-face");
     const name = foot.querySelector(".xn-foot-name");
     const show = (me) => {
@@ -580,6 +601,17 @@
         lv.replaceChildren(window.xnRank.hexb(me.tier || 0, me.level));
         lv.title = (me.rank || "Geek level") + ", level " + me.level;
         lv.hidden = false;
+      }
+      // The rank's name on the other side of the badge (mommy 2026-11-06).
+      const rank = foot.querySelector(".xn-foot-rank");
+      if (rank && me.rank) {
+        const rn = document.createElement("span");
+        rn.className = "xn-rn";
+        rn.dataset.tier = String(me.tier || 1);
+        rn.textContent = me.rank;
+        rank.replaceChildren(rn);
+        rank.hidden = false;
+        if (window.xnRank && window.xnRank.letter) window.xnRank.letter(rank);
       }
     };
     // Last seen values first so the row is filled at once, then the server's.
@@ -909,13 +941,23 @@
     if (signedIn) addLink("/Chat", "Chat", "/Forum");
     addLink("/Music", "Music", signedIn ? "/Chat" : "/Forum");
     if (signedIn) addLink("/Notes", "Notes", "/journal");
-    if (signedIn) addLink("/Pills", "Pills", "/Notes");
+    if (signedIn) addLink("/Pills", "Pill Database", "/Notes");
+    // Tile order (mommy 2026-11-06), three to a row: Drug Database, Graph,
+    // Pill Database / Chat, Profile, Forum / Notes, Music, Files. Links not
+    // named here keep their place after these.
+    if (linkBox) {
+      const ORDER = ["/journal", "/", "/Pills", "/Chat", "/Profile", "/Forum", "/Notes", "/Music", "/Files/"];
+      const named = ORDER.map((href) => linkBox.querySelector(`:scope > a[href="${href}"]`)).filter(Boolean);
+      const rest = [...linkBox.querySelectorAll(":scope > a")].filter((a) => !named.includes(a));
+      linkBox.prepend(...named, ...rest);
+    }
     addIcons(linkBox);
     const links = nav.querySelectorAll(".xn-links a");
     initMenuFoot(linkBox);
     initMail(nav);
     initChat(nav);
     initFriendsBar(nav);
+    initTitle(nav);
     initLogout(nav);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
@@ -1005,7 +1047,6 @@
     { href: "/Chat", label: "Chat", desc: "Messages and groups", icon: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>' },
     { href: "/Music", label: "Music", desc: "Songs and playlists", icon: '<path d="M20 3.2v12.3a3.5 3.5 0 1 1-2-3.2V7.6l-8 2v8.9a3.5 3.5 0 1 1-2-3.2V6.4a1.5 1.5 0 0 1 1.1-1.5l9-2.3A1.5 1.5 0 0 1 20 3.2z"/>' },
     { href: "/Files/", label: "Files", files: true, desc: "Uploads and folders", icon: '<path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.3c.7 0 1.3.3 1.8.8L12 6.3h7.5A2.5 2.5 0 0 1 22 8.8v9.7a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>' },
-    { href: "/Utility", label: "Utility", desc: "Tools and portable apps", icon: '<path d="M14.7 3.2a5.5 5.5 0 0 0-5.9 7.3L3.3 16a2.3 2.3 0 0 0 3.3 3.3l5.5-5.5a5.5 5.5 0 0 0 7.3-5.9l-3 3a1.6 1.6 0 0 1-2.3 0l-1.1-1.1a1.6 1.6 0 0 1 0-2.3z"/>' },
     { href: "/Profile", label: "Profile", desc: "Calendar, likes, settings", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
   ];
 
@@ -1026,8 +1067,28 @@
       const name = a.textContent.trim();
       a.innerHTML = '<span class="xn-link-ic"><svg class="xn-ico" viewBox="0 0 24 24" aria-hidden="true">' + page.icon + '</svg></span><span class="xn-link-text"><span class="xn-link-name"></span><span class="xn-link-desc"></span></span>';
       a.querySelector(".xn-link-name").textContent = name;
-      a.querySelector(".xn-link-desc").textContent = page.desc;
+      a.dataset.name = name;
+      // No line under the names (mommy 2026-11-06).
     });
+  }
+
+  // The page's name in the middle of the top bar (mommy 2026-11-06); the
+  // headings at the top of the pages are gone. A page can set
+  // <html data-page-title="..."> to name itself, otherwise the <title>
+  // before " · " is used.
+  const PAGE_TITLES = { "Substance timeline": "Graph", "Home": "Home", "Files": "Files", "Upload": "Upload" };
+  function initTitle(nav) {
+    if (nav.querySelector(".xn-title")) return;
+    let name = document.documentElement.dataset.pageTitle || "";
+    if (!name) {
+      const raw = (document.title || "").split(" · ")[0].trim();
+      name = PAGE_TITLES[raw] || raw;
+    }
+    if (!name || /geek.?u/i.test(name)) return;
+    const el = document.createElement("span");
+    el.className = "xn-title";
+    el.textContent = name;
+    nav.append(el);
   }
 
   // Desktop app: pages load ahead of the click.
@@ -1195,7 +1256,7 @@
     toastTimer = setTimeout(() => toastEl.classList.remove("is-on"), 3200);
   };
 
-  // Offline, the Graph, Profile and Utility still work (the app keeps them
+  // Offline, the Graph and Profile still work (the app keeps them
   // on the phone), but these pages need the server. Say so instead of
   // opening a page that can't load.
   // The phone app keeps the Journal on the phone, so only the website needs internet for it.
@@ -1224,7 +1285,7 @@
       document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
       document.body.appendChild(offlineBox);
     }
-    offlineBox.querySelector("p").textContent = `Connect to Wi-Fi or mobile data to use ${what}. ${IN_APP ? "The Graph, Drug Database, your Profile and Utility" : "The Graph, your Profile and Utility"} work without internet.`;
+    offlineBox.querySelector("p").textContent = `Connect to Wi-Fi or mobile data to use ${what}. ${IN_APP ? "The Graph, Drug Database and your Profile" : "The Graph and your Profile"} work without internet.`;
     offlineBox.classList.add("is-on");
     offlineBox.querySelector("button").focus();
   }

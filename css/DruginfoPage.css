@@ -331,3 +331,32 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 .wk-pills[hidden], .wk-pilldb[hidden], #sec-pills .wk-hatnote[hidden] { display: none; }
 .wk-pilldb { margin-top: 12px; }
 .wk-pilldb a { color: var(--oled-accent, #a67cff); font-weight: 600; }
+
+/* Member pictures (mommy 2026-11-06) */
+.wk-mp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin: 0 0 12px; padding: 0; list-style: none; }
+.wk-mp { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface); }
+.wk-mp.is-pending { border-color: rgba(96, 165, 250, 0.5); }
+.wk-mp.is-rejected { opacity: 0.6; }
+.wk-mp-pic { position: relative; display: block; aspect-ratio: 1; padding: 0; border: 0; background: #000; cursor: zoom-in; }
+.wk-mp-pic img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s ease; }
+@media (hover: hover) { .wk-mp-pic:hover img { transform: scale(1.04); } }
+.wk-mp-tag { position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 99px; background: rgba(96, 165, 250, 0.92); color: #08131f; font-size: 10.5px; font-weight: 700; }
+.wk-mp.is-rejected .wk-mp-tag { background: rgba(255, 139, 139, 0.92); color: #1f0808; }
+.wk-mp-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; }
+.wk-mp-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-right: auto; color: var(--oled-text); font-size: 12.5px; text-decoration: none; }
+.wk-mp-who span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-mp-face { display: grid; place-items: center; flex: none; width: 24px; height: 24px; overflow: hidden; border-radius: var(--xn-pfp-r, 22%); background: var(--oled-accent-soft); color: var(--oled-accent); font-size: 11px; font-weight: 700; }
+.wk-mp-face img { width: 100%; height: 100%; object-fit: cover; }
+.wk-mp-act { padding: 3px 8px; border: 1px solid var(--oled-line-strong); border-radius: 8px; background: transparent; color: var(--oled-muted); font: inherit; font-size: 11.5px; cursor: pointer; }
+.wk-mp-act.is-ok { border-color: rgba(52, 211, 153, 0.5); color: #6ee7b7; }
+.wk-mp-act.is-del:hover { border-color: rgba(255, 139, 139, 0.5); color: #ff8b8b; }
+.wk-mp-text { margin: 0; padding: 0 10px 10px; color: var(--oled-muted); font-size: 12px; overflow-wrap: anywhere; }
+.wk-mp-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wk-mp-cap { flex: 1 1 220px; max-width: 360px; }
+.wk-mp-cap .xn-input { width: 100%; }
+.wk-mp-add .xn-btn svg { width: 16px; height: 16px; margin-right: 6px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; vertical-align: -3px; }
+.wk-mp-view { max-width: min(92vw, 1100px); max-height: 92vh; padding: 12px; border: 1px solid var(--oled-line-strong); border-radius: 16px; background: var(--oled-surface); color: var(--oled-text); }
+.wk-mp-view::backdrop { background: rgba(0, 0, 0, 0.8); }
+.wk-mp-view img { display: block; max-width: 100%; max-height: calc(92vh - 80px); margin: 0 auto; border-radius: 10px; }
+.wk-mp-view .wk-file-x { float: right; }
+.wk-mp-view-cap { margin: 10px 4px 0; color: var(--oled-muted); font-size: 13px; }

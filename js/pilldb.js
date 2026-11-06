@@ -12,7 +12,7 @@ const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
 const STATUS = { pending: "Waiting for a check", approved: "Approved", rejected: "Rejected" };
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
 
-const state = { view: "all", items: [], offset: 0, more: false, admin: false, choices: null, open: null };
+const state = { view: "all", items: [], offset: 0, more: false, admin: false, choices: null, open: null, category: "" };
 const grid = $("pdGrid");
 
 async function api(path, options) {
@@ -31,6 +31,7 @@ function query(offset) {
   if (q) p.set("q", q);
   for (const [id, key] of [["pdColor", "color"], ["pdShape", "shape"], ["pdKind", "form"]]) if ($(id).value) p.set(key, $(id).value);
   if ($("pdLab").checked) p.set("lab", "1");
+  if (state.category) p.set("category", state.category);
   if (state.view === "mine") p.set("mine", "1");
   if (state.view === "check") p.set("status", $("pdStatus").value);
   if (offset) p.set("offset", String(offset));
@@ -60,7 +61,46 @@ async function load(append) {
   }
 }
 
+// Categories (mommy 2026-11-06): worked out on the server from what each
+// pill is said to contain; a row of tiles filters by one.
+const CAT_NAMES = { stimulant: "Stimulants", opioid: "Opioids", benzodiazepine: "Benzos", sleep: "Sleeping pills", gabapentinoid: "Gabapentinoids", entactogen: "Ecstasy", psychedelic: "Psychedelics", dissociative: "Dissociatives", antidepressant: "Antidepressants", antipsychotic: "Antipsychotics", antihistamine: "Antihistamines", depressant: "Depressants" };
+const CAT_ICONS = { sleep: "zdrug", entactogen: "xtc", benzodiazepine: "bar", gabapentinoid: "capsule", antidepressant: "oblong", antihistamine: "syrup" };
+const ALL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>';
+function catIcon(cat) {
+  const C = window.xnClass;
+  if (!C || !cat) return null;
+  const key = CAT_ICONS[cat] && C.LABELS && C.LABELS[CAT_ICONS[cat]] ? CAT_ICONS[cat] : C.keyForClass(cat);
+  return key ? C.icon(key, "pd-cat-icon") : null;
+}
+function fillCats(list) {
+  const row = $("pdCats");
+  if (row.childElementCount || !list || !list.length) return;
+  const tile = (cat, label) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pd-cat";
+    b.dataset.cat = cat;
+    b.setAttribute("aria-pressed", String(cat === state.category));
+    const ic = document.createElement("span");
+    ic.className = "pd-cat-ic";
+    const icon = catIcon(cat);
+    if (icon) ic.append(icon); else ic.innerHTML = ALL_ICON;
+    const name = document.createElement("span");
+    name.textContent = label;
+    b.append(ic, name);
+    b.addEventListener("click", () => {
+      state.category = cat;
+      row.querySelectorAll(".pd-cat").forEach((t) => t.setAttribute("aria-pressed", String(t === b)));
+      load(false);
+    });
+    return b;
+  };
+  row.append(tile("", "All"), ...list.map((c) => tile(c, CAT_NAMES[c] || cap(c))));
+  row.hidden = false;
+}
+
 function fillChoices(data) {
+  fillCats(data.categories);
   if (state.choices) return;
   state.choices = { color: data.colors || [], shape: data.shapes || [], form: data.forms || [] };
   const add = (select, list) => select.append(...list.map((v) => new Option(cap(v), v)));
@@ -122,7 +162,16 @@ function card(p) {
   contents.className = "pd-card-contents";
   contents.textContent = p.labContents ? p.labContents : p.contents;
   const tag = p.labContents ? chip("Lab confirmed", "lab") : chip("Reported", "reported");
-  text.append(title, contents, tag);
+  const tags = document.createElement("span");
+  tags.className = "pd-card-tags";
+  tags.append(tag);
+  if (p.category) {
+    const cat = chip(CAT_NAMES[p.category] || cap(p.category), "cat");
+    const icon = catIcon(p.category);
+    if (icon) cat.prepend(icon);
+    tags.append(cat);
+  }
+  text.append(title, contents, tags);
   b.append(pic, text);
   li.append(b, uploaderLine(p.uploader, true));
   return li;
@@ -130,7 +179,7 @@ function card(p) {
 
 function draw(total) {
   grid.replaceChildren(...state.items.map(card));
-  const filtered = $("pdQ").value.trim() || $("pdColor").value || $("pdShape").value || $("pdKind").value || $("pdLab").checked;
+  const filtered = state.category || $("pdQ").value.trim() || $("pdColor").value || $("pdShape").value || $("pdKind").value || $("pdLab").checked;
   $("pdCount").textContent = total ? (total === 1 ? "1 pill" : total + " pills") : "";
   const empty = $("pdEmpty");
   empty.hidden = state.items.length > 0;

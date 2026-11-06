@@ -853,9 +853,9 @@ input[type="search"].xn-input::-webkit-search-cancel-button { filter: invert(0.6
 html.xn-modal-open,
 html.xn-modal-open body { overflow: hidden; }
 
-/* Files is admin only. nav.js adds .xn-admin from the xn_role cookie;
-   without JS the link stays and the server answers instead. */
+/* nav.js marks the account role from xn_role; the server still checks access. */
 html.xn-js:not(.xn-admin):not(.xn-files) .xn-links a[href^="/Files"] { display: none; }
+html:not(.xn-admin) .xn .xn-links a.xn-admin { display: none; }
 
 /* Like (heart) buttons: Journal cards, Drug info, Profile. js/likes.js wires them. */
 .xn-like {
@@ -1486,7 +1486,7 @@ html.xn-has-tabs .xn-chat-btn { display: none; }
 .xn-links a[aria-current="page"] .xn-ico { color: var(--oled-accent); opacity: 1; }
 @media (hover: hover) { .xn-links a:hover .xn-ico { opacity: 1; } }
 /* Phones (tab bar): the top bar only shows the Admin pill, as icon and name. */
-html:not(.xn-menu) .xn-links :is(.xn-link-ic, .xn-link-text) { display: contents; }
+html:not(.xn-menu):not(.xn-bar-side) .xn-links :is(.xn-link-ic, .xn-link-text) { display: contents; }
 html:not(.xn-menu) .xn-links .xn-link-desc { display: none; }
 html.xn-has-tabs:not(.xn-menu) .xn-links a.xn-admin { gap: 6px; }
 html.xn-has-tabs:not(.xn-menu) .xn-links a.xn-admin .xn-ico { width: 15px; height: 15px; }
@@ -1951,3 +1951,150 @@ html[data-motion="off"]::view-transition-group(*), html[data-motion="off"]::view
 .xn-sci-chip:hover{ background:rgba(255,255,255,.1); }
 .xn-sci-chip:focus-visible{ outline:2px solid var(--violet, #a67cff); outline-offset:2px; }
 .xn-sci-legend:has(.xn-sci-chip){ opacity:1; gap:.4rem; }
+
+/* ---- Profile pictures everywhere use the header's shape (mommy 2026-11-06) ----
+   The friend pictures in the top bar are a rounded square (7px on 32px, about
+   22%). Every member picture on the site uses the same shape, so it scales
+   with the picture's size. (The Main card picture keeps mommy's own corners.) */
+:root { --xn-pfp-r: 22%; }
+.xn-friend-pic, .xn-friend-face, .xn-foot-face, .xn-inbox-face,
+.ch-av:not(.is-group), .ch-av.is-group > span,
+.fm-avatar, .fm-comment-face, .pc-face, .pc-avatar, .mu-avatar,
+.nt-face, .nt-comment-face, .nt-welcome-pic,
+.fa-face, .ac-face, .pf-act-face, .ppl-face, .profile-avatar {
+  border-radius: var(--xn-pfp-r) !important;
+}
+:is(.xn-friend-pic, .xn-friend-face, .xn-foot-face, .xn-inbox-face, .ch-av, .fm-avatar, .fm-comment-face, .pc-face, .pc-avatar, .mu-avatar, .nt-face, .nt-comment-face, .nt-welcome-pic, .fa-face, .ac-face, .pf-act-face, .ppl-face, .profile-avatar) img { border-radius: inherit !important; }
+
+/* ------------------------------------------------------------
+   Menu styles (Profile > Preferences, mommy 2026-11-06). Wide screens
+   only; nav.js sets html.xn-bar-top or html.xn-bar-side instead of
+   html.xn-menu. The default stays the menu button.
+   ------------------------------------------------------------ */
+/* Top navigation bar: every page as a link with its icon in the bar. */
+html.xn-bar-top .xn-brand { margin-right: 0; }
+html.xn-bar-top .xn .xn-links { position: static; flex: 1 1 auto; justify-content: center; min-width: 0; gap: 2px; overflow-x: auto; overflow-y: hidden; transform: none; scrollbar-width: none; white-space: nowrap; }
+html.xn-bar-top .xn .xn-links::-webkit-scrollbar { display: none; }
+html.xn-bar-top .xn .xn-links a { position: relative; flex: none; gap: 8px; min-height: 40px; padding: 0 11px; transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease; }
+html.xn-bar-top .xn-links .xn-link-ic .xn-ico { width: 18px; height: 18px; }
+html.xn-bar-top .xn-links .xn-link-desc { display: none; }
+html.xn-bar-top .xn-links .xn-link-name { font-size: 13.5px; }
+html.xn-bar-top .xn .xn-links a[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -8px; height: 2px; border-radius: 2px; background: var(--oled-accent); }
+html.xn-bar-top .xn-friends { flex: 0 1 auto; max-width: 22%; }
+html.xn-bar-top .xn-out { margin-left: 0; }
+@media (hover: hover) { html.xn-bar-top .xn .xn-links a:hover { transform: translateY(-1px); } }
+/* Not enough room for the names: just the icons, the name shows on hover. */
+@media (max-width: 1399.98px) {
+  html.xn-bar-top .xn .xn-links a { padding: 0 10px; }
+  html.xn-bar-top .xn-links .xn-link-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  html.xn-bar-top .xn-links .xn-link-ic .xn-ico { width: 20px; height: 20px; }
+}
+
+/* Side navigation bar: the pages down the left side, under the top bar. */
+html.xn-bar-side { --xn-side-w: 228px; }
+html.xn-bar-side body { padding-left: var(--xn-side-w); }
+html.xn-bar-side .xn .xn-links {
+  position: fixed;
+  top: calc(var(--oled-nav-h) + env(safe-area-inset-top));
+  bottom: 0;
+  left: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: var(--xn-side-w);
+  padding: 12px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform: none;
+  border-right: 1px solid var(--oled-line);
+  background: var(--oled-bg);
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+html.xn-bar-side .xn .xn-links a { position: relative; flex: none; gap: 12px; min-height: 44px; padding: 0 10px 0 6px; transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease; }
+html.xn-bar-side .xn-links .xn-link-ic { width: 32px; height: 32px; border-radius: 9px; }
+html.xn-bar-side .xn-links .xn-link-ic .xn-ico { width: 18px; height: 18px; }
+html.xn-bar-side .xn-links .xn-link-desc { display: none; }
+html.xn-bar-side .xn-links .xn-link-name { overflow: hidden; text-overflow: ellipsis; }
+html.xn-bar-side .xn .xn-links a[aria-current="page"] { box-shadow: inset 3px 0 0 var(--oled-accent); }
+@media (hover: hover) { html.xn-bar-side .xn .xn-links a:hover { transform: translateX(3px); } }
+/* Your name, picture and Log out sit at the bottom of the side bar. */
+html.xn-bar-side .xn > .xn-out { display: none; }
+html.xn-bar-side .xn-menu-foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 12px 2px 2px; border-top: 1px solid var(--oled-line); }
+html.xn-bar-side .xn .xn-links a.xn-foot-me { display: inline-flex; align-items: center; gap: 10px; min-height: 0; min-width: 0; margin-left: auto; padding: 4px 4px 4px 10px; border-radius: 12px; }
+html.xn-bar-side .xn-foot-me .xn-foot-name { max-width: 104px; }
+html.xn-bar-side .xn-foot-lv { display: none !important; }
+/* Things fixed to the bottom or left of the screen move over to clear it. */
+html.xn-bar-side .gp-totals { left: var(--xn-side-w); }
+/* Narrower screens: a thin bar of icons, the name shows on hover. */
+@media (max-width: 1199.98px) {
+  html.xn-bar-side { --xn-side-w: 68px; }
+  html.xn-bar-side .xn .xn-links { padding: 10px 8px; overflow: visible; }
+  html.xn-bar-side .xn .xn-links a { justify-content: center; padding: 0; }
+  html.xn-bar-side .xn-links .xn-link-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  html.xn-bar-side .xn-menu-foot { flex-direction: column-reverse; padding: 10px 0 2px; }
+  html.xn-bar-side .xn .xn-links a.xn-foot-me { margin: 0; padding: 0; }
+  html.xn-bar-side .xn-foot-me .xn-foot-name { display: none; }
+}
+/* Icon-only links name themselves on hover (data-name from nav.js). */
+@media (hover: hover) {
+  html.xn-bar-top .xn .xn-links a[data-name]:hover::before,
+  html.xn-bar-side .xn .xn-links a[data-name]:hover::before { content: attr(data-name); position: absolute; z-index: 3; padding: 5px 9px; border: 1px solid var(--oled-line-strong); border-radius: 8px; background: var(--oled-surface); color: var(--oled-text); font-size: 12px; white-space: nowrap; pointer-events: none; box-shadow: 0 10px 24px -12px #000; }
+  html.xn-bar-top .xn .xn-links a[data-name]:hover::before { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+  html.xn-bar-side .xn .xn-links a[data-name]:hover::before { left: calc(100% + 10px); top: 50%; transform: translateY(-50%); }
+}
+@media (min-width: 1400px) { html.xn-bar-top .xn .xn-links a[data-name]:hover::before { display: none; } }
+@media (min-width: 1200px) { html.xn-bar-side .xn .xn-links a[data-name]:hover::before { display: none; } }
+
+html.xn-bar-side .xn { margin-left: calc(var(--xn-side-w) * -1); }
+
+/* The page's name in the middle of the top bar (nav.js initTitle, mommy 2026-11-06). */
+.xn-title { position: absolute; left: 50%; top: calc(50% + env(safe-area-inset-top) / 2); z-index: 1; max-width: 38vw; overflow: hidden; transform: translate(-50%, -50%); color: var(--oled-text); font-size: 16px; font-weight: 700; letter-spacing: 0.01em; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+html.xn-bar-top .xn-title { display: none; }
+@media (max-width: 767px) { .xn-title { font-size: 15px; max-width: 46vw; } }
+
+/* Level bar (mommy 2026-11-06): ten icons of the next rank in a row; one
+   lights up for every 10% of the way there (geekRank.Steps in Go). */
+.xn-lrow { --m: 30px; display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%; }
+.xn-lrow .xn-lbar-mile { position: relative; top: auto; left: auto; flex: 0 1 var(--m); width: auto; height: auto; min-width: 0; aspect-ratio: 1; transform: none; border: 0; border-radius: 0; background: none; }
+.xn-lrow .xn-lbar-mile .xn-lp-ico { width: 100%; height: 100%; }
+.xn-lrow .xn-lbar-mile.is-on .xn-lp-ico { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tc) 60%, transparent)); opacity: 1; }
+.xn-lrow .xn-lbar-mile:not(.is-on) .xn-lp-ico { filter: grayscale(1) brightness(.5); opacity: .45; }
+@media (prefers-reduced-motion: no-preference) {
+  .xn-lrow .xn-lbar-mile.is-on { animation: xn-lrow-on .45s cubic-bezier(.3, 1.5, .6, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+}
+@keyframes xn-lrow-on { from { transform: scale(.6); opacity: .4; } }
+
+/* Menu bottom row (mommy 2026-11-06): no line above it, no border or
+   background; Log out and Admin are bare icons; Admin is no longer a tile;
+   the rank name sits on the other side of the level badge. */
+html:is(.xn-menu, .xn-bar-side) .xn .xn-links a.xn-admin { display: none !important; }
+html:is(.xn-menu, .xn-bar-side) .xn-menu-foot { gap: 6px; border: 0; background: none; box-shadow: none; }
+html.xn-menu .xn-menu-foot { margin-top: 2px; padding: 8px 6px 2px; }
+.xn-foot-out button { width: 38px; height: 38px; border: 0; border-radius: 10px; background: none; transition: color 0.15s ease, transform 0.15s ease; }
+.xn-foot-out svg { width: 21px; height: 21px; }
+.xn-foot-out button:hover, .xn-foot-out button:focus-visible { border: 0; background: none; transform: scale(1.1); }
+.xn-foot-out button:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.xn-foot-admin button { color: #ff8b8b; }
+.xn-foot-admin button:hover, .xn-foot-admin button:focus-visible { color: #ffb0b0; }
+html:is(.xn-menu, .xn-bar-side) .xn .xn-links a.xn-foot-me { border: 0; background: none; }
+.xn-foot-rank { display: inline-flex; flex: none; }
+.xn-foot-rank[hidden] { display: none; }
+.xn-foot-rank .xn-rn { font-size: 1.05rem; }
+.xn-foot-me .xn-foot-lv { margin-inline: -4px; }
+html.xn-bar-side .xn-foot-rank { display: none !important; }
+@media (max-width: 900px) { html.xn-menu .xn-foot-rank .xn-rn { font-size: .9rem; } }
+
+/* Menu panel (mommy 2026-11-06): only as wide as it needs to be, three
+   columns sized to the longest name, names on one line; on hover the icon
+   box moves up and to the right (45 degrees). */
+@media (min-width: 768px) {
+  html.xn-menu .xn .xn-links { grid-template-columns: repeat(3, max-content); width: max-content; max-width: calc(100% - var(--xn-menu-x, 12px) - 12px); }
+  html.xn-menu .xn .xn-links a:not(.xn-foot-me) { padding-right: 18px; }
+  html.xn-menu .xn .xn-links .xn-link-name { white-space: nowrap; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  html.xn-menu .xn .xn-links a:hover .xn-link-ic { transform: translate(2px, -2px) scale(1.06); }
+}

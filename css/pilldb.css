@@ -141,3 +141,30 @@
 .pd-view-pic { position: relative; overflow: hidden; }
 .pd-who .fm-lv { display: inline-flex; flex: none; }
 .pd-who .fm-lv .xn-hexb { font-size: 28px; }
+
+/* Categories (mommy 2026-11-06): tiles above the filters, a chip on each card. */
+.pd-cats { display: flex; gap: 8px; margin: 0 0 14px; padding: 2px 2px 8px; overflow-x: auto; scrollbar-width: thin; }
+.pd-cats[hidden] { display: none; }
+.pd-cat { display: grid; justify-items: center; gap: 6px; flex: none; min-width: 92px; padding: 12px 10px 10px; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface); color: var(--oled-text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease; }
+.pd-cat-ic { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid rgba(var(--xn-accent-rgb), 0.25); border-radius: 11px; background: var(--oled-accent-soft); color: var(--oled-accent); }
+.pd-cat-ic svg { width: 22px; height: 22px; fill: currentColor; }
+.pd-cat-ic .sc-icon { width: 22px; height: 22px; margin: 0; }
+.pd-cat[aria-pressed="true"] { border-color: var(--oled-accent); background: var(--oled-accent-soft); }
+@media (hover: hover) { .pd-cat:hover { border-color: rgba(var(--xn-accent-rgb), 0.5); transform: translateY(-2px); } }
+.pd-cat:active { transform: scale(0.97); }
+.pd-cat:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.pd-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pd-chip-cat { gap: 4px; background: var(--oled-accent-soft); color: var(--oled-accent); box-shadow: inset 0 0 0 1px rgba(var(--xn-accent-rgb), 0.35); }
+.pd-chip-cat .sc-icon { width: 12px; height: 12px; margin: 0; }
+
+/* Categories sit in a box like the tabs, to the right of them (mommy 2026-11-06). */
+.pd-bar { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.pd-bar .pd-tabs { flex: none; }
+.pd-cats { flex: 1 1 0; min-width: 0; gap: 4px; margin: 0; padding: 4px; border: 1px solid var(--oled-line); border-radius: 12px; background: var(--oled-surface-2); }
+.pd-cat { display: inline-flex; align-items: center; gap: 7px; min-width: 0; min-height: 38px; padding: 0 12px 0 8px; border: 0; border-radius: 9px; background: none; color: var(--oled-muted); font-size: 13px; white-space: nowrap; transition: color 0.2s ease, background-color 0.2s ease; }
+.pd-cat-ic { width: 24px; height: 24px; border: 0; border-radius: 7px; background: none; color: currentColor; }
+.pd-cat-ic svg, .pd-cat-ic .sc-icon { width: 18px; height: 18px; }
+.pd-cat[aria-pressed="true"] { color: var(--oled-text); background: var(--oled-accent-soft); box-shadow: inset 0 0 0 1px rgba(var(--xn-accent-rgb), 0.45); }
+.pd-cat[aria-pressed="true"] .pd-cat-ic { color: var(--oled-accent); }
+@media (hover: hover) { .pd-cat:hover { border-color: transparent; color: var(--oled-text); transform: none; } }
+@media (max-width: 767px) { .pd-cats { flex-basis: 100%; } }

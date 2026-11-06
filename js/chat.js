@@ -62,6 +62,32 @@ function face(p) {
   return s;
 }
 
+// "Online" / "Active 5 min ago" from a member's lastSeen (ms), like the Forum.
+function seenText(lastSeen) {
+  if (!lastSeen) return { on: false, text: "" };
+  const ago = Date.now() - lastSeen;
+  if (ago < 3 * 60000) return { on: true, text: "Online" };
+  const min = Math.round(ago / 60000);
+  if (min < 60) return { on: false, text: "Active " + min + " min ago" };
+  const h = Math.round(min / 60);
+  if (h < 24) return { on: false, text: "Active " + h + (h === 1 ? " hour ago" : " hours ago") };
+  const d = Math.round(h / 24);
+  if (d < 60) return { on: false, text: "Last active " + d + (d === 1 ? " day ago" : " days ago") };
+  return { on: false, text: "Last active " + new Date(lastSeen).toLocaleDateString(undefined, { month: "short", year: "numeric" }) };
+}
+
+/** The chat's picture, with a green dot while the other person is online. */
+function avatarWithDot(chat) {
+  const av = avatarFor(chat);
+  const other = chat.kind !== "group" && chat.members.find((m) => m.id !== state.me);
+  if (!other || !seenText(other.lastSeen).on) return av;
+  const wrap = el("span", "ch-av-wrap");
+  const dot = el("span", "ch-on-dot");
+  dot.title = "Online";
+  wrap.append(av, dot);
+  return wrap;
+}
+
 function avatarFor(chat) {
   const others = chat.members.filter((m) => m.id !== state.me);
   if (chat.kind === "group") {
@@ -194,7 +220,7 @@ function renderList() {
     bottom.append(el("span", "ch-item-last" + (typing ? " is-typing" : ""), lastText));
     if (c.unread && c.id !== state.open) bottom.append(el("span", "ch-badge", c.unread > 99 ? "99+" : String(c.unread)));
     text.append(top, bottom);
-    b.append(avatarFor(c), text);
+    b.append(avatarWithDot(c), text);
     b.addEventListener("click", () => openChat(c.id));
     li.append(b);
     list.append(li);
@@ -261,8 +287,10 @@ function renderHead() {
   sub.classList.toggle("is-typing", !!typing);
   if (typing) sub.textContent = c.kind === "group" ? c.typing.join(", ") + (c.typing.length === 1 ? " is" : " are") + " typing…" : "typing…";
   else if (c.kind === "group") sub.textContent = c.members.length + " members · " + c.members.map((m) => (m.id === state.me ? "you" : m.name)).join(", ");
-  else sub.textContent = "Private chat";
   const other = c.members.find((m) => m.id !== state.me);
+  const seen = c.kind !== "group" && other ? seenText(other.lastSeen) : { on: false, text: "" };
+  sub.classList.toggle("is-on", !typing && seen.on);
+  if (!typing && c.kind !== "group") sub.textContent = seen.text || "Private chat";
   const who = $("chWho");
   if (c.kind !== "group" && other) who.href = "/u/" + encodeURIComponent(other.name);
   else who.removeAttribute("href");
@@ -888,3 +916,6 @@ viewer.addEventListener("click", () => viewer.close());
   else refresh(true);
 })();
 window.addEventListener("hashchange", () => openChat(Number(location.hash.slice(1)) || 0, { push: false }));
+
+// The "Active ... ago" line in the header stays current while the chat is open.
+setInterval(() => { if (!document.hidden) renderHead(); }, 60000);

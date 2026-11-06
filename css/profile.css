@@ -57,7 +57,7 @@
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 16px 24px;
-  margin-top: -96px;
+  margin-top: -57px;
 }
 .pf-who { flex: 1 1 200px; min-width: 0; padding-top: 110px; }
 .pf-who .xn-h1 { overflow-wrap: anywhere; }
@@ -1403,7 +1403,116 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 }
 @media (max-width: 640px) {
   .pf-banner { height: 200px; }
-  .pf-head-row { margin-top: -64px; gap: 12px; }
+  .pf-head-row { margin-top: -58px; gap: 12px; }
   .profile-avatar { width: 128px; height: 128px; }
   .pf-initial { font-size: 52px; }
 }
+
+/* Pills in the calendar (mommy 2026-11-06): pill picture lying flat + the dose. */
+.cal-day.has-pills { height: auto; min-height: clamp(40px, 7vw, 52px); padding: 5px 2px; gap: 3px; }
+.cal-pills { display: grid; justify-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.cal-pill { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0; }
+.cal-pill .sc-icon.cal-pill-ico { width: 16px; height: 16px; margin: 0; flex: none; }
+.cal-pill .is-capsule, .pf-ico.is-pill .is-capsule { transform: rotate(90deg); }
+.cal-pill-amt { overflow: hidden; font-size: 9.5px; font-weight: 600; line-height: 1; letter-spacing: -.02em; white-space: nowrap; text-overflow: ellipsis; color: var(--oled-text); }
+.cal-dots[hidden] { display: none; }
+@media (max-width: 520px) {
+  .cal-pill { flex-direction: column; gap: 1px; }
+  .cal-pill .sc-icon.cal-pill-ico { width: 14px; height: 14px; }
+  .cal-pill-amt { font-size: 8.5px; }
+}
+
+/* Hover on every Profile button (mommy 2026-11-06): it lifts, the border takes
+   the accent and a soft glow shows under it; pressing pushes it back down. */
+.pf :is(.xn-btn, .pf-tool, .cal-step, .pf-range [role="tab"], .pf-add, .pf-gear, .pf-menu-item, .pr-font-btn, .fr-small),
+.pf-pop :is(.xn-btn, .pf-tool), dialog :is(.xn-btn, .pf-tool) {
+  transition: transform .18s cubic-bezier(.3, 1.4, .6, 1), border-color .2s ease, background-color .2s ease, box-shadow .2s ease, color .2s ease;
+}
+@media (hover: hover) {
+  .pf :is(.xn-btn, .pf-tool, .cal-step, .pf-add, .pf-gear, .pr-font-btn, .fr-small):not(:disabled):hover,
+  dialog :is(.xn-btn, .pf-tool):not(:disabled):hover {
+    transform: translateY(-2px);
+    border-color: rgba(var(--xn-accent-rgb), .6);
+    box-shadow: 0 8px 20px -10px rgba(var(--xn-accent-rgb), .85);
+  }
+  .pf .pf-range [role="tab"]:not([aria-selected="true"]):hover { color: var(--oled-text); background: rgba(var(--xn-accent-rgb), .12); }
+  .pf .pf-gear:hover svg { transform: rotate(60deg); }
+  .pf .pf-add:hover svg { transform: rotate(90deg); }
+}
+.pf .pf-gear svg, .pf .pf-add svg { transition: transform .35s cubic-bezier(.3, 1.4, .6, 1); }
+.pf :is(.xn-btn, .pf-tool, .cal-step, .pf-add, .pf-gear, .pr-font-btn, .fr-small):not(:disabled):active,
+dialog :is(.xn-btn, .pf-tool):not(:disabled):active { transform: translateY(0) scale(.96); box-shadow: none; }
+
+/* Phones (mommy 2026-11-06): Liked substances, Recent intake and Totals are
+   buttons under the calendar; each opens its card in a popup. */
+.cal-more { display: none; }
+.cal-more .xn-btn { gap: 6px; justify-content: center; min-height: 44px; padding: 0 8px; font-size: 13px; }
+.cal-more svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: var(--oled-accent); }
+@media (max-width: 767px) {
+  .cal-more { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+  [data-sheet-card]:not(.is-in-sheet) { display: none !important; }
+  .pf-data:not(:has(> :not([data-sheet-card]):not([hidden]))) { display: none; }
+}
+.pf-sheet-body { min-height: 0; max-height: min(62vh, 560px); overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
+.pf-sheet .is-in-sheet { display: flex; flex-direction: column; gap: 12px; padding: 0; border: 0; background: none; box-shadow: none; animation: none; }
+.pf-sheet .is-in-sheet > .pf-box-head > .xn-h2 { display: none; }
+.pf-sheet .is-in-sheet > .pf-box-head { justify-content: flex-end; }
+
+/* Menu style choices (mommy 2026-11-06): a tiny drawing of each layout. */
+.pr-navs { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.pr-nav-pic { position: relative; width: 46px; height: 32px; border-radius: 5px; background: rgba(var(--xn-accent-rgb), 0.08); box-shadow: 0 0 0 1px var(--oled-line); overflow: hidden; }
+.pr-nav-pic i { position: absolute; left: 0; right: 0; top: 0; height: 7px; background: rgba(var(--xn-accent-rgb), 0.28); }
+.pr-nav-pic b { position: absolute; width: 4px; height: 3px; border-radius: 1px; background: var(--oled-accent); }
+.pr-nav-pic[data-nav="menu"] b { top: 1px; width: 2px; height: 2px; }
+.pr-nav-pic[data-nav="menu"] b:nth-of-type(1) { left: 3px; top: 1px; }
+.pr-nav-pic[data-nav="menu"] b:nth-of-type(2) { left: 6px; top: 1px; }
+.pr-nav-pic[data-nav="menu"] b:nth-of-type(3) { left: 3px; top: 4px; }
+.pr-nav-pic[data-nav="menu"] b:nth-of-type(4) { left: 6px; top: 4px; }
+.pr-nav-pic[data-nav="top"] b { top: 2px; width: 6px; }
+.pr-nav-pic[data-nav="top"] b:nth-of-type(1) { left: 9px; }
+.pr-nav-pic[data-nav="top"] b:nth-of-type(2) { left: 17px; }
+.pr-nav-pic[data-nav="top"] b:nth-of-type(3) { left: 25px; }
+.pr-nav-pic[data-nav="top"] b:nth-of-type(4) { left: 33px; }
+.pr-nav-pic[data-nav="side"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 0; width: 12px; background: rgba(var(--xn-accent-rgb), 0.18); }
+.pr-nav-pic[data-nav="side"] b { left: 3px; width: 6px; }
+.pr-nav-pic[data-nav="side"] b:nth-of-type(1) { top: 10px; }
+.pr-nav-pic[data-nav="side"] b:nth-of-type(2) { top: 15px; }
+.pr-nav-pic[data-nav="side"] b:nth-of-type(3) { top: 20px; }
+.pr-nav-pic[data-nav="side"] b:nth-of-type(4) { top: 25px; }
+
+/* Liked / Recent intake / Totals in one card with tabs (mommy 2026-11-06), like Notes. */
+.pf-data:empty { display: none; }
+.pf-seg { position: relative; display: inline-flex; align-self: flex-start; max-width: 100%; padding: 3px; border: 1px solid var(--oled-line); border-radius: 12px; background: var(--oled-surface-2); overflow-x: auto; scrollbar-width: none; }
+.pf-seg-btn { display: inline-flex; align-items: center; gap: 7px; flex: none; min-height: 38px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--oled-muted); font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color 0.25s ease, transform 0.12s ease; }
+.pf-seg-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.pf-seg-btn[aria-selected="true"] { background: var(--oled-accent-soft); color: var(--oled-text); }
+.pf-seg-btn[aria-selected="true"] svg { color: var(--oled-accent); }
+.pf-seg-btn:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
+.pf-seg-btn:active { transform: scale(0.94); }
+.pf-seg-glow { position: absolute; top: 3px; left: 0; z-index: 0; height: calc(100% - 6px); border-radius: 9px; background: var(--oled-accent-soft); box-shadow: inset 0 0 0 1px rgba(var(--xn-accent-rgb), 0.3), 0 0 18px -6px rgba(var(--xn-accent-rgb), 0.6); pointer-events: none; transition: transform 0.38s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.38s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.pf-seg.has-glow .pf-seg-btn { position: relative; z-index: 1; }
+.pf-seg.has-glow .pf-seg-btn[aria-selected="true"] { background: transparent; }
+.pf-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.pf-tabbed .pf-pane:not(.is-on) { display: none; }
+.pf-tabbed .pf-pane > .pf-box-head { justify-content: flex-end; min-height: 0; }
+.pf-tabbed .pf-pane > .pf-box-head > .xn-h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* The open pane's head (count, 7 days / 30 days / All) sits on the tab row. */
+.pf-tabbed { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 14px; }
+.pf-tabbed > .pf-seg { grid-column: 1; grid-row: 1; }
+.pf-tabbed .pf-pane.is-on { display: contents; }
+.pf-tabbed .pf-pane.is-on > .pf-box-head { grid-column: 2; grid-row: 1; }
+.pf-tabbed .pf-pane.is-on > :not(.pf-box-head) { grid-column: 1 / -1; grid-row: 2; align-self: start; animation: pf-pane-in 0.28s ease both; }
+@keyframes pf-pane-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .pf-seg-glow { transition: none; } .pf-tabbed .pf-pane.is-on > * { animation: none; } }
+@media (max-width: 767px) { .pf-tabbed { display: none !important; } }
+
+/* Banner buttons (mommy 2026-11-06): the settings gear and an icon-only Change banner, both 40px squares. */
+.pf .pf-banner > .pf-menu-wrap .pf-gear,
+.pf .xn-btn.pf-banner-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; padding: 0; border-radius: 23%; display: grid; place-items: center; }
+.pf .xn-btn.pf-banner-btn svg { width: 18px; height: 18px; margin: 0; }
+@media (max-width: 640px) { .pf .xn-btn.pf-banner-btn { top: 12px; right: 12px; } }
+/* The square stays still; only the gear inside turns when the menu opens. */
+.pf .pf-banner .pf-gear[aria-expanded="true"] { transform: none; }
+.pf .pf-banner .pf-gear span { transition: transform .25s ease; }
+.pf .pf-banner .pf-gear[aria-expanded="true"] span { transform: rotate(45deg); }
+.pf-progress .xn-lrow { --m: 22px; gap: 1px; margin-block: 2px; }

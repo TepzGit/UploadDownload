@@ -1066,7 +1066,7 @@ func desktopMirrorRefresh(server string) {
 	if !strings.Contains(cookie, "SessionID=") {
 		return
 	}
-	paths := []string{"/Main", "/", "/journal", "/Notes", "/Forum", "/Music", "/Profile", "/Utility", "/Files/",
+	paths := []string{"/Main", "/", "/journal", "/Notes", "/Forum", "/Music", "/Profile", "/Files/",
 		"/forum/posts", "/forum/members", "/friends", "/notifications", "/profile/appearance", "/experiences",
 		"/graphColors", "/likes", "/substances/custom", "/music/library", "/music/playlists", "/notes/reports", "/notes/notepad"}
 	for _, p := range paths {

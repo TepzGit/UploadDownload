@@ -336,6 +336,31 @@ var cookies = map[string]cookiesStruct{}
 
 var tpl *template.Template
 
+func parseHTMLPage(filename string) (*template.Template, error) {
+	return template.ParseFiles(filename, "html/xn-nav.html")
+}
+
+func renderHTMLPage(w http.ResponseWriter, filename string, data any) {
+	page, err := parseHTMLPage(filename)
+	if err != nil {
+		fmt.Println("Couldnt load page:", err)
+		http.Error(w, "Couldnt load page", http.StatusInternalServerError)
+		return
+	}
+
+	var rendered bytes.Buffer
+	if err := page.Execute(&rendered, data); err != nil {
+		fmt.Println("Couldnt render page:", err)
+		http.Error(w, "Couldnt load page", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if _, err := w.Write(rendered.Bytes()); err != nil {
+		fmt.Println("Couldnt write page:", err)
+	}
+}
+
 func main() {
 	tpl = template.New("root")
 	tpl.New("Upload")
@@ -352,7 +377,7 @@ func main() {
 		case "/", "/index.html":
 			// no-cache: browsers check for a newer copy each visit (a 304 when nothing changed).
 			w.Header().Set("Cache-Control", "no-cache")
-			http.ServeFile(w, r, "html/index.html")
+			renderHTMLPage(w, "html/index.html", nil)
 		default:
 			http.NotFound(w, r)
 		}
@@ -431,11 +456,11 @@ func main() {
 	http.HandleFunc("/friends", requireLogin(friends))
 	http.HandleFunc("/experiences/people", requireLogin(experiencePeople))
 	http.HandleFunc("/likes", requireLogin(likes))
-	http.HandleFunc("/Utility", requireLogin(Utility))
-	// Replications was replaced by Utility; old links and bookmarks land there.
-	http.HandleFunc("/Replications", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/Utility", http.StatusMovedPermanently)
-	})
+	// The Utility page was deleted (mommy 2026-11-06); old links and bookmarks
+	// (also the older /Replications) land on Main.
+	toMain := func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/Main", http.StatusFound) }
+	http.HandleFunc("/Utility", toMain)
+	http.HandleFunc("/Replications", toMain)
 	http.HandleFunc("/GetSportifyFileFromLink", requireLogin(GetSportifyFileFromLink))
 	http.HandleFunc("/replications/list", requireLogin(replicationsList))
 	http.HandleFunc("/replications/files/", requireLogin(replicationsFile))
@@ -569,6 +594,7 @@ func main() {
 	registerPsychonautWikiCopy()
 	registerPillPictures()
 	registerPreviewPictures()
+	registerMemberPhotos()
 	registerPillDatabase()
 	// News board items got a title, a pin and an edit time.
 	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''", "tag TEXT NOT NULL DEFAULT ''", "tag_color TEXT NOT NULL DEFAULT ''", "size TEXT NOT NULL DEFAULT ''"} {
@@ -648,7 +674,7 @@ func Main(w http.ResponseWriter, r *http.Request) {
 	setRoleHint(w, r, d.SessionInfo, d.Login)
 	fmt.Printf("[%s] NEUTRAL IP=%s USER=%s PATH=%s\n", time.Now().Format("2006-01-02 15:04:05"), clientIP(r), d.SessionInfo.OriginalUsername, r.URL.Path)
 
-	tpl, err := template.ParseFiles("html/Main.html")
+	tpl, err := parseHTMLPage("html/Main.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -1147,7 +1173,7 @@ func loadMeCard(uid int) *meCard {
 }
 
 func Profile(w http.ResponseWriter, r *http.Request) {
-	tpl, err := template.ParseFiles("html/profile.html")
+	tpl, err := parseHTMLPage("html/profile.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -1692,7 +1718,7 @@ func timeToHowLongAgoString(timeArg time.Time) string {
 }
 
 func Substance(w http.ResponseWriter, r *http.Request) {
-	tpl, err := template.ParseFiles("html/sub.html")
+	tpl, err := parseHTMLPage("html/sub.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -1833,7 +1859,7 @@ func saveData(w http.ResponseWriter, r *http.Request) {
 }
 
 func Journal(w http.ResponseWriter, r *http.Request) {
-	tpl, err := template.ParseFiles("html/Journal.html")
+	tpl, err := parseHTMLPage("html/Journal.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -1847,7 +1873,7 @@ func Journal(w http.ResponseWriter, r *http.Request) {
 }
 
 func DrugInfo(w http.ResponseWriter, r *http.Request) {
-	tpl, err := template.ParseFiles("html/DruginfoPage.html")
+	tpl, err := parseHTMLPage("html/DruginfoPage.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -2304,7 +2330,7 @@ func Downloader(w http.ResponseWriter, r *http.Request) {
 		}
 		d.Files = withFolderIcons(grant.visible(d.Files, rel), rel)
 
-		tpl, err := template.ParseFiles("html/Downloader.html")
+		tpl, err := parseHTMLPage("html/Downloader.html")
 		if err != nil {
 			http.Error(w, "Couldnt load page", http.StatusBadRequest)
 			return
@@ -2331,7 +2357,7 @@ func Uploader(w http.ResponseWriter, r *http.Request) {
 
 	//tpl.ExecuteTemplate(w, "Upload", nil)
 
-	tpl, err := template.ParseFiles("html/Uploader.html")
+	tpl, err := parseHTMLPage("html/Uploader.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -2812,7 +2838,7 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 }
 
 func AdminPanel(w http.ResponseWriter, r *http.Request) {
-	tpl, err := template.ParseFiles("html/AdminPanel.html")
+	tpl, err := parseHTMLPage("html/AdminPanel.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -2827,11 +2853,11 @@ func AdminPanel(w http.ResponseWriter, r *http.Request) {
 
 func AdminDrugIcons(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, "html/drug-icons.html")
+	renderHTMLPage(w, "html/drug-icons.html", nil)
 }
 
 func AdminPanelCreateUser(w http.ResponseWriter, r *http.Request) {
-	tpl, err := template.ParseFiles("html/AdminPanelCreateUser.html")
+	tpl, err := parseHTMLPage("html/AdminPanelCreateUser.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -4581,7 +4607,7 @@ func publicProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tpl, err := template.ParseFiles("html/user.html")
+	tpl, err := parseHTMLPage("html/user.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -4606,7 +4632,7 @@ func Forum(w http.ResponseWriter, r *http.Request) {
 		Avatar  string
 	}{session.OriginalUsername, initialOf(session.OriginalUsername), existingPicture(avatar)}
 
-	tpl, err := template.ParseFiles("html/forum.html")
+	tpl, err := parseHTMLPage("html/forum.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -5107,6 +5133,8 @@ type siteLook struct {
 	OgIcons bool `json:"ogIcons"`
 	// Animations: "" on (also when the device asks for less motion), "device" follows the device, "off".
 	Motion string `json:"motion,omitempty"`
+	// Menu style on wide screens: "" the menu button, "top" a bar of links, "side" a bar on the left.
+	Nav string `json:"nav,omitempty"`
 }
 
 var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "consolas": true, "courier": true, "inter": true, "grotesk": true, "system": true, "verdana": true, "trebuchet": true, "rounded": true, "comic": true, "serif": true, "garamond": true}
@@ -5122,6 +5150,9 @@ func (l siteLook) clean() siteLook {
 	}
 	if l.Motion != "device" && l.Motion != "off" {
 		l.Motion = ""
+	}
+	if l.Nav != "top" && l.Nav != "side" {
+		l.Nav = ""
 	}
 	if l.Size < 80 || l.Size > 130 {
 		l.Size = 100
@@ -6489,6 +6520,51 @@ func (g geekRank) BarPct() int {
 	return int(math.Round((float64(g.Tier-1) + in/float64(to-from)) * 100 / float64(n-1)))
 }
 
+// RankPct is how far the account is from its rank to the next one, 0 to 100
+// (100 at the top rank). Levels count with their part-done progress.
+func (g geekRank) RankPct() int {
+	n := len(geekTiers)
+	if g.Tier >= n || g.Tier < 1 {
+		return 100
+	}
+	from, to := geekTiers[g.Tier-1].From, geekTiers[g.Tier].From
+	in := float64(g.Level-from) + float64(g.Progress)/100
+	pct := int(math.Floor(in * 100 / float64(to-from)))
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	return pct
+}
+
+// rankStepIcon is one of the ten icons in the level bar.
+type rankStepIcon struct {
+	On   bool
+	Tier int
+	Name string
+}
+
+// Steps is the level bar (mommy 2026-11-06): ten icons of the next rank, all
+// muted at 0% and one more lights up for every 10% of the way to it. At the
+// top rank all ten are lit and show that rank.
+func (g geekRank) Steps() []rankStepIcon {
+	tier := g.Tier + 1
+	if tier > len(geekTiers) {
+		tier = len(geekTiers)
+	}
+	if tier < 1 {
+		tier = 1
+	}
+	lit := g.RankPct() / 10
+	out := make([]rankStepIcon, 10)
+	for i := range out {
+		out[i] = rankStepIcon{On: i < lit, Tier: tier, Name: geekTiers[tier-1].Name}
+	}
+	return out
+}
+
 // pointsForLevel is how many points reaching level l takes in total.
 func pointsForLevel(l int) int {
 	n := 0
@@ -6603,7 +6679,7 @@ func viewedPage(r *http.Request) string {
 	}
 	p := r.URL.Path
 	switch {
-	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Utility" || p == "/Pills":
+	case p == "/" || p == "/Main" || p == "/journal" || p == "/journal/Drug" || p == "/Profile" || p == "/Forum" || p == "/admin" || p == "/Uploader" || p == "/Pills":
 		return p
 	case strings.HasPrefix(p, "/u/"):
 		return "/u/"
@@ -7911,16 +7987,9 @@ func replDownload(link, dest string) (int64, error) {
 
 // ---- pages and endpoints ----
 
-// Utility: small tools (volumetric dosing, unit converter, redose timer) that
-// run in the browser, so they also work in the app without internet.
-func Utility(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, "html/utility.html")
-}
-
 func Replications(w http.ResponseWriter, r *http.Request) {
 	session, _ := sessionFromRequest(r)
-	t, err := template.ParseFiles("html/replications.html")
+	t, err := parseHTMLPage("html/replications.html")
 	if err != nil {
 		http.Error(w, "Couldnt load page", http.StatusBadRequest)
 		return
@@ -8595,7 +8664,7 @@ func loadCustomSubstances() ([]customSubstance, error) {
 
 func SubstancesImporter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, "html/substances.html")
+	renderHTMLPage(w, "html/substances.html", nil)
 }
 
 // publicCustomSubstances lists the custom substances for the Graph, Journal and Drug info.
@@ -9680,7 +9749,7 @@ func musicTrackByID(raw string) (musicTrack, bool) {
 
 func Music(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, "html/music.html")
+	renderHTMLPage(w, "html/music.html", nil)
 }
 
 // musicLibrary: GET answers {tracks, scanning, ffmpeg, access}. ?wait=1 waits for a scan.
@@ -10931,7 +11000,7 @@ func registerNotes() {
 		panic("cannot add trip_reports.pictures: " + err.Error())
 	}
 	http.HandleFunc("/Notes", requireLogin(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "html/notes.html")
+		renderHTMLPage(w, "html/notes.html", nil)
 	}))
 	http.HandleFunc("/notes/reports", tripReports)
 	http.HandleFunc("/notes/reports/public", publicTripReports)
@@ -13562,16 +13631,18 @@ func chatIsMember(chat int64, user int) bool {
 
 type chatPerson struct {
 	postAuthor
-	ID int `json:"id"`
+	ID       int   `json:"id"`
+	LastSeen int64 `json:"lastSeen,omitempty"` // ms; the chat header shows Online / Active ... ago
 }
 
 func chatPersonOf(id int) chatPerson {
 	var name, avatar, authority string
-	db.QueryRow("SELECT originalUsername, pathToProfilePic, authority FROM users WHERE id = ?", id).Scan(&name, &avatar, &authority)
+	var seen int64
+	db.QueryRow("SELECT originalUsername, pathToProfilePic, authority, lastSeen FROM users WHERE id = ?", id).Scan(&name, &avatar, &authority, &seen)
 	if name == "" {
 		name = "Deleted account"
 	}
-	return chatPerson{person(name, avatar, authority), id}
+	return chatPerson{person(name, avatar, authority), id, seen}
 }
 
 type chatMessage struct {
@@ -13717,7 +13788,7 @@ func registerChat() {
 	}
 	http.HandleFunc("/Chat", requireLogin(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, "html/chat.html")
+		renderHTMLPage(w, "html/chat.html", nil)
 	}))
 	http.HandleFunc("/chat/updates", requireLogin(chatUpdates))
 	http.HandleFunc("/chat/people", requireLogin(chatPeople))
@@ -15956,6 +16027,196 @@ func previewPictures(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"items": listPreviews(name)})
 }
 
+// ---- Member pictures on drug pages (mommy 2026-11-06) ----
+// Any member can add pictures of a substance (what it looks like, the
+// packaging). They wait for an admin like the Pill Database; members see
+// the approved ones and their own. Admins' own pictures go up approved.
+
+const memberPhotoSchema = `CREATE TABLE IF NOT EXISTS substance_photos (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	file TEXT NOT NULL,
+	caption TEXT NOT NULL DEFAULT '',
+	user_id INTEGER NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending',
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS substance_photos_name ON substance_photos(name);`
+
+var memberPhotoDir = filepath.Join(UploadedFilesDirName, "photos")
+var memberPhotoFile = regexp.MustCompile(`^mpic-[0-9a-f]{12}\.(jpg|png|gif|webp)$`)
+
+type memberPhoto struct {
+	ID      int64      `json:"id"`
+	URL     string     `json:"url"`
+	Caption string     `json:"caption"`
+	Status  string     `json:"status"`
+	By      postAuthor `json:"by"`
+	Mine    bool       `json:"mine"`
+	At      int64      `json:"at"`
+}
+
+func registerMemberPhotos() {
+	if _, err := db.Exec(memberPhotoSchema); err != nil {
+		fmt.Println("substance_photos:", err)
+	}
+	http.HandleFunc("/journal/api/photos", requireLogin(memberPhotos))
+	http.HandleFunc("/member-pic/", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/member-pic/")
+		if !memberPhotoFile.MatchString(name) {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		http.ServeFile(w, r, filepath.Join(memberPhotoDir, name))
+	}))
+}
+
+func listMemberPhotos(name string, me int, admin bool) []memberPhoto {
+	out := []memberPhoto{}
+	rows, err := db.Query(`SELECT p.id, p.file, p.caption, p.status, p.user_id, p.created_at,
+		COALESCE(u.originalUsername, ''), COALESCE(u.pathToProfilePic, ''), COALESCE(u.authority, '')
+		FROM substance_photos p LEFT JOIN users u ON u.id = p.user_id
+		WHERE p.name = ? AND (p.status = 'approved' OR p.user_id = ? OR ?)
+		ORDER BY p.status = 'pending' DESC, p.created_at DESC, p.id DESC`, previewKey(name), me, admin)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p memberPhoto
+		var file, uname, avatar, authority string
+		var owner int
+		if rows.Scan(&p.ID, &file, &p.Caption, &p.Status, &owner, &p.At, &uname, &avatar, &authority) != nil {
+			continue
+		}
+		if p.Status == "rejected" && owner != me && !admin {
+			continue
+		}
+		if uname == "" {
+			uname = "deleted account"
+		}
+		p.URL = "/member-pic/" + file
+		p.By = person(uname, avatar, authority)
+		p.Mine = owner == me
+		out = append(out, p)
+	}
+	return out
+}
+
+// memberPhotos: GET ?q=<substance>; POST multipart (name, caption, image x up
+// to 4) to add; POST JSON {action: approve|reject|delete, id}. Admins approve
+// and reject; the uploader or an admin can delete.
+func memberPhotos(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	admin := session.Authority == "admin"
+	me := session.UserId
+	if r.Method == http.MethodGet {
+		writeJSON(w, map[string]any{"items": listMemberPhotos(r.URL.Query().Get("q"), me, admin), "admin": admin})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		var req struct {
+			Action string `json:"action"`
+			ID     int64  `json:"id"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req) != nil {
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+		var name, file string
+		var owner int
+		if db.QueryRow("SELECT name, file, user_id FROM substance_photos WHERE id = ?", req.ID).Scan(&name, &file, &owner) != nil {
+			http.Error(w, "That picture is gone.", http.StatusNotFound)
+			return
+		}
+		switch req.Action {
+		case "approve", "reject":
+			if !admin {
+				http.Error(w, "Only admins can check pictures.", http.StatusForbidden)
+				return
+			}
+			status := map[string]string{"approve": "approved", "reject": "rejected"}[req.Action]
+			db.Exec("UPDATE substance_photos SET status = ? WHERE id = ?", status, req.ID)
+		case "delete":
+			if !admin && owner != me {
+				http.Error(w, "You can only delete your own pictures.", http.StatusForbidden)
+				return
+			}
+			db.Exec("DELETE FROM substance_photos WHERE id = ?", req.ID)
+			if memberPhotoFile.MatchString(file) {
+				os.Remove(filepath.Join(memberPhotoDir, file))
+			}
+		default:
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]any{"items": listMemberPhotos(name, me, admin), "admin": admin})
+		return
+	}
+	const most = 4
+	r.Body = http.MaxBytesReader(w, r.Body, most*(25<<20))
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		http.Error(w, "Those pictures are too big. Each must be under 25 MB.", http.StatusRequestEntityTooLarge)
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	name := previewKey(r.FormValue("name"))
+	if name == "" || len(name) > 120 {
+		http.Error(w, "Which substance?", http.StatusBadRequest)
+		return
+	}
+	caption := strings.TrimSpace(r.FormValue("caption"))
+	if len(caption) > 200 {
+		caption = caption[:200]
+	}
+	files := r.MultipartForm.File["image"]
+	if len(files) == 0 {
+		http.Error(w, "Pick a picture first.", http.StatusBadRequest)
+		return
+	}
+	if len(files) > most {
+		http.Error(w, fmt.Sprintf("At most %d pictures at a time.", most), http.StatusBadRequest)
+		return
+	}
+	// A cap on waiting pictures per member keeps the check list short.
+	var waiting int
+	db.QueryRow("SELECT COUNT(*) FROM substance_photos WHERE user_id = ? AND status = 'pending'", me).Scan(&waiting)
+	if !admin && waiting+len(files) > 20 {
+		http.Error(w, "You have 20 pictures waiting for a check. Try again once they are checked.", http.StatusTooManyRequests)
+		return
+	}
+	status := "pending"
+	if admin {
+		status = "approved"
+	}
+	for _, fh := range files {
+		if fh.Size > 25<<20 {
+			http.Error(w, fh.Filename+" is over 25 MB.", http.StatusRequestEntityTooLarge)
+			return
+		}
+		f, err := fh.Open()
+		if err != nil {
+			http.Error(w, "Couldn't read "+fh.Filename+".", http.StatusBadRequest)
+			return
+		}
+		file, code, msg := saveImageIn(f, memberPhotoDir, "mpic")
+		f.Close()
+		if code != 0 {
+			http.Error(w, fh.Filename+": "+msg, code)
+			return
+		}
+		db.Exec("INSERT INTO substance_photos(name, file, caption, user_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+			name, file, caption, me, status, time.Now().UnixMilli())
+	}
+	writeJSON(w, map[string]any{"items": listMemberPhotos(name, me, admin), "admin": admin})
+}
+
 // ---- Pill database (mommy 2026-11-05) ----
 //
 // Members add pictures of pills they have seen, with the brand, strength and
@@ -16025,6 +16286,7 @@ type pillReport struct {
 	Notes       string     `json:"notes"`
 	Picture     string     `json:"picture"`
 	Status      string     `json:"status"`
+	Category    string     `json:"category,omitempty"`
 	ModNote     string     `json:"modNote,omitempty"`
 	Uploader    postAuthor `json:"uploader"`
 	Mine        bool       `json:"mine"`
@@ -16038,7 +16300,7 @@ func registerPillDatabase() {
 	}
 	http.HandleFunc("/Pills", requireLogin(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, "html/pilldb.html")
+		renderHTMLPage(w, "html/pilldb.html", nil)
 	}))
 	http.HandleFunc("/pilldb/api/list", requireLogin(pillDBList))
 	http.HandleFunc("/pilldb/api/item", requireLogin(pillDBItem))
@@ -16117,6 +16379,7 @@ func scanPillReport(rows interface{ Scan(...any) error }, me int, admin bool) (p
 		return p, err
 	}
 	p.Picture = "/pilldb/pic/" + file
+	p.Category = pillCategoryOf(p.Brand + " " + p.Contents + " " + p.LabContents)
 	if name == "" {
 		name = "deleted account"
 	}
@@ -16158,6 +16421,14 @@ func pillDBList(w http.ResponseWriter, r *http.Request) {
 	if q.Get("lab") == "1" {
 		where = append(where, "p.lab_contents != ''")
 	}
+	if words, ok := pillCategoryWords[q.Get("category")]; ok {
+		likes := make([]string, len(words))
+		for i, word := range words {
+			likes[i] = "p.search_text LIKE ?"
+			args = append(args, "%"+word+"%")
+		}
+		where = append(where, "("+strings.Join(likes, " OR ")+")")
+	}
 	// Every word must be somewhere in the entry ("elvanse 70", "oxycodone round").
 	for i, word := range strings.Fields(strings.ToLower(q.Get("q"))) {
 		if i >= 8 {
@@ -16197,7 +16468,37 @@ func pillDBList(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"items": items, "total": total, "more": offset+len(items) < total, "admin": admin, "pending": pending,
-		"colors": pillColors, "shapes": pillShapes, "forms": pillForms})
+		"colors": pillColors, "shapes": pillShapes, "forms": pillForms, "categories": pillCategories})
+}
+
+// Pill categories (mommy 2026-11-06): worked out from what a pill is said to
+// contain, so old entries get one too. The first category whose words match wins.
+var pillCategories = []string{"stimulant", "opioid", "benzodiazepine", "sleep", "gabapentinoid", "entactogen", "psychedelic", "dissociative", "antidepressant", "antipsychotic", "antihistamine", "depressant"}
+var pillCategoryWords = map[string][]string{
+	"stimulant":      {"amphetamin", "amfetamin", "methylphenidate", "ritalin", "concerta", "medikinet", "adderall", "elvanse", "vyvanse", "modafinil", "cocaine", "caffeine", "phentermine", "dexedrine"},
+	"opioid":         {"oxycodone", "oxycontin", "hydrocodone", "morphine", "codeine", "tramadol", "tapentadol", "fentanyl", "heroin", "buprenorphine", "methadone", "hydromorphone", "oxymorphone", "dihydrocodeine", "nitazene", "kratom"},
+	"benzodiazepine": {"alprazolam", "xanax", "ksalol", "diazepam", "valium", "clonazepam", "rivotril", "lorazepam", "ativan", "temazepam", "oxazepam", "bromazepam", "nitrazepam", "etizolam", "flualprazolam", "chlordiazepoxide", "flunitrazepam", "midazolam", "clobazam", "flubromazolam", "bromazolam"},
+	"sleep":          {"zopiclone", "imovane", "zolpidem", "stilnox", "ambien", "zaleplon"},
+	"gabapentinoid":  {"pregabalin", "lyrica", "gabapentin", "neurontin", "phenibut"},
+	"entactogen":     {"mdma", "ecstasy", "mda ", "methylone"},
+	"psychedelic":    {"lsd", "psilocybin", "2c-b", "dmt", "mescaline"},
+	"dissociative":   {"ketamine", "dextromethorphan", "dxm", "pcp", "memantine"},
+	"antidepressant": {"sertraline", "fluoxetine", "citalopram", "escitalopram", "paroxetine", "venlafaxine", "duloxetine", "mirtazapine", "bupropion", "trazodone", "amitriptyline"},
+	"antipsychotic":  {"quetiapine", "seroquel", "olanzapine", "risperidone", "aripiprazole", "haloperidol"},
+	"antihistamine":  {"promethazine", "diphenhydramine", "hydroxyzine", "doxylamine"},
+	"depressant":     {"barbital", "carisoprodol", "baclofen", "ghb", "methaqualone"},
+}
+
+func pillCategoryOf(text string) string {
+	text = strings.ToLower(text) + " "
+	for _, cat := range pillCategories {
+		for _, word := range pillCategoryWords[cat] {
+			if strings.Contains(text, word) {
+				return cat
+			}
+		}
+	}
+	return ""
 }
 
 func pillDBGet(id int64, me int, admin bool) (pillReport, bool) {
