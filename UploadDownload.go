@@ -439,9 +439,11 @@ func main() {
 	http.HandleFunc("/notifications", requireLogin(notifications))
 	http.HandleFunc("/journalImport", requireLogin(journalImport))
 	http.HandleFunc("/profile/doses", requireLogin(profileDoses))
+	http.HandleFunc("/profile/mydata", requireLogin(myData))
 	http.HandleFunc("/profile/intake", requireLogin(profileIntake))
 	http.HandleFunc("/profile/boxes", requireLogin(profileBoxes))
 	http.HandleFunc("/profile/picture", requireLogin(profilePicture))
+	http.HandleFunc("/profile/backgrounds", requireLogin(profileBackgrounds))
 	http.HandleFunc("/profile/appearance", requireLogin(profileAppearance))
 	http.HandleFunc("/me", currentUser)
 	http.HandleFunc("/profile/bio", requireLogin(profileBio))
@@ -3622,6 +3624,42 @@ func profilePicture(w http.ResponseWriter, r *http.Request) {
 	var old string
 	db.QueryRow("SELECT "+column+" FROM users WHERE id = ?", uid).Scan(&old)
 
+	// Profile backgrounds stay in a gallery (mommy 2026-11-07): changing the
+	// background keeps the old picture, use=<link> picks one again and
+	// delete=<link> throws one away.
+	if kind == "background" {
+		own := func(link string) bool {
+			f, ok := profileFile(link)
+			if !ok || !strings.HasPrefix(link, "/profiles/"+strconv.Itoa(uid)+"/background-") || strings.Contains(strings.TrimPrefix(link, "/profiles/"+strconv.Itoa(uid)+"/"), "/") {
+				return false
+			}
+			_, err := os.Stat(f)
+			return err == nil
+		}
+		if use := r.FormValue("use"); use != "" {
+			if !own(use) {
+				http.Error(w, "That picture isn't in your gallery.", http.StatusBadRequest)
+				return
+			}
+			db.Exec("UPDATE users SET pathToBackground = ? WHERE id = ?", use, uid)
+			writeJSON(w, map[string]string{"url": use})
+			return
+		}
+		if del := r.FormValue("delete"); del != "" {
+			if !own(del) {
+				http.Error(w, "That picture isn't in your gallery.", http.StatusBadRequest)
+				return
+			}
+			if del == old {
+				db.Exec("UPDATE users SET pathToBackground = '' WHERE id = ?", uid)
+				old = ""
+			}
+			removeOwnPicture(del, uid)
+			writeJSON(w, map[string]string{"url": old})
+			return
+		}
+	}
+
 	if r.FormValue("remove") == "1" {
 		link := ""
 		if kind == "avatar" {
@@ -3632,7 +3670,9 @@ func profilePicture(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Couldn't remove the picture.", http.StatusInternalServerError)
 			return
 		}
-		removeOwnPicture(old, uid)
+		if kind != "background" {
+			removeOwnPicture(old, uid)
+		}
 		writeJSON(w, map[string]string{"url": ""})
 		return
 	}
@@ -3655,8 +3695,59 @@ func profilePicture(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Couldn't save the picture.", http.StatusInternalServerError)
 		return
 	}
-	removeOwnPicture(old, uid)
+	if kind == "background" {
+		trimBackgrounds(uid)
+	} else {
+		removeOwnPicture(old, uid)
+	}
 	writeJSON(w, map[string]string{"url": link})
+}
+
+const maxBackgrounds = 12
+
+// ownBackgrounds lists the account's saved profile backgrounds, newest first.
+func ownBackgrounds(uid int) []string {
+	dir := filepath.Join(ProfilePicturesDirName, strconv.Itoa(uid))
+	entries, _ := os.ReadDir(dir)
+	type pic struct {
+		name string
+		at   time.Time
+	}
+	var pics []pic
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), "background-") {
+			continue
+		}
+		if info, err := e.Info(); err == nil {
+			pics = append(pics, pic{e.Name(), info.ModTime()})
+		}
+	}
+	sort.Slice(pics, func(i, j int) bool { return pics[i].at.After(pics[j].at) })
+	out := make([]string, 0, len(pics))
+	for _, p := range pics {
+		out = append(out, "/profiles/"+strconv.Itoa(uid)+"/"+p.name)
+	}
+	return out
+}
+
+// trimBackgrounds keeps the newest maxBackgrounds pictures (never the one in use).
+func trimBackgrounds(uid int) {
+	var cur string
+	db.QueryRow("SELECT pathToBackground FROM users WHERE id = ?", uid).Scan(&cur)
+	for i, link := range ownBackgrounds(uid) {
+		if i >= maxBackgrounds && link != cur {
+			removeOwnPicture(link, uid)
+		}
+	}
+}
+
+// profileBackgrounds: GET /profile/backgrounds answers {"current": link, "pictures": [links]}.
+func profileBackgrounds(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	var cur string
+	db.QueryRow("SELECT pathToBackground FROM users WHERE id = ?", session.UserId).Scan(&cur)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"current": cur, "pictures": ownBackgrounds(session.UserId)})
 }
 
 var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -12739,6 +12830,7 @@ func registerLinkDownloads() {
 	http.HandleFunc("/files/folder-icon", requireFilesLogin(setFolderIcon))
 	http.HandleFunc("/files/move", requireFilesLogin(moveItem))
 	http.HandleFunc("/folder-icon/", requireFilesLogin(serveFolderIcon))
+	http.HandleFunc("/files/sizes", requireFilesLogin(folderSizes))
 }
 
 // publicHost is true when every address of host is on the internet, so a
@@ -13343,6 +13435,89 @@ func folderIconFor(rel string) folderIcon {
 	folderIconsMu.RLock()
 	defer folderIconsMu.RUnlock()
 	return folderIcons[rel]
+}
+
+// ---- Folder sizes (mommy 2026-11-06: the Files cards show how much each folder holds) ----
+
+type folderSize struct {
+	Bytes int64 `json:"bytes"`
+	Files int   `json:"files"`
+	at    time.Time
+}
+
+var (
+	folderSizeMu    sync.Mutex
+	folderSizeCache = map[string]folderSize{}
+)
+
+// sizeOfFolder adds up every file under abs. Results are kept for a minute so
+// opening a folder again is quick; a walk stops after 300000 entries.
+func sizeOfFolder(abs string) folderSize {
+	folderSizeMu.Lock()
+	if c, ok := folderSizeCache[abs]; ok && time.Since(c.at) < time.Minute {
+		folderSizeMu.Unlock()
+		return c
+	}
+	folderSizeMu.Unlock()
+	var fs folderSize
+	seen := 0
+	filepath.WalkDir(abs, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		seen++
+		if seen > 300000 {
+			return filepath.SkipAll
+		}
+		if d.Type().IsRegular() {
+			if info, err := d.Info(); err == nil {
+				fs.Bytes += info.Size()
+				fs.Files++
+			}
+		}
+		return nil
+	})
+	fs.at = time.Now()
+	folderSizeMu.Lock()
+	folderSizeCache[abs] = fs
+	folderSizeMu.Unlock()
+	return fs
+}
+
+// folderSizes: GET /files/sizes?dir=/Files/a/b answers {"name": {bytes, files}}
+// for each folder in that folder the account may open in full.
+func folderSizes(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	grant, _ := filesGrantFor(session)
+	dir := strings.Trim(strings.TrimPrefix(strings.TrimSuffix(r.URL.Query().Get("dir"), "/"), "/Files"), "/")
+	var parts []string
+	if dir != "" {
+		parts = strings.Split(dir, "/")
+	}
+	dirPath, ok := insideUploads(parts...)
+	if !ok {
+		http.Error(w, "No such folder.", http.StatusBadRequest)
+		return
+	}
+	rel := uploadRel(dirPath)
+	if !grant.canSee(rel) {
+		http.Error(w, "You don't have access to that folder.", http.StatusForbidden)
+		return
+	}
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		http.Error(w, "No such folder.", http.StatusBadRequest)
+		return
+	}
+	out := map[string]folderSize{}
+	for _, e := range entries {
+		if !e.IsDir() || !grant.allows(joinRel(rel, e.Name())) {
+			continue
+		}
+		out[e.Name()] = sizeOfFolder(filepath.Join(dirPath, e.Name()))
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, out)
 }
 
 // withFolderIcons fills in the icon of every folder in items (dir is their folder).
@@ -16736,4 +16911,337 @@ func pillDBAction(w http.ResponseWriter, r *http.Request) {
 	}
 	p, _ := pillDBGet(req.ID, session.UserId, admin)
 	writeJSON(w, p)
+}
+
+// ---- Data page (mommy's design 2026-11-07) ----
+// GET /profile/mydata lists what the account made: notes, chat messages,
+// database contributions (pill pictures + drug pictures), Forum posts and trip
+// reports, and every dose. ?download=1 sends it all as one JSON file.
+// POST {kind, id} deletes one item, {kind, all: true} clears that whole list.
+// kinds: note, message, pill, photo, post, report, dose (id = dose refs, comma
+// separated), posts (all: Forum posts + trip reports), contributions (all).
+
+type myDataItem struct {
+	Kind     string   `json:"kind"`
+	ID       int64    `json:"id,omitempty"`
+	Ref      string   `json:"ref,omitempty"`
+	Title    string   `json:"title,omitempty"`
+	Body     string   `json:"body,omitempty"`
+	To       string   `json:"to,omitempty"`
+	Picture  string   `json:"picture,omitempty"`
+	Pictures []string `json:"pictures,omitempty"`
+	Status   string   `json:"status,omitempty"`
+	Public   bool     `json:"public,omitempty"`
+	Rating   int      `json:"rating,omitempty"`
+	Amount   string   `json:"amount,omitempty"`
+	Unit     string   `json:"unit,omitempty"`
+	Method   string   `json:"method,omitempty"`
+	At       int64    `json:"at"`
+}
+
+const myDataListMax = 400
+
+func myDataShort(s string, full bool) string {
+	if full {
+		return s
+	}
+	r := []rune(strings.TrimSpace(s))
+	if len(r) > 280 {
+		return string(r[:280]) + "…"
+	}
+	return string(r)
+}
+
+func myDataLists(uid int, zone *time.Location, full bool) (map[string][]myDataItem, map[string]int) {
+	out := map[string][]myDataItem{"notes": {}, "messages": {}, "contributions": {}, "posts": {}, "doses": {}}
+	counts := map[string]int{}
+	limit := myDataListMax
+	if full {
+		limit = 1 << 30
+	}
+	q := func(list string, query string, scan func(*sql.Rows) (myDataItem, bool), args ...any) {
+		rows, err := db.Query(query, args...)
+		if err != nil {
+			fmt.Println("mydata", list, err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			it, ok := scan(rows)
+			if !ok {
+				continue
+			}
+			if it.At > 0 && it.At < 1e11 {
+				it.At *= 1000 // every time goes out in milliseconds
+			}
+			counts[it.Kind]++
+			if len(out[list]) < limit {
+				out[list] = append(out[list], it)
+			}
+		}
+	}
+	q("notes", "SELECT id, title, body, updated_at FROM notepad_notes WHERE user_id = ? ORDER BY updated_at DESC", func(r *sql.Rows) (myDataItem, bool) {
+		it := myDataItem{Kind: "note"}
+		err := r.Scan(&it.ID, &it.Title, &it.Body, &it.At)
+		it.Body = myDataShort(it.Body, full)
+		return it, err == nil
+	}, uid)
+	q("messages", `SELECT m.id, m.body, m.image, m.created_at, c.kind, c.name,
+		COALESCE((SELECT u.username FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = c.id AND cm.user_id <> ? LIMIT 1), '')
+		FROM chat_messages m JOIN chats c ON c.id = m.chat_id WHERE m.user_id = ? AND m.deleted = 0 ORDER BY m.id DESC`, func(r *sql.Rows) (myDataItem, bool) {
+		it := myDataItem{Kind: "message"}
+		var image, kind, name, other string
+		err := r.Scan(&it.ID, &it.Body, &image, &it.At, &kind, &name, &other)
+		it.To = other
+		if kind != "dm" && name != "" {
+			it.To = name
+		}
+		if it.Body == "" && image != "" {
+			it.Body = "Picture"
+		}
+		it.Body = myDataShort(it.Body, full)
+		return it, err == nil
+	}, uid, uid)
+	q("contributions", "SELECT id, brand, strength, contents, file, status, created_at FROM pill_reports WHERE user_id = ? ORDER BY id DESC", func(r *sql.Rows) (myDataItem, bool) {
+		it := myDataItem{Kind: "pill"}
+		var brand, strength, contents, file string
+		err := r.Scan(&it.ID, &brand, &strength, &contents, &file, &it.Status, &it.At)
+		it.Title = brand
+		it.Body = strings.Trim(strings.Join([]string{strength, contents}, " · "), " ·")
+		if pillDBFileName.MatchString(file) {
+			it.Picture = "/pilldb/pic/" + file
+		}
+		return it, err == nil
+	}, uid)
+	q("contributions", "SELECT id, name, caption, file, status, created_at FROM substance_photos WHERE user_id = ? ORDER BY id DESC", func(r *sql.Rows) (myDataItem, bool) {
+		it := myDataItem{Kind: "photo"}
+		var file string
+		err := r.Scan(&it.ID, &it.Title, &it.Body, &file, &it.Status, &it.At)
+		if memberPhotoFile.MatchString(file) {
+			it.Picture = "/member-pic/" + file
+		}
+		return it, err == nil
+	}, uid)
+	q("posts", "SELECT id, body, pictures, created_at FROM forum_posts WHERE user_id = ? ORDER BY id DESC", func(r *sql.Rows) (myDataItem, bool) {
+		it := myDataItem{Kind: "post"}
+		var pics string
+		err := r.Scan(&it.ID, &it.Body, &pics, &it.At)
+		json.Unmarshal([]byte(pics), &it.Pictures)
+		it.Body = myDataShort(it.Body, full)
+		return it, err == nil
+	}, uid)
+	q("posts", "SELECT id, title, body, pictures, rating, public, CASE WHEN happened_at > 0 THEN happened_at ELSE updated_at END FROM trip_reports WHERE user_id = ? ORDER BY updated_at DESC", func(r *sql.Rows) (myDataItem, bool) {
+		it := myDataItem{Kind: "report"}
+		var pics string
+		var public int
+		err := r.Scan(&it.ID, &it.Title, &it.Body, &pics, &it.Rating, &public, &it.At)
+		it.Public = public == 1
+		json.Unmarshal([]byte(pics), &it.Pictures)
+		it.Body = myDataShort(it.Body, full)
+		return it, err == nil
+	}, uid)
+	// Newest first across both kinds.
+	for _, k := range []string{"contributions", "posts"} {
+		l := out[k]
+		sort.SliceStable(l, func(i, j int) bool { return l[i].At > l[j].At })
+	}
+	if doses, err := accountDoses(uid, zone, time.Time{}, time.Time{}); err == nil {
+		counts["dose"] = len(doses)
+		for i := len(doses) - 1; i >= 0 && len(out["doses"]) < limit; i-- {
+			d := doses[i]
+			out["doses"] = append(out["doses"], myDataItem{Kind: "dose", Title: d.Name, Amount: formatAmount(d.Amount), Unit: displayUnit(d.Unit), Method: d.Method, At: d.At.UnixMilli(), Ref: strings.Join(d.Refs, ",")})
+		}
+	} else {
+		fmt.Println("mydata doses", err)
+	}
+	return out, counts
+}
+
+func myData(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	uid := session.UserId
+	switch r.Method {
+	case http.MethodGet:
+		zone := visitorZone(r.URL.Query())
+		full := r.URL.Query().Get("download") == "1"
+		lists, counts := myDataLists(uid, zone, full)
+		if full {
+			w.Header().Set("Content-Disposition", `attachment; filename="geek4u-my-data-`+time.Now().Format("2006-01-02")+`.json"`)
+		}
+		writeJSON(w, map[string]any{"lists": lists, "counts": counts, "zoneOffset": func() int { _, off := time.Now().In(zone).Zone(); return off / 60 }()})
+	case http.MethodPost:
+		var in struct {
+			Kind string `json:"kind"`
+			ID   int64  `json:"id"`
+			Ref  string `json:"ref"`
+			All  bool   `json:"all"`
+			// A Graph dose is matched by name, amount and clock time (as on the Profile calendar).
+			Name   string `json:"name"`
+			Amount string `json:"amount"`
+			Time   string `json:"time"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&in); err != nil {
+			http.Error(w, "Couldn't read that.", http.StatusBadRequest)
+			return
+		}
+		n := 0
+		if in.All {
+			n = myDataClear(uid, in.Kind)
+		} else {
+			n = myDataDelete(uid, in.Kind, in.ID, in.Ref, in.Name, in.Amount, in.Time)
+		}
+		if n < 0 {
+			http.Error(w, "Unknown kind.", http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]int{"deleted": n})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func myDataIDs(query string, uid int) []int64 {
+	ids := []int64{}
+	rows, err := db.Query(query, uid)
+	if err != nil {
+		fmt.Println(err)
+		return ids
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// myDataClear deletes every item of one list; -1 for an unknown kind.
+func myDataClear(uid int, kind string) int {
+	n := 0
+	each := func(k, query string) {
+		for _, id := range myDataIDs(query, uid) {
+			n += myDataDelete(uid, k, id, "", "", "", "")
+		}
+	}
+	switch kind {
+	case "notes", "note":
+		each("note", "SELECT id FROM notepad_notes WHERE user_id = ?")
+	case "messages", "message":
+		each("message", "SELECT id FROM chat_messages WHERE user_id = ? AND deleted = 0")
+	case "contributions":
+		each("pill", "SELECT id FROM pill_reports WHERE user_id = ?")
+		each("photo", "SELECT id FROM substance_photos WHERE user_id = ?")
+	case "posts":
+		each("post", "SELECT id FROM forum_posts WHERE user_id = ?")
+		each("report", "SELECT id FROM trip_reports WHERE user_id = ?")
+	case "doses", "dose":
+		res, _ := db.Exec("DELETE FROM doses WHERE user_id = ?", uid)
+		if res != nil {
+			c, _ := res.RowsAffected()
+			n += int(c)
+		}
+		res, _ = db.Exec("DELETE FROM graph_experiences WHERE user_id = ?", uid)
+		if res != nil {
+			c, _ := res.RowsAffected()
+			n += int(c)
+		}
+		db.Exec("DELETE FROM experience_people WHERE experience_id NOT IN (SELECT id FROM graph_experiences)")
+	default:
+		return -1
+	}
+	return n
+}
+
+// myDataDelete deletes one of the account's own items; -1 for an unknown kind.
+func myDataDelete(uid int, kind string, id int64, ref, name, amount, clock string) int {
+	affected := func(res sql.Result, err error) int {
+		if err != nil {
+			fmt.Println(err)
+			return 0
+		}
+		c, _ := res.RowsAffected()
+		return int(c)
+	}
+	switch kind {
+	case "note":
+		return affected(db.Exec("DELETE FROM notepad_notes WHERE id = ? AND user_id = ?", id, uid))
+	case "message":
+		var chat int64
+		var img string
+		if db.QueryRow("SELECT chat_id, image FROM chat_messages WHERE id = ? AND user_id = ? AND deleted = 0", id, uid).Scan(&chat, &img) != nil {
+			return 0
+		}
+		if img != "" {
+			os.Remove(filepath.Join(chatFilesDir, strconv.FormatInt(chat, 10), filepath.Base(img)))
+		}
+		n := affected(db.Exec("UPDATE chat_messages SET deleted = 1, body = '', image = '', edited_at = ? WHERE id = ?", time.Now().UnixMilli(), id))
+		chatNotify(chatMemberIDs(chat)...)
+		return n
+	case "pill":
+		var file string
+		if db.QueryRow("SELECT file FROM pill_reports WHERE id = ? AND user_id = ?", id, uid).Scan(&file) != nil {
+			return 0
+		}
+		n := affected(db.Exec("DELETE FROM pill_reports WHERE id = ? AND user_id = ?", id, uid))
+		if pillDBFileName.MatchString(file) {
+			os.Remove(filepath.Join(pillDBDir, file))
+		}
+		return n
+	case "photo":
+		var file string
+		if db.QueryRow("SELECT file FROM substance_photos WHERE id = ? AND user_id = ?", id, uid).Scan(&file) != nil {
+			return 0
+		}
+		n := affected(db.Exec("DELETE FROM substance_photos WHERE id = ? AND user_id = ?", id, uid))
+		if memberPhotoFile.MatchString(file) {
+			os.Remove(filepath.Join(memberPhotoDir, file))
+		}
+		return n
+	case "post":
+		var pics string
+		if db.QueryRow("SELECT pictures FROM forum_posts WHERE id = ? AND user_id = ?", id, uid).Scan(&pics) != nil {
+			return 0
+		}
+		n := affected(db.Exec("DELETE FROM forum_posts WHERE id = ? AND user_id = ?", id, uid))
+		db.Exec("DELETE FROM forum_comments WHERE post_id = ?", id)
+		var links []string
+		json.Unmarshal([]byte(pics), &links)
+		for _, l := range links {
+			removeOwnPicture(l, uid)
+		}
+		return n
+	case "report":
+		var pics string
+		if db.QueryRow("SELECT pictures FROM trip_reports WHERE id = ? AND user_id = ?", id, uid).Scan(&pics) != nil {
+			return 0
+		}
+		n := affected(db.Exec("DELETE FROM trip_reports WHERE id = ? AND user_id = ?", id, uid))
+		db.Exec("DELETE FROM trip_report_comments WHERE report_id = ?", id)
+		db.Exec("DELETE FROM trip_report_likes WHERE report_id = ?", id)
+		var links []string
+		json.Unmarshal([]byte(pics), &links)
+		for _, l := range links {
+			removeOwnPicture(l, uid)
+		}
+		return n
+	case "dose":
+		n := 0
+		for _, part := range strings.Split(ref, ",") {
+			var jid, gid int64
+			var i int
+			if _, err := fmt.Sscanf(part, "j%d", &jid); err == nil && strings.HasPrefix(part, "j") {
+				n += affected(db.Exec("DELETE FROM doses WHERE id = ? AND user_id = ?", jid, uid))
+			} else if _, err := fmt.Sscanf(part, "g%d:%d", &gid, &i); err == nil {
+				c, err := removeGraphDoses(uid, gid, []int{i}, name, amount, clock)
+				if err != nil {
+					fmt.Println(err)
+				}
+				n += c
+			}
+		}
+		return n
+	}
+	return -1
 }

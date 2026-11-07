@@ -32,8 +32,14 @@
   // Only on wide screens; phones keep their tab bar or menu button.
   let NAV_STYLE = "";
   try { const saved = JSON.parse(localStorage.getItem("xn_site_look") || "null"); if (saved && (saved.nav === "top" || saved.nav === "side")) NAV_STYLE = saved.nav; } catch (_) {}
+  // Notch header (mommy 2026-11-06), a switch on the Experimental page of
+  // the settings window: the page title in a black notch hanging from the
+  // top. Kept on this device only (xn_exp_header).
+  let EXP_HEADER = false;
+  try { EXP_HEADER = localStorage.getItem("xn_exp_header") === "1"; } catch (_) {}
   const syncMenu = () => {
     const root = document.documentElement;
+    root.classList.toggle("xn-exp", EXP_HEADER);
     const bar = NAV_STYLE && WIDE.matches ? NAV_STYLE : "";
     root.classList.toggle("xn-menu", !bar && (LOCAL_SERVER || IOS || WIDE.matches));
     root.classList.toggle("xn-bar-top", bar === "top");
@@ -41,6 +47,15 @@
   };
   syncMenu();
   WIDE.addEventListener("change", syncMenu);
+  window.xnExpHeader = {
+    get: () => EXP_HEADER,
+    set(on) {
+      EXP_HEADER = !!on;
+      try { if (EXP_HEADER) localStorage.setItem("xn_exp_header", "1"); else localStorage.removeItem("xn_exp_header"); } catch (_) {}
+      syncMenu();
+      window.dispatchEvent(new CustomEvent("xn:nav-style"));
+    },
+  };
   
 
   // Inside the Music page's frame (js/musicshell.js) the song keeps playing in
@@ -288,6 +303,15 @@
       try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (_) {}
     },
   };
+  // A change made in another frame or tab (the settings window's pages are
+  // frames) shows here at once.
+  window.addEventListener("storage", (e) => {
+    try {
+      if (e.key === COLOR_KEY) applySiteColor(e.newValue || "");
+      else if (e.key === LOOK_KEY) applyLook(JSON.parse(e.newValue || "null"));
+      else if (e.key === SCENE_KEY) { scene = Object.assign(scene, JSON.parse(e.newValue || "{}")); applyScene(scene); }
+    } catch (_) {}
+  });
 
   if (signedIn) {
     fetch("/profile/appearance", { headers: { Accept: "application/json" } })
@@ -959,6 +983,7 @@
     initFriendsBar(nav);
     initTitle(nav);
     initLogout(nav);
+    initSettings(nav, linkBox);
     paintNames();
     placeScene(document.documentElement.dataset.scene || "");
 
@@ -1089,6 +1114,291 @@
     el.className = "xn-title";
     el.textContent = name;
     nav.append(el);
+  }
+
+  // Settings (mommy 2026-11-06): a round settings button left of the logo
+  // opens a window 85% of the page wide and tall. Your picture and name sit
+  // in its top left corner; under them Profile, Privacy, Site theme,
+  // Preferences and Experimental, then every page of the site, then Sign
+  // out. Experimental is a page inside the window with switches for
+  // features still being tried out, such as the notch header (html.xn-exp):
+  // the page title in a black notch hanging from the top of the screen with
+  // a round settings button beside it.
+  const GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2.6h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.8a7 7 0 0 1 0 2l2 1.8-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6a7 7 0 0 1-1.7-.9l-2.5.9-1.7-2.9 2-1.8a7 7 0 0 1 0-2l-2-1.8 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const FLASK = '<path d="M9 2.5h6a1 1 0 0 1 0 2h-.6v4.6l5.3 9.2A2.3 2.3 0 0 1 17.7 21.7H6.3a2.3 2.3 0 0 1-2-3.4l5.3-9.2V4.5H9a1 1 0 0 1 0-2zm2.6 2v5.1l-1.6 2.8h4l-1.6-2.8V4.5z" fill-rule="evenodd"/>';
+  const SET_ITEMS = [
+    { pane: "profile", frame: "profile", label: "Profile", desc: "Pictures, badge, name color", icon: '<circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C4.3 15.9 7.8 13.5 12 13.5s7.7 2.4 8.5 6.7c.1.7-.4 1.3-1.1 1.3H4.6c-.7 0-1.2-.6-1.1-1.3z"/>' },
+    { pane: "privacy", label: "Privacy", desc: "What other people see of you", icon: '<path d="M12 2.4 4.4 5.4v5.8c0 4.8 3.2 9.1 7.6 10.4 4.4-1.3 7.6-5.6 7.6-10.4V5.4z"/><rect x="9" y="10.5" width="6" height="5" rx="1" fill="#000"/><path d="M10.2 10.5V9.3a1.8 1.8 0 0 1 3.6 0v1.2" fill="none" stroke="#000" stroke-width="1.3"/>' },
+    { pane: "theme", frame: "theme", label: "Site theme", desc: "Colors, background, see-through", icon: '<path d="M12 2.5a9.5 9.5 0 0 0 0 19c1.2 0 1.9-.9 1.9-1.9 0-.5-.2-.9-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1 .9-1.9 1.9-1.9h2.2a5 5 0 0 0 5-5C22 6.3 17.5 2.5 12 2.5z"/><circle cx="7" cy="11.5" r="1.5" fill="#000"/><circle cx="9.5" cy="7" r="1.5" fill="#000"/><circle cx="14.5" cy="7" r="1.5" fill="#000"/><circle cx="17.5" cy="11" r="1.5" fill="#000"/>' },
+    { pane: "preferences", frame: "preferences", label: "Preferences", desc: "Font, menu style, graph", icon: '<path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="15" cy="6.5" r="2.3"/><circle cx="9" cy="12" r="2.3"/><circle cx="17" cy="17.5" r="2.3"/>' },
+    { pane: "data", frame: "data", label: "Data", desc: "Import from the Journal app", icon: '<ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 8.2c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V12c0 1.7-3.4 3-7.5 3s-7.5-1.3-7.5-3zM4.5 15c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v3.5c0 1.7-3.4 3-7.5 3s-7.5-1.3-7.5-3z"/>' },
+    { pane: "sync", frame: "sync", label: "Phone sync", desc: "Folders copied to your phone", icon: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><rect x="10" y="17.6" width="4" height="1.4" rx=".7" fill="#000"/>' },
+    { pane: "exp", label: "Experimental", desc: "Try new features first", icon: FLASK },
+  ];
+  // Features on the Experimental page. get/set keep each one on this device.
+  const EXPERIMENTS = [
+    {
+      label: "Notch header",
+      desc: "The page title sits in a black notch hanging from the top of the screen, with a round settings button beside it.",
+      get: () => EXP_HEADER,
+      set: (on) => window.xnExpHeader.set(on),
+    },
+  ];
+  function initSettings(nav, linkBox) {
+    if (nav.querySelector(".xn-set-btn")) return;
+    const makeGear = (cls) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "xn-set-btn" + (cls ? " " + cls : "");
+      b.setAttribute("aria-label", "Settings");
+      b.setAttribute("aria-haspopup", "dialog");
+      b.setAttribute("aria-expanded", "false");
+      b.title = "Settings";
+      b.innerHTML = GEAR;
+      return b;
+    };
+    // The button left of the logo, in every menu style.
+    const btn = makeGear("");
+    const brand = nav.querySelector(".xn-brand");
+    if (brand) brand.before(btn); else nav.prepend(btn);
+    // The notch (only shown with the notch header on): the page title in
+    // the black part, the settings button beside it.
+    const notch = document.createElement("div");
+    notch.className = "xn-notch";
+    notch.innerHTML = '<span class="xn-notch-body"><span class="xn-notch-title"></span></span>';
+    const notchGear = makeGear("xn-notch-gear");
+    notch.append(notchGear);
+    const titleEl = nav.querySelector(".xn-title");
+    notch.querySelector(".xn-notch-title").textContent = titleEl ? titleEl.textContent : "";
+    if (!titleEl) notch.classList.add("is-empty");
+    nav.append(notch);
+    const gears = [btn, notchGear];
+    let opener = btn;
+
+    // The window (mommy's design, 2026-11-06): a side column with your
+    // picture, name and Sign out on top, then the User settings and every
+    // page; the picked setting's page fills the rest. Profile settings come
+    // from the Profile page itself (/Profile?pane=..., in a frame), so they
+    // keep working exactly as they did in its popups.
+    let win = null, card = null, lastFocus = null, current = "";
+    const frames = {};
+    const PANE_KEY = "xn_set_pane";
+    const row = (tag, label, desc, body, extra) => {
+      const el = document.createElement(tag);
+      el.className = "xn-set-row" + (extra ? " " + extra : "");
+      if (tag === "button") el.type = "button";
+      el.innerHTML = '<span class="xn-set-ic"><svg viewBox="0 0 24 24" aria-hidden="true">' + body + '</svg></span><span class="xn-set-txt"><span class="xn-set-name"></span><span class="xn-set-desc"></span></span>';
+      el.querySelector(".xn-set-name").textContent = label;
+      el.querySelector(".xn-set-desc").textContent = desc || "";
+      return el;
+    };
+    const wide = () => matchMedia("(min-width: 768px)").matches;
+    function showPane(name, focus) {
+      if (!win) return;
+      const item = SET_ITEMS.find((it) => it.pane === name) || SET_ITEMS[0];
+      name = item.pane;
+      current = name;
+      try { sessionStorage.setItem(PANE_KEY, name); } catch (_) {}
+      win.querySelectorAll(".xn-set-row[data-pane]").forEach((r) => {
+        if (r.dataset.pane === name) r.setAttribute("aria-current", "true"); else r.removeAttribute("aria-current");
+      });
+      win.querySelector(".xn-set-mtitle").textContent = item.label;
+      const box = win.querySelector(".xn-set-pane");
+      box.querySelectorAll(":scope > *").forEach((el) => { el.hidden = true; });
+      let view = box.querySelector('[data-view="' + name + '"]');
+      if (!view && item.frame) {
+        view = document.createElement("div");
+        view.className = "xn-set-framebox is-loading";
+        view.dataset.view = name;
+        const f = document.createElement("iframe");
+        f.className = "xn-set-frame";
+        f.title = item.label;
+        f.src = "/Profile?pane=" + encodeURIComponent(item.frame);
+        f.addEventListener("load", () => view.classList.remove("is-loading"));
+        view.append(f);
+        frames[name] = f;
+        box.append(view);
+      }
+      if (view) view.hidden = false;
+      card.classList.add("is-pane");
+      if (focus) win.querySelector(wide() ? '.xn-set-row[aria-current="true"]' : ".xn-set-back")?.focus({ preventScroll: true });
+    }
+    function showList() {
+      if (!card) return;
+      card.classList.remove("is-pane");
+      win.querySelector('.xn-set-row[aria-current="true"]')?.focus({ preventScroll: true });
+    }
+    function build() {
+      win = document.createElement("div");
+      win.className = "xn-set";
+      win.hidden = true;
+      win.innerHTML =
+        '<div class="xn-set-card" role="dialog" aria-modal="true" aria-label="Settings">' +
+        '<aside class="xn-set-side">' +
+        '<div class="xn-set-head"><a class="xn-set-me" href="/Profile"><span class="xn-set-face" aria-hidden="true"></span><span class="xn-set-who"><span class="xn-set-uname">Your account</span><span class="xn-set-rank"></span></span></a><span class="xn-set-headout"></span></div>' +
+        '<nav class="xn-set-list" aria-label="Settings and pages"><div class="xn-set-group xn-set-admin"></div><h2 class="xn-set-h">User</h2><div class="xn-set-group xn-set-mine"></div>' +
+        '<h2 class="xn-set-h">Pages</h2><div class="xn-set-group xn-set-pages"></div></nav></aside>' +
+        '<section class="xn-set-main"><div class="xn-set-mhead"><button type="button" class="xn-set-back" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+        '<h2 class="xn-set-h xn-set-mtitle">Settings</h2>' +
+        '<button type="button" class="xn-set-x" aria-label="Close settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>' +
+        '<div class="xn-set-pane"></div></section></div>';
+      card = win.querySelector(".xn-set-card");
+      const rc = document.documentElement.classList;
+      let me = null;
+      try { me = JSON.parse(localStorage.getItem("xn_me") || "null"); } catch (_) {}
+      // User settings.
+      const mine = win.querySelector(".xn-set-mine");
+      SET_ITEMS.forEach((it) => {
+        const r = row("button", it.label, it.desc, it.icon, it.pane === "exp" ? "is-exp" : "");
+        r.dataset.pane = it.pane;
+        mine.append(r);
+      });
+      // Pages, in the menu's order. (On phones the links are hidden behind
+      // the tab bar, so who sees what is checked here.) Admin sits on top.
+      const pages = win.querySelector(".xn-set-pages");
+      const here = location.pathname.replace(/\/+$/, "") || "/";
+      if (linkBox) {
+        [...linkBox.querySelectorAll(":scope > a")].forEach((a) => {
+          const href = a.getAttribute("href") || "";
+          if (href === "/Profile") return;
+          const isAdmin = a.classList.contains("xn-admin");
+          if (isAdmin && !rc.contains("xn-admin")) return;
+          if (/^\/Files/.test(href) && !rc.contains("xn-admin") && !rc.contains("xn-files")) return;
+          const ic = a.querySelector(".xn-link-ic svg");
+          const r = row("a", a.dataset.name || a.textContent.trim(), "", ic ? ic.innerHTML : OTHER_ICON, isAdmin ? "is-admin" : "");
+          r.href = href;
+          const target = href.replace(/\/+$/, "") || "/";
+          if (target === "/" ? here === "/" : here === target || here.startsWith(target + "/")) r.setAttribute("aria-current", "page");
+          (isAdmin ? win.querySelector(".xn-set-admin") : pages).append(r);
+        });
+      }
+      // Sign out: the small red button in the top right of the side column.
+      const out = win.querySelector(".xn-set-headout");
+      out.innerHTML = signedIn
+        ? '<form method="post" action="/logout"><button type="submit" class="xn-set-out" aria-label="Sign out" title="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></svg></button></form>'
+        : '<a class="xn-set-out" href="/login" aria-label="Sign in" title="Sign in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 16l4-4-4-4M18 12H8"/></svg></a>';
+      // Pages made here: Privacy and Experimental.
+      const box = win.querySelector(".xn-set-pane");
+      const privacy = document.createElement("div");
+      privacy.className = "xn-set-native";
+      privacy.dataset.view = "privacy";
+      privacy.innerHTML =
+        '<div class="xn-set-block"><h3 class="xn-set-bh">Your public page</h3><p class="xn-set-note">Other people see your public page: your name, picture, banner, geek level and the boxes you show on your profile.</p>' +
+        '<a class="xn-set-pill" data-me-link href="/Profile" target="_top">See what others see</a></div>' +
+        '<div class="xn-set-block"><h3 class="xn-set-bh">More privacy settings</h3><p class="xn-set-note">Nothing to change here yet. Settings such as who can see your doses or when you were last online will go on this page.</p></div>';
+      box.append(privacy);
+      const exp = document.createElement("div");
+      exp.className = "xn-set-native";
+      exp.dataset.view = "exp";
+      exp.innerHTML = '<p class="xn-set-note">Features still being tried out. They are saved on this device only and can change or go away.</p><div class="xn-set-exps"></div>';
+      box.append(exp);
+      const exps = exp.querySelector(".xn-set-exps");
+      EXPERIMENTS.forEach((x, i) => {
+        const r = document.createElement("label");
+        r.className = "xn-set-exp";
+        r.innerHTML = '<span class="xn-set-exp-txt"><span class="xn-set-exp-name"></span><span class="xn-set-exp-desc"></span></span><span class="xn-switch"><input type="checkbox" role="switch"><span aria-hidden="true"></span></span>';
+        r.querySelector(".xn-set-exp-name").textContent = x.label;
+        r.querySelector(".xn-set-exp-desc").textContent = x.desc;
+        const input = r.querySelector("input");
+        input.id = "xnExp" + i;
+        input.checked = !!x.get();
+        input.addEventListener("change", () => x.set(input.checked));
+        exps.append(r);
+      });
+      const setMe = (m) => {
+        fillMe(m);
+        const link = win.querySelector("[data-me-link]");
+        if (link && m && m.name) link.href = "/u/" + encodeURIComponent(m.name);
+      };
+      setMe(me);
+      if (signedIn) {
+        fetch("/me", { headers: { Accept: "application/json" } })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((m) => { if (m && m.name) setMe(m); })
+          .catch(() => {});
+      }
+      win.addEventListener("pointerdown", (e) => { if (e.target === win) setOpen(false); });
+      win.querySelector(".xn-set-x").addEventListener("click", () => setOpen(false));
+      win.querySelector(".xn-set-back").addEventListener("click", showList);
+      win.addEventListener("click", (e) => {
+        const p = e.target.closest(".xn-set-row[data-pane]");
+        if (p) { showPane(p.dataset.pane, true); return; }
+        if (e.target.closest("a[href]")) setOpen(false);
+      });
+      win.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          if (!wide() && card.classList.contains("is-pane")) showList();
+          else setOpen(false);
+          return;
+        }
+        if (e.key !== "Tab") return;
+        const shown = [...card.querySelectorAll("a[href], button, input, iframe")].filter((el) => el.getClientRects().length && !el.closest("[hidden]"));
+        if (!shown.length) return;
+        const first = shown[0], last = shown[shown.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      });
+      document.body.append(win);
+    }
+    function fillMe(m) {
+      if (!win || !m || !m.name) return;
+      win.querySelector(".xn-set-uname").textContent = m.name;
+      const face = win.querySelector(".xn-set-face");
+      face.textContent = "";
+      if (m.avatar) {
+        const img = document.createElement("img");
+        img.src = m.avatar; img.alt = "";
+        img.addEventListener("error", () => { img.remove(); face.textContent = m.name.charAt(0).toUpperCase(); });
+        face.append(img);
+      } else face.textContent = m.name.charAt(0).toUpperCase();
+      const rank = win.querySelector(".xn-set-rank");
+      rank.textContent = m.rank ? m.rank + (typeof m.level === "number" ? " · level " + m.level : "") : "";
+      const uname = win.querySelector(".xn-set-uname");
+      if (m.nameColor) { uname.dataset.nameColor = m.nameColor; paintNames(win); }
+    }
+    function setOpen(open, pane) {
+      if (open && !win) build();
+      if (!win) return;
+      if (open && pane) showPane(pane);
+      if (open === !win.hidden) return;
+      gears.forEach((g) => g.setAttribute("aria-expanded", String(open && g === opener)));
+      document.documentElement.classList.toggle("xn-set-open", open);
+      if (open) {
+        lastFocus = document.activeElement;
+        win.querySelectorAll(".xn-set-exp input").forEach((input, i) => { input.checked = !!EXPERIMENTS[i].get(); });
+        if (!pane) {
+          let last = "";
+          try { last = sessionStorage.getItem(PANE_KEY) || ""; } catch (_) {}
+          if (wide()) showPane(last || current || "profile");
+          else { if (!current) showPane(last || "profile"); card.classList.remove("is-pane"); }
+        }
+        win.hidden = false;
+        win.querySelectorAll(".xn-set-row").forEach((t, i) => t.style.setProperty("--i", i));
+        requestAnimationFrame(() => {
+          win.classList.add("is-open");
+          (win.querySelector('.xn-set-row[aria-current="true"]') || card.querySelector(".xn-set-x")).focus({ preventScroll: true });
+        });
+      } else {
+        win.classList.remove("is-open");
+        const done = () => { if (!win.classList.contains("is-open")) win.hidden = true; };
+        const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        setTimeout(done, reduce ? 0 : 220);
+        if (lastFocus && lastFocus.focus && lastFocus.getClientRects().length) lastFocus.focus({ preventScroll: true });
+        // Your picture or name may have changed in a settings page.
+        if (signedIn) fetch("/me", { headers: { Accept: "application/json" } }).then((r) => (r.ok ? r.json() : null)).then((m) => { if (m && m.name) { fillMe(m); try { localStorage.setItem("xn_me", JSON.stringify(m)); } catch (_) {} } }).catch(() => {});
+      }
+    }
+    gears.forEach((g) => g.addEventListener("click", (e) => {
+      e.stopPropagation();
+      opener = g;
+      setOpen(!win || win.hidden);
+    }));
+    // Other code (the Profile page's gear) opens a settings page directly.
+    window.xnSettings = {
+      open(pane) { opener = btn; setOpen(true, pane || ""); },
+      close() { setOpen(false); },
+    };
   }
 
   // Desktop app: pages load ahead of the click.

@@ -2098,3 +2098,255 @@ html.xn-bar-side .xn-foot-rank { display: none !important; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   html.xn-menu .xn .xn-links a:hover .xn-link-ic { transform: translate(2px, -2px) scale(1.06); }
 }
+
+/* ------------------------------------------------------------
+   Settings button + notch header (mommy 2026-11-06, nav.js
+   initSettings). The round settings button sits left of the logo in
+   every menu style and opens the settings window (85% of the page).
+   The notch header is a switch on its Experimental page (html.xn-exp):
+   the page title in a black notch hanging from the bottom of the bar,
+   joined to it by inward curves, with a round settings button beside it.
+   ------------------------------------------------------------ */
+.xn .xn-set-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--oled-line-strong);
+  border-radius: 50%;
+  background: #000;
+  color: var(--oled-text);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, transform .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.xn-set-btn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; transition: transform .5s cubic-bezier(.34, 1.56, .64, 1); }
+.xn .xn-set-btn[aria-expanded="true"] { color: var(--oled-accent); border-color: var(--oled-accent); }
+.xn-set-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
+@media (hover: hover) { .xn .xn-set-btn:hover { color: var(--oled-accent); border-color: color-mix(in srgb, var(--oled-accent) 55%, transparent); } }
+.xn .xn-set-btn:active { transform: scale(.94); }
+.xn-set-btn:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+/* Menu-button style: the logo is at the far right, so the button goes with it. */
+html.xn-menu .xn > .xn-set-btn { order: 9; margin-left: auto; }
+html.xn-menu .xn > .xn-set-btn + .xn-brand { margin-left: 4px; }
+@media (max-width: 767px) { .xn .xn-set-btn { width: 36px; height: 36px; } .xn-set-btn svg { width: 19px; height: 19px; } }
+
+/* Notch header (mommy 2026-11-06, like her picture): no bar. The black
+   notch with the page title hangs from the very top of the screen, joined
+   to the top edge by inward curves; the menu button sits left and the logo
+   right, level with it; the round settings button sits beside the notch. */
+.xn-notch { display: none; }
+html.xn-exp { --xn-notch-h: 46px; }
+html.xn-exp .xn,
+html.xn-exp.xn-has-tabs .xn {
+  min-height: calc(var(--xn-notch-h) + env(safe-area-inset-top));
+  border-bottom: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, .78), rgba(0, 0, 0, .35) 70%, rgba(0, 0, 0, 0));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html.xn-exp .xn > .xn-title,
+html.xn-exp .xn > .xn-set-btn { display: none; }
+/* Menu button in the left corner, logo in the right corner. */
+html.xn-exp.xn-menu .xn > .xn-brand { margin-left: auto; }
+html.xn-exp .xn-notch {
+  --n-bg: #000;
+  --n-line: var(--oled-line-strong);
+  --n-r: 16px;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  display: block;
+  transform: translateX(-50%);
+}
+.xn-notch-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--xn-notch-h, 46px) + env(safe-area-inset-top));
+  min-width: clamp(170px, 24vw, 340px);
+  max-width: 44vw;
+  padding: env(safe-area-inset-top) 28px 0;
+  border: 1px solid var(--n-line);
+  border-top: 0;
+  border-radius: 0 0 var(--n-r) var(--n-r);
+  background: var(--n-bg);
+}
+/* The inward curves where the notch meets the top of the screen. */
+.xn-notch-body::before,
+.xn-notch-body::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: calc(var(--n-r) + 1px);
+  height: var(--n-r);
+  pointer-events: none;
+}
+.xn-notch-body::before { left: calc(-1px - var(--n-r)); background: radial-gradient(circle at 0 100%, transparent calc(var(--n-r) - 1px), var(--n-line) calc(var(--n-r) - 1px), var(--n-line) var(--n-r), var(--n-bg) calc(var(--n-r) + .5px)); }
+.xn-notch-body::after { right: calc(-1px - var(--n-r)); background: radial-gradient(circle at 100% 100%, transparent calc(var(--n-r) - 1px), var(--n-line) calc(var(--n-r) - 1px), var(--n-line) var(--n-r), var(--n-bg) calc(var(--n-r) + .5px)); }
+.xn-notch-title { overflow: hidden; color: var(--oled-text); font-size: 15px; font-weight: 700; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
+.xn-notch.is-empty .xn-notch-body { min-width: 120px; }
+/* The round settings button beside the notch, level with it. */
+.xn .xn-notch-gear { position: absolute; top: calc(50% + env(safe-area-inset-top) / 2); left: calc(100% + var(--n-r) + 8px); width: 36px; height: 36px; margin-top: -18px; }
+html.xn-exp .xn .xn-notch-gear:active { transform: scale(.94); }
+@media (max-width: 767px) {
+  html.xn-exp { --xn-notch-h: 42px; }
+  html.xn-exp .xn-notch { --n-r: 13px; }
+  .xn-notch-body { min-width: 110px; max-width: 44vw; padding: env(safe-area-inset-top) 16px 0; }
+  .xn-notch-title { font-size: 14px; }
+  .xn .xn-notch-gear { width: 32px; height: 32px; margin-top: -16px; left: calc(100% + var(--n-r) + 5px); }
+  html.xn-exp.xn-has-tabs .xn-brand { padding: 0; }
+  /* Log out and Admin are in the settings window; the notch needs the room. */
+  html.xn-exp.xn-has-tabs .xn > .xn-out,
+  html.xn-exp.xn-has-tabs .xn-links a.xn-admin { display: none; }
+  html.xn-exp.xn-has-tabs .xn-brand .xn-logo { height: 26px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html.xn-exp .xn-notch-body { animation: xn-notch-drop .45s cubic-bezier(.2, 1.2, .4, 1) both; transform-origin: top center; }
+  html.xn-exp .xn-notch-gear { animation: xn-notch-gear-in .4s .12s cubic-bezier(.2, 1.3, .4, 1) both; }
+}
+@keyframes xn-notch-drop { from { transform: scaleY(.2); opacity: 0; } }
+@keyframes xn-notch-gear-in { from { transform: scale(.4); opacity: 0; } }
+
+/* The settings window (mommy's design, 2026-11-06, nav.js initSettings):
+   85% of the page; a side column with your picture, name and Sign out on
+   top, then User settings and every page; the picked page on the right. */
+html.xn-set-open, html.xn-set-open body { overflow: hidden; }
+.xn-set, .xn-set *, .xn-set *::before, .xn-set *::after { box-sizing: border-box; }
+.xn-set {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+.xn-set[hidden] { display: none; }
+.xn-set.is-open { opacity: 1; }
+.xn-set-card {
+  display: grid;
+  grid-template-columns: 235px minmax(0, 1fr);
+  width: 85vw;
+  height: 85vh;
+  height: 85dvh;
+  overflow: hidden;
+  border: 1px solid var(--oled-line-strong);
+  border-radius: 28px;
+  background: #060608;
+  color: var(--oled-text);
+  box-shadow: 0 40px 90px -30px #000;
+}
+.xn-set-side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--oled-line); }
+.xn-set-head { display: flex; align-items: flex-start; gap: 8px; padding: 22px 12px 14px 16px; border-bottom: 1px solid var(--oled-line); }
+.xn-set-me { display: flex; align-items: center; gap: 14px; flex: 1 1 auto; min-width: 0; color: inherit; text-decoration: none; border-radius: 12px; }
+.xn-set-me:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 3px; }
+.xn-set-face { display: grid; place-items: center; flex: none; width: 60px; height: 60px; overflow: hidden; border-radius: 12px; background: var(--oled-accent-soft, rgba(166, 124, 255, .15)); color: var(--oled-accent); font-size: 24px; font-weight: 700; }
+.xn-set-face img { width: 100%; height: 100%; object-fit: cover; }
+.xn-set-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.xn-set-uname { overflow: hidden; font-size: 21px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.xn-set-rank { color: var(--oled-muted); font-size: 12px; line-height: 1.35; }
+.xn-set-rank:empty { display: none; }
+.xn-set-headout form { margin: 0; }
+.xn-set .xn-set-out { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; color: #ff7b7b; cursor: pointer; transition: background-color .15s ease, transform .15s ease; }
+.xn-set-out svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.xn-set .xn-set-out:hover, .xn-set .xn-set-out:focus-visible { background: rgba(255, 123, 123, .12); transform: scale(1.08); }
+.xn-set .xn-set-out:focus-visible { outline: 2px solid #ff7b7b; outline-offset: 1px; }
+.xn-set-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 8px 16px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--oled-line-strong) transparent; }
+.xn-set .xn-set-h { margin: 16px 4px 8px; color: var(--oled-muted); font-size: 11.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.xn-set-group { display: flex; flex-direction: column; gap: 2px; }
+.xn-set-admin:empty { display: none; }
+.xn-set-admin { margin-top: 8px; }
+.xn-set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--oled-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.xn-set-row:hover { background: rgba(255, 255, 255, 0.04); }
+.xn-set-row:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
+.xn-set-row[aria-current] { background: color-mix(in srgb, var(--oled-accent) 12%, transparent); }
+.xn-set-row[aria-current] .xn-set-name { color: var(--oled-accent); }
+.xn-set-ic { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--oled-accent-soft, rgba(166, 124, 255, .15)); color: var(--oled-accent); transition: transform .18s ease; }
+.xn-set-ic svg { width: 18px; height: 18px; fill: currentColor; }
+.xn-set-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xn-set-name { overflow: hidden; font-size: 13.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.xn-set-desc { overflow: hidden; color: var(--oled-muted); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.xn-set-desc:empty { display: none; }
+.xn-set-row.is-exp .xn-set-ic { background: rgba(120, 230, 170, .12); color: #7fe0ae; }
+.xn-set-row.is-admin .xn-set-ic { background: rgba(255, 139, 139, 0.12); color: #ff8b8b; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) { .xn-set-row:hover .xn-set-ic { transform: translate(2px, -2px) scale(1.06); } }
+/* The page on the right. */
+.xn-set-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.xn-set-mhead { display: flex; align-items: center; gap: 10px; padding: 14px 14px 6px 22px; }
+.xn-set .xn-set-mtitle { flex: 1 1 auto; margin: 0; }
+.xn-set-back { display: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--oled-line); border-radius: 50%; background: none; color: var(--oled-text); cursor: pointer; }
+.xn-set-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.xn-set-x { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--oled-muted); cursor: pointer; transition: color .15s ease, border-color .15s ease; }
+.xn-set-x svg, .xn-set-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.xn-set-x:hover, .xn-set-x:focus-visible { color: var(--oled-text); border-color: var(--oled-line); }
+.xn-set-x:focus-visible, .xn-set-back:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.xn-set-pane { position: relative; flex: 1 1 auto; min-height: 0; }
+.xn-set-pane > [hidden] { display: none !important; }
+.xn-set-framebox { position: absolute; inset: 0 0 0 18px; }
+.xn-set-frame { display: block; width: 100%; height: 100%; border: 0; background: #060608; color-scheme: dark; }
+.xn-set-framebox.is-loading::before { content: ""; position: absolute; top: 18px; left: 4px; width: min(560px, 80%); height: 140px; border-radius: 18px; background: linear-gradient(90deg, rgba(255,255,255,.03), rgba(255,255,255,.07), rgba(255,255,255,.03)); background-size: 200% 100%; animation: xn-set-shim 1.1s linear infinite; }
+.xn-set-framebox.is-loading .xn-set-frame { opacity: 0; }
+@keyframes xn-set-shim { to { background-position: -200% 0; } }
+.xn-set-native { position: absolute; inset: 0; overflow-y: auto; padding: 4px 22px 24px; }
+.xn-set-block { max-width: 760px; margin-bottom: 14px; padding: 18px 20px; border: 1px solid var(--oled-line); border-radius: 18px; background: var(--oled-surface); }
+.xn-set .xn-set-bh { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.xn-set-note { max-width: 62ch; margin: 0 0 14px; color: var(--oled-muted); font-size: 13.5px; line-height: 1.5; }
+.xn-set-block .xn-set-note:last-child { margin-bottom: 0; }
+.xn-set-pill { display: inline-flex; align-items: center; height: 38px; padding: 0 16px; border: 1px solid var(--oled-line-strong); border-radius: 12px; color: var(--oled-text); font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.xn-set-pill:hover, .xn-set-pill:focus-visible { border-color: var(--oled-accent); color: var(--oled-accent); }
+/* Experimental page. */
+.xn-set-exps { display: grid; gap: 10px; max-width: 760px; }
+.xn-set-exp { display: flex; align-items: center; gap: 18px; padding: 16px 18px; border: 1px solid var(--oled-line); border-radius: 18px; background: var(--oled-surface); cursor: pointer; }
+.xn-set-exp:hover { border-color: var(--oled-line-strong); }
+.xn-set-exp-txt { display: flex; flex: 1 1 auto; flex-direction: column; gap: 5px; min-width: 0; }
+.xn-set-exp-name { font-size: 15.5px; font-weight: 600; }
+.xn-set-exp-desc { color: var(--oled-muted); font-size: 13px; line-height: 1.45; }
+.xn-switch { position: relative; flex: none; width: 50px; height: 30px; }
+.xn-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.xn-switch span { position: absolute; inset: 0; border-radius: 99px; background: #2a2732; transition: background-color .2s ease; pointer-events: none; }
+.xn-switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }
+.xn-switch input:checked + span { background: var(--oled-accent); }
+.xn-switch input:checked + span::after { transform: translateX(20px); }
+.xn-switch input:focus-visible + span { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+/* Phones: the list fills the window; a page slides over it with a Back button. */
+@media (max-width: 767px) {
+  .xn-set-card { grid-template-columns: minmax(0, 1fr); border-radius: 22px; position: relative; }
+  .xn-set-side { border-right: 0; }
+  .xn-set-main { position: absolute; inset: 0; z-index: 1; border-radius: inherit; overflow: hidden; background: #060608; transform: translateX(100%); visibility: hidden; transition: transform .28s cubic-bezier(.2, .9, .3, 1), visibility 0s .28s; }
+  .xn-set-card.is-pane .xn-set-main { transform: none; visibility: visible; transition: transform .28s cubic-bezier(.2, .9, .3, 1); }
+  .xn-set-back { display: grid; }
+  .xn-set-mhead { padding: 12px 10px 6px 12px; }
+  .xn-set-framebox { left: 8px; }
+  .xn-set-native { padding: 4px 12px 20px; }
+  .xn-set-head { padding: 16px 10px 12px 14px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .xn-set-card { transform: scale(.95) translateY(-12px); transition: transform .32s cubic-bezier(.2, 1.2, .4, 1); }
+  .xn-set.is-open .xn-set-card { transform: none; }
+  .xn-set.is-open .xn-set-row { animation: xn-set-row-in .32s cubic-bezier(.2, 1.1, .4, 1) both; animation-delay: calc(40ms + var(--i, 0) * 16ms); }
+}
+@keyframes xn-set-row-in { from { opacity: 0; transform: translateX(-8px); } }

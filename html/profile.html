@@ -51,7 +51,7 @@
   <section class="xn-card pf-head" id="header">
     <div class="pf-banner" id="pfBanner">
       <div class="pf-menu-wrap">
-        <button type="button" class="pf-gear" id="pfGear" aria-label="Settings" title="Settings" aria-haspopup="menu" aria-expanded="false" aria-controls="options"><span aria-hidden="true"></span></button>
+        <button type="button" class="pf-gear" id="pfGear" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="options"><span aria-hidden="true"></span></button>
         <div class="pf-menu" id="options" role="menu" aria-label="Settings" hidden>
           <button type="button" class="pf-menu-item option" id="APB" role="menuitem">Appearance</button>
           <button type="button" class="pf-menu-item option" id="DTB" role="menuitem">Data</button>
@@ -598,7 +598,12 @@
       // scrolls the page, and that used to close the menu before a tap landed.
       if (keyboard) items()[0].focus({ preventScroll: true });
     };
-    gear.addEventListener("click", (event) => setOpen(menu.hidden, { keyboard: event.detail === 0 }));
+    // The gear opens the site's settings window (nav.js), where these
+    // settings now live (mommy 2026-11-06); the old menu is the fallback.
+    gear.addEventListener("click", (event) => {
+      if (window.xnSettings) { event.stopPropagation(); window.xnSettings.open("profile"); return; }
+      setOpen(menu.hidden, { keyboard: event.detail === 0 });
+    });
     // Capture runs before the item's own handler, so a popup opened by the
     // item hands focus back to the gear when it closes.
     menu.addEventListener("click", (event) => {
@@ -633,6 +638,19 @@
   closeBtnA.onclick = () => hidePopup(AP);
   closeBtnD.onclick = () => hidePopup(DT);
   closeBtnP.onclick = () => hidePopup(PR);
+
+  // /Profile#appearance and #preferences open that popup (the settings
+  // window links here: Site theme, Preferences).
+  const openFromHash = () => {
+    const h = location.hash.toLowerCase();
+    if (h !== "#appearance" && h !== "#preferences") return;
+    history.replaceState(null, "", location.pathname + location.search);
+    if (window.xnSettings) window.xnSettings.open(h === "#appearance" ? "theme" : "preferences");
+    else if (h === "#appearance") showPopup(AP);
+    else { showPopup(PR); window.gcOpen && window.gcOpen(); }
+  };
+  window.addEventListener("hashchange", openFromHash);
+  setTimeout(openFromHash, 0);
 
   const DAY = document.getElementById("DAY");
   document.getElementById("CSDay").onclick = () => hidePopup(DAY);
@@ -2064,7 +2082,9 @@
         if (url) bannerImg.src = url; else bannerImg.removeAttribute("src");
       }
       document.querySelectorAll('[data-remove="' + kind + '"]').forEach((b) => { b.disabled = !url; });
+      document.dispatchEvent(new CustomEvent("pf-picture", { detail: { kind, url: url || "" } }));
     }
+    window.pfShowPicture = showPicture;
 
     const shrink = shrinkPicture;
 
@@ -2247,6 +2267,533 @@
     expList.replaceChildren(...rows);
     rows[0].focus({ preventScroll: true });
   }
+</script>
+<script>
+  // Settings window pages (mommy 2026-11-06): the settings window (nav.js)
+  // shows /Profile?pane=<name> in a frame. The Profile settings that used to
+  // live in the gear's popups are moved into one page here; their own code
+  // keeps working because the same elements are moved, not copied.
+  (() => {
+    const pane = new URLSearchParams(location.search).get("pane");
+    if (!pane) return;
+    document.documentElement.classList.add("pf-embed");
+    const $ = (sel) => document.querySelector(sel);
+    // Siblings from `from` up to (not including) the first that matches `until`.
+    const run = (from, until) => {
+      const out = [];
+      for (let el = from; el && !(until && el.matches(until)); el = el.nextElementSibling) out.push(el);
+      return out;
+    };
+    const ap = $("#AP .APcontent");
+    const look = $('#PR section[aria-labelledby="lkLabel"]');
+    const groups = {
+      pictures: () => run(ap && ap.firstElementChild, 'label[for="clearRange"]'),
+      clear: () => run($('label[for="clearRange"]'), "#colorLabel"),
+      color: () => run($("#colorLabel"), "#rlLabel"),
+      badge: () => run($("#rlLabel"), "#nameColorLabel"),
+      nameColor: () => run($("#nameColorLabel"), null),
+      glow: () => run($("#lkAuraLabel"), ".ps-actions"),
+      siteLook: () => run($("#lkFontLabel"), "#lkAuraLabel"),
+      lookReset: () => (look ? [look.querySelector(".ps-actions")] : []),
+      scene: () => run($("#sceneLabel"), null),
+      graph: () => [...($("#PR .pr-col:nth-of-type(2)") || { children: [] }).children],
+      data: () => [...($("#DT .content") || { children: [] }).children],
+      sync: () => [...($("#SY .APcontent") || { children: [] }).children],
+    };
+    const PAGES = {
+      profile: [["Pictures", "pictures"], ["Geek badge", "badge"], ["Name color", "nameColor"], ["Profile picture glow", "glow"]],
+      theme: [["Site color", "color"], ["Widget transparency", "clear"], ["Site background", "scene"]],
+      preferences: [["Site look", "siteLook", "lookReset"], ["Graph", "graph"]],
+      data: [["Data", "data"]],
+      sync: [["Phone sync", "sync"]],
+    };
+    const build = () => {
+      const page = document.createElement("div");
+      page.className = "pf-embed-page";
+      // Find every group before moving any (each group ends where the next starts).
+      const found = {};
+      Object.keys(groups).forEach((k) => { found[k] = groups[k]().filter(Boolean); });
+      if (pane === "data") {
+        dataPage(page, found);
+        document.body.append(page);
+        page.addEventListener("click", (e) => { const a = e.target.closest("a[href]"); if (a && !a.target) a.target = "_top"; });
+        return;
+      }
+      if (pane === "theme") {
+        themePage(page, found);
+        document.body.append(page);
+        page.addEventListener("click", (e) => { const a = e.target.closest("a[href]"); if (a && !a.target) a.target = "_top"; });
+        return;
+      }
+      if (pane === "profile" || !PAGES[pane]) {
+        profilePage(page, found);
+        document.body.append(page);
+        page.addEventListener("click", (e) => { const a = e.target.closest("a[href]"); if (a && !a.target) a.target = "_top"; });
+        return;
+      }
+      // Preferences (mommy's design 2026-11-07): Site look and Graph as two open columns.
+      if (pane === "preferences") page.classList.add("pfx-pref");
+      (PAGES[pane] || PAGES.profile).forEach(([title, ...keys]) => {
+        const nodes = keys.flatMap((k) => found[k]);
+        if (!nodes.length) return;
+        const card = document.createElement("section");
+        card.className = "pf-embed-card APcontent";
+        const h = document.createElement("h3");
+        h.className = "pf-embed-h";
+        h.textContent = title;
+        card.append(h, ...nodes);
+        // The group's own label repeats the card's title: keep it for screen readers only.
+        const first = nodes[0];
+        if (first.matches(".xn-label") && first.textContent.trim().toLowerCase().startsWith(title.toLowerCase())) first.classList.add("pf-embed-dup");
+        page.append(card);
+      });
+      document.body.append(page);
+      if (pane === "preferences" && window.gcOpen) window.gcOpen();
+      if (pane === "sync" && window.syOpen) window.syOpen();
+      // Links leave the frame and go to the whole page.
+      page.addEventListener("click", (e) => {
+        const a = e.target.closest("a[href]");
+        if (a && !a.target) a.target = "_top";
+      });
+    };
+    // The Profile page of the settings window (mommy's design 2026-11-07):
+    // left, the picture + banner, the badge and name colors side by side and
+    // the picture glow; right, the profile background with a gallery of the
+    // backgrounds you used before.
+    // The Data page (mommy's design 2026-11-07): everything the account made,
+    // each list with its own delete buttons and Clear (GET/POST /profile/mydata).
+    function dataPage(page, found) {
+      page.classList.add("pfd");
+      const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+      const zone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (_) { return ""; } })();
+      const q = "zone=" + encodeURIComponent(zone) + "&tz=" + new Date().getTimezoneOffset();
+      const two = (n) => String(n).padStart(2, "0");
+      const clock = (ms) => { const d = new Date(ms); return two(d.getHours()) + ":" + two(d.getMinutes()); };
+      const short = (ms) => { const d = new Date(ms); return two(d.getDate()) + "/" + two(d.getMonth() + 1) + "/" + String(d.getFullYear()).slice(2); };
+      const long = (ms) => { const d = new Date(ms); return two(d.getDate()) + "/" + two(d.getMonth() + 1) + "/" + d.getFullYear(); };
+      const nice = (ms) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+      const X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+      // Two taps: the first arms the button for a few seconds.
+      const twoTap = (b, label, sure, run) => {
+        let armed = 0;
+        b.addEventListener("click", async () => {
+          if (!armed) {
+            b.classList.add("is-armed");
+            b.textContent = sure;
+            armed = setTimeout(() => { armed = 0; b.classList.remove("is-armed"); b.textContent = label; }, 3500);
+            return;
+          }
+          clearTimeout(armed); armed = 0;
+          b.classList.remove("is-armed"); b.textContent = label;
+          b.disabled = true;
+          try { await run(); } finally { b.disabled = false; }
+        });
+      };
+      const post = async (body) => {
+        const res = await fetch("/profile/mydata", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      };
+
+      // A box: header (title, count, optional Clear) and a scrolling list.
+      const box = (cls, title, clearKind, sure) => {
+        const b = el("section", "pfd-box " + cls);
+        const head = el("header", "pfd-head");
+        const h = el("h3", "pfd-title", title);
+        const count = el("span", "pfd-count", "");
+        head.append(h, count);
+        if (clearKind) {
+          const c = el("button", "pfd-clear", "Clear");
+          c.type = "button";
+          twoTap(c, "Clear", sure || "Sure? Clear all", async () => {
+            try { await post({ kind: clearKind, all: true }); } catch (_) {}
+            load();
+          });
+          head.append(c);
+        }
+        const list = el("div", "pfd-list");
+        list.setAttribute("aria-live", "polite");
+        b.append(head, list);
+        b.list = list; b.count = count;
+        return b;
+      };
+      const delBtn = (label, item, row) => {
+        const d = el("button", "pfd-x");
+        d.type = "button";
+        d.innerHTML = X;
+        d.setAttribute("aria-label", label);
+        d.addEventListener("click", async () => {
+          row.classList.add("is-going");
+          try {
+            const body = { kind: item.kind, id: item.id || 0 };
+            if (item.kind === "dose") Object.assign(body, { ref: item.ref, name: item.title, amount: item.amount, time: clock(item.at) });
+            await post(body);
+            row.addEventListener("transitionend", () => { row.remove(); load(true); }, { once: true });
+            row.classList.add("is-gone");
+            setTimeout(() => { if (row.isConnected) { row.remove(); load(true); } }, 400);
+          } catch (_) { row.classList.remove("is-going"); }
+        });
+        return d;
+      };
+      const empty = (list, text) => list.replaceChildren(el("p", "pfd-empty", text));
+
+      const grid = el("div", "pfd-grid");
+      const notes = box("pfd-notes", "Notes", "notes", "Sure? Delete all notes");
+      const msgs = box("pfd-msgs", "Messages", "messages", "Sure? Delete all");
+      const contrib = box("pfd-contrib", "Contributions", "contributions", "Sure? Delete all");
+      const glance = box("pfd-glance", "At a glance");
+      grid.append(notes, msgs, contrib, glance);
+      const left = el("div", "pfd-panel pfd-main");
+      left.append(grid);
+      const posts = box("pfd-panel pfd-posts", "Posts", "posts", "Sure? Delete all");
+      const doses = box("pfd-panel pfd-doses", "All doses", "doses", "Sure? Delete all");
+
+      // Import from the Journal app sits at the bottom of All doses.
+      const imp = el("div", "pfd-import");
+      const ji = found.data.find((n) => n.id === "journalImport");
+      const oldClear = found.data.find((n) => n.matches("button.xn-btn-danger"));
+      if (ji) {
+        ji.querySelector("#jiTitle")?.classList.add("pfd-hide");
+        ji.querySelector(".pf-note")?.classList.add("pfd-hide");
+        const row = ji.querySelector(".ji-row");
+        if (row && oldClear) {
+          oldClear.className = "pfd-clear";
+          oldClear.title = "Forget the picked file";
+          row.append(oldClear);
+          oldClear.addEventListener("click", () => {
+            const f = ji.querySelector("#jiFile"); if (f) f.value = "";
+            ji.querySelector("#jiGo")?.setAttribute("hidden", "");
+            const sum = ji.querySelector("#jiSummary"); if (sum) { sum.hidden = true; sum.textContent = ""; }
+            const st = ji.querySelector("#jiStatus"); if (st) st.textContent = "";
+          });
+        }
+        imp.append(ji);
+        // An import adds doses: list them again when it reports back.
+        const st = ji.querySelector("#jiStatus");
+        let t = 0;
+        if (st) new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => load(true), 800); }).observe(st, { childList: true, characterData: true, subtree: true });
+      }
+      doses.append(imp);
+      page.append(left, posts, doses);
+
+      let me = null;
+      const rowOf = (cls) => el("div", "pfd-row " + cls);
+      const draw = (data) => {
+        const L = data.lists || {};
+        const C = data.counts || {};
+        const set = (b, n) => { b.count.textContent = n ? String(n) : ""; };
+
+        // Notes
+        set(notes, C.note);
+        if (!L.notes.length) empty(notes.list, "No notes yet. Write one in Notes.");
+        else notes.list.replaceChildren(...L.notes.map((it) => {
+          const r = rowOf("pfd-note");
+          const t = el("div", "pfd-txt");
+          t.append(el("strong", "", it.title || "Untitled"), el("small", "", nice(it.at) + (it.body ? " · " + it.body : "")));
+          r.append(t, delBtn("Delete note", it, r));
+          return r;
+        }));
+
+        // Messages
+        set(msgs, C.message);
+        if (!L.messages.length) empty(msgs.list, "No messages sent yet.");
+        else msgs.list.replaceChildren(...L.messages.map((it) => {
+          const r = rowOf("pfd-msg");
+          const when = el("span", "pfd-when");
+          when.append(el("b", "", clock(it.at)), el("span", "", short(it.at)));
+          const t = el("div", "pfd-txt");
+          t.append(el("span", "pfd-to", "To: " + (it.to || "chat")), el("strong", "pfd-body", it.body));
+          r.append(t, when, delBtn("Delete message", it, r));
+          return r;
+        }));
+
+        // Contributions
+        set(contrib, (C.pill || 0) + (C.photo || 0));
+        if (!L.contributions.length) empty(contrib.list, "Nothing added to the Pill or Drug Database yet.");
+        else contrib.list.replaceChildren(...L.contributions.map((it) => {
+          const r = rowOf("pfd-con");
+          const pic = el("span", "pfd-thumb");
+          if (it.picture) { const im = el("img"); im.src = it.picture; im.alt = ""; im.loading = "lazy"; pic.append(im); }
+          const t = el("div", "pfd-txt");
+          const meta = el("small", "pfd-meta");
+          meta.append(el("span", "pfd-chip is-" + (it.status || "pending"), it.status || "pending"), (it.kind === "pill" ? "Pill · " : "Drug picture · ") + short(it.at));
+          t.append(el("strong", "", it.kind === "pill" ? [it.body, it.title].filter(Boolean).join(". ") : it.title + (it.body ? ": " + it.body : "")), meta);
+          r.append(pic, t, delBtn("Delete this", it, r));
+          return r;
+        }));
+
+        // At a glance (idea): counts as tiles and a copy of everything to download.
+        const tiles = [["Doses", C.dose], ["Notes", C.note], ["Messages", C.message], ["Posts", C.post], ["Trip reports", C.report], ["Database", (C.pill || 0) + (C.photo || 0)]];
+        const wrap = el("div", "pfd-tiles");
+        tiles.forEach(([k, v]) => { const t = el("div", "pfd-tile"); t.append(el("b", "", String(v || 0)), el("span", "", k)); wrap.append(t); });
+        const first = L.doses.length ? L.doses[L.doses.length - 1] : null;
+        const since = el("p", "pfd-since", first && L.doses.length >= (C.dose || 0) ? "Logging doses since " + nice(first.at) : first ? "" : "No doses logged yet.");
+        const dl = el("a", "pfd-dl");
+        dl.href = "/profile/mydata?download=1&" + q;
+        dl.setAttribute("download", "");
+        dl.target = "_self";
+        dl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Download a copy of my data</span>';
+        glance.list.replaceChildren(wrap, since, dl);
+
+        // Forum posts and trip reports
+        set(posts, (C.post || 0) + (C.report || 0));
+        if (!L.posts.length) empty(posts.list, "No Forum posts or trip reports yet.");
+        else posts.list.replaceChildren(...L.posts.map((it) => {
+          const c = el("article", "pfd-row pfd-post");
+          const top = el("div", "pfd-post-top");
+          const who = el("span", "pfd-who");
+          if (me && me.avatar) { const im = el("img"); im.src = me.avatar; im.alt = ""; who.append(im); }
+          else who.append(el("i", "pfd-initial", ((me && me.name) || "?").slice(0, 1).toUpperCase()));
+          const nm = el("span", "pfd-who-txt");
+          const nb = el("b", "", (me && me.name) || "");
+          if (me && me.nameColor) nb.style.color = me.nameColor;
+          nm.append(nb, el("small", "", nice(it.at)));
+          who.append(nm);
+          const tag = el("span", "pfd-chip " + (it.kind === "report" ? "is-report" : "is-post"), it.kind === "report" ? (it.public ? "Trip report · Public" : "Trip report") : "Forum post");
+          const del = el("button", "pfd-del", "Delete");
+          del.type = "button";
+          twoTap(del, "Delete", "Sure?", async () => {
+            c.classList.add("is-going");
+            try { await post({ kind: it.kind, id: it.id }); c.classList.add("is-gone"); setTimeout(() => load(true), 300); } catch (_) { c.classList.remove("is-going"); }
+          });
+          top.append(who, del);
+          c.append(top, tag);
+          if (it.title) c.append(el("h4", "pfd-post-title", it.title));
+          if (it.rating) c.append(el("div", "pfd-stars", "★".repeat(it.rating) + "☆".repeat(Math.max(0, 5 - it.rating))));
+          if (it.body) c.append(el("p", "pfd-post-body", it.body));
+          if (it.pictures && it.pictures.length) {
+            const pics = el("div", "pfd-pics" + (it.pictures.length > 1 ? " is-many" : ""));
+            it.pictures.slice(0, 4).forEach((u) => { const im = el("img"); im.src = u; im.alt = ""; im.loading = "lazy"; pics.append(im); });
+            c.append(pics);
+          }
+          return c;
+        }));
+
+        // Doses
+        set(doses, C.dose);
+        if (!L.doses.length) empty(doses.list, "No doses yet. Add one on the Graph.");
+        else doses.list.replaceChildren(...L.doses.map((it) => {
+          const r = rowOf("pfd-dose");
+          const t = el("div", "pfd-txt");
+          const sub = el("small", "");
+          sub.append(el("span", "pfd-amt", it.amount + (it.unit || "")), "  ·  " + clock(it.at) + "  ·  " + short(it.at));
+          t.append(el("strong", "pfd-dname", it.title), sub);
+          r.append(t, delBtn("Delete dose", it, r));
+          return r;
+        }));
+        if (L.doses.length < (C.dose || 0)) doses.list.append(el("p", "pfd-more", "Showing the newest " + L.doses.length + " of " + C.dose + "."));
+      };
+
+      let busy = false;
+      async function load(quiet) {
+        if (busy) return;
+        busy = true;
+        if (!quiet) page.classList.add("is-loading");
+        try {
+          if (!me) {
+            try { const r = await fetch("/me", { headers: { Accept: "application/json" } }); if (r.ok) me = await r.json(); } catch (_) {}
+          }
+          const res = await fetch("/profile/mydata?" + q, { headers: { Accept: "application/json" } });
+          if (!res.ok) throw new Error();
+          draw(await res.json());
+        } catch (_) {
+          [notes, msgs, contrib, posts, doses].forEach((b) => empty(b.list, "Couldn't load this. Try again in a moment."));
+        } finally {
+          busy = false;
+          page.classList.remove("is-loading");
+        }
+      }
+      load();
+    }
+    // The Site theme page (mommy's design 2026-11-07): one card with the
+    // background tiles in a 4 x 2 grid, then transparency and site color side
+    // by side under it.
+    function themePage(page, found) {
+      page.classList.add("pfx", "pfx-theme-page");
+      const card = document.createElement("section");
+      card.className = "pf-embed-card APcontent pfx-theme";
+      const h = document.createElement("h3");
+      h.className = "pf-embed-h";
+      h.textContent = "Site background";
+      const hideLabel = (nodes) => nodes.forEach((n) => { if (n.matches(".xn-label")) n.classList.add("pf-embed-dup"); });
+      hideLabel(found.scene);
+      card.append(h, ...found.scene.filter((n) => !n.matches("hr")));
+      const row = document.createElement("div");
+      row.className = "pfx-theme-row";
+      [["Widget transparency", found.clear], ["Site color", found.color]].forEach(([title, nodes]) => {
+        if (!nodes.length) return;
+        const half = document.createElement("div");
+        half.className = "pfx-theme-half";
+        const t = document.createElement("h4");
+        t.className = "pfx-theme-t";
+        t.textContent = title;
+        hideLabel(nodes);
+        half.append(t, ...nodes);
+        row.append(half);
+      });
+      card.append(row);
+      page.append(card);
+      // Sunset only shows here while it is the picked background (her design has 8 tiles).
+      const sunset = card.querySelector('.pf-scene[data-scene="sunset"]');
+      const syncSunset = () => { if (sunset) sunset.hidden = sunset.getAttribute("aria-checked") !== "true"; };
+      syncSunset();
+      if (sunset) new MutationObserver(syncSunset).observe(card.querySelector("#scenePicks") || card, { subtree: true, attributes: true, attributeFilter: ["aria-checked"] });
+    }
+    function profilePage(page, found) {
+      page.classList.add("pfx");
+      const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+      const card = (cls) => el("section", "pf-embed-card APcontent pfx-card " + cls);
+      const btn = (sel) => document.querySelector(sel);
+      const textBtns = (kind) => {
+        const box = el("span", "pfx-acts");
+        const change = btn('#AP [data-pick="' + kind + '"]');
+        const remove = btn('#AP [data-remove="' + kind + '"]');
+        [change, remove].forEach((b) => { if (b) { b.className = "pfx-link" + (b === remove ? " is-danger" : ""); box.append(b); } });
+        return box;
+      };
+      const left = el("div", "pfx-col");
+      const right = el("div", "pfx-col");
+
+      // Picture and banner
+      const pics = card("pfx-pics");
+      pics.setAttribute("aria-label", "Pictures");
+      const avatar = el("button", "pfx-avatar");
+      avatar.type = "button";
+      avatar.setAttribute("aria-label", "Change profile picture");
+      avatar.addEventListener("click", () => btn('[data-pick="avatar"]')?.click());
+      const banner = el("button", "pfx-banner");
+      banner.type = "button";
+      banner.setAttribute("aria-label", "Change banner");
+      banner.addEventListener("click", () => btn('[data-pick="banner"]')?.click());
+      pics.append(el("div", "pfx-pic-pair"), el("div", "pfx-pic-pair pfx-pic-wide"));
+      pics.children[0].append(avatar, textBtns("avatar"));
+      pics.children[1].append(banner, textBtns("banner"));
+      const avatarImg = document.getElementById("avatarImg");
+      const bannerImg = document.getElementById("bannerImg");
+      const initial = document.getElementById("avatarInitial");
+      const paintPic = (box, url, fallback) => {
+        box.replaceChildren();
+        if (url) { const i = el("img"); i.src = url; i.alt = ""; box.append(i); }
+        else if (fallback) box.append(el("span", "pfx-initial", fallback));
+        box.classList.toggle("is-empty", !url);
+      };
+      const showAvatar = () => paintPic(avatar, avatarImg && !avatarImg.hidden ? avatarImg.getAttribute("src") : "", initial ? initial.textContent.trim() : "");
+      const showBanner = () => paintPic(banner, bannerImg && !bannerImg.hidden ? bannerImg.getAttribute("src") : "", "");
+      showAvatar();
+      showBanner();
+
+      // Badge and name colors side by side
+      const looks = card("pfx-looks");
+      const badge = el("div", "pfx-half pfx-badge");
+      badge.append(...found.badge.filter((n) => !n.matches(".xn-label")));
+      looks.append(badge);
+      const nameNodes = found.nameColor.filter((n) => !n.matches(".xn-label"));
+      if (nameNodes.length) {
+        const half = el("div", "pfx-half pfx-namecol");
+        const preview = el("p", "pfx-name-preview");
+        const shown = el("span", "pfx-name");
+        preview.append(shown);
+        const heading = document.getElementById("username");
+        const mirror = () => {
+          shown.textContent = heading.textContent.trim();
+          shown.className = "pfx-name " + heading.className.replace(/\bxn-h1\b/g, "");
+          shown.style.color = heading.style.color;
+          if (heading.dataset.fx) shown.dataset.fx = heading.dataset.fx; else delete shown.dataset.fx;
+          if (heading.dataset.nameColor) shown.dataset.nameColor = heading.dataset.nameColor;
+        };
+        mirror();
+        new MutationObserver(mirror).observe(heading, { attributes: true, childList: true, characterData: true, subtree: true });
+        half.append(preview, ...nameNodes);
+        looks.append(half);
+        if (window.xnPaintNames) window.xnPaintNames(half);
+      } else {
+        looks.classList.add("is-single");
+      }
+
+      // Picture glow
+      const glow = card("pfx-glow");
+      glow.append(el("h3", "pf-embed-h pfx-glow-h", "Profile picture glow"), ...found.glow.filter((n) => !n.matches(".xn-label, hr")));
+      left.append(pics, looks, glow);
+
+      // Profile background + gallery
+      const bgCard = card("pfx-bg");
+      bgCard.setAttribute("aria-label", "Profile background");
+      const bgView = el("div", "pfx-bg-view");
+      bgCard.append(bgView);
+      const galCard = card("pfx-gallery");
+      galCard.setAttribute("aria-label", "Your backgrounds");
+      const gal = el("div", "pfx-gal");
+      galCard.append(gal);
+      const change = btn('#AP [data-pick="background"]');
+      const remove = btn('#AP [data-remove="background"]');
+      if (change) change.className = "xn-btn pfx-wide";
+      if (remove) remove.className = "xn-btn xn-btn-danger pfx-wide";
+      right.append(bgCard, galCard, ...[change, remove].filter(Boolean));
+      page.append(left, right);
+
+      let current = "";
+      let pictures = [];
+      const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+      const drawBg = () => {
+        bgView.replaceChildren();
+        if (current) { const i = el("img"); i.src = current; i.alt = "Your profile background"; bgView.append(i); }
+        else bgView.append(el("span", "pfx-bg-none", "No background yet"));
+        gal.replaceChildren(...pictures.map((url) => {
+          const tile = el("div", "pfx-thumb" + (url === current ? " is-on" : ""));
+          const pick = el("button", "pfx-thumb-pick");
+          pick.type = "button";
+          pick.setAttribute("aria-label", url === current ? "Background in use" : "Use this background");
+          pick.setAttribute("aria-pressed", String(url === current));
+          const img = el("img"); img.src = url; img.alt = ""; img.loading = "lazy";
+          pick.append(img);
+          pick.addEventListener("click", () => send({ use: url }, "Background changed."));
+          const del = el("button", "pfx-thumb-del", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>');
+          del.type = "button";
+          del.setAttribute("aria-label", "Delete this background");
+          del.title = "Delete";
+          del.addEventListener("click", () => send({ delete: url }, "Background deleted."));
+          tile.append(pick, del);
+          return tile;
+        }));
+        const add = el("button", "pfx-add", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>');
+        add.type = "button";
+        add.setAttribute("aria-label", "Add a background");
+        add.title = "Add a background";
+        add.addEventListener("click", () => change && change.click());
+        gal.append(add);
+      };
+      const load = () => fetch("/profile/backgrounds", { headers: { Accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d) { current = d.current || ""; pictures = d.pictures || []; drawBg(); } })
+        .catch(() => {});
+      async function send(fields, done) {
+        const form = new FormData();
+        form.append("kind", "background");
+        Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+        try {
+          const res = await fetch("/profile/picture", { method: "POST", body: form });
+          if (!res.ok) throw new Error((await res.text()).trim() || "Couldn't change the background.");
+          const data = await res.json();
+          if (window.pfShowPicture) window.pfShowPicture("background", data.url);
+          toast(done);
+        } catch (error) {
+          toast(error.message, true);
+        }
+        load();
+      }
+      document.addEventListener("pf-picture", (e) => {
+        if (e.detail.kind === "avatar") showAvatar();
+        else if (e.detail.kind === "banner") showBanner();
+        else if (e.detail.kind === "background") { current = e.detail.url; drawBg(); load(); }
+      });
+      drawBg();
+      load();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build);
+    else build();
+  })();
 </script>
 </body>
 </html>

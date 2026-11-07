@@ -412,10 +412,10 @@
 .fx-tree-tog { display: grid; place-items: center; flex: none; width: 22px; height: 28px; padding: 0; border: 0; background: none; color: var(--oled-muted); cursor: pointer; }
 .fx-tree-tog .fx-ico { width: 14px; height: 14px; transition: transform 0.15s ease; }
 .fx-tree li[aria-expanded="true"] > .fx-tree-row .fx-tree-tog .fx-ico { transform: rotate(90deg); }
-.fx-tree li.is-leaf > .fx-tree-row .fx-tree-tog { visibility: hidden; }
+.fx-tree li.is-leaf > .fx-tree-row .fx-tree-tog { opacity: 0.45; }
 .fx-tree-row a { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; min-height: 30px; padding: 0 8px; border-radius: 8px; color: var(--oled-muted); font-size: 13px; text-decoration: none; }
 .fx-tree-row a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fx-tree-row a .fx-ico { width: 16px; height: 16px; color: var(--oled-accent); }
+.fx-tree-row a .fx-ico { flex: none; width: 16px; height: 16px; color: var(--oled-accent); }
 @media (hover: hover) { .fx-tree-row a:hover { color: var(--oled-text); background: var(--oled-surface-2); } }
 .fx-tree-row.is-here a { color: var(--oled-text); background: var(--oled-accent-soft); }
 
@@ -505,3 +505,25 @@
 }
 .fx-explorer[data-view="details"] .fx-row-actions { justify-content: flex-end; width: 84px; }
 .fx-on-server2 .fx-nav-title, .fx-on-server2 .fx-tree { display: none; }
+
+/* Large icons (mommy 2026-11-06): every folder and file is a card; the folder
+   icon (or its own picture) fills most of it, with the name and how much the
+   folder holds underneath. */
+.fx-explorer[data-view="large"] .fx-cols-head { display: none; }
+.fx-explorer[data-view="large"] .fx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; align-content: start; }
+.fx-explorer[data-view="large"] .item { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; padding: 10px 10px 12px; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface-2); text-align: left; transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease; }
+.fx-explorer[data-view="large"] .item.is-selected { border-color: var(--oled-accent); background: var(--oled-accent-soft); }
+@media (hover: hover) { .fx-explorer[data-view="large"] .item:hover { border-color: rgba(var(--xn-accent-rgb), 0.5); transform: translateY(-2px); } }
+.fx-explorer[data-view="large"] .fx-thumb { display: grid; place-items: center; width: 100%; height: auto; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 10px; background: rgba(var(--xn-accent-rgb), 0.08); }
+.fx-explorer[data-view="large"] .fx-thumb .fx-ico { width: 46%; height: 46%; }
+.fx-explorer[data-view="large"] .fx-thumb :is(img.fx-ficon, img.preview) { width: 100%; height: 100%; max-width: none; object-fit: cover; border-radius: 0; }
+.fx-explorer[data-view="large"] .fx-thumb .fx-femoji { font-size: 64px; line-height: 1; }
+.fx-explorer[data-view="large"] .fileinfo { display: grid; gap: 3px; width: 100%; min-width: 0; }
+.fx-explorer[data-view="large"] .filename { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.fx-explorer[data-view="large"] .fx-meta { display: block; overflow: hidden; color: var(--oled-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.fx-explorer[data-view="large"] .fx-cols { display: none; }
+.fx-explorer[data-view="large"] .fx-row-actions { position: absolute; top: 14px; right: 14px; padding: 2px; border-radius: 9px; background: rgba(0, 0, 0, 0.6); opacity: 0; transition: opacity 0.15s ease; }
+.fx-explorer[data-view="large"] .item:is(:hover, :focus-within, .is-selected) .fx-row-actions { opacity: 1; }
+.fx-explorer[data-view="large"] .fx-row-actions .fx-chev { display: none; }
+@media (max-width: 560px) { .fx-explorer[data-view="large"] .fx-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+.fx-tree-none { padding: 4px 8px 6px calc(var(--d, 0) * 14px + 32px); color: var(--oled-muted); font-size: 12px; font-style: italic; white-space: nowrap; opacity: 0.8; }
