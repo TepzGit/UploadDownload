@@ -591,11 +591,13 @@
     if (!signedIn || !box || box.querySelector(".xn-menu-foot")) return;
     const foot = document.createElement("div");
     foot.className = "xn-menu-foot";
+    // mommy's design 2026-11-07: level badge + rank name on the left; Admin
+    // (admins only), name and picture on the right. Log out lives in the
+    // settings window now.
     foot.innerHTML =
-      '<form method="post" action="/logout" class="xn-foot-out"><button type="submit" aria-label="Log out" title="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></svg></button></form>' +
-      // Admin sits next to Log out for admins, on every page (mommy 2026-11-06); it is no longer a tile.
-      (document.documentElement.classList.contains("xn-admin") ? '<form method="get" action="/admin" class="xn-foot-out xn-foot-admin"><button type="submit" aria-label="Admin" title="Admin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.8 5.6v5.6c0 4.5 3 8.5 7.2 9.8 4.2-1.3 7.2-5.3 7.2-9.8V5.6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg></button></form>' : "") +
-      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-rank" hidden></span><span class="xn-foot-lv" hidden></span><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
+      '<span class="xn-foot-lvl"><span class="xn-foot-lv" hidden></span><span class="xn-foot-rank" hidden></span></span>' +
+      (document.documentElement.classList.contains("xn-admin") ? '<form method="get" action="/admin" class="xn-foot-out xn-foot-admin"><button type="submit" aria-label="Admin" title="Admin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4 4.4 5.3v5.9c0 4.7 3.2 8.9 7.6 10.3 4.4-1.4 7.6-5.6 7.6-10.3V5.3z"/></svg></button></form>' : "") +
+      '<a class="xn-foot-me" href="/Profile" aria-label="Your profile"><span class="xn-foot-name"></span><span class="xn-foot-face" aria-hidden="true"></span></a>';
     box.append(foot);
     // Go straight to /admin (a plain GET form would add a "?").
     foot.querySelector(".xn-foot-admin")?.addEventListener("submit", (e) => { e.preventDefault(); location.assign("/admin"); });

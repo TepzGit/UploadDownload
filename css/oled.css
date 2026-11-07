@@ -2350,3 +2350,14 @@ html.xn-set-open, html.xn-set-open body { overflow: hidden; }
   .xn-set.is-open .xn-set-row { animation: xn-set-row-in .32s cubic-bezier(.2, 1.1, .4, 1) both; animation-delay: calc(40ms + var(--i, 0) * 16ms); }
 }
 @keyframes xn-set-row-in { from { opacity: 0; transform: translateX(-8px); } }
+
+/* Menu bottom row (mommy's design 2026-11-07): badge + rank name left,
+   Admin shield, name and picture right; no Log out here. */
+.xn-foot-lvl { display: inline-flex; align-items: center; gap: 8px; flex: none; min-width: 0; padding-left: 4px; }
+html:is(.xn-menu, .xn-bar-side) .xn-foot-lvl { margin-right: auto; }
+html:is(.xn-menu, .xn-bar-side) .xn .xn-links a.xn-foot-me { margin-left: 0; padding-left: 4px; }
+.xn-foot-lvl .xn-foot-rank .xn-rn { font-size: 0.92rem; }
+.xn-foot-lv .xn-hexb { font-size: 30px; }
+.xn-foot-admin button { width: 34px; height: 34px; color: #f87171; }
+.xn-foot-admin svg { width: 24px; height: 24px; fill: currentColor; stroke: none; }
+.xn-foot-admin button:hover, .xn-foot-admin button:focus-visible { color: #fca5a5; }
