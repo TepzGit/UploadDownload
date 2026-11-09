@@ -1806,6 +1806,78 @@ function updateScienceNote() {
     : `No studies for ${without.join(", ")}: PsychonautWiki shown`;
 }
 
+// Curve preview (mommy 2026-11-09): picking a drug shows the shape of its
+// effect at the common dose in the big box on the right, in place of Recent
+// doses and Experiences while no dose is on the graph yet. Typing another
+// dose draws that one over it. Settings > Graph can turn it off
+// (html.xn-no-gpreview).
+function renderDosePreview() {
+  const empty = els.chartEmpty;
+  if (!empty) return;
+  let box = document.getElementById("dosePreview");
+  if (!box) {
+    box = el("figure", "dose-preview");
+    box.id = "dosePreview";
+    box.hidden = true;
+    const boxes = empty.querySelector(".chart-boxes");
+    (boxes || empty.lastElementChild).before(box);
+    els.doseInput.addEventListener("input", () => renderDosePreview());
+    // Closing the dose form (reset, another search) takes the preview away.
+    new MutationObserver(() => renderDosePreview()).observe(els.dosePanel, { attributes: true, attributeFilter: ["hidden"] });
+    window.addEventListener("xn:look", () => renderDosePreview());
+    let rz = 0;
+    window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!box.hidden) renderDosePreview(); }, 150); });
+  }
+  const st = logic.getState();
+  const common = Number(st.currentCommonDose);
+  const hoursTotal = st.baseDurations ? Object.values(st.baseDurations).reduce((s, v) => s + (Number(v) > 0 && typeof v !== "object" ? Number(v) : 0), 0) : 0;
+  const off = document.documentElement.classList.contains("xn-no-gpreview");
+  const show = !off && !els.dosePanel.hidden && st.currentSubstance && common > 0 && hoursTotal > 0;
+  box.hidden = !show;
+  empty.classList.toggle("has-preview", !!show);
+  if (!show) return;
+  let mine = null, ref = null;
+  try {
+    ref = logic.buildDoseCurve(0, common, 0);
+    const amount = Number(els.doseInput.value);
+    if (amount > 0 && Math.abs(amount - common) > 1e-9) mine = logic.buildDoseCurve(0, amount, 0);
+  } catch (_) { box.hidden = true; empty.classList.remove("has-preview"); return; }
+  const all = [ref, mine].filter(Boolean);
+  const end = Math.max(...all.map((c) => c.x[c.x.length - 1])) || 1;
+  const top = Math.max(100, ...all.map((c) => Math.max(...c.y)));
+  const W = Math.max(240, Math.round(box.clientWidth - 38) || 600);
+  const H = Math.max(220, Math.min(460, Math.round(W * 0.45)));
+  const L = 38, R = 14, T = 14, B = 28;
+  const sx = (x) => L + (x / end) * (W - L - R);
+  const sy = (y) => T + (1 - y / top) * (H - T - B);
+  const path = (c) => c.x.map((x, i) => (i ? "L" : "M") + sx(x).toFixed(1) + " " + sy(c.y[i]).toFixed(1)).join(" ");
+  const color = logic.peekColor(st.currentSubstance.name) || "rgb(var(--xn-accent-rgb, 166, 124, 255))";
+  const stepH = end <= 8 ? 1 : end <= 16 ? 2 : end <= 36 ? 4 : end <= 96 ? 12 : 24;
+  const ticks = [];
+  for (let h = 0; h <= end + 1e-9; h += stepH) ticks.push(h);
+  const lvStep = top <= 100 ? 25 : top <= 200 ? 50 : top <= 500 ? 100 : 250;
+  const levels = [];
+  for (let v = 0; v <= top + 1e-9; v += lvStep) levels.push(v);
+  const units = st.units || "";
+  const main = mine || ref;
+  const peakAt = main.x[main.y.indexOf(Math.max(...main.y))];
+  box.innerHTML =
+    '<figcaption class="dp-head"><span class="dp-kick">Preview</span><strong></strong><span class="dp-sub"></span></figcaption>' +
+    '<svg viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" role="img">' +
+    levels.map((v) => '<line class="dp-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(v) + '" y2="' + sy(v) + '"/><text class="dp-y" x="' + (L - 8) + '" y="' + (sy(v) + 3) + '">' + v + "%</text>").join("") +
+    ticks.map((h) => '<line class="dp-grid" x1="' + sx(h) + '" x2="' + sx(h) + '" y1="' + T + '" y2="' + (H - B) + '"/><text class="dp-tick" x="' + sx(h) + '" y="' + (H - 8) + '">' + h + "h</text>").join("") +
+    '<path class="dp-fill" d="' + path(main) + " L " + sx(main.x[main.x.length - 1]) + " " + sy(0) + " L " + sx(0) + " " + sy(0) + ' Z" style="fill:' + color + '"/>' +
+    (mine ? '<path class="dp-line is-ref" d="' + path(ref) + '" style="stroke:' + color + '"/>' : "") +
+    '<path class="dp-line" d="' + path(main) + '" style="stroke:' + color + '"/>' +
+    "</svg>" +
+    '<p class="dp-foot"></p>';
+  box.querySelector("svg").setAttribute("aria-label", `Effect over time for ${st.currentSubstance.name}`);
+  const fmtH = (h) => (h >= 48 ? Math.round(h / 24) + " days" : (Math.round(h * 2) / 2) + " h");
+  box.querySelector(".dp-head strong").textContent = st.currentSubstance.name;
+  box.querySelector(".dp-sub").textContent = mine ? `${els.doseInput.value} ${units} · dashed line: common dose ${common} ${units}` : `Common dose ${common} ${units}`;
+  box.querySelector(".dp-foot").textContent = `Strongest after about ${fmtH(peakAt)}, over after about ${fmtH(ref.x[ref.x.length - 1])}. Add the dose to put it on the graph.`;
+}
+
 // Route of administration: one chip per route PsychonautWiki has timings for.
 // Picking one swaps in that route's durations and common dose.
 const routeName = (name) => (name ? name.charAt(0).toUpperCase() + name.slice(1) : "");
@@ -1816,6 +1888,7 @@ function showRoute({ substance, roa, roas, commonDose, units }) {
   els.doseUnit.textContent = units;
   els.status.textContent = `${substance.name} loaded · ${roa.name ? roa.name + " · " : ""}common dose ${commonDose} ${units}`;
   renderSubstanceInfo(substance, roa);
+  renderDosePreview();
   const field = document.getElementById("roaField");
   const picker = document.getElementById("roaPicker");
   if (!field || !picker) return;
@@ -1943,6 +2016,7 @@ async function usePill(p, button) {
       if (time) els.doseStartHour.value = time; // keep a time the user had already set
     }
     els.doseInput.value = p.dose;
+    renderDosePreview();
     handleAddDose();
   } finally {
     button?.removeAttribute("aria-busy");

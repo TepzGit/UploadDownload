@@ -244,7 +244,7 @@
 .nt-pics-edit.is-drop { outline-color: var(--oled-accent); background: var(--oled-accent-soft); }
 .nt-pic-edit { position: relative; aspect-ratio: 1 / 1; overflow: hidden; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); }
 .nt-pic-edit img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.nt-pic-x { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
+.nt-pic-x { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
 .nt-pic-x:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 1px; }
 .nt-pic-add {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 1 / 1; padding: 6px;
@@ -277,7 +277,7 @@
 .nt-doses { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; align-items: start; }
 .nt-index { position: sticky; top: calc(var(--oled-nav-h) + 12px); display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface); }
 .nt-index-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 4px 0; }
-.nt-index-list { display: flex; flex-direction: column; gap: 2px; max-height: calc(100svh - var(--oled-nav-h) - 200px); overflow-y: auto; scrollbar-width: thin; }
+.nt-index-list { display: flex; flex-direction: column; gap: 2px; max-height: calc(100svh - var(--oled-nav-h) - 200px); overflow-y: auto; }
 .nt-index-list:empty { display: none; }
 .nt-index-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--oled-text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
 .nt-index-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

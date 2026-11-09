@@ -366,7 +366,7 @@
     .gp-ver-view { --gp-tile: #111115; --gp-line: #23202b; --gp-line-hi: #3a3150; box-sizing: border-box; position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
     .gp-ver-view[hidden] { display: none; }
     .gp-ver-card { display: flex; flex-direction: column; width: min(1100px, 100%); max-height: min(820px, calc(100dvh - 48px)); border: 1px solid rgba(var(--xn-accent-rgb), 0.5); border-radius: 16px; background: #0d0c12; }
-    .gp-ver-close { display: grid; place-items: center; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 1px solid var(--gp-line); border-radius: 50%; background: #000; color: var(--oled-text); cursor: pointer; }
+    .gp-ver-close { display: grid; place-items: center; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 1px solid var(--gp-line); border-radius: 10px; background: #000; color: var(--oled-text); cursor: pointer; }
     .gp-ver-close svg { width: 18px; height: 18px; }
     .gp-ver-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; flex: 1; }
     .gp-ver-line { position: relative; margin: 0; padding: 22px 12px 22px 28px; list-style: none; overflow-y: auto; border-right: 1px solid var(--gp-line); }
@@ -538,7 +538,7 @@
       .gp-top.is-me { grid-template-rows: auto auto; grid-template-areas: "board me" "board row"; }
       /* The list takes no height of its own, so the board is as tall as the right
          column; every post is listed and the list scrolls when they don't fit. */
-      .gp-top.is-me > .gp-ann .gp-news-list { flex: 1 1 0; min-height: 120px; contain: size; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(var(--xn-accent-rgb), 0.4) transparent; }
+      .gp-top.is-me > .gp-ann .gp-news-list { flex: 1 1 0; min-height: 120px; contain: size; overflow-y: auto; overscroll-behavior: contain; }
       .gp-top.is-me > .gp-ann .gp-news-item.is-more { display: block; }
       .gp-top.is-me > .gp-ann .gp-ann-all { display: none; }
       .gp-top.is-me > .gp-row { gap: 12px; }
@@ -1323,6 +1323,7 @@
         if (res.ok) {
           signupError.classList.add('is-ok');
           signupError.textContent = 'Account created. Signing you in…';
+          try { localStorage.setItem('xn_setup_new', '1'); } catch (_) {}
           signedIn();
           return;
         }

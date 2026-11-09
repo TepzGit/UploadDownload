@@ -76,7 +76,7 @@
   height: 40px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 50%;
+  border-radius: 12px;
   background: transparent;
   color: var(--oled-muted);
   cursor: pointer;
@@ -564,7 +564,7 @@
   width: 44px;
   height: 44px;
   border: 1px dashed rgba(var(--xn-accent-rgb), 0.55);
-  border-radius: 50%;
+  border-radius: 12px;
   background: var(--oled-surface);
   color: var(--oled-accent);
   cursor: pointer;
@@ -645,7 +645,7 @@
   width: 32px;
   height: 32px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.7);
   color: #fff;
   font-size: 18px;
@@ -950,7 +950,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
   height: 36px;
   padding: 0;
   border: 2px solid transparent;
-  border-radius: 50%;
+  border-radius: 8px;
   background: var(--sw);
   box-shadow: inset 0 0 0 2px #0a0a0c;
   cursor: pointer;
@@ -1302,7 +1302,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-shelf-off {
   position: absolute; top: 2px; right: 2px;
   width: 24px; height: 24px; padding: 0;
-  border: 1px solid var(--oled-line); border-radius: 50%;
+  border: 1px solid var(--oled-line); border-radius: 12px;
   background: rgba(0, 0, 0, 0.75); color: var(--oled-text);
   font: 600 16px/1 inherit; cursor: pointer;
   opacity: 0; transition: opacity 0.15s ease;
@@ -1314,7 +1314,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
   position: absolute; top: -19px; right: -19px; z-index: 1;
   display: grid; place-items: center;
   width: 30px; height: 30px; padding: 0;
-  border: 1px solid rgba(255, 210, 170, 0.25); border-radius: 50%;
+  border: 1px solid rgba(255, 210, 170, 0.25); border-radius: 12px;
   background: color-mix(in srgb, var(--wood) 60%, #000); color: #f3dcc5; cursor: pointer;
 }
 .pf-shelf-paint { right: 17px; }
@@ -1364,7 +1364,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-activity { display: grid; gap: 8px; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--oled-line); border-radius: 14px; background: rgba(255, 255, 255, 0.025); }
 .pf-act-head { display: flex; align-items: baseline; gap: 10px; }
 .pf-act-title { margin: 0; color: var(--oled-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
-.pf-act-row { display: flex; gap: 10px; min-height: 52px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; padding-bottom: 4px; mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+.pf-act-row { display: flex; gap: 10px; min-height: 52px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 4px; mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
 .pf-act-row[aria-busy="true"]::before { content: ""; flex: 0 0 260px; height: 52px; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.08), rgba(255,255,255,0.03)) 0 0 / 200% 100%; animation: pf-act-shimmer 1.2s linear infinite; }
 @keyframes pf-act-shimmer { to { background-position: -200% 0; } }
 .pf-act { display: flex; flex: none; align-items: center; gap: 10px; max-width: 320px; padding: 8px 12px 8px 8px; border: 1px solid var(--oled-line); border-radius: 12px; background: #2a2838cc; color: var(--oled-text); text-decoration: none; scroll-snap-align: start; transition: border-color 0.2s ease, background-color 0.2s ease, translate 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -1372,7 +1372,7 @@ a.pf-tool { color: var(--oled-text); text-decoration: none; }
 .pf-act:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
 .pf-act-face { position: relative; display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: 26%; background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), 0.35), #0d0a16); font-size: 13px; font-weight: 600; }
 .pf-act-face img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
-.pf-act-ic { position: absolute; right: -5px; bottom: -5px; width: 16px; height: 16px; padding: 2px; border-radius: 50%; background: var(--oled-accent); fill: none; stroke: #0b0a10; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; box-shadow: 0 0 0 2px #1a1824; }
+.pf-act-ic { position: absolute; right: -5px; bottom: -5px; width: 16px; height: 16px; padding: 2px; border-radius: 5px; background: var(--oled-accent); fill: none; stroke: #0b0a10; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; box-shadow: 0 0 0 2px #1a1824; }
 .pf-act-ic[data-kind="report"] { background: #8bd5ca; }
 .pf-act-ic[data-kind="group"] { background: #f5a97f; }
 .pf-act-ic[data-kind="friend"] { background: #f5bde6; }
@@ -1576,17 +1576,17 @@ html.pf-embed .xn-tabs, html.pf-embed .xn-fluid, html.pf-embed .xn-scene { displ
 .pfx-bg-view img { width: 100%; height: 100%; max-width: none; object-fit: contain; }
 .pfx-bg-none { color: var(--oled-muted); font-size: 13px; }
 .pfx-gallery { padding: 6px; }
-.pfx-gal { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+.pfx-gal { display: flex; align-items: center; gap: 6px; overflow-x: auto; }
 .pfx-thumb { position: relative; flex: none; width: 186px; aspect-ratio: 16 / 9; }
 .pfx-thumb-pick { position: absolute; inset: 0; overflow: hidden; padding: 0; border: 1px solid var(--oled-line); border-radius: 12px; background: #000; cursor: pointer; transition: border-color 0.15s ease; }
 .pfx-thumb-pick img { width: 100%; height: 100%; max-width: none; object-fit: cover; }
 .pfx-thumb.is-on .pfx-thumb-pick { border-color: var(--oled-accent); box-shadow: 0 0 0 1px var(--oled-accent); }
 @media (hover: hover) { .pfx-thumb-pick:hover { border-color: rgba(var(--xn-accent-rgb), 0.6); } }
-.pfx-thumb-del { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.7); color: #fff; cursor: pointer; opacity: 0; transition: opacity 0.15s ease; }
+.pfx-thumb-del { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 7px; background: rgba(0, 0, 0, 0.7); color: #fff; cursor: pointer; opacity: 0; transition: opacity 0.15s ease; }
 .pfx-thumb-del svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .pfx-thumb:is(:hover, :focus-within) .pfx-thumb-del { opacity: 1; }
 @media (hover: none) { .pfx-thumb-del { opacity: 0.85; } }
-.pfx-add { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin: 0 8px; padding: 0; border: 1px solid var(--oled-line-strong); border-radius: 50%; background: none; color: var(--oled-text); cursor: pointer; }
+.pfx-add { display: grid; place-items: center; flex: none; width: 36px; height: 36px; margin: 0 8px; padding: 0; border: 1px solid var(--oled-line-strong); border-radius: 10px; background: none; color: var(--oled-text); cursor: pointer; }
 .pfx-add svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 @media (hover: hover) { .pfx-add:hover { border-color: var(--oled-accent); color: var(--oled-accent); } }
 .xn-btn.pfx-wide { width: 100%; min-height: 46px; justify-content: center; border-radius: 4px; }
@@ -1656,7 +1656,7 @@ html.pf-embed .xn-tabs, html.pf-embed .xn-fluid, html.pf-embed .xn-scene { displ
 .pfd-clear:hover, .pfd-del:hover { background: rgba(248, 113, 113, .12); border-color: rgba(248, 113, 113, .4); }
 .pfd-clear.is-armed, .pfd-del.is-armed { background: #b91c1c; border-color: #ef4444; color: #fff; }
 .pfd-clear:disabled { opacity: .5; }
-.pfd-list { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; padding: 10px; overflow: auto; transition: opacity .2s; scrollbar-width: thin; scrollbar-color: var(--d5) transparent; }
+.pfd-list { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; padding: 10px; overflow: auto; transition: opacity .2s; }
 .pfd-empty, .pfd-more { margin: auto; padding: 16px; color: var(--oled-muted); font-size: 12px; text-align: center; }
 .pfd-more { margin: 4px 0 0; padding: 6px; }
 
@@ -1756,3 +1756,6 @@ html.pf-embed .xn-tabs, html.pf-embed .xn-fluid, html.pf-embed .xn-scene { displ
 .pfd-dl { margin-top: 0; padding: 8px; }
 .pfd-meta { display: flex; align-items: center; gap: 6px; }
 .pfd-dose .pfd-amt { font-weight: 700; }
+
+/* Settings > Graph (the Graph page's own settings, mommy 2026-11-09). */
+.pf-embed-page.pfx-graph { max-width: 760px; }

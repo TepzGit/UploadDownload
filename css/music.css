@@ -111,7 +111,7 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 .mu-now-text span { font-size: 11px; color: var(--oled-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-controls { display: flex; align-items: center; gap: 6px; }
 .mu-ctl {
-  position: relative; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%;
+  position: relative; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 12px;
   background: transparent; color: var(--oled-text); cursor: pointer;
 }
 .mu-ctl svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -239,7 +239,7 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 .mu-art.is-editable { position: relative; }
 .mu-art-edit {
   position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 36px; height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; background: rgba(0, 0, 0, 0.65); color: #fff; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; background: rgba(0, 0, 0, 0.65); color: #fff; cursor: pointer;
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 .mu-art-edit svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -266,7 +266,7 @@ html.mu-has-player body { padding-bottom: calc(var(--mu-player-h) + var(--xn-tab
 .mv.is-idle { cursor: none; }
 .mv-top { top: max(14px, env(safe-area-inset-top)); justify-content: space-between; }
 .mv-bottom { bottom: max(22px, env(safe-area-inset-bottom)); flex-direction: column; gap: 14px; }
-.mv-btn { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.mv-btn { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; background: rgba(0, 0, 0, 0.45); color: #fff; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .mv-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mv-btn .mv-fill { fill: currentColor; stroke: none; }
 .mv-btn:focus-visible, .mv-mode:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }

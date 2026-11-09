@@ -381,6 +381,16 @@
         <button type="button" role="radio" class="pr-aura" data-nav="top"><span class="pr-nav-pic" data-nav="top" aria-hidden="true"><i></i><b></b><b></b><b></b><b></b></span><span>Top bar</span></button>
         <button type="button" role="radio" class="pr-aura" data-nav="side"><span class="pr-nav-pic" data-nav="side" aria-hidden="true"><i></i><b></b><b></b><b></b><b></b></span><span>Side bar</span></button>
       </div>
+      <div class="pr-side" id="lkSideBox">
+        <span class="xn-label pf-ap-label" id="lkSideLabel">Side bar</span>
+        <div class="ps-seg pr-side-seg" role="radiogroup" aria-labelledby="lkSideLabel" id="lkSides">
+          <button type="button" role="radio" data-side="">Full</button>
+          <button type="button" role="radio" data-side="slide">Slides out on hover</button>
+          <button type="button" role="radio" data-side="icons">Icons only</button>
+        </div>
+      </div>
+      <label class="ps-check pr-check"><input type="checkbox" id="lkNavText" checked><span>Show page names in the menu and bar</span></label>
+      <label class="ps-check pr-check"><input type="checkbox" id="lkSideTips"><span>Show the page name when pointing at an icon</span></label>
       <span class="xn-label pf-ap-label">Drug icons</span>
       <label class="ps-check pr-check"><input type="checkbox" id="lkOg"><span>OG medication icons: each pill or powder in its real color instead of purple</span></label>
       <div class="pr-og-sample" id="lkOgSample" aria-hidden="true"></div>
@@ -461,6 +471,9 @@
           <span class="pf-note" id="psStatus" aria-live="polite"></span>
         </div>
       </div>
+      <hr class="ps-rule">
+      <span class="xn-label" id="gpvLabel">Adding a dose</span>
+      <label class="ps-check pr-check"><input type="checkbox" id="lkGPrev" checked><span>Preview the curve at the common dose when you pick a drug</span></label>
       <hr class="ps-rule">
       <span class="xn-label" id="gcLabel">Graph colors</span>
       <div class="gc-search">
@@ -1635,6 +1648,11 @@
     const auras = [...document.querySelectorAll("#lkAuras .pr-aura")];
     const motions = [...document.querySelectorAll("#lkMotions .pr-aura")];
     const navs = [...document.querySelectorAll("#lkNavs .pr-aura")];
+    const sides = [...document.querySelectorAll("#lkSides button")];
+    const sideTips = document.getElementById("lkSideTips");
+    const sideBox = document.getElementById("lkSideBox");
+    const gPrev = document.getElementById("lkGPrev");
+    const navText = document.getElementById("lkNavText");
     const avatar = document.getElementById("profile-pic");
     const size = document.getElementById("lkSize");
     const sizeOut = document.getElementById("lkSizeOut");
@@ -1669,6 +1687,11 @@
         b.setAttribute("aria-checked", String(on));
         b.tabIndex = on ? 0 : -1;
       });
+      sides.forEach((b) => b.setAttribute("aria-checked", String(b.dataset.side === (look.side || ""))));
+      if (sideTips) { sideTips.checked = !look.sideNoTips; }
+      if (gPrev) gPrev.checked = !look.noGraphPreview;
+      if (navText) navText.checked = !look.navNoText;
+      if (sideBox) sideBox.classList.toggle("is-off", look.nav !== "side");
       motions.forEach((b) => {
         const on = b.dataset.motion === (look.motion || "");
         b.setAttribute("aria-checked", String(on));
@@ -1780,6 +1803,10 @@
     size.addEventListener("change", () => change({ size: Number(size.value) }));
     logo.addEventListener("change", () => change({ logo: logo.checked }, true));
     og.addEventListener("change", () => change({ ogIcons: og.checked }, true));
+    sides.forEach((b) => b.addEventListener("click", () => change({ side: b.dataset.side, nav: "side" }, true)));
+    if (sideTips) sideTips.addEventListener("change", () => change({ sideNoTips: !sideTips.checked }, true));
+    if (gPrev) gPrev.addEventListener("change", () => change({ noGraphPreview: !gPrev.checked }, true));
+    if (navText) navText.addEventListener("change", () => change({ navNoText: !navText.checked }, true));
     document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true, aura: "", ogIcons: false, motion: "", nav: "" }, true));
     show(window.xnLook.get());
   })();
@@ -2304,6 +2331,7 @@
       profile: [["Pictures", "pictures"], ["Geek badge", "badge"], ["Name color", "nameColor"], ["Profile picture glow", "glow"]],
       theme: [["Site color", "color"], ["Widget transparency", "clear"], ["Site background", "scene"]],
       preferences: [["Site look", "siteLook", "lookReset"], ["Graph", "graph"]],
+      graph: [["Drug graph colors and line", "graph"]],
       data: [["Data", "data"]],
       sync: [["Phone sync", "sync"]],
     };
@@ -2348,7 +2376,8 @@
         page.append(card);
       });
       document.body.append(page);
-      if (pane === "preferences" && window.gcOpen) window.gcOpen();
+      if ((pane === "preferences" || pane === "graph") && window.gcOpen) window.gcOpen();
+      if (pane === "graph") page.classList.add("pfx-graph");
       if (pane === "sync" && window.syOpen) window.syOpen();
       // Links leave the frame and go to the whole page.
       page.addEventListener("click", (e) => {

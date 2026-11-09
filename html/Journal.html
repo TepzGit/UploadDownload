@@ -78,7 +78,7 @@
     .jr-status{ grid-column:1 / -1; margin:0; padding:40px 12px; text-align:center; font-size:12px; color:var(--muted); }
     /* Class dropdown: a button with the picked class, the list opens under it. */
     /* Categories row (mommy 2026-11-06): the biggest classes as tiles. */
-    .jr-cats { display: flex; gap: 8px; margin: 14px 0 4px; padding: 2px 2px 8px; overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity; }
+    .jr-cats { display: flex; gap: 8px; margin: 14px 0 4px; padding: 2px 2px 8px; overflow-x: auto; scroll-snap-type: x proximity; }
     .jr-cats[hidden] { display: none; }
     .jr-cat { display: grid; justify-items: center; gap: 6px; flex: none; min-width: 96px; padding: 12px 10px 10px; border: 1px solid var(--oled-line); border-radius: 14px; background: var(--oled-surface); color: var(--oled-muted); font: inherit; font-size: 12.5px; cursor: pointer; scroll-snap-align: start; transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, transform 0.15s ease; }
     .jr-cat-ic { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid rgba(var(--xn-accent-rgb), 0.25); border-radius: 11px; background: var(--oled-accent-soft); color: var(--oled-accent); }
@@ -102,7 +102,7 @@
     .jr-class-chev{ width:16px; height:16px; flex:none; fill:none; stroke:var(--muted); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform .18s ease; }
     .jr-classpick.is-open .jr-class-chev{ transform:rotate(180deg); }
     @media (hover:hover){ .jr-class-btn:hover{ border-color:var(--oled-line-strong); } }
-    .jr-classes{ position:absolute; top:calc(100% + 6px); left:0; display:flex; flex-direction:column; gap:2px; width:max(100%, 280px); max-height:min(60vh, 420px); padding:6px; overflow-y:auto; border:1px solid var(--oled-line-strong); border-radius:2px; background:var(--oled-surface); box-shadow:0 18px 40px -12px rgba(0,0,0,.85); scrollbar-width:thin; }
+    .jr-classes{ position:absolute; top:calc(100% + 6px); left:0; display:flex; flex-direction:column; gap:2px; width:max(100%, 280px); max-height:min(60vh, 420px); padding:6px; overflow-y:auto; border:1px solid var(--oled-line-strong); border-radius:2px; background:var(--oled-surface); box-shadow:0 18px 40px -12px rgba(0,0,0,.85); }
     .jr-classes[hidden]{ display:none; }
     .jr-chip{ display:flex; align-items:center; gap:10px; width:100%; min-height:38px; padding:0 10px; border:1px solid transparent; border-radius:2px; background:transparent; color:var(--muted); font:inherit; font-size:13px; text-align:left; cursor:pointer; white-space:nowrap; transition:color .15s ease, background-color .15s ease; -webkit-tap-highlight-color:transparent; }
     .jr-chip .sc-icon{ width:15px; height:15px; margin:0; }
@@ -148,6 +148,20 @@
     @media (max-width:1099px){ .xn-page .Drugs{ grid-template-columns:repeat(4, minmax(0,1fr)); } }
     @media (max-width:899px){ .xn-page .Drugs{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
     @media (max-width:560px){ .xn-page .Drugs{ grid-template-columns:repeat(2, minmax(0,1fr)); } .drug-thumb{ width:60px; height:60px; } }
+    /* View modes (Settings > Drug Database, mommy 2026-11-09). Compact: small
+       rows with the picture on the left. Text only: names, no pictures. */
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .xn-page .Drugs{ grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:8px; }
+    html[data-drug-view="text"] .xn-page .Drugs{ grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:6px; }
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .Drug{ flex-direction:row; justify-content:flex-start; gap:12px; min-height:68px; padding:10px 84px 10px 12px; border-radius:10px; text-align:left; }
+    html[data-drug-view="text"] .Drug{ min-height:48px; padding:8px 76px 8px 14px; }
+    html[data-drug-view="compact"] .drug-thumb{ flex:none; width:44px; height:44px; }
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .drug-text{ min-width:0; text-align:left; }
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .drugname{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .drugclass{ display:block; overflow:hidden; margin-top:2px; color:var(--muted, #8a8a96); font-size:11.5px; text-overflow:ellipsis; white-space:nowrap; }
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .drug-corner{ top:50%; transform:translateY(-50%); }
+    html:is([data-drug-view="compact"], [data-drug-view="text"]) .drug-cls-wrap:is(:hover, :focus-visible) .drug-cls-name{ max-width:0; padding:0; opacity:0; }
+    @media (hover:hover){ html:is([data-drug-view="compact"], [data-drug-view="text"]) .Drug:hover{ transform:none; } }
+    @media (max-width:560px){ html:is([data-drug-view="compact"], [data-drug-view="text"]) .xn-page .Drugs{ grid-template-columns:1fr; } }
   </style>
   <meta name="theme-color" content="#000000" />
   <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
@@ -445,6 +459,8 @@
             }
 
             /** One card: picture, name, class line and the heart beside it. */
+            // View mode from Settings > Drug Database (siteLook.drugView, nav.js sets html[data-drug-view]).
+            const drugView = () => document.documentElement.dataset.drugView || "";
             function makeItem(substance, liked, pills) {
                         const drugDiv = document.createElement("a");
                         const imgUrl = substance?.images?.[0]?.thumb || '';
@@ -475,9 +491,13 @@
                         // A picture of the form it is most often taken in (js/formthumbs.js).
                         // An admin's custom drug icon or a medicine's own pill picture wins.
                         const thumb = drugDiv.querySelector(".drug-thumb");
-                        const form = window.xnForm ? window.xnForm.thumb(substance) : null;
-                        const pill = window.xnPills ? window.xnPills.pick(window.xnPills.forSubstance(pills, substance)) : null;
-                        if (pill) {
+                        // Settings > Drug Database > Text only: no pictures at all (loads faster).
+                        const textOnly = drugView() === "text";
+                        const form = !textOnly && window.xnForm ? window.xnForm.thumb(substance) : null;
+                        const pill = !textOnly && window.xnPills ? window.xnPills.pick(window.xnPills.forSubstance(pills, substance)) : null;
+                        if (textOnly) {
+                            thumb.remove();
+                        } else if (pill) {
                             const img = document.createElement("img");
                             img.className = "drug-pill";
                             img.src = pill.url;
@@ -760,6 +780,13 @@
 
             let displaySeq = 0;
 
+            let shownView = drugView();
+            window.addEventListener("xn:drug-view", () => {
+                if (drugView() === shownView) return;
+                shownView = drugView();
+                if (catalog) displaySubstances(0, currentSearchQuery || "");
+            });
+
             async function displaySubstances(offset, query = "") {
                 const seq = ++displaySeq;
                 const drugsDiv = document.querySelector(".Drugs");
@@ -784,7 +811,7 @@
                             drugsDiv.firstChild.textContent = query ? `Nothing matches “${query}”${currentClass ? " in this class" : ""}.` : currentClass ? "No substances in this class." : "No substances yet.";
                             return;
                         }
-                        virtualList.show(matches, (substance) => makeItem(substance, liked, pills), currentClass + "|" + query.toLowerCase());
+                        virtualList.show(matches, (substance) => makeItem(substance, liked, pills), currentClass + "|" + query.toLowerCase() + "|" + drugView());
                         return;
                     } else if (!navigator.onLine) {
                         throw new TypeError("offline"); // the saved list shows once loadCatalog has it

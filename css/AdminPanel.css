@@ -217,7 +217,7 @@
 .fa-user summary:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: -2px; }
 .fa-user .adm-chev { transition: transform 0.2s ease; }
 .fa-user[open] .adm-chev { transform: rotate(90deg); }
-.fa-face { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--oled-surface); color: var(--oled-muted); font-size: 13px; font-weight: 600; }
+.fa-face { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 26%; background: var(--oled-surface); color: var(--oled-muted); font-size: 13px; font-weight: 600; }
 .fa-user.has-access .fa-face { background: var(--oled-accent-soft); color: var(--oled-accent); }
 .fa-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .fa-who strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }

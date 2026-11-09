@@ -5068,14 +5068,14 @@ func currentUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Log in first.", http.StatusUnauthorized)
 		return
 	}
-	var avatar, nameColor string
-	db.QueryRow("SELECT pathToProfilePic, nameColor FROM users WHERE id = ?", session.UserId).Scan(&avatar, &nameColor)
+	var avatar, nameColor, banner string
+	db.QueryRow("SELECT pathToProfilePic, nameColor, pathToBanner FROM users WHERE id = ?", session.UserId).Scan(&avatar, &nameColor, &banner)
 	if session.Authority != "admin" {
 		nameColor = ""
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	rank := rankOf(session.OriginalUsername)
-	writeJSON(w, map[string]any{"name": session.OriginalUsername, "avatar": existingPicture(avatar), "nameColor": nameColor, "tier": rank.Tier, "level": rank.Level, "rank": rank.Name})
+	writeJSON(w, map[string]any{"name": session.OriginalUsername, "avatar": existingPicture(avatar), "banner": existingPicture(banner), "nameColor": nameColor, "tier": rank.Tier, "level": rank.Level, "rank": rank.Name})
 }
 
 func profileAppearance(w http.ResponseWriter, r *http.Request) {
@@ -5226,6 +5226,66 @@ type siteLook struct {
 	Motion string `json:"motion,omitempty"`
 	// Menu style on wide screens: "" the menu button, "top" a bar of links, "side" a bar on the left.
 	Nav string `json:"nav,omitempty"`
+	// Friends bar (Settings > Friends, mommy 2026-11-09).
+	Fbar *fbarLook `json:"fbar,omitempty"`
+	// Side bar menu style (mommy 2026-11-09): "" full, "slide" icons that slide
+	// open on hover, "icons" icons only. SideNoTips hides the page name hints.
+	Side       string `json:"side,omitempty"`
+	SideNoTips bool   `json:"sideNoTips,omitempty"`
+	// No page names in the menu, top bar and side bar: icons only.
+	NavNoText bool `json:"navNoText,omitempty"`
+	// Drug Database view (Settings > Drug Database): "" large icons, "compact", "text".
+	DrugView string `json:"drugView,omitempty"`
+	// Settings > Graph: no curve preview under the dose form when a drug is picked.
+	NoGraphPreview bool `json:"noGraphPreview,omitempty"`
+	// Settings > Pill Database notifications, comma separated: "new" (pills
+	// other people added), "mine" (your pill approved or rejected), "review"
+	// (admins: pills waiting for review).
+	PillNotes string `json:"pillNotes,omitempty"`
+	// Settings > Chat and Settings > Forum notifications: off switches and
+	// the friends (names) and Friendz groups (ids) that are muted.
+	ChatOff   bool     `json:"chatOff,omitempty"`
+	ChatMute  []string `json:"chatMute,omitempty"`
+	ForumOff  bool     `json:"forumOff,omitempty"`
+	GroupMute []int64  `json:"groupMute,omitempty"`
+}
+
+// fbarLook is how the friends bar in the top bar looks.
+// Show: "" everyone, "online" only friends who are online (a group icon when
+// nobody is), "icon" only a group icon. Style: "" squares, round, pill, glass.
+// Color: "" the site color or #rrggbb. Pos: "" next to the menu, center, right, bottom.
+type fbarLook struct {
+	Show  string `json:"show,omitempty"`
+	Style string `json:"style,omitempty"`
+	Color string `json:"color,omitempty"`
+	Pos   string `json:"pos,omitempty"`
+}
+
+func (f *fbarLook) clean() *fbarLook {
+	if f == nil {
+		return nil
+	}
+	out := *f
+	if out.Show != "online" && out.Show != "icon" {
+		out.Show = ""
+	}
+	switch out.Style {
+	case "round", "pill", "glass":
+	default:
+		out.Style = ""
+	}
+	if !hexColor.MatchString(out.Color) {
+		out.Color = ""
+	}
+	switch out.Pos {
+	case "center", "right", "bottom":
+	default:
+		out.Pos = ""
+	}
+	if out == (fbarLook{}) {
+		return nil
+	}
+	return &out
 }
 
 var siteLookFonts = map[string]bool{"": true, "jetbrains": true, "consolas": true, "courier": true, "inter": true, "grotesk": true, "system": true, "verdana": true, "trebuchet": true, "rounded": true, "comic": true, "serif": true, "garamond": true}
@@ -5245,6 +5305,35 @@ func (l siteLook) clean() siteLook {
 	if l.Nav != "top" && l.Nav != "side" {
 		l.Nav = ""
 	}
+	l.Fbar = l.Fbar.clean()
+	if l.Side != "slide" && l.Side != "icons" {
+		l.Side = ""
+	}
+	if l.DrugView != "compact" && l.DrugView != "text" {
+		l.DrugView = ""
+	}
+	notes := []string{}
+	for _, part := range strings.Split(l.PillNotes, ",") {
+		if (part == "new" || part == "mine" || part == "review") && !strings.Contains(strings.Join(notes, ","), part) {
+			notes = append(notes, part)
+		}
+	}
+	l.PillNotes = strings.Join(notes, ",")
+	mute := []string{}
+	for _, name := range l.ChatMute {
+		name = strings.TrimSpace(name)
+		if name != "" && len(name) <= 64 && len(mute) < 300 {
+			mute = append(mute, name)
+		}
+	}
+	l.ChatMute = mute
+	groups := []int64{}
+	for _, id := range l.GroupMute {
+		if id > 0 && len(groups) < 300 {
+			groups = append(groups, id)
+		}
+	}
+	l.GroupMute = groups
 	if l.Size < 80 || l.Size > 130 {
 		l.Size = 100
 	}

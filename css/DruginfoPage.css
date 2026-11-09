@@ -283,7 +283,7 @@ html[data-scene] .wk-backdrop { z-index: 0; }
 .wk-file { width: min(1000px, calc(100vw - 24px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--wk-line, #3a3f47); border-radius: 2px; background: #101418; color: #eaecf0; --oled-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .wk-file::backdrop { background: rgba(0, 0, 0, 0.7); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .wk-file-in { position: relative; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); max-height: inherit; }
-.wk-file-x { position: absolute; top: 8px; right: 8px; z-index: 2; width: 36px; height: 36px; border: 1px solid #3a3f47; border-radius: 50%; background: rgba(16, 20, 24, 0.85); color: #eaecf0; font-size: 22px; line-height: 1; cursor: pointer; }
+.wk-file-x { position: absolute; top: 8px; right: 8px; z-index: 2; width: 36px; height: 36px; border: 1px solid #3a3f47; border-radius: 10px; background: rgba(16, 20, 24, 0.85); color: #eaecf0; font-size: 22px; line-height: 1; cursor: pointer; }
 .wk-file-x:focus-visible, .wk-file-pic:focus-visible { outline: 2px solid #88a3e8; outline-offset: 2px; }
 .wk-file-pic { display: grid; place-items: center; min-height: 280px; padding: 0; border: 0; background: #07090c; cursor: zoom-in; }
 .wk-file-pic img { max-width: 100%; max-height: calc(100vh - 34px); object-fit: contain; }

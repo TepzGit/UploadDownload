@@ -116,7 +116,7 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 .si-item-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 .si-item-name > :first-child { flex: none; }
 .si-item-meta { font-size: 11px; color: var(--oled-muted); }
-.si-noicon { width: 16px; height: 16px; border: 1px solid var(--oled-line-strong); border-radius: 50%; }
+.si-noicon { width: 16px; height: 16px; border: 1px solid var(--oled-line-strong); border-radius: 4px; }
 .sc-icon.si-noicon:not(.has-custom-image) { background: transparent; -webkit-mask: none; mask: none; }
 .si-icon-btn {
   flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: 2px;

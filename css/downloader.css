@@ -388,7 +388,7 @@
 .fx-explorer .fx-layout { grid-template-columns: 250px minmax(0, 1fr) 260px; }
 .fx-explorer .fx-head .fx-actions > a[href]:not([href="/Uploader"]) { display: none; }
 .fx-explorer .fx-head .fx-crumbs { display: none; }
-.xn-card.fx-nav { position: sticky; top: calc(var(--oled-nav-h) + 12px); display: flex; flex-direction: column; gap: 10px; max-height: calc(100svh - var(--oled-nav-h) - 24px); padding: 14px 10px 14px 12px; overflow: auto; scrollbar-width: thin; }
+.xn-card.fx-nav { position: sticky; top: calc(var(--oled-nav-h) + 12px); display: flex; flex-direction: column; gap: 10px; max-height: calc(100svh - var(--oled-nav-h) - 24px); padding: 14px 10px 14px 12px; overflow: auto; }
 .fx-nav-title { margin: 8px 4px 0; }
 
 /* Storage server switch: two drives, the picked one outlined, a glide between them. */
