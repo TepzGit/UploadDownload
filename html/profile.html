@@ -32,6 +32,8 @@
   <script src="/classicons.js"></script>
   <script src="/nav.js"></script>
   <script src="/likes.js"></script>
+  <script src="/pillrate.js"></script>
+  <script src="/achievements.js"></script>
   <script src="/media.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -173,8 +175,17 @@
         </div>
         <div class="fr-list" id="friends" aria-live="polite"><p class="xn-empty">Loading your friends…</p></div>
       </section>
+
+      <!-- I've tried (mommy 2026-11-20): substances rated 0 to 10 pills with an optional note (js/pillrate.js). -->
+      <section class="xn-card pf-box" id="triedBox"></section>
     </div>
   </div>
+
+  <!-- Achievements wall (mommy 2026-11-20, js/achievements.js). -->
+  <section class="xn-card pf-box xa-box" id="achievements" aria-labelledby="achTitle">
+    <div class="pf-box-head"><h2 class="xn-h2" id="achTitle">Achievements</h2></div>
+    <div id="achWall"><p class="xn-empty">Loading your achievements…</p></div>
+  </section>
 
   <div class="pf-grid pf-data" id="profile-data"></div>
 
@@ -474,6 +485,7 @@
       <hr class="ps-rule">
       <span class="xn-label" id="gpvLabel">Adding a dose</span>
       <label class="ps-check pr-check"><input type="checkbox" id="lkGPrev" checked><span>Preview the curve at the common dose when you pick a drug</span></label>
+      <label class="pr-cur"><span class="xn-label" id="lkCurLabel">Currency for dose prices</span><input class="xn-input" id="lkCur" maxlength="4" placeholder="kr" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="lkCurHelp"><span class="pf-note" id="lkCurHelp">Shown next to prices on the Graph and the Stats page, like kr, €, $ or DKK.</span></label>
       <hr class="ps-rule">
       <span class="xn-label" id="gcLabel">Graph colors</span>
       <div class="gc-search">
@@ -1652,6 +1664,7 @@
     const sideTips = document.getElementById("lkSideTips");
     const sideBox = document.getElementById("lkSideBox");
     const gPrev = document.getElementById("lkGPrev");
+    const curIn = document.getElementById("lkCur");
     const navText = document.getElementById("lkNavText");
     const avatar = document.getElementById("profile-pic");
     const size = document.getElementById("lkSize");
@@ -1690,6 +1703,7 @@
       sides.forEach((b) => b.setAttribute("aria-checked", String(b.dataset.side === (look.side || ""))));
       if (sideTips) { sideTips.checked = !look.sideNoTips; }
       if (gPrev) gPrev.checked = !look.noGraphPreview;
+      if (curIn && document.activeElement !== curIn) curIn.value = look.currency || "kr";
       if (navText) navText.checked = !look.navNoText;
       if (sideBox) sideBox.classList.toggle("is-off", look.nav !== "side");
       motions.forEach((b) => {
@@ -1806,6 +1820,7 @@
     sides.forEach((b) => b.addEventListener("click", () => change({ side: b.dataset.side, nav: "side" }, true)));
     if (sideTips) sideTips.addEventListener("change", () => change({ sideNoTips: !sideTips.checked }, true));
     if (gPrev) gPrev.addEventListener("change", () => change({ noGraphPreview: !gPrev.checked }, true));
+    if (curIn) curIn.addEventListener("change", () => { const v = curIn.value.trim().slice(0, 4); change({ currency: v.toLowerCase() === "kr" ? "" : v }, true); });
     if (navText) navText.addEventListener("change", () => change({ navNoText: !navText.checked }, true));
     document.getElementById("lkReset").addEventListener("click", () => change({ font: "", size: 100, logo: true, aura: "", ogIcons: false, motion: "", nav: "" }, true));
     show(window.xnLook.get());
@@ -2166,6 +2181,11 @@
     avatarImg.addEventListener("error", () => showPicture("avatar", ""));
     bannerImg.addEventListener("error", () => showPicture("banner", ""));
   })();
+</script>
+<script>
+  // I've tried + Achievements wall (mommy 2026-11-20).
+  if (window.xnTried) window.xnTried.mount(document.getElementById("triedBox"));
+  if (window.xnAch) window.xnAch.load().then((d) => window.xnAch.render(document.getElementById("achWall"), d)).catch(() => { document.getElementById("achWall").innerHTML = '<p class="xn-empty">Couldn\'t load your achievements.</p>'; });
 </script>
 <script type="module" src="/plotstyle.js"></script>
 

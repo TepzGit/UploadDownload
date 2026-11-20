@@ -598,6 +598,7 @@ func main() {
 	registerPreviewPictures()
 	registerMemberPhotos()
 	registerPillDatabase()
+	registerNov20()
 	// News board items got a title, a pin and an edit time.
 	for _, column := range []string{"title TEXT NOT NULL DEFAULT ''", "pinned INTEGER NOT NULL DEFAULT 0", "edited_at INTEGER NOT NULL DEFAULT 0", "kind TEXT NOT NULL DEFAULT 'update'", "thumb TEXT NOT NULL DEFAULT ''", "font TEXT NOT NULL DEFAULT ''", "color TEXT NOT NULL DEFAULT ''", "version TEXT NOT NULL DEFAULT ''", "tag TEXT NOT NULL DEFAULT ''", "tag_color TEXT NOT NULL DEFAULT ''", "size TEXT NOT NULL DEFAULT ''"} {
 		if _, err := db.Exec("ALTER TABLE site_news ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -3269,6 +3270,9 @@ type loggedDose struct {
 	Method string
 	At     time.Time
 	Refs   []string // where it is stored, for deleteCalendarDose
+	Price  float64  // Graph doses only: what it cost
+	Common float64  // Graph doses only: the common dose it was drawn against
+	Note   bool     // Graph doses only: a note was written
 }
 
 // accountDoses lists the account's doses taken in [from, to), oldest first; a
@@ -3285,6 +3289,13 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 		key := strings.ToLower(d.Name) + "|" + strconv.FormatFloat(d.Amount, 'f', -1, 64) + "|" + strconv.FormatInt(d.At.Unix()/60, 10)
 		if i, ok := seen[key]; ok {
 			out[i].Refs = append(out[i].Refs, d.Refs...)
+			if out[i].Price == 0 {
+				out[i].Price = d.Price
+			}
+			if out[i].Common == 0 {
+				out[i].Common = d.Common
+			}
+			out[i].Note = out[i].Note || d.Note
 			return
 		}
 		seen[key] = len(out)
@@ -3358,6 +3369,9 @@ func accountDoses(userID int, loc *time.Location, from, to time.Time) ([]loggedD
 				Method: strings.Trim(strings.Join([]string{g.Route, g.Formulation}, ", "), ", "),
 				At:     time.Date(day.Year(), day.Month(), day.Day(), h, m, 0, 0, loc),
 				Refs:   []string{fmt.Sprintf("g%d:%d", id, i)},
+				Price:  g.Price,
+				Common: g.Profile.CommonDose,
+				Note:   g.Note != "",
 			})
 		}
 	}
@@ -3854,7 +3868,10 @@ type experienceDose struct {
 	Route        string  `json:"route"` // route of administration: oral, insufflated, ...
 	Time         string  `json:"time"`
 	Note         string  `json:"note,omitempty"` // how the dose felt, written on the Graph
-	Profile      struct {
+	// What the dose cost (mommy 2026-11-20, spending tracker), in the
+	// account's currency (siteLook.Currency). 0 = not entered.
+	Price   float64 `json:"price,omitempty"`
+	Profile struct {
 		Base struct {
 			Onset  float64 `json:"onset"`
 			Comeup float64 `json:"comeup"`
@@ -3899,6 +3916,10 @@ func cleanExperienceDoses(in []experienceDose) ([]experienceDose, bool) {
 		d.Formulation = cleanText(d.Formulation, 40)
 		d.Route = cleanText(d.Route, 30)
 		d.Note = cleanMultiline(d.Note, 2000)
+		if !inRange(d.Price, 0, 1e7) {
+			d.Price = 0
+		}
+		d.Price = math.Round(d.Price*100) / 100
 		if d.Profile.Base.Shape != "smooth" {
 			d.Profile.Base.Shape = ""
 		}
@@ -4753,6 +4774,10 @@ type forumPost struct {
 	CreatedAt int64      `json:"createdAt"`
 	CanDelete bool       `json:"canDelete"`
 	Comments  int        `json:"comments"`
+	// Emoji reactions and the half-pill rating (mommy 2026-11-20).
+	Reactions []postReaction `json:"reactions"`
+	Rating    postRating     `json:"rating"`
+	Mine      bool           `json:"mine"`
 }
 
 // forumPosts: GET answers {posts, more} newest first, 20 at a time
@@ -4828,12 +4853,14 @@ func forumPosts(w http.ResponseWriter, r *http.Request) {
 				p.Pictures = []string{}
 			}
 			p.CanDelete = author == uid || isAdmin
+			p.Mine = author == uid
 			posts = append(posts, p)
 		}
 		more := len(posts) > postsPerPage
 		if more {
 			posts = posts[:postsPerPage]
 		}
+		fillPostExtras(posts, uid)
 		writeJSON(w, map[string]any{"posts": posts, "more": more})
 
 	case http.MethodPost:
@@ -5248,6 +5275,8 @@ type siteLook struct {
 	ChatMute  []string `json:"chatMute,omitempty"`
 	ForumOff  bool     `json:"forumOff,omitempty"`
 	GroupMute []int64  `json:"groupMute,omitempty"`
+	// Settings > Graph: the money sign the spending tracker writes ("" = kr).
+	Currency string `json:"currency,omitempty"`
 }
 
 // fbarLook is how the friends bar in the top bar looks.
@@ -5334,6 +5363,10 @@ func (l siteLook) clean() siteLook {
 		}
 	}
 	l.GroupMute = groups
+	l.Currency = cleanText(l.Currency, 4)
+	if l.Currency == "kr" {
+		l.Currency = ""
+	}
 	if l.Size < 80 || l.Size > 130 {
 		l.Size = 100
 	}
@@ -8535,6 +8568,69 @@ type customSubstance struct {
 	// The scientific graph an admin entered (Substances Editor), or nil.
 	// nil: the evidence review's version (js/science.js); an empty list: none.
 	Science *[]scienceGraph `json:"science,omitempty"`
+	// What a pill or mix contains (mommy 2026-11-20, "What's in this mix"):
+	// every compound with its amount; psychoactive ones are drawn on the Graph.
+	Contents []mixPart `json:"contents,omitempty"`
+	// Safer-use tips for the Drug Database's harm reduction card, one per line.
+	HarmReduction string `json:"harmReduction,omitempty"`
+	// Legal status by country code (dk, se, ...): "legal", "prescription",
+	// "controlled", "illegal" or "grey", with an optional note after a colon.
+	Legal map[string]string `json:"legal,omitempty"`
+}
+
+// mixPart is one compound in a pill or mix.
+type mixPart struct {
+	Name         string  `json:"name"`
+	Amount       float64 `json:"amount,omitempty"`
+	Unit         string  `json:"unit,omitempty"`
+	Psychoactive bool    `json:"psychoactive,omitempty"`
+	Note         string  `json:"note,omitempty"`
+}
+
+func cleanMixParts(in []mixPart) []mixPart {
+	out := []mixPart{}
+	for _, p := range in {
+		p.Name = cleanText(p.Name, 80)
+		if p.Name == "" || len(out) >= 16 {
+			continue
+		}
+		if !inRange(p.Amount, 0, 1e6) {
+			p.Amount = 0
+		}
+		p.Unit = cleanText(p.Unit, 12)
+		p.Note = cleanText(p.Note, 200)
+		out = append(out, p)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+var legalStates = map[string]bool{"legal": true, "prescription": true, "controlled": true, "illegal": true, "grey": true}
+
+func cleanLegal(in map[string]string) map[string]string {
+	out := map[string]string{}
+	for code, v := range in {
+		code = strings.ToLower(strings.TrimSpace(code))
+		if len(code) != 2 || len(out) >= 60 {
+			continue
+		}
+		state, note, _ := strings.Cut(v, ":")
+		state = strings.ToLower(strings.TrimSpace(state))
+		if !legalStates[state] {
+			continue
+		}
+		note = cleanText(note, 160)
+		if note != "" {
+			state += ":" + note
+		}
+		out[code] = state
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // scienceGraph is the timeline from clinical studies for one way of taking a
@@ -8719,6 +8815,9 @@ func (c *customSubstance) clean() string {
 	c.Interactions.Unsafe = cleanList(c.Interactions.Unsafe, 60, 80)
 	c.Interactions.Uncertain = cleanList(c.Interactions.Uncertain, 60, 80)
 	c.InteractionNotes = cleanInteractionNotes(c.InteractionNotes, c.Interactions.Dangerous, c.Interactions.Unsafe, c.Interactions.Uncertain)
+	c.Contents = cleanMixParts(c.Contents)
+	c.HarmReduction = cleanMultiline(c.HarmReduction, 3000)
+	c.Legal = cleanLegal(c.Legal)
 	c.Units = cleanText(c.Units, 12)
 	if c.Units == "" {
 		c.Units = "mg"
@@ -9092,6 +9191,8 @@ func (c *customSubstance) cleanPill(self int64) string {
 	c.Ingredient, c.Class, c.ChemicalClass, c.AddictionPotential, c.Risks, c.Units = "", "", "", "", "", ""
 	c.Interactions.Dangerous, c.Interactions.Unsafe, c.Interactions.Uncertain = nil, nil, nil
 	c.InteractionNotes, c.Dose, c.Methods = nil, customDose{}, nil
+	c.Contents = cleanMixParts(c.Contents) // a pill can have its own mix
+	c.HarmReduction, c.Legal = "", nil
 	return ""
 }
 
@@ -9118,6 +9219,10 @@ func resolvePills(list []customSubstance) []customSubstance {
 			}
 			c.Class, c.ChemicalClass, c.AddictionPotential, c.Risks = p.Class, p.ChemicalClass, p.AddictionPotential, p.Risks
 			c.Interactions, c.InteractionNotes = p.Interactions, p.InteractionNotes
+			c.HarmReduction, c.Legal = p.HarmReduction, p.Legal
+			if c.Contents == nil {
+				c.Contents = p.Contents
+			}
 			if c.Summary == "" {
 				c.Summary = p.Summary
 			}
@@ -16550,6 +16655,7 @@ type pillReport struct {
 	Notes       string     `json:"notes"`
 	Picture     string     `json:"picture"`
 	Status      string     `json:"status"`
+	Verified    bool       `json:"verified"` // an admin checked it (badge)
 	Category    string     `json:"category,omitempty"`
 	ModNote     string     `json:"modNote,omitempty"`
 	Uploader    postAuthor `json:"uploader"`
@@ -16562,6 +16668,12 @@ func registerPillDatabase() {
 	if _, err := db.Exec(pillDBSchema); err != nil {
 		fmt.Println("pill_reports:", err)
 	}
+	// Verified badge (mommy 2026-11-20): entries no longer wait for a check.
+	db.Exec("ALTER TABLE pill_reports ADD COLUMN verified INTEGER NOT NULL DEFAULT 0")
+	db.Exec("UPDATE pill_reports SET verified = 1 WHERE status = 'approved' AND (reviewed_by > 0 OR user_id IN (SELECT id FROM users WHERE authority = 'admin')) AND verified = 0 AND NOT EXISTS (SELECT 1 FROM site_settings WHERE key = 'pill-verified-migrated')")
+	db.Exec("UPDATE pill_reports SET status = 'approved' WHERE status = 'pending'")
+	db.Exec("INSERT OR IGNORE INTO site_settings (key, value) VALUES ('pill-verified-migrated', '1')")
+	http.HandleFunc("/pilldb/api/identify", requireLogin(pillDBIdentify))
 	http.HandleFunc("/Pills", requireLogin(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		renderHTMLPage(w, "html/pilldb.html", nil)
@@ -16631,14 +16743,14 @@ func pillDupeKey(brand, strength, imprint, color string) string {
 }
 
 const pillDBColumns = `p.id, p.brand, p.strength, p.contents, p.lab_contents, p.lab_source, p.imprint, p.color, p.shape, p.form, p.country, p.notes,
-	p.file, p.status, p.mod_note, p.user_id, p.created_at, p.updated_at, COALESCE(u.originalUsername, ''), COALESCE(u.pathToProfilePic, ''), COALESCE(u.authority, '')`
+	p.file, p.status, p.mod_note, p.user_id, p.created_at, p.updated_at, COALESCE(u.originalUsername, ''), COALESCE(u.pathToProfilePic, ''), COALESCE(u.authority, ''), p.verified`
 
 func scanPillReport(rows interface{ Scan(...any) error }, me int, admin bool) (pillReport, error) {
 	var p pillReport
 	var file, name, avatar, authority string
 	var owner int
 	err := rows.Scan(&p.ID, &p.Brand, &p.Strength, &p.Contents, &p.LabContents, &p.LabSource, &p.Imprint, &p.Color, &p.Shape, &p.Form, &p.Country, &p.Notes,
-		&file, &p.Status, &p.ModNote, &owner, &p.CreatedAt, &p.UpdatedAt, &name, &avatar, &authority)
+		&file, &p.Status, &p.ModNote, &owner, &p.CreatedAt, &p.UpdatedAt, &name, &avatar, &authority, &p.Verified)
 	if err != nil {
 		return p, err
 	}
@@ -16671,6 +16783,9 @@ func pillDBList(w http.ResponseWriter, r *http.Request) {
 	case admin && (status == "pending" || status == "rejected" || status == "approved"):
 		where = append(where, "p.status = ?")
 		args = append(args, status)
+	case admin && status == "unverified":
+		// "To verify" (mommy 2026-11-20): shown entries no admin verified yet.
+		where = append(where, "p.status = 'approved' AND p.verified = 0")
 	case admin && status == "all":
 	default:
 		where = append(where, "(p.status = 'approved' OR p.user_id = ?)")
@@ -16684,6 +16799,9 @@ func pillDBList(w http.ResponseWriter, r *http.Request) {
 	}
 	if q.Get("lab") == "1" {
 		where = append(where, "p.lab_contents != ''")
+	}
+	if q.Get("verified") == "1" {
+		where = append(where, "p.verified = 1")
 	}
 	if words, ok := pillCategoryWords[q.Get("category")]; ok {
 		likes := make([]string, len(words))
@@ -16728,7 +16846,8 @@ func pillDBList(w http.ResponseWriter, r *http.Request) {
 	}
 	var pending int
 	if admin {
-		db.QueryRow("SELECT COUNT(*) FROM pill_reports WHERE status = 'pending'").Scan(&pending)
+		// "pending" now counts the entries nobody verified yet.
+		db.QueryRow("SELECT COUNT(*) FROM pill_reports WHERE status = 'approved' AND verified = 0").Scan(&pending)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, map[string]any{"items": items, "total": total, "more": offset+len(items) < total, "admin": admin, "pending": pending,
@@ -16842,10 +16961,12 @@ func pillDBSave(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if !admin {
-		var waiting int
-		db.QueryRow("SELECT COUNT(*) FROM pill_reports WHERE user_id = ? AND status = 'pending'", session.UserId).Scan(&waiting)
-		if waiting >= pillDBMaxPending {
-			pillDBFail(w, http.StatusTooManyRequests, fmt.Sprintf("You have %d pills waiting for a check. Add more once some are checked.", waiting), 0)
+		// Entries are public at once now (mommy 2026-11-20), so new ones are
+		// limited per day instead of by how many wait for a check.
+		var today int
+		db.QueryRow("SELECT COUNT(*) FROM pill_reports WHERE user_id = ? AND created_at > ?", session.UserId, time.Now().Add(-24*time.Hour).UnixMilli()).Scan(&today)
+		if today >= pillDBMaxPending {
+			pillDBFail(w, http.StatusTooManyRequests, fmt.Sprintf("You added %d pills today. Add more tomorrow.", today), 0)
 			return
 		}
 	}
@@ -16919,10 +17040,15 @@ func pillDBSave(w http.ResponseWriter, r *http.Request) {
 	}
 	search := strings.ToLower(strings.Join([]string{brand, strength, contents, lab, imprint, color, shape, form, country}, " "))
 	now := time.Now().UnixMilli()
-	// Admins' own entries are approved at once; everything else waits.
-	status := "pending"
-	if admin && (id == 0 || old.status == "approved") {
-		status = "approved"
+	// Every entry is public at once (mommy 2026-11-20); an admin's "verified"
+	// badge says it was checked. A member's change takes the badge off again,
+	// and an entry an admin hid stays hidden.
+	status := "approved"
+	if id > 0 && old.status == "rejected" && !admin {
+		status = "rejected"
+	}
+	if id > 0 && !admin {
+		db.Exec("UPDATE pill_reports SET verified = 0 WHERE id = ?", id)
 	}
 	if id == 0 {
 		res, err := db.Exec(`INSERT INTO pill_reports(brand, strength, contents, lab_contents, lab_source, imprint, color, shape, form, country, notes,
@@ -16934,6 +17060,9 @@ func pillDBSave(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id, _ = res.LastInsertId()
+		if admin {
+			db.Exec("UPDATE pill_reports SET verified = 1 WHERE id = ?", id) // an admin's own entry is checked already
+		}
 	} else {
 		_, err := db.Exec(`UPDATE pill_reports SET brand=?, strength=?, contents=?, lab_contents=?, lab_source=?, imprint=?, color=?, shape=?, form=?, country=?, notes=?,
 			file=?, image_hash=?, dupe_key=?, search_text=?, status=?, updated_at=? WHERE id=?`,
@@ -16991,9 +17120,21 @@ func pillDBAction(w http.ResponseWriter, r *http.Request) {
 			pillDBFail(w, http.StatusForbidden, "Only admins can check pills.", 0)
 			return
 		}
-		status := map[string]string{"approve": "approved", "reject": "rejected", "pending": "pending"}[req.Action]
+		// "pending" is gone (entries are public at once): it shows the entry again.
+		status := map[string]string{"approve": "approved", "reject": "rejected", "pending": "approved"}[req.Action]
 		db.Exec("UPDATE pill_reports SET status = ?, mod_note = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
 			status, pillDBClean(req.Note, 300), session.UserId, time.Now().UnixMilli(), req.ID)
+	case "verify", "unverify":
+		if !admin {
+			pillDBFail(w, http.StatusForbidden, "Only admins can verify pills.", 0)
+			return
+		}
+		v := 0
+		if req.Action == "verify" {
+			v = 1
+		}
+		db.Exec("UPDATE pill_reports SET verified = ?, status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?",
+			v, session.UserId, time.Now().UnixMilli(), req.ID)
 	default:
 		pillDBFail(w, http.StatusBadRequest, "Unknown action.", 0)
 		return
@@ -17333,4 +17474,759 @@ func myDataDelete(uid int, kind string, id int64, ref, name, amount, clock strin
 		return n
 	}
 	return -1
+}
+
+// ==== Nov 20 features (mommy 2026-11-20) ====
+// Stats page (/Stats), "I've tried" list with ratings, achievements, Forum
+// emoji reactions (built in + admin uploaded), half-pill ratings with the
+// "Helpful" badge, and the pill identifier (imprint, color, shape).
+
+const nov20Schema = `
+CREATE TABLE IF NOT EXISTS tried_substances (
+	user_id INTEGER NOT NULL,
+	name TEXT NOT NULL COLLATE NOCASE,
+	rating REAL NOT NULL DEFAULT 0,
+	note TEXT NOT NULL DEFAULT '',
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY(user_id, name)
+);
+CREATE TABLE IF NOT EXISTS forum_reactions (
+	post_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	emoji TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY(post_id, user_id, emoji)
+);
+CREATE INDEX IF NOT EXISTS forum_reactions_post ON forum_reactions(post_id);
+CREATE TABLE IF NOT EXISTS forum_ratings (
+	post_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	score REAL NOT NULL,
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY(post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS forum_emoji (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	file TEXT NOT NULL,
+	created_by INTEGER NOT NULL,
+	created_at INTEGER NOT NULL
+);
+`
+
+// The site's own emoji (drawn by js/reactions.js). Uploaded ones are "c<id>".
+var builtinEmoji = []string{"pill", "heart", "fire", "lol", "mind", "hug", "brain", "eyes", "sparkle", "melt", "skull", "clap"}
+var forumEmojiDir = filepath.Join(UploadedFilesDirName, "forum-emoji")
+var forumEmojiFile = regexp.MustCompile(`^emoji-[0-9a-f]{12}\.(jpg|png|gif|webp)$`)
+var customEmojiKey = regexp.MustCompile(`^c[0-9]{1,9}$`)
+
+const helpfulScore = 3.5 // a post rated above this gets the Helpful badge
+
+type postReaction struct {
+	Emoji string `json:"emoji"`
+	Count int    `json:"count"`
+	Mine  bool   `json:"mine"`
+}
+
+type postRating struct {
+	Average float64 `json:"average"`
+	Count   int     `json:"count"`
+	Mine    float64 `json:"mine"`
+	Helpful bool    `json:"helpful"`
+}
+
+func registerNov20() {
+	if _, err := db.Exec(nov20Schema); err != nil {
+		fmt.Println("nov20:", err)
+	}
+	os.MkdirAll(forumEmojiDir, 0o755)
+	http.HandleFunc("/Stats", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		renderHTMLPage(w, "html/stats.html", nil)
+	}))
+	http.HandleFunc("/stats/api", requireLogin(statsAPI))
+	http.HandleFunc("/tried", requireLogin(triedAPI))
+	http.HandleFunc("/achievements", requireLogin(achievementsAPI))
+	http.HandleFunc("/forum/react", requireLogin(forumReact))
+	http.HandleFunc("/forum/rate", requireLogin(forumRate))
+	http.HandleFunc("/forum/emoji", requireLogin(forumEmojiAPI))
+	http.HandleFunc("/forum-emoji/", requireLogin(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/forum-emoji/")
+		if !forumEmojiFile.MatchString(name) {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+		http.ServeFile(w, r, filepath.Join(forumEmojiDir, name))
+	}))
+}
+
+// fillPostExtras adds the reactions and rating to a page of Forum posts.
+func fillPostExtras(posts []forumPost, me int) {
+	if len(posts) == 0 {
+		return
+	}
+	ids := make([]string, len(posts))
+	at := map[int64]int{}
+	for i, p := range posts {
+		ids[i] = strconv.FormatInt(p.ID, 10)
+		at[p.ID] = i
+		posts[i].Reactions = []postReaction{}
+	}
+	in := strings.Join(ids, ",") // numbers only, safe to inline
+	rows, err := db.Query("SELECT post_id, emoji, COUNT(*), MAX(user_id = ?) FROM forum_reactions WHERE post_id IN ("+in+") GROUP BY post_id, emoji ORDER BY MIN(created_at)", me)
+	if err == nil {
+		for rows.Next() {
+			var id int64
+			var r postReaction
+			var mine int
+			if rows.Scan(&id, &r.Emoji, &r.Count, &mine) == nil {
+				r.Mine = mine == 1
+				posts[at[id]].Reactions = append(posts[at[id]].Reactions, r)
+			}
+		}
+		rows.Close()
+	}
+	rows, err = db.Query("SELECT post_id, AVG(score), COUNT(*), COALESCE(MAX(CASE WHEN user_id = ? THEN score END), 0) FROM forum_ratings WHERE post_id IN ("+in+") GROUP BY post_id", me)
+	if err == nil {
+		for rows.Next() {
+			var id int64
+			var r postRating
+			if rows.Scan(&id, &r.Average, &r.Count, &r.Mine) == nil {
+				r.Average = math.Round(r.Average*10) / 10
+				r.Helpful = r.Count > 0 && r.Average > helpfulScore
+				posts[at[id]].Rating = r
+			}
+		}
+		rows.Close()
+	}
+}
+
+func postExists(id int64) (author int, ok bool) {
+	err := db.QueryRow("SELECT user_id FROM forum_posts WHERE id = ?", id).Scan(&author)
+	return author, err == nil
+}
+
+// forumReact: POST {post, emoji} adds that reaction, or takes it back.
+func forumReact(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	var req struct {
+		Post  int64  `json:"post"`
+		Emoji string `json:"emoji"`
+	}
+	if json.NewDecoder(io.LimitReader(r.Body, 2048)).Decode(&req) != nil {
+		http.Error(w, "Bad request.", http.StatusBadRequest)
+		return
+	}
+	ok := false
+	for _, k := range builtinEmoji {
+		ok = ok || k == req.Emoji
+	}
+	if !ok && customEmojiKey.MatchString(req.Emoji) {
+		var n int
+		db.QueryRow("SELECT COUNT(*) FROM forum_emoji WHERE id = ?", strings.TrimPrefix(req.Emoji, "c")).Scan(&n)
+		ok = n > 0
+	}
+	if !ok {
+		http.Error(w, "That emoji isn't on the site.", http.StatusBadRequest)
+		return
+	}
+	group := postGroup(req.Post)
+	if _, exists := postExists(req.Post); !exists || (group > 0 && !inFriendGroup(session.UserId, group)) {
+		http.Error(w, "That post is gone.", http.StatusNotFound)
+		return
+	}
+	res, _ := db.Exec("DELETE FROM forum_reactions WHERE post_id = ? AND user_id = ? AND emoji = ?", req.Post, session.UserId, req.Emoji)
+	if n, _ := res.RowsAffected(); n == 0 {
+		var mine int
+		db.QueryRow("SELECT COUNT(*) FROM forum_reactions WHERE post_id = ? AND user_id = ?", req.Post, session.UserId).Scan(&mine)
+		if mine >= 8 {
+			http.Error(w, "You can give a post up to 8 reactions.", http.StatusBadRequest)
+			return
+		}
+		db.Exec("INSERT OR IGNORE INTO forum_reactions (post_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)", req.Post, session.UserId, req.Emoji, time.Now().UnixMilli())
+	}
+	posts := []forumPost{{ID: req.Post}}
+	fillPostExtras(posts, session.UserId)
+	writeJSON(w, map[string]any{"reactions": posts[0].Reactions})
+}
+
+// forumRate: POST {post, score}: 0.5 to 5 in half pills; 0 takes the rating back.
+func forumRate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := sessionFromRequest(r)
+	var req struct {
+		Post  int64   `json:"post"`
+		Score float64 `json:"score"`
+	}
+	if json.NewDecoder(io.LimitReader(r.Body, 2048)).Decode(&req) != nil || !inRange(req.Score, 0, 5) || math.Mod(req.Score*2, 1) != 0 {
+		http.Error(w, "Pick from half a pill up to 5 pills.", http.StatusBadRequest)
+		return
+	}
+	author, exists := postExists(req.Post)
+	group := postGroup(req.Post)
+	if !exists || (group > 0 && !inFriendGroup(session.UserId, group)) {
+		http.Error(w, "That post is gone.", http.StatusNotFound)
+		return
+	}
+	if author == session.UserId {
+		http.Error(w, "You can't rate your own post.", http.StatusBadRequest)
+		return
+	}
+	if req.Score == 0 {
+		db.Exec("DELETE FROM forum_ratings WHERE post_id = ? AND user_id = ?", req.Post, session.UserId)
+	} else {
+		db.Exec("INSERT INTO forum_ratings (post_id, user_id, score, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(post_id, user_id) DO UPDATE SET score = excluded.score",
+			req.Post, session.UserId, req.Score, time.Now().UnixMilli())
+	}
+	posts := []forumPost{{ID: req.Post}}
+	fillPostExtras(posts, session.UserId)
+	writeJSON(w, map[string]any{"rating": posts[0].Rating})
+}
+
+// forumEmojiAPI: GET {builtin, custom: [{key, name, url}], admin}.
+// Admins: multipart POST name + image adds one; JSON {delete: id} removes one.
+func forumEmojiAPI(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	admin := session.Authority == "admin"
+	type emoji struct {
+		Key  string `json:"key"`
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	}
+	list := func() []emoji {
+		out := []emoji{}
+		rows, err := db.Query("SELECT id, name, file FROM forum_emoji ORDER BY id")
+		if err != nil {
+			return out
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id int64
+			var e emoji
+			var file string
+			if rows.Scan(&id, &e.Name, &file) == nil {
+				e.Key, e.URL = "c"+strconv.FormatInt(id, 10), "/forum-emoji/"+file
+				out = append(out, e)
+			}
+		}
+		return out
+	}
+	switch r.Method {
+	case http.MethodGet:
+		w.Header().Set("Cache-Control", "no-cache")
+		writeJSON(w, map[string]any{"builtin": builtinEmoji, "custom": list(), "admin": admin})
+	case http.MethodPost:
+		if !admin {
+			http.Error(w, "Only admins can add emoji.", http.StatusForbidden)
+			return
+		}
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			r.Body = http.MaxBytesReader(w, r.Body, 600<<10)
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				http.Error(w, "Emoji pictures have to be under 512 KB.", http.StatusRequestEntityTooLarge)
+				return
+			}
+			defer r.MultipartForm.RemoveAll()
+			name := strings.ToLower(cleanText(r.FormValue("name"), 24))
+			name = strings.Map(func(c rune) rune {
+				if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '-' || c == '_' {
+					return c
+				}
+				return -1
+			}, name)
+			if name == "" {
+				http.Error(w, "Give the emoji a short name.", http.StatusBadRequest)
+				return
+			}
+			file, _, err := r.FormFile("image")
+			if err != nil {
+				http.Error(w, "Pick a picture.", http.StatusBadRequest)
+				return
+			}
+			defer file.Close()
+			saved, status, msg := saveImageIn(file, forumEmojiDir, "emoji")
+			if status != 0 {
+				http.Error(w, msg, status)
+				return
+			}
+			if _, err := db.Exec("INSERT INTO forum_emoji (name, file, created_by, created_at) VALUES (?, ?, ?, ?)", name, saved, session.UserId, time.Now().UnixMilli()); err != nil {
+				os.Remove(filepath.Join(forumEmojiDir, saved))
+				http.Error(w, "There's already an emoji called "+name+".", http.StatusConflict)
+				return
+			}
+		} else {
+			var req struct {
+				Delete int64 `json:"delete"`
+			}
+			if json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&req) != nil {
+				http.Error(w, "Bad request.", http.StatusBadRequest)
+				return
+			}
+			var file string
+			if db.QueryRow("SELECT file FROM forum_emoji WHERE id = ?", req.Delete).Scan(&file) == nil {
+				db.Exec("DELETE FROM forum_emoji WHERE id = ?", req.Delete)
+				db.Exec("DELETE FROM forum_reactions WHERE emoji = ?", "c"+strconv.FormatInt(req.Delete, 10))
+				if forumEmojiFile.MatchString(file) {
+					os.Remove(filepath.Join(forumEmojiDir, file))
+				}
+			}
+		}
+		writeJSON(w, map[string]any{"builtin": builtinEmoji, "custom": list(), "admin": admin})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- I've tried ----
+
+type triedItem struct {
+	Name      string  `json:"name"`
+	Rating    float64 `json:"rating"` // 0 to 10 pills, in halves
+	Note      string  `json:"note"`
+	UpdatedAt int64   `json:"updatedAt"`
+}
+
+func triedList(uid int) []triedItem {
+	out := []triedItem{}
+	rows, err := db.Query("SELECT name, rating, note, updated_at FROM tried_substances WHERE user_id = ? ORDER BY rating DESC, lower(name)", uid)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t triedItem
+		if rows.Scan(&t.Name, &t.Rating, &t.Note, &t.UpdatedAt) == nil {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// triedAPI: GET (?user=<name> for someone else's) {items, mine};
+// POST {action: "save", name, rating, note} or {action: "delete", name}.
+func triedAPI(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	switch r.Method {
+	case http.MethodGet:
+		uid := session.UserId
+		if name := r.URL.Query().Get("user"); name != "" {
+			id, ok := userByName(name)
+			if !ok {
+				http.Error(w, "No account has that name.", http.StatusNotFound)
+				return
+			}
+			uid = id
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, map[string]any{"items": triedList(uid), "mine": uid == session.UserId})
+	case http.MethodPost:
+		var req struct {
+			Action string  `json:"action"`
+			Name   string  `json:"name"`
+			Rating float64 `json:"rating"`
+			Note   string  `json:"note"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&req) != nil {
+			http.Error(w, "Bad request.", http.StatusBadRequest)
+			return
+		}
+		name := cleanText(req.Name, 80)
+		if name == "" {
+			http.Error(w, "Pick a substance.", http.StatusBadRequest)
+			return
+		}
+		switch req.Action {
+		case "delete":
+			db.Exec("DELETE FROM tried_substances WHERE user_id = ? AND name = ?", session.UserId, name)
+		case "save":
+			if !inRange(req.Rating, 0, 10) || math.Mod(req.Rating*2, 1) != 0 {
+				http.Error(w, "Rate it from 0 to 10 pills.", http.StatusBadRequest)
+				return
+			}
+			var n int
+			db.QueryRow("SELECT COUNT(*) FROM tried_substances WHERE user_id = ?", session.UserId).Scan(&n)
+			if n >= 500 {
+				http.Error(w, "Your list is full (500 substances).", http.StatusBadRequest)
+				return
+			}
+			db.Exec(`INSERT INTO tried_substances (user_id, name, rating, note, updated_at) VALUES (?, ?, ?, ?, ?)
+				ON CONFLICT(user_id, name) DO UPDATE SET name = excluded.name, rating = excluded.rating, note = excluded.note, updated_at = excluded.updated_at`,
+				session.UserId, name, req.Rating, cleanMultiline(req.Note, 600), time.Now().UnixMilli())
+		default:
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]any{"items": triedList(session.UserId), "mine": true})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- Activity numbers (Stats page and achievements) ----
+
+type activityCounts struct {
+	Graphs           int     `json:"graphs"`
+	Doses            int     `json:"doses"`
+	PricedDoses      int     `json:"pricedDoses"`
+	DoseNotes        int     `json:"doseNotes"`
+	ForumPosts       int     `json:"forumPosts"`
+	CommentsWritten  int     `json:"commentsWritten"`
+	CommentsReceived int     `json:"commentsReceived"`
+	ReactionsGot     int     `json:"reactionsReceived"`
+	ReactionsGiven   int     `json:"reactionsGiven"`
+	RatingsGiven     int     `json:"ratingsGiven"`
+	RatingAverage    float64 `json:"ratingAverage"`
+	RatingsGot       int     `json:"ratingsReceived"`
+	HelpfulPosts     int     `json:"helpfulPosts"`
+	Reports          int     `json:"reports"`
+	ReportLikes      int     `json:"reportLikes"`
+	ReportComments   int     `json:"reportComments"`
+	ReportCommentsBy int     `json:"reportCommentsWritten"`
+	Pills            int     `json:"pills"`
+	PillsVerified    int     `json:"pillsVerified"`
+	Photos           int     `json:"photos"`
+	Tried            int     `json:"tried"`
+	Friends          int     `json:"friends"`
+	Level            int     `json:"level"`
+}
+
+func countsFor(uid int, name string) activityCounts {
+	var c activityCounts
+	one := func(dst *int, query string, args ...any) {
+		if err := db.QueryRow(query, args...).Scan(dst); err != nil && err != sql.ErrNoRows {
+			fmt.Println("stats:", err)
+		}
+	}
+	one(&c.Graphs, "SELECT COUNT(*) FROM graph_experiences WHERE user_id = ?", uid)
+	one(&c.ForumPosts, "SELECT COUNT(*) FROM forum_posts WHERE user_id = ?", uid)
+	one(&c.CommentsWritten, "SELECT COUNT(*) FROM forum_comments WHERE user_id = ?", uid)
+	one(&c.CommentsReceived, "SELECT COUNT(*) FROM forum_comments c JOIN forum_posts p ON p.id = c.post_id WHERE p.user_id = ? AND c.user_id != ?", uid, uid)
+	one(&c.ReactionsGot, "SELECT COUNT(*) FROM forum_reactions r JOIN forum_posts p ON p.id = r.post_id WHERE p.user_id = ? AND r.user_id != ?", uid, uid)
+	one(&c.ReactionsGiven, "SELECT COUNT(*) FROM forum_reactions WHERE user_id = ?", uid)
+	one(&c.RatingsGiven, "SELECT COUNT(*) FROM forum_ratings WHERE user_id = ?", uid)
+	one(&c.RatingsGot, "SELECT COUNT(*) FROM forum_ratings r JOIN forum_posts p ON p.id = r.post_id WHERE p.user_id = ?", uid)
+	var avg sql.NullFloat64
+	db.QueryRow("SELECT AVG(r.score) FROM forum_ratings r JOIN forum_posts p ON p.id = r.post_id WHERE p.user_id = ?", uid).Scan(&avg)
+	if avg.Valid {
+		c.RatingAverage = math.Round(avg.Float64*10) / 10
+	}
+	one(&c.HelpfulPosts, "SELECT COUNT(*) FROM (SELECT r.post_id FROM forum_ratings r JOIN forum_posts p ON p.id = r.post_id WHERE p.user_id = ? GROUP BY r.post_id HAVING AVG(r.score) > ?)", uid, helpfulScore)
+	one(&c.Reports, "SELECT COUNT(*) FROM trip_reports WHERE user_id = ?", uid)
+	one(&c.ReportLikes, "SELECT COUNT(*) FROM trip_report_likes l JOIN trip_reports t ON t.id = l.report_id WHERE t.user_id = ? AND l.user_id != ?", uid, uid)
+	one(&c.ReportComments, "SELECT COUNT(*) FROM trip_report_comments c JOIN trip_reports t ON t.id = c.report_id WHERE t.user_id = ? AND c.user_id != ?", uid, uid)
+	one(&c.ReportCommentsBy, "SELECT COUNT(*) FROM trip_report_comments WHERE user_id = ?", uid)
+	one(&c.Pills, "SELECT COUNT(*) FROM pill_reports WHERE user_id = ? AND status != 'rejected'", uid)
+	one(&c.PillsVerified, "SELECT COUNT(*) FROM pill_reports WHERE user_id = ? AND verified = 1", uid)
+	one(&c.Photos, "SELECT COUNT(*) FROM substance_photos WHERE user_id = ? AND status != 'rejected'", uid)
+	one(&c.Tried, "SELECT COUNT(*) FROM tried_substances WHERE user_id = ?", uid)
+	one(&c.Friends, "SELECT COUNT(*) FROM friendships WHERE status = 'accepted' AND (requester_id = ? OR addressee_id = ?)", uid, uid)
+	c.Level = rankOf(name).Level
+	return c
+}
+
+type achievement struct {
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Desc     string `json:"desc"`
+	Icon     string `json:"icon"`
+	Got      bool   `json:"got"`
+	Progress int    `json:"progress"`
+	Goal     int    `json:"goal"`
+}
+
+// achievementsFor: the Achievements wall. Each one is a goal on a number above.
+func achievementsFor(c activityCounts) []achievement {
+	list := []struct {
+		key, name, desc, icon string
+		have, goal            int
+	}{
+		{"graph-1", "First graph", "Draw your first experience on the Graph", "graph", c.Graphs, 1},
+		{"graph-25", "Graph nerd", "Save 25 Graph sessions", "graph", c.Graphs, 25},
+		{"graph-100", "Chart topper", "Save 100 Graph sessions", "graph", c.Graphs, 100},
+		{"notes-10", "Diarist", "Write a note on 10 doses", "note", c.DoseNotes, 10},
+		{"budget-10", "Bookkeeper", "Add a price to 10 doses", "coin", c.PricedDoses, 10},
+		{"tried-5", "Reviewer", "Rate 5 substances in I've tried", "star", c.Tried, 5},
+		{"tried-25", "Critic's choice", "Rate 25 substances in I've tried", "star", c.Tried, 25},
+		{"post-1", "Hello world", "Write your first Forum post", "chat", c.ForumPosts, 1},
+		{"post-25", "Regular", "Write 25 Forum posts", "chat", c.ForumPosts, 25},
+		{"comment-50", "Chatterbox", "Write 50 comments", "chat", c.CommentsWritten + c.ReportCommentsBy, 50},
+		{"helpful-1", "Helpful", "Get a post rated above 3.5 pills", "badge", c.HelpfulPosts, 1},
+		{"helpful-10", "Guru", "Get 10 posts rated above 3.5 pills", "badge", c.HelpfulPosts, 10},
+		{"reactions-50", "Crowd pleaser", "Get 50 reactions on your posts", "heart", c.ReactionsGot, 50},
+		{"rate-10", "Judge", "Rate 10 posts", "pill", c.RatingsGiven, 10},
+		{"report-1", "Storyteller", "Write your first trip report", "book", c.Reports, 1},
+		{"report-10", "Chronicler", "Write 10 trip reports", "book", c.Reports, 10},
+		{"pill-1", "Pill hunter", "Add a pill to the Pill Database", "pill", c.Pills, 1},
+		{"pill-10", "Lab rat", "Add 10 pills to the Pill Database", "flask", c.Pills, 10},
+		{"verified-1", "Verified", "Get a pill verified by an admin", "check", c.PillsVerified, 1},
+		{"photo-1", "Photographer", "Add a picture to the Drug Database", "camera", c.Photos, 1},
+		{"friends-5", "Social butterfly", "Make 5 friends", "people", c.Friends, 5},
+		{"level-10", "Level 10", "Reach geek level 10", "level", c.Level, 10},
+		{"level-50", "Level 50", "Reach geek level 50", "level", c.Level, 50},
+		{"level-100", "Level 100", "Reach the top geek level", "crown", c.Level, 100},
+	}
+	out := make([]achievement, 0, len(list))
+	for _, a := range list {
+		p := a.have
+		if p > a.goal {
+			p = a.goal
+		}
+		out = append(out, achievement{Key: a.key, Name: a.name, Desc: a.desc, Icon: a.icon, Got: a.have >= a.goal, Progress: p, Goal: a.goal})
+	}
+	return out
+}
+
+// countsWithDoses also fills the dose numbers (needs the dose list).
+func countsWithDoses(uid int, name string, doses []loggedDose) activityCounts {
+	c := countsFor(uid, name)
+	c.Doses = len(doses)
+	for _, d := range doses {
+		if d.Price > 0 {
+			c.PricedDoses++
+		}
+		if d.Note {
+			c.DoseNotes++
+		}
+	}
+	return c
+}
+
+// achievementsAPI: GET (?user=<name>) {items, got, total}.
+func achievementsAPI(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	uid, name := session.UserId, session.OriginalUsername
+	if who := r.URL.Query().Get("user"); who != "" {
+		id, ok := userByName(who)
+		if !ok {
+			http.Error(w, "No account has that name.", http.StatusNotFound)
+			return
+		}
+		uid = id
+		db.QueryRow("SELECT originalUsername FROM users WHERE id = ?", id).Scan(&name)
+	}
+	doses, _ := accountDoses(uid, time.UTC, time.Time{}, time.Time{})
+	items := achievementsFor(countsWithDoses(uid, name, doses))
+	got := 0
+	for _, a := range items {
+		if a.Got {
+			got++
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"items": items, "got": got, "total": len(items)})
+}
+
+// statsAPI: GET ?zone= the Stats page: every dose (name, amount, unit,
+// method, time, price), the activity numbers and the currency.
+func statsAPI(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	loc := visitorZone(r.URL.Query())
+	doses, err := accountDoses(session.UserId, loc, time.Time{}, time.Time{})
+	if err != nil {
+		http.Error(w, "Couldn't load your doses.", http.StatusInternalServerError)
+		return
+	}
+	type statDose struct {
+		Name   string  `json:"name"`
+		Amount float64 `json:"amount"`
+		Unit   string  `json:"unit"`
+		Method string  `json:"method,omitempty"`
+		At     int64   `json:"at"`
+		Day    int     `json:"day"`  // 0 Sunday .. 6 Saturday, in the visitor's time zone
+		Hour   int     `json:"hour"` // 0..23 there
+		Price  float64 `json:"price,omitempty"`
+		Common float64 `json:"common,omitempty"`
+	}
+	list := make([]statDose, 0, len(doses))
+	for _, d := range doses {
+		list = append(list, statDose{Name: d.Name, Amount: d.Amount, Unit: displayUnit(d.Unit), Method: d.Method, At: d.At.UnixMilli(),
+			Day: int(d.At.Weekday()), Hour: d.At.Hour(), Price: d.Price, Common: d.Common})
+	}
+	c := countsWithDoses(session.UserId, session.OriginalUsername, doses)
+	var look string
+	db.QueryRow("SELECT COALESCE(siteLook, '') FROM users WHERE id = ?", session.UserId).Scan(&look)
+	var sl siteLook
+	json.Unmarshal([]byte(look), &sl)
+	currency := sl.Currency
+	if currency == "" {
+		currency = "kr"
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"doses": list, "counts": c, "currency": currency})
+}
+
+// ---- Pill identifier ----
+
+func pillLetters(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// editDistance is the Levenshtein distance (short strings: imprints).
+func editDistance(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	prev := make([]int, len(rb)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(ra); i++ {
+		cur := make([]int, len(rb)+1)
+		cur[0] = i
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			best := prev[j] + 1
+			if cur[j-1]+1 < best {
+				best = cur[j-1] + 1
+			}
+			if prev[j-1]+cost < best {
+				best = prev[j-1] + cost
+			}
+			cur[j] = best
+		}
+		prev = cur
+	}
+	return prev[len(rb)]
+}
+
+// Colors and shapes that are easy to mix up count as half a match.
+var pillNearColor = map[string][]string{
+	"white": {"off-white", "grey"}, "off-white": {"white", "yellow"}, "yellow": {"off-white", "orange"}, "orange": {"yellow", "red", "brown"},
+	"red": {"orange", "pink"}, "pink": {"red", "purple"}, "purple": {"pink", "blue"}, "blue": {"purple", "green"}, "green": {"blue"},
+	"brown": {"orange"}, "grey": {"white", "black"}, "black": {"grey"},
+}
+var pillNearShape = map[string][]string{
+	"round": {"oval"}, "oval": {"round", "oblong"}, "oblong": {"oval", "capsule", "rectangle"}, "capsule": {"oblong"},
+	"rectangle": {"oblong", "square"}, "square": {"rectangle", "diamond"}, "diamond": {"square"}, "triangle": {"heart"}, "heart": {"triangle"},
+}
+
+func near(table map[string][]string, a, b string) bool {
+	for _, x := range table[a] {
+		if x == b {
+			return true
+		}
+	}
+	return false
+}
+
+// pillDBIdentify: GET ?imprint=&color=&shape= the entries that look most
+// like it, best first, each with a match score (0-100) and what matched.
+func pillDBIdentify(w http.ResponseWriter, r *http.Request) {
+	session, _ := sessionFromRequest(r)
+	admin := session.Authority == "admin"
+	q := r.URL.Query()
+	imprint := pillLetters(q.Get("imprint"))
+	color := strings.ToLower(strings.TrimSpace(q.Get("color")))
+	shape := strings.ToLower(strings.TrimSpace(q.Get("shape")))
+	if imprint == "" && color == "" && shape == "" {
+		writeJSON(w, map[string]any{"items": []any{}})
+		return
+	}
+	rows, err := db.Query("SELECT "+pillDBColumns+" FROM pill_reports p LEFT JOIN users u ON u.id = p.user_id WHERE p.status = 'approved' OR p.user_id = ?", session.UserId)
+	if err != nil {
+		pillDBFail(w, http.StatusInternalServerError, "Couldn't read the pill database.", 0)
+		return
+	}
+	defer rows.Close()
+	type hit struct {
+		pillReport
+		Score int      `json:"score"`
+		Why   []string `json:"why"`
+	}
+	hits := []hit{}
+	for rows.Next() {
+		p, err := scanPillReport(rows, session.UserId, admin)
+		if err != nil {
+			continue
+		}
+		score, max := 0, 0
+		why := []string{}
+		if imprint != "" {
+			max += 60
+			// Imprints are often two sides ("M | 30"); match either side or both.
+			theirs := pillLetters(p.Imprint)
+			sides := strings.FieldsFunc(strings.ToLower(p.Imprint), func(r rune) bool { return r == '|' || r == '/' || r == ',' || r == ';' })
+			best := 0
+			switch {
+			case theirs == "":
+			case theirs == imprint:
+				best = 60
+			default:
+				for _, side := range sides {
+					if s := pillLetters(side); s != "" && s == imprint {
+						best = 52
+					}
+				}
+				if best == 0 && (strings.Contains(theirs, imprint) || strings.Contains(imprint, theirs)) && len(imprint) >= 2 {
+					best = 40
+				}
+				if best == 0 {
+					if d := editDistance(theirs, imprint); d == 1 || (d == 2 && len(imprint) >= 5) {
+						best = 30 - 8*(d-1)
+					}
+				}
+			}
+			if best > 0 {
+				why = append(why, "imprint")
+			}
+			score += best
+		}
+		if color != "" {
+			max += 20
+			if p.Color == color {
+				score += 20
+				why = append(why, "color")
+			} else if near(pillNearColor, color, p.Color) {
+				score += 8
+			}
+		}
+		if shape != "" {
+			max += 20
+			if p.Shape == shape {
+				score += 20
+				why = append(why, "shape")
+			} else if near(pillNearShape, shape, p.Shape) {
+				score += 8
+			}
+		}
+		if score == 0 || max == 0 {
+			continue
+		}
+		// With an imprint typed, an entry whose imprint doesn't match at all is a weak guess.
+		if imprint != "" && len(why) > 0 && why[0] != "imprint" {
+			score = score / 2
+		}
+		pct := score * 100 / max
+		if pct < 30 {
+			continue
+		}
+		hits = append(hits, hit{p, pct, why})
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].Score != hits[j].Score {
+			return hits[i].Score > hits[j].Score
+		}
+		return hits[i].Verified && !hits[j].Verified
+	})
+	if len(hits) > 40 {
+		hits = hits[:40]
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, map[string]any{"items": hits})
 }

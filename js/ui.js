@@ -9,6 +9,7 @@
 import * as logic from "./logic.js";
 import * as plot from "./plot.js";
 import * as offline from "./offline.js";
+import * as gp from "./graphplus.js";
 
 let suggestionTimer;
 let els = {}; // populated in init()
@@ -54,6 +55,10 @@ function init() {
   };
 
   bindEvents();
+  try {
+    gp.initGraphPlus({ session: () => activeExp });
+    els.doseStartHour.addEventListener("change", () => gp.renderSafety());
+  } catch (error) { console.error(error); }
   // First, so the "Scientific graph" switch is there even if a later step fails.
   try { initScience(); } catch (error) { console.error(error); }
   try { initPills(); } catch (error) { console.error(error); }
@@ -794,6 +799,7 @@ function bindEvents() {
         amount: form.querySelector("[name=amount]").value,
         time: form.querySelector("[name=time]").value,
         note: form.querySelector("[name=note]").value,
+        price: form.querySelector("[name=price]").value,
       });
       relogDose(dose);
       renderDoseList();
@@ -1842,7 +1848,12 @@ function renderDosePreview() {
     const amount = Number(els.doseInput.value);
     if (amount > 0 && Math.abs(amount - common) > 1e-9) mine = logic.buildDoseCurve(0, amount, 0);
   } catch (_) { box.hidden = true; empty.classList.remove("has-preview"); return; }
-  const all = [ref, mine].filter(Boolean);
+  // Route comparison (mommy 2026-11-20): every route this drug has, each in
+  // its own color, with a small card saying which is which.
+  const routes = logic.routeCurves();
+  const routeColor = (r) => ROUTE_COLORS[r] || ROUTE_COLORS.other;
+  const others = routes.filter((r) => !r.current);
+  const all = [ref, mine, ...others.map((r) => r.curve)].filter(Boolean);
   const end = Math.max(...all.map((c) => c.x[c.x.length - 1])) || 1;
   const top = Math.max(100, ...all.map((c) => Math.max(...c.y)));
   const W = Math.max(240, Math.round(box.clientWidth - 38) || 600);
@@ -1851,7 +1862,7 @@ function renderDosePreview() {
   const sx = (x) => L + (x / end) * (W - L - R);
   const sy = (y) => T + (1 - y / top) * (H - T - B);
   const path = (c) => c.x.map((x, i) => (i ? "L" : "M") + sx(x).toFixed(1) + " " + sy(c.y[i]).toFixed(1)).join(" ");
-  const color = logic.peekColor(st.currentSubstance.name) || "rgb(var(--xn-accent-rgb, 166, 124, 255))";
+  const color = routes.length ? routeColor(st.currentRoa?.name) : (logic.peekColor(st.currentSubstance.name) || "rgb(var(--xn-accent-rgb, 166, 124, 255))");
   const stepH = end <= 8 ? 1 : end <= 16 ? 2 : end <= 36 ? 4 : end <= 96 ? 12 : 24;
   const ticks = [];
   for (let h = 0; h <= end + 1e-9; h += stepH) ticks.push(h);
@@ -1867,16 +1878,38 @@ function renderDosePreview() {
     levels.map((v) => '<line class="dp-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + sy(v) + '" y2="' + sy(v) + '"/><text class="dp-y" x="' + (L - 8) + '" y="' + (sy(v) + 3) + '">' + v + "%</text>").join("") +
     ticks.map((h) => '<line class="dp-grid" x1="' + sx(h) + '" x2="' + sx(h) + '" y1="' + T + '" y2="' + (H - B) + '"/><text class="dp-tick" x="' + sx(h) + '" y="' + (H - 8) + '">' + h + "h</text>").join("") +
     '<path class="dp-fill" d="' + path(main) + " L " + sx(main.x[main.x.length - 1]) + " " + sy(0) + " L " + sx(0) + " " + sy(0) + ' Z" style="fill:' + color + '"/>' +
+    others.map((r) => '<path class="dp-line dp-route" d="' + path(r.curve) + '" style="stroke:' + routeColor(r.route) + '"><title></title></path>').join("") +
     (mine ? '<path class="dp-line is-ref" d="' + path(ref) + '" style="stroke:' + color + '"/>' : "") +
     '<path class="dp-line" d="' + path(main) + '" style="stroke:' + color + '"/>' +
     "</svg>" +
+    (routes.length ? '<ul class="dp-routes" aria-label="Routes on the preview"></ul>' : "") +
     '<p class="dp-foot"></p>';
+  if (routes.length) {
+    const legend = box.querySelector(".dp-routes");
+    box.querySelectorAll(".dp-route title").forEach((t, i) => { t.textContent = `${routeName(others[i].route)}: common dose ${others[i].common} ${others[i].units}`; });
+    routes.forEach((r) => {
+      const li = el("li", "dp-route-key" + (r.current ? " is-current" : ""));
+      const sw = el("i");
+      sw.style.background = routeColor(r.route);
+      const btn = el("button", "dp-route-btn");
+      btn.type = "button";
+      btn.title = r.current ? "The route picked now" : `Switch to ${routeName(r.route)}`;
+      btn.append(sw, el("span", "", routeName(r.route)), el("small", "", `${r.common} ${r.units}`));
+      if (!r.current) btn.addEventListener("click", () => showRoute(logic.selectRoa(r.route)));
+      li.append(btn);
+      legend.append(li);
+    });
+  }
   box.querySelector("svg").setAttribute("aria-label", `Effect over time for ${st.currentSubstance.name}`);
   const fmtH = (h) => (h >= 48 ? Math.round(h / 24) + " days" : (Math.round(h * 2) / 2) + " h");
   box.querySelector(".dp-head strong").textContent = st.currentSubstance.name;
   box.querySelector(".dp-sub").textContent = mine ? `${els.doseInput.value} ${units} · dashed line: common dose ${common} ${units}` : `Common dose ${common} ${units}`;
   box.querySelector(".dp-foot").textContent = `Strongest after about ${fmtH(peakAt)}, over after about ${fmtH(ref.x[ref.x.length - 1])}. Add the dose to put it on the graph.`;
 }
+
+// Route colors for the preview's route comparison: fixed per route, from the
+// dataviz palette's dark steps (validated on the site's black).
+const ROUTE_COLORS = { oral: "#3987e5", insufflated: "#d95926", smoked: "#199e70", intravenous: "#c98500", sublingual: "#d55181", rectal: "#0ca30c", vaporized: "#9085e9", other: "#e66767" };
 
 // Route of administration: one chip per route PsychonautWiki has timings for.
 // Picking one swaps in that route's durations and common dose.
@@ -1888,6 +1921,11 @@ function showRoute({ substance, roa, roas, commonDose, units }) {
   els.doseUnit.textContent = units;
   els.status.textContent = `${substance.name} loaded · ${roa.name ? roa.name + " · " : ""}common dose ${commonDose} ${units}`;
   renderSubstanceInfo(substance, roa);
+  try {
+    gp.renderMix();
+    if (gp.syncMixForm().length) { els.doseInput.value = 1; els.doseUnit.textContent = "pills"; }
+    gp.renderSafety();
+  } catch (error) { console.error(error); }
   renderDosePreview();
   const field = document.getElementById("roaField");
   const picker = document.getElementById("roaPicker");
@@ -2233,13 +2271,37 @@ function selectedFormulation() {
 // Doses: add / remove / reset
 // ------------------------------------------------------------
 
+async function handleAddMix() {
+  const priceEl = document.getElementById("dosePrice");
+  try {
+    els.addDoseButton.disabled = true;
+    const { added, missing } = await logic.addMixDoses({ count: els.doseInput.value, time: els.doseStartHour.value, price: priceEl?.value });
+    if (priceEl) priceEl.value = "";
+    if (!sessionIsPast()) added.forEach((d) => logDose(d));
+    renderTracker();
+    renderDoseList();
+    refreshChart();
+    experienceChanged();
+    showToast(missing.length ? `Added ${added.map((d) => d.substance).join(", ")}. No timeline for ${missing.join(", ")}.` : `Added ${added.map((d) => d.substance).join(" + ")}.`);
+    if (isPhone()) { closeSheet(); updateGraphTitle(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    els.addDoseButton.disabled = false;
+  }
+}
+
 function handleAddDose() {
+  if (logic.mixParts().length) return handleAddMix();
+  const priceEl = document.getElementById("dosePrice");
   try {
     const dose = logic.addDoseToState({
       amount: els.doseInput.value,
       time: els.doseStartHour.value,
       formulation: selectedFormulation(),
+      price: priceEl?.value,
     });
+    if (priceEl) priceEl.value = "";
     const f = selectedFormulation();
     rememberDose({ substance: dose.substance, amount: dose.amount, unit: dose.unit, route: dose.route, formulation: f.key, label: f.label, releaseHours: f.releaseHours });
     if (!sessionIsPast()) logDose(dose); // the tracker counts today's doses only
@@ -2282,6 +2344,7 @@ function handleReset(event, { quiet = false } = {}) {
 function renderDoseList() {
   const { addedDoses } = logic.getState();
   showSessionDay();
+  try { gp.renderSessionBar(); gp.renderSafety(); } catch (error) { console.error(error); }
 
   els.doseList.replaceChildren();
   els.doseCount.textContent = addedDoses.length;
@@ -2308,7 +2371,7 @@ function renderDoseList() {
     const name = document.createElement("strong");
     name.append(classIcon(dose.substance), dose.substance);
     const meta = document.createElement("span");
-    meta.textContent = [`${dose.amount} ${dose.unit}`, dose.route, dose.formulation].filter(Boolean).join(" · ");
+    meta.textContent = [`${dose.amount} ${dose.unit}`, dose.route, dose.formulation, dose.price > 0 ? gp.money(dose.price) : ""].filter(Boolean).join(" · ");
     details.append(name, meta);
     if (dose.note) {
       const note = document.createElement("p");
@@ -2363,6 +2426,7 @@ function openDoseEditor(id, toNote = false) {
     <p class="dose-edit-title"><strong></strong><span></span></p>
     <label class="dose-edit-field"><span>Dose</span><span class="dose-edit-amount"><input name="amount" type="number" inputmode="decimal" min="0" step="any" required class="input input-sm bg-[var(--bg)] border-[var(--line)] font-mono w-full" /><em></em></span></label>
     <label class="dose-edit-field"><span>Time</span><input name="time" type="time" required class="input input-sm bg-[var(--bg)] border-[var(--line)] font-mono w-full" /></label>
+    <label class="dose-edit-field"><span>Price</span><span class="dose-edit-amount"><input name="price" type="number" inputmode="decimal" min="0" step="any" placeholder="0" class="input input-sm bg-[var(--bg)] border-[var(--line)] font-mono w-full" /><em data-cur></em></span></label>
     <label class="dose-edit-field dose-edit-note"><span>Note · how it felt</span><textarea name="note" rows="3" maxlength="2000" placeholder="Come-up, mood, body feel, anything worth remembering…"></textarea></label>
     <div class="dose-edit-actions">
       <button type="button" class="btn btn-sm btn-ghost font-mono" data-edit-cancel="${id}">Cancel</button>
@@ -2374,6 +2438,8 @@ function openDoseEditor(id, toNote = false) {
   form.querySelector(".dose-edit-amount em").textContent = dose.unit || "";
   form.querySelector("[name=time]").value = dose.time;
   form.querySelector("[name=note]").value = dose.note || "";
+  form.querySelector("[name=price]").value = dose.price > 0 ? dose.price : "";
+  form.querySelector("[data-cur]").textContent = gp.currency();
   form.querySelector(".dose-edit-save").style.background = dose.color;
   fresh.replaceWith(form);
   if (toNote) {

@@ -18,6 +18,8 @@
   <script src="/classicons.js"></script>
   <script src="/nav.js"></script>
   <script src="/media.js"></script>
+  <script src="/pillrate.js"></script>
+  <script src="/achievements.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 </head>
@@ -61,6 +63,15 @@
   {{if .IsSelf}}<p class="pf-self-note">This is how other members see your profile. Your dose calendar, recent intake and totals stay private.</p>{{end}}
 
   <div class="pf-grid pf-data" id="userBoxes" aria-label="Boxes" hidden></div>
+
+  <!-- I've tried + Achievements (mommy 2026-11-20). -->
+  <div class="pf-grid pf-more">
+    <section class="xn-card pf-box" id="triedBox" data-user="{{.Name}}"></section>
+    <section class="xn-card pf-box xa-box xa-side" id="achievements" aria-labelledby="achTitle">
+      <div class="pf-box-head"><h2 class="xn-h2" id="achTitle">Achievements</h2></div>
+      <div id="achWall"></div>
+    </section>
+  </div>
 
   <div class="fm-layout fm-user">
     <section class="fm-feed-wrap" aria-labelledby="postsTitle">
@@ -125,5 +136,13 @@
   grid.hidden = boxes.count === 0;
 </script>
 {{end}}
+<script>
+  (() => {
+    const box = document.getElementById("triedBox");
+    const who = box ? box.dataset.user : "";
+    if (window.xnTried && box) window.xnTried.mount(box, { user: who, hideEmpty: true });
+    if (window.xnAch && who) window.xnAch.load(who).then((d) => window.xnAch.render(document.getElementById("achWall"), d, { got: true })).catch(() => { document.getElementById("achievements").hidden = true; });
+  })();
+</script>
 </body>
 </html>

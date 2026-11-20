@@ -19,6 +19,7 @@
   <script src="/likes.js"></script>
   <script src="/media.js"></script>
   <script src="/pills.js"></script>
+  <script src="/drugfacts.js"></script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 </head>
@@ -82,6 +83,13 @@
           <p class="wk-hatnote wk-pilldb" id="pillDbLink" hidden></p>
         </section>
 
+        <!-- What's in it (mommy 2026-11-20): every compound in a mix, psychoactive or not. -->
+        <section class="wk-section" id="sec-mix" data-toc="What's in it" hidden>
+          <h2 class="wk-h2">What's in it</h2>
+          <p class="wk-hatnote">Every compound in one tablet or dose. The psychoactive ones are drawn on the Graph.</p>
+          <ul class="di-mix-list" data-mix></ul>
+        </section>
+
         <section class="wk-section" id="sec-science" data-toc="Scientific timeline" hidden>
           <h2 class="wk-h2">Scientific timeline</h2>
           <div class="sci-head" id="sciHead"></div>
@@ -98,6 +106,19 @@
             <div class="wk-legend" aria-hidden="true"><span class="wk-risk" data-risk="1">Low</span><span class="wk-risk" data-risk="2">Moderate</span><span class="wk-risk" data-risk="3">High</span><span class="wk-risk" data-risk="4">Dangerous</span></div>
           </div>
           <div class="wk-table-wrap"><table class="wikitable wk-mx-table" id="mxTable"></table></div>
+        </section>
+
+        <!-- Harm reduction and legal status (mommy 2026-11-20, js/drugfacts.js). -->
+        <section class="wk-section" id="sec-harm" data-toc="Harm reduction" hidden>
+          <h2 class="wk-h2">Harm reduction</h2>
+          <p class="wk-hatnote">Ways to make use safer. A rough guide, not medical advice.</p>
+          <ol class="hr-tips" data-tips></ol>
+        </section>
+
+        <section class="wk-section" id="sec-legal" data-toc="Legal status" hidden>
+          <h2 class="wk-h2">Legal status</h2>
+          <p class="wk-hatnote">Laws change and have exceptions. Check the current law where you are.</p>
+          <div class="lg-grid" data-legal></div>
         </section>
 
         <section class="wk-section" id="sec-gallery" data-toc="Gallery" hidden>
@@ -533,6 +554,9 @@ ${DETAIL_FIELDS}
 
     renderScience(substance);
     renderPills(substance);
+    if (window.xnFacts) {
+      try { window.xnFacts.drugPage(substance, { harm: $("sec-harm"), legalBox: $("sec-legal"), mix: $("sec-mix") }); } catch (err) { console.warn(err); }
+    }
     buildToc();
     loadMixtures(outName, [].concat(substance.commonNames || []));
     loadPictures(outName, substance);

@@ -197,6 +197,26 @@
           </div>
         </fieldset>
 
+        <!-- What's in it, harm reduction, legal status (mommy 2026-11-20). -->
+        <fieldset class="si-section">
+          <legend class="si-legend">What's in it</legend>
+          <p class="si-hint">For pills and mixes with more than one compound. With two or more psychoactive ones, the Graph adds a curve for each; the rest are listed on the drug page and the Graph.</p>
+          <div class="se-mix" id="fMix"></div>
+          <button type="button" class="xn-btn se-mix-add" id="fMixAdd"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add a compound</button>
+        </fieldset>
+
+        <fieldset class="si-section" data-only="substance">
+          <legend class="si-legend">Harm reduction and legal status</legend>
+          <div class="si-field">
+            <label class="xn-label" for="fHarm">Harm reduction tips <span class="si-hint">one per line; shown first, before the site's own tips</span></label>
+            <textarea class="xn-input si-text" id="fHarm" rows="4" maxlength="3000" placeholder="Start with a quarter of a tablet&#10;Don't drive for 24 hours"></textarea>
+          </div>
+          <div class="si-field">
+            <label class="xn-label" for="fLegal">Legal status <span class="si-hint">one country per line: code, state, note. States: legal, prescription, controlled, illegal, grey. Empty uses the site's own table.</span></label>
+            <textarea class="xn-input si-text se-legal" id="fLegal" rows="4" maxlength="3000" placeholder="DK: prescription: only with a doctor's prescription&#10;NL: grey: sold in smart shops"></textarea>
+          </div>
+        </fieldset>
+
         <fieldset class="si-section" data-only="substance">
           <legend class="si-legend">Combination warnings</legend>
           <p class="si-hint se-int-intro">Pick from the substances on the site and PsychonautWiki, or type a name or group (like Opioids) and press Enter. Add a note to say why.</p>

@@ -421,3 +421,21 @@ h3.si-legend { float: none; margin-top: 16px; margin-bottom: 6px; }
 .se-prev-tools button:disabled { opacity: 0.35; cursor: default; }
 .se-prev-tools button.is-confirm { border-color: rgba(248, 113, 113, 0.5); color: #fca5a5; font-size: 11px; }
 .se-prev-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+
+/* ---------- What's in it rows (mommy 2026-11-20) ---------- */
+.se-mix { display: flex; flex-direction: column; gap: 8px; }
+.se-mix:empty { display: none; }
+.se-mix-row { display: grid; grid-template-columns: minmax(140px, 1.6fr) minmax(70px, .6fr) minmax(64px, .45fr) auto minmax(120px, 1.4fr) 40px; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); }
+.se-mix-psy { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.se-mix-del { width: 40px; padding: 0; font-size: 18px; }
+.se-mix-add { align-self: flex-start; margin-top: 8px; }
+.se-mix-add svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.se-legal { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+@media (max-width: 760px) {
+  .se-mix-row { grid-template-columns: minmax(0, 1fr) minmax(0, .6fr) minmax(0, .5fr); }
+  .se-mix-name { grid-column: 1 / -1; }
+  .se-mix-note { grid-column: 1 / 3; }
+  .se-mix-psy { grid-column: 1 / 3; grid-row: 3; }
+  .se-mix-note { grid-row: 4; }
+  .se-mix-del { grid-column: 3; grid-row: 3 / span 2; justify-self: end; }
+}

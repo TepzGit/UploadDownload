@@ -284,6 +284,9 @@
     look.forumOff = !!(raw && raw.forumOff === true);
     look.chatMute = raw && Array.isArray(raw.chatMute) ? [...new Set(raw.chatMute.filter((n) => typeof n === "string" && n.trim()).map((n) => n.trim()))].slice(0, 300) : [];
     look.groupMute = raw && Array.isArray(raw.groupMute) ? [...new Set(raw.groupMute.map(Number).filter((n) => n > 0))].slice(0, 300) : [];
+    // Currency shown next to dose prices (Settings > Graph, mommy 2026-11-20); "" = kr.
+    look.currency = String((raw && raw.currency) || "").replace(/[<>"]/g, "").trim().slice(0, 4);
+    if (look.currency.toLowerCase() === "kr") look.currency = "";
     look.pillNotes = [...new Set(String((raw && raw.pillNotes) || "").split(",").filter((p) => p === "new" || p === "mine" || p === "review"))].join(",");
     if (raw && LOOK_FONTS.includes(raw.font)) look.font = raw.font;
     const size = Number(raw && raw.size);
@@ -732,6 +735,7 @@
         if (!me) return;
         show(me);
         try { localStorage.setItem("xn_me", JSON.stringify(me)); } catch {}
+        checkLevelUp(me);
       })
       .catch(() => {});
   }
@@ -1111,11 +1115,12 @@
     addLink("/Music", "Music", signedIn ? "/Chat" : "/Forum");
     if (signedIn) addLink("/Notes", "Notes", "/journal");
     if (signedIn) addLink("/Pills", "Pill Database", "/Notes");
+    if (signedIn) addLink("/Stats", "Stats", "/Pills");
     // Tile order (mommy 2026-11-06), three to a row: Drug Database, Graph,
     // Pill Database / Chat, Profile, Forum / Notes, Music, Files. Links not
     // named here keep their place after these.
     if (linkBox) {
-      const ORDER = ["/journal", "/", "/Pills", "/Chat", "/Profile", "/Forum", "/Notes", "/Music", "/Files/"];
+      const ORDER = ["/journal", "/", "/Pills", "/Chat", "/Profile", "/Forum", "/Notes", "/Music", "/Files/", "/Stats"];
       const named = ORDER.map((href) => linkBox.querySelector(`:scope > a[href="${href}"]`)).filter(Boolean);
       const rest = [...linkBox.querySelectorAll(":scope > a")].filter((a) => !named.includes(a));
       linkBox.prepend(...named, ...rest);
@@ -1228,10 +1233,12 @@
   const ADMIN = { icon: '<path d="M12 2.2 4.2 5.3v5.9c0 4.9 3.3 9.3 7.8 10.6 4.5-1.3 7.8-5.7 7.8-10.6V5.3z"/>', desc: "Accounts and site stats" };
   // The Pill Database (/Pills) is in the menu but not a phone tab.
   const PILLS = { icon: '<path d="M8.6 3.4a5.2 5.2 0 0 1 7.4 0l4.6 4.6a5.2 5.2 0 0 1-7.4 7.4l-4.6-4.6a5.2 5.2 0 0 1 0-7.4zm1.4 1.4a3.2 3.2 0 0 0 0 4.6l1.8 1.8 4.6-4.6-1.8-1.8a3.2 3.2 0 0 0-4.6 0z" fill-rule="evenodd"/><circle cx="7" cy="17" r="4.6"/>', desc: "Pictures of real pills" };
+  // Stats (/Stats, mommy 2026-11-20): totals, days, classes and spending.
+  const STATS = { icon: '<rect x="3" y="12" width="4.6" height="9" rx="1.3"/><rect x="9.7" y="3" width="4.6" height="18" rx="1.3"/><rect x="16.4" y="8" width="4.6" height="13" rx="1.3"/>', desc: "Your totals, days and spending" };
   const OTHER_ICON = '<circle cx="12" cy="12" r="5"/>';
   function addIcons(box) {
     if (!box) return;
-    const pages = { "/admin": ADMIN, "/Pills": PILLS };
+    const pages = { "/admin": ADMIN, "/Pills": PILLS, "/Stats": STATS };
     TABS.forEach((tab) => { pages[tab.href] = tab; });
     box.querySelectorAll("a").forEach((a) => {
       if (a.querySelector("svg")) return;
@@ -1686,8 +1693,8 @@
       view.append(pageBar(PAGE_SETS.find((p) => p.pane === "page-pills")));
       const KINDS = [
         { k: "new", name: "New pills", desc: "When someone adds a pill to the Pill Database." },
-        { k: "mine", name: "Your pills", desc: "When a pill you added is approved or rejected." },
-        { k: "review", name: "Waiting for review", desc: "Admins: when new pills wait for you to check them.", admin: true },
+        { k: "mine", name: "Your pills", desc: "When an admin verifies or hides a pill you added." },
+        { k: "review", name: "Waiting to be verified", desc: "Admins: when new pills are added that nobody has verified yet.", admin: true },
       ];
       const block = document.createElement("div");
       block.className = "xn-set-block";
@@ -1832,6 +1839,8 @@
       // User settings.
       const mine = win.querySelector(".xn-set-mine");
       SET_ITEMS.forEach((it) => {
+        // Profile has no row (mommy 2026-11-09): the Profile page's gear opens it.
+        if (it.pane === "profile") return;
         const r = row("button", it.label, it.desc, it.icon, it.pane === "exp" ? "is-exp" : "");
         r.dataset.pane = it.pane;
         mine.append(r);
@@ -1958,8 +1967,8 @@
         if (!pane) {
           let last = "";
           try { last = sessionStorage.getItem(PANE_KEY) || ""; } catch (_) {}
-          if (wide()) showPane(last || current || "profile");
-          else { if (!current) showPane(last || "profile"); card.classList.remove("is-pane"); }
+          if (wide()) showPane(last || current || "privacy");
+          else { if (!current) showPane(last || "privacy"); card.classList.remove("is-pane"); }
         }
         win.hidden = false;
         win.querySelectorAll(".xn-set-row").forEach((t, i) => t.style.setProperty("--i", i));
@@ -2136,6 +2145,54 @@
     // Scrollbar drags, keys and clicks take over from an animation in progress.
     ["mousedown", "keydown", "touchstart"].forEach((type) => window.addEventListener(type, stop, { passive: true }));
   }
+
+  // Level up (mommy 2026-11-20): when /me shows a higher geek level than
+  // this browser saw last time, the new badge pops in with a burst of
+  // little squares and a card says the new level (and the new rank when it
+  // changed). The first visit only remembers the level.
+  function checkLevelUp(me) {
+    if (!me || !me.name || !(Number(me.level) >= 0)) return;
+    const key = "xn_lv_" + String(me.name).toLowerCase();
+    let prev = null;
+    try { prev = JSON.parse(localStorage.getItem(key) || "null"); } catch (_) {}
+    const now = { level: Number(me.level) || 0, tier: Number(me.tier) || 1 };
+    try { localStorage.setItem(key, JSON.stringify(now)); } catch (_) {}
+    if (!prev || !(now.level > prev.level)) return;
+    showLevelUp(now.level, now.tier, me.rank || "", now.tier > (prev.tier || 0));
+  }
+  function showLevelUp(level, tier, rank, newRank) {
+    const old = document.getElementById("xnLevelUp");
+    if (old) old.remove();
+    const box = document.createElement("div");
+    box.id = "xnLevelUp";
+    box.className = "xn-lvup";
+    box.setAttribute("role", "status");
+    box.innerHTML = '<div class="xn-lvup-card"><div class="xn-lvup-badge"></div><div class="xn-lvup-txt"><span class="xn-lvup-kick">Level up</span><strong></strong><span class="xn-lvup-rank"></span></div><button type="button" class="xn-lvup-x" aria-label="Close">×</button><span class="xn-lvup-fx" aria-hidden="true"></span></div>';
+    const badge = window.xnRank && window.xnRank.hexb ? window.xnRank.hexb(tier, level) : null;
+    if (badge) box.querySelector(".xn-lvup-badge").append(badge);
+    box.querySelector("strong").textContent = "You reached level " + level;
+    box.querySelector(".xn-lvup-rank").textContent = newRank && rank ? "New rank: " + rank : rank ? "Rank: " + rank : "";
+    // Confetti: small rounded squares in the site color and a few others.
+    const fx = box.querySelector(".xn-lvup-fx");
+    const colors = ["var(--oled-accent)", "#fab219", "#3987e5", "#d55181", "#199e70", "#f5f3fa"];
+    for (let i = 0; i < 18; i++) {
+      const bit = document.createElement("i");
+      const ang = (i / 18) * Math.PI * 2 + Math.random() * 0.3;
+      const dist = 60 + Math.random() * 70;
+      bit.style.setProperty("--dx", Math.round(Math.cos(ang) * dist) + "px");
+      bit.style.setProperty("--dy", Math.round(Math.sin(ang) * dist) + "px");
+      bit.style.setProperty("--r", Math.round(Math.random() * 360) + "deg");
+      bit.style.setProperty("--d", (Math.random() * 0.15).toFixed(2) + "s");
+      bit.style.background = colors[i % colors.length];
+      fx.append(bit);
+    }
+    document.body.append(box);
+    const close = () => { box.classList.remove("is-on"); setTimeout(() => box.remove(), 400); };
+    box.querySelector(".xn-lvup-x").addEventListener("click", close);
+    requestAnimationFrame(() => requestAnimationFrame(() => box.classList.add("is-on")));
+    setTimeout(close, 6500);
+  }
+  window.xnLevelUp = showLevelUp;
 
   // Short status message at the bottom of the screen; styles live in oled.css.
   let toastEl = null;
@@ -2364,15 +2421,18 @@
       const items = Array.isArray(data.items) ? data.items : [];
       const others = items.filter((p) => !p.mine && p.status === "approved");
       const mineNow = {};
-      items.filter((p) => p.mine).forEach((p) => { mineNow[p.id] = p.status; });
+      // Pills are public at once (mommy 2026-11-20); what changes is verified or hidden.
+      const stateOf = (p) => (p.status === "rejected" ? "rejected" : p.verified ? "verified" : "shown");
+      items.filter((p) => p.mine).forEach((p) => { mineNow[p.id] = stateOf(p); });
       const next = { at: Date.now(), newest: Math.max(0, ...others.map((p) => p.createdAt || 0)), mine: mineNow, pending: data.pending || 0 };
       try { localStorage.setItem(keyOf(), JSON.stringify(next)); } catch (_) {}
       // On the Pill Database itself everything is in view: just remember it.
       if (!seen || /^\/Pills/.test(location.pathname)) return;
       const notes = [];
       if (on.includes("mine")) {
-        items.filter((p) => p.mine && seen.mine && seen.mine[p.id] && seen.mine[p.id] !== p.status && (p.status === "approved" || p.status === "rejected")).forEach((p) => {
-          notes.push({ title: label(p) + (p.status === "approved" ? " was approved" : " was rejected"), text: p.status === "approved" ? "Everyone can see it in the Pill Database now." : (p.modNote || "Open it to see why."), pic: p.picture });
+        items.filter((p) => p.mine && seen.mine && seen.mine[p.id] && seen.mine[p.id] !== stateOf(p) && stateOf(p) !== "shown").forEach((p) => {
+          const st = stateOf(p);
+          notes.push({ title: label(p) + (st === "verified" ? " was verified" : " was hidden"), text: st === "verified" ? "An admin checked it. It has a Verified badge now." : (p.modNote || "Open it to see why."), pic: p.picture });
         });
       }
       if (on.includes("new")) {
@@ -2381,7 +2441,7 @@
       }
       if (on.includes("review") && data.admin && (data.pending || 0) > (seen.pending || 0)) {
         const n = data.pending - (seen.pending || 0);
-        notes.push({ title: n === 1 ? "A pill waits for review" : n + " pills wait for review", text: data.pending + " waiting in total.", pic: "" });
+        notes.push({ title: n === 1 ? "A new pill isn't verified yet" : n + " new pills aren't verified yet", text: data.pending + " not verified in total.", pic: "" });
       }
       if (notes.length) show(notes.length === 1 ? notes[0] : { title: notes[0].title, text: notes.slice(1).map((n) => n.title).join(" · "), pic: notes[0].pic });
     }

@@ -225,6 +225,9 @@ export function customToSubstance(c) {
     halfLife: c.halfLife || null,
     risks: c.risks || "",
     notes: c.notes || "",
+    contents: Array.isArray(c.contents) ? c.contents : [], // "What's in this mix" (mommy 2026-11-20)
+    harmReduction: c.harmReduction || "",
+    legal: c.legal || null,
     dangerousInteractions: named(c.interactions?.dangerous),
     unsafeInteractions: named(c.interactions?.unsafe),
     uncertainInteractions: named(c.interactions?.uncertain),
@@ -463,7 +466,138 @@ export async function fetchSubstanceData(name) {
   state.currentSubstance = substance;
   state.roas = roas;
   rememberClass(substance);
+  rememberInteractions(substance);
   return selectRoa(withDose.name);
+}
+
+// ------------------------------------------------------------
+// Interaction lists (mommy 2026-11-20, interaction checker): PsychonautWiki's
+// (or the Substances Editor's) lists for every substance loaded, kept so a
+// saved session's doses can be checked against each other later.
+// ------------------------------------------------------------
+const IX_KEY = "xn_ix_cache";
+let ixCache = null;
+function readIx() {
+  if (ixCache) return ixCache;
+  try { ixCache = JSON.parse(localStorage.getItem(IX_KEY)) || {}; } catch { ixCache = {}; }
+  return ixCache;
+}
+function rememberInteractions(substance) {
+  if (!substance?.name) return;
+  const names = (list) => (list || []).map((i) => i?.name || i).filter(Boolean).map(String);
+  const cache = readIx();
+  cache[substance.name.toLowerCase()] = {
+    severe: names(substance.dangerousInteractions), danger: names(substance.unsafeInteractions), caution: names(substance.uncertainInteractions),
+    ingredient: substance.ingredient || "",
+  };
+  const keys = Object.keys(cache);
+  if (keys.length > 300) keys.slice(0, keys.length - 300).forEach((k) => delete cache[k]);
+  try { localStorage.setItem(IX_KEY, JSON.stringify(cache)); } catch {}
+}
+/** {severe, danger, caution, ingredient} for a substance loaded before, or null. */
+export function interactionsOf(name) {
+  return readIx()[String(name || "").toLowerCase()] || null;
+}
+
+/**
+ * The drawing profile of any substance on its first route with timings,
+ * without loading it into the form: { name, base, commonDose, units, route }.
+ * Used for the parts of a mix (each psychoactive part gets its own curve).
+ */
+export async function profileFor(name) {
+  let substance = await customByName(name);
+  if (!substance) {
+    const query = `query Substance($name: String!) { substances(query: $name) { ${SUBSTANCE_FIELDS} } }`;
+    try {
+      if (offline.isOffline()) throw new TypeError("offline");
+      const result = await fetchGraphQL(query, { name });
+      substance = (result?.data?.substances || []).find((s) => s.name.toLowerCase() === String(name).toLowerCase()) || result?.data?.substances?.[0];
+    } catch (error) {
+      if (!offline.isNetworkError(error)) throw error;
+      substance = await offline.getSubstance(name);
+    }
+  }
+  const withDose = substance?.roas?.find((r) => r.duration && r.dose?.common?.min);
+  if (!substance || !withDose) throw new Error(`No timeline was found for ${name}.`);
+  rememberClass(substance);
+  rememberInteractions(substance);
+  const roa = substance.roas.find((r) => r.name === "oral" && r.duration && r.dose?.common?.min) || withDose;
+  return {
+    name: substance.name,
+    route: roa.name,
+    units: roa.dose.units || "",
+    commonDose: Number(roa.dose.common.min),
+    base: {
+      onset: averageHours(roa.duration.onset), comeup: averageHours(roa.duration.comeup),
+      peak: averageHours(roa.duration.peak), offset: averageHours(roa.duration.offset), ...extendedBase(roa.extended),
+    },
+  };
+}
+
+/** The psychoactive parts of the substance loaded now, when it's a mix of two or more. */
+export function mixParts() {
+  const parts = (state.currentSubstance?.contents || []).filter((p) => p.psychoactive && p.name);
+  return parts.length >= 2 ? parts : [];
+}
+
+/**
+ * Adds one curve per psychoactive part of the mix loaded now: `count` pills
+ * taken at `time`. Each part is drawn with its own timeline. Returns the doses.
+ */
+export async function addMixDoses({ count, time, price }) {
+  const mix = state.currentSubstance;
+  const parts = mixParts();
+  const n = Number(count);
+  if (!mix || !parts.length) throw new Error("Select a mix first.");
+  if (!Number.isFinite(n) || n <= 0) throw new Error("Enter how many you took.");
+  const profiles = await Promise.all(parts.map((p) => profileFor(p.name).catch(() => null)));
+  const missing = parts.filter((_, i) => !profiles[i]).map((p) => p.name);
+  if (missing.length === parts.length) throw new Error(`No timelines were found for ${missing.join(", ")}.`);
+  const doseTime = time || currentTimeValue();
+  const added = [];
+  parts.forEach((part, i) => {
+    const prof = profiles[i];
+    if (!prof) return;
+    const amount = (Number(part.amount) || prof.commonDose) * n;
+    const profile = { base: { ...prof.base }, commonDose: prof.commonDose };
+    const sciBase = scienceBase(prof.name, prof.route);
+    const drawWith = state.scientific && sciBase ? { base: { ...sciBase }, commonDose: prof.commonDose } : profile;
+    const curve = buildDoseCurve(timeToHours(doseTime), amount, 0, drawWith);
+    const dose = {
+      id: ++state.doseSequence, x: curve.x, y: curve.y, time: doseTime, amount,
+      unit: part.unit || prof.units, formulation: `${n} × ${mix.name}`, releaseHours: 0, route: prof.route,
+      substance: prof.name, color: colorForSubstance(prof.name), profile, sciBase, mix: mix.name,
+      // The price is for the whole pill: it goes on the first part only.
+      price: added.length === 0 && Number(price) > 0 ? Math.round(Number(price) * 100) / 100 : 0,
+    };
+    state.addedDoses.push(dose);
+    added.push(dose);
+  });
+  return { added, missing };
+}
+
+/**
+ * The preview's route comparison (mommy 2026-11-20): one curve per route of
+ * the substance loaded now, each at its own common dose.
+ */
+export function routeCurves() {
+  const substance = state.currentSubstance;
+  if (!substance || state.roas.length < 2) return [];
+  const fallback = state.roas.find((r) => r.dose?.common?.min);
+  return state.roas.map((roa) => {
+    const dose = roa.dose?.common?.min ? roa.dose : fallback.dose;
+    const profile = {
+      commonDose: Number(dose.common.min),
+      base: {
+        onset: averageHours(roa.duration.onset), comeup: averageHours(roa.duration.comeup),
+        peak: averageHours(roa.duration.peak), offset: averageHours(roa.duration.offset), ...extendedBase(roa.extended),
+      },
+    };
+    try {
+      const curve = buildDoseCurve(0, profile.commonDose, 0, profile);
+      return { route: roa.name, common: profile.commonDose, units: dose.units || "", curve, current: roa.name === state.currentRoa?.name };
+    } catch { return null; }
+  }).filter(Boolean);
 }
 
 /**
@@ -602,7 +736,7 @@ function extendedBase(raw) {
  * Throws Error with the same messages the old toasts showed, so ui.js can
  * catch and display them without duplicating validation rules.
  */
-export function addDoseToState({ amount, time, formulation }) {
+export function addDoseToState({ amount, time, formulation, price }) {
   if (!state.currentSubstance) {
     throw new Error("Select a substance before adding a dose.");
   }
@@ -635,6 +769,7 @@ export function addDoseToState({ amount, time, formulation }) {
     color: colorForSubstance(state.currentSubstance.name),
     profile,
     sciBase,
+    price: Number(price) > 0 ? Math.round(Number(price) * 100) / 100 : 0,
   };
 
   state.addedDoses.push(dose);
@@ -642,7 +777,7 @@ export function addDoseToState({ amount, time, formulation }) {
 }
 
 /** Changes an added dose's amount and/or time and redraws its curve. */
-export function updateDoseInState(id, { amount, time, note }) {
+export function updateDoseInState(id, { amount, time, note, price }) {
   const dose = state.addedDoses.find((item) => item.id === id);
   if (!dose) throw new Error("That dose is no longer on the timeline.");
   const numericAmount = Number(amount);
@@ -655,6 +790,7 @@ export function updateDoseInState(id, { amount, time, note }) {
   dose.amount = numericAmount;
   dose.time = time;
   if (note !== undefined) dose.note = String(note).trim().slice(0, 2000);
+  if (price !== undefined) dose.price = Number(price) > 0 ? Math.round(Number(price) * 100) / 100 : 0;
   redrawDose(dose);
   return dose;
 }
@@ -673,6 +809,7 @@ export function snapshotDoses() {
     route: dose.route || "",
     time: dose.time,
     note: dose.note || "",
+    ...(dose.price > 0 ? { price: dose.price } : {}),
     profile: { base: { ...dose.profile.base }, commonDose: dose.profile.commonDose },
   }));
 }
@@ -700,6 +837,7 @@ function savedDose(raw) {
     route: String(raw.route || "").slice(0, 30),
     time: raw.time,
     note: String(raw.note || "").slice(0, 2000),
+    price: Number(raw.price) > 0 && Number(raw.price) < 1e7 ? Number(raw.price) : 0,
     profile: { base, commonDose },
   };
 }

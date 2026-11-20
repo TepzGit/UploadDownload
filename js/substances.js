@@ -1100,6 +1100,60 @@ function setKind(next) {
   checkDupe();
 }
 
+// ---------- What's in it, legal status (mommy 2026-11-20) ----------
+const MIX_UNITS = ["mg", "µg", "g", "ml"];
+function mixRow(part) {
+  const p = part || {};
+  const row = document.createElement("div");
+  row.className = "se-mix-row";
+  row.innerHTML =
+    '<label class="se-mix-name"><span class="xn-sr">Compound</span><input class="xn-input" data-k="name" maxlength="80" placeholder="Compound, e.g. Paracetamol" autocomplete="off"></label>' +
+    '<label class="se-mix-amt"><span class="xn-sr">Amount</span><input class="xn-input" data-k="amount" type="number" min="0" step="any" inputmode="decimal" placeholder="Amount"></label>' +
+    '<label class="se-mix-unit"><span class="xn-sr">Unit</span><select class="xn-input" data-k="unit">' + MIX_UNITS.map((u) => `<option>${u}</option>`).join("") + "</select></label>" +
+    '<label class="se-mix-psy"><input type="checkbox" data-k="psychoactive"> Psychoactive</label>' +
+    '<label class="se-mix-note"><span class="xn-sr">Note</span><input class="xn-input" data-k="note" maxlength="200" placeholder="Note (optional)" autocomplete="off"></label>' +
+    '<button type="button" class="xn-btn se-mix-del" aria-label="Remove this compound">×</button>';
+  const q = (k) => row.querySelector(`[data-k="${k}"]`);
+  q("name").value = p.name || "";
+  q("amount").value = p.amount != null && p.amount !== 0 ? p.amount : "";
+  q("unit").value = MIX_UNITS.includes(p.unit) ? p.unit : "mg";
+  q("psychoactive").checked = part ? !!p.psychoactive : true;
+  q("note").value = p.note || "";
+  row.querySelector(".se-mix-del").addEventListener("click", () => { row.remove(); dirty = true; });
+  return row;
+}
+function mixRows(parts) {
+  $("fMix").replaceChildren(...parts.map(mixRow));
+}
+function readMix() {
+  return [...$("fMix").querySelectorAll(".se-mix-row")].map((row) => {
+    const q = (k) => row.querySelector(`[data-k="${k}"]`);
+    const amount = Number(q("amount").value);
+    return { name: q("name").value.trim(), amount: amount > 0 ? amount : 0, unit: q("unit").value, psychoactive: q("psychoactive").checked, note: q("note").value.trim() };
+  }).filter((p) => p.name);
+}
+// {dk: "prescription:note"} <-> "DK: prescription: note" lines.
+function legalText(map) {
+  return Object.entries(map || {}).map(([code, v]) => {
+    const i = String(v).indexOf(":");
+    return code.toUpperCase() + ": " + (i < 0 ? v : v.slice(0, i) + ": " + v.slice(i + 1));
+  }).join("\n");
+}
+function readLegal() {
+  const out = {};
+  $("fLegal").value.split("\n").forEach((line) => {
+    const m = line.match(/^\s*([a-z]{2})\s*[:,-]\s*([a-z]+)\s*(?:[:,-]\s*(.*))?$/i);
+    if (!m) return;
+    out[m[1].toLowerCase()] = m[2].toLowerCase() + (m[3] && m[3].trim() ? ":" + m[3].trim() : "");
+  });
+  return out;
+}
+$("fMixAdd").addEventListener("click", () => {
+  const row = mixRow(null);
+  $("fMix").append(row);
+  row.querySelector("input").focus();
+});
+
 function fillForm(entry, newKind) {
   const e = entry || {};
   const set = (id, v) => ($(id).value = v == null ? "" : v);
@@ -1115,6 +1169,9 @@ function fillForm(entry, newKind) {
   set("fHalfMax", e.halfLife?.max);
   set("fAddiction", e.addictionPotential);
   set("fRisks", e.risks);
+  set("fHarm", e.harmReduction);
+  set("fLegal", legalText(e.legal));
+  mixRows(e.contents || []);
   set("fNotes", e.notes);
   $("fUnits").value = e.units || "mg";
   ints = { uncertain: [...(e.interactions?.uncertain || [])], unsafe: [...(e.interactions?.unsafe || [])], dangerous: [...(e.interactions?.dangerous || [])] };
@@ -1170,7 +1227,7 @@ function readForm() {
     notes: $("fNotes").value.trim(),
   };
   if (kind === "pill") {
-    return { ...base, kind: "pill", parentId, route: $("fePillRoute").value, durations: readDurations() };
+    return { ...base, kind: "pill", parentId, route: $("fePillRoute").value, durations: readDurations(), contents: readMix() };
   }
   methods[cur] = readMethod();
   const [first, ...more] = methods;
@@ -1186,6 +1243,9 @@ function readForm() {
     chemicalClass: $("fChem").value.trim(),
     addictionPotential: $("fAddiction").value.trim(),
     risks: $("fRisks").value.trim(),
+    contents: readMix(),
+    harmReduction: $("fHarm").value.trim(),
+    legal: readLegal(),
     interactions: { dangerous: [...ints.dangerous], unsafe: [...ints.unsafe], uncertain: [...ints.uncertain] },
     interactionNotes: notes,
     units: $("fUnits").value,

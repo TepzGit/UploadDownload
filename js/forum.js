@@ -2,6 +2,10 @@
 // Forum page lists everyone's posts; /u/<name> lists one member's. Needs
 // media.js on the page.
 const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
+// Reactions and pill ratings (js/reactions.js), loaded on the side so the
+// pages that only borrow a helper from here still work if it is missing.
+let fx = null;
+const fxReady = import("/reactions.js").then((m) => (fx = m)).catch(() => null);
 const DAY = 86400000;
 const COMMENT_MAX = 1000;
 const touch = window.matchMedia("(pointer: coarse)");
@@ -382,6 +386,15 @@ export function postCard(post, { onRemoved } = {}) {
     });
     card.append(pics);
   }
+  // Reactions and the pill rating (mommy 2026-11-20, js/reactions.js).
+  const addFoot = (m) => {
+    const foot = document.createElement("div");
+    foot.className = "fx-foot";
+    foot.append(m.reactionBar(post), m.ratingRow(post));
+    card.insertBefore(foot, commentBox.parentNode === card ? commentBox : null);
+  };
+  if (fx) addFoot(fx);
+  else fxReady.then((m) => m && addFoot(m));
   card.append(commentBox);
   return card;
 }

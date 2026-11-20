@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Stats · Geek⁴u</title>
+  <meta name="description" content="Your totals, the days you take things, classes, spending and what you added to the site.">
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Geek⁴u" />
+  <link rel="stylesheet" href="/oled.css" />
+  <script src="/nav.js"></script>
+  <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+  <link rel="stylesheet" href="/classicons.css" />
+  <link rel="stylesheet" href="/stats.css" />
+  <script src="/classicons.js"></script>
+  <script src="/drugfacts.js"></script>
+  <script src="/achievements.js"></script>
+  <script src="/stats.js" defer></script>
+</head>
+<body class="xn-bg">
+{{template "xn-header" .}}
+<div class="xn-fluid" aria-hidden="true"><span class="xn-b1"></span><span class="xn-b2"></span><span class="xn-b3"></span><span class="xn-b4"></span></div>
+<div class="xn-hatch" aria-hidden="true"></div>
+
+<main class="xn-page st" id="stats">
+
+  <div class="st-top">
+    <div class="st-range" role="radiogroup" aria-label="Time range">
+      <button type="button" role="radio" data-days="30" aria-checked="false">30 days</button>
+      <button type="button" role="radio" data-days="90" aria-checked="false">90 days</button>
+      <button type="button" role="radio" data-days="365" aria-checked="false">1 year</button>
+      <button type="button" role="radio" data-days="0" aria-checked="true">All time</button>
+    </div>
+    <p class="st-range-note" id="stRangeNote" aria-live="polite"></p>
+  </div>
+
+  <p class="st-loading" id="stLoading">Loading your stats…</p>
+  <p class="st-error" id="stError" role="alert" hidden></p>
+
+  <section class="st-kpis" id="stKpis" aria-label="Summary" hidden>
+    <div class="st-kpi"><span class="st-kpi-label">Doses</span><strong id="kDoses">0</strong><span class="st-kpi-sub" id="kDosesSub"></span></div>
+    <div class="st-kpi"><span class="st-kpi-label">Substances</span><strong id="kSubs">0</strong><span class="st-kpi-sub" id="kSubsSub"></span></div>
+    <div class="st-kpi"><span class="st-kpi-label">Spent</span><strong id="kSpent">0</strong><span class="st-kpi-sub" id="kSpentSub"></span></div>
+    <div class="st-kpi"><span class="st-kpi-label">Busiest day</span><strong id="kDay">None</strong><span class="st-kpi-sub" id="kDaySub"></span></div>
+  </section>
+
+  <div class="st-empty xn-card" id="stEmpty" hidden>
+    <h2 class="xn-h2">No doses yet</h2>
+    <p class="xn-sub">Add doses on the <a href="/">Graph</a> or in your Journal and they show up here.</p>
+  </div>
+
+  <div class="st-grid" id="stGrid" hidden>
+
+    <section class="xn-card st-card st-wide" aria-labelledby="hTotals">
+      <header class="st-head">
+        <h2 class="xn-h2" id="hTotals">Drug totals</h2>
+        <div class="st-sort" role="radiogroup" aria-label="Sort by">
+          <button type="button" role="radio" data-sort="doses" aria-checked="true">Doses</button>
+          <button type="button" role="radio" data-sort="spent" aria-checked="false">Spent</button>
+          <button type="button" role="radio" data-sort="last" aria-checked="false">Latest</button>
+        </div>
+      </header>
+      <ol class="st-totals" id="stTotals"></ol>
+      <button type="button" class="xn-btn st-more" id="stMore" hidden>Show all</button>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hDays">
+      <header class="st-head">
+        <h2 class="xn-h2" id="hDays">What days you take them</h2>
+        <button type="button" class="st-tbtn" data-table="days" aria-pressed="false">Table</button>
+      </header>
+      <p class="st-sub" id="stDaysSub"></p>
+      <div class="st-chart" id="stDays" role="img" aria-labelledby="hDays stDaysSub"></div>
+      <div class="st-table" data-for="days" hidden></div>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hClasses">
+      <header class="st-head">
+        <h2 class="xn-h2" id="hClasses">Your use by class</h2>
+        <button type="button" class="st-tbtn" data-table="classes" aria-pressed="false">Table</button>
+      </header>
+      <p class="st-sub">Share of your doses in each kind of drug.</p>
+      <div class="st-pie-wrap">
+        <div class="st-chart st-pie" id="stPie" role="img" aria-labelledby="hClasses"></div>
+        <ul class="st-legend" id="stLegend"></ul>
+      </div>
+      <div class="st-table" data-for="classes" hidden></div>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hSpend">
+      <header class="st-head">
+        <h2 class="xn-h2" id="hSpend">Spending</h2>
+        <button type="button" class="st-tbtn" data-table="spend" aria-pressed="false">Table</button>
+      </header>
+      <p class="st-sub" id="stSpendSub"></p>
+      <div class="st-chart" id="stSpend"></div>
+      <div class="st-table" data-for="spend" hidden></div>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hTol">
+      <header class="st-head"><h2 class="xn-h2" id="hTol">Tolerance right now</h2></header>
+      <p class="st-sub">A rough estimate from your doses. It fades over days.</p>
+      <ul class="st-tol" id="stTol"></ul>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hForum">
+      <header class="st-head"><h2 class="xn-h2" id="hForum">Forum</h2><a class="st-link" href="/Forum">Open</a></header>
+      <dl class="st-nums" id="stForum"></dl>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hReports">
+      <header class="st-head"><h2 class="xn-h2" id="hReports">Trip reports</h2><a class="st-link" href="/Notes">Open</a></header>
+      <dl class="st-nums" id="stReports"></dl>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hPills">
+      <header class="st-head"><h2 class="xn-h2" id="hPills">Pill Database</h2><a class="st-link" href="/Pills">Open</a></header>
+      <dl class="st-nums" id="stPills"></dl>
+    </section>
+
+    <section class="xn-card st-card" aria-labelledby="hAch">
+      <header class="st-head"><h2 class="xn-h2" id="hAch">Achievements</h2><a class="st-link" href="/Profile#achievements">See all</a></header>
+      <div class="st-ach" id="stAch"></div>
+    </section>
+
+  </div>
+  <div class="st-tip" id="stTip" role="tooltip" hidden></div>
+</main>
+</body>
+</html>

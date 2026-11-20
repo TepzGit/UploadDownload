@@ -611,6 +611,8 @@
   <script src="/classicons.js"></script>
   <script src="/science.js?v=3"></script>
   <script src="/pills.js"></script>
+  <script src="/drugfacts.js"></script>
+  <link rel="stylesheet" href="/graphplus.css" />
   <script>if (window.matchMedia("(max-width: 767px)").matches) document.documentElement.classList.add("gp-phone");</script>
   <link rel="icon" href="/brand/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -667,9 +669,15 @@
   <div class="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0 xl:min-h-0 xl:col-start-2 xl:row-start-1">
 
 
+    <!-- Top bar (mommy 2026-11-20): day of the session, totals per substance and what it cost. -->
+    <section id="sessBar" class="glass gs-bar order-1 xl:order-none" aria-label="This session">
+      <div class="gs-day"><span class="gs-kick">Taken</span><strong data-gs-day></strong></div>
+      <div class="gs-totals" data-gs-totals role="list" aria-label="Session totals"></div>
+      <div class="gs-price"><span class="gs-kick">Session price</span><strong data-gs-price>–</strong></div>
+    </section>
+
     <section id="chartCard" class="glass rounded-sm p-3 sm:p-5 order-1 xl:order-none min-w-0 xl:flex-1 scroll-mt-20">
 
-      <div id="sciRow" class="sci-row"><span id="sciNote" class="sci-note"></span></div>
       <div id="chartEmpty" class="chart-empty">
         <p class="gp-hint"><strong>No doses yet</strong>Tap + to add one and draw the graph.</p>
 
@@ -693,6 +701,11 @@
         </div>
       </div>
       <div id="myPlot"></div>
+    </section>
+
+    <!-- Bottom bar: which timelines are drawn and the Scientific graph switch. -->
+    <section id="sciBar" class="glass gs-sci order-1 xl:order-none" aria-label="Timelines">
+      <div id="sciRow" class="sci-row"><span id="sciNote" class="sci-note"></span></div>
     </section>
 
   </div>
@@ -735,6 +748,12 @@
             <input id="doseStartHour" type="time" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" />
           </label>
         </div>
+
+        <label class="price-field">
+          <span class="font-mono text-[11px] text-[var(--muted)]">Price <em>optional</em></span>
+          <span class="price-input"><input id="dosePrice" type="number" inputmode="decimal" min="0" step="any" placeholder="0" class="input input-sm bg-[var(--surface-2)] border-[var(--line)] font-mono w-full" aria-describedby="priceCur" /><b id="priceCur">kr</b></span>
+        </label>
+        <p id="mixNote" class="mix-note" hidden></p>
 
         <section id="pillBox" class="pill-box" aria-label="Pills: tap one to add that dose" hidden>
           <div id="pillGrid" class="pill-grid" role="list"></div>
@@ -798,6 +817,19 @@
   </aside>
 
   <aside class="contents xl:flex xl:flex-col xl:gap-5 xl:min-h-0 xl:col-start-3 xl:row-start-1">
+    <!-- Tolerance, cross-tolerance and interactions between doses that overlap (js/graphplus.js). -->
+    <section id="gpSafety" class="glass gp-safety order-4 xl:order-none" aria-label="Safety checks" hidden>
+      <div class="sf-block" data-sf="ix" hidden>
+        <h2 class="sf-title">Interaction check</h2>
+        <ul class="sf-list" data-sf-ix></ul>
+      </div>
+      <div class="sf-block" data-sf="tol" hidden>
+        <h2 class="sf-title">Tolerance <span data-sf-tolname></span></h2>
+        <div class="sf-meter" role="meter" aria-valuemin="0" aria-valuemax="100" data-sf-meter><i></i></div>
+        <p class="sf-tol-text" data-sf-toltext></p>
+        <ul class="sf-list sf-cross" data-sf-cross></ul>
+      </div>
+    </section>
     <section id="substanceInfo" class="glass rounded-sm p-4 sm:p-6 order-5 xl:order-none xl:flex-1 xl:min-h-0 xl:overflow-y-auto" hidden>
       <div class="flex items-center gap-4 mb-4">
         <img id="substanceImage" alt="" hidden class="w-20 h-20 object-contain flex-none" />
@@ -809,6 +841,11 @@
           </div>
         </div>
       </div>
+      <section id="mixCard" class="mix-card mb-6" aria-labelledby="mixTitle" hidden>
+        <h4 id="mixTitle">What's in this mix</h4>
+        <p class="mix-sub" data-mix-sub></p>
+        <ul class="mix-list" data-mix></ul>
+      </section>
       <section id="substanceTimes" class="sub-times mb-6" aria-labelledby="substanceTimesTitle" hidden>
         <div class="sub-times-head">
           <h4 id="substanceTimesTitle">Duration</h4>

@@ -442,6 +442,76 @@
     }
   },
   {
+    "key": "clobazam",
+    "name": "Frisium (clobazam)",
+    "ingredient": "Clobazam",
+    "aliases": [
+      "Frisium",
+      "Onfi",
+      "Sympazan",
+      "Urbanyl"
+    ],
+    "class": "Depressant",
+    "chemicalClass": "Benzodiazepine",
+    "summary": "Clobazam is a long-acting benzodiazepine used for anxiety and as an add-on treatment for epilepsy, including Lennox-Gastaut syndrome. Frisium is the main brand in Europe, Onfi (tablets and liquid) and Sympazan (a film that melts on the tongue) in the US. Its chemistry is a little different from other benzos (a 1,5-benzodiazepine), and at doses that work as well it usually makes people less sleepy than diazepam.",
+    "halfLife": {
+      "min": 36,
+      "max": 82
+    },
+    "addictionPotential": "Moderate",
+    "risks": "Overdose: so sleepy they can't be woken, slow or noisy breathing, blue lips. Call an ambulance and put them in the recovery position.\nMost benzo deaths happen when they are mixed with alcohol, opioids, GHB/GBL or pregabalin, which together can stop your breathing.\nHigher doses cause blackouts: people forget what they took, take more, or do things they don't remember.\nTaking it daily for a few weeks causes dependence. Stopping suddenly after regular use can cause seizures, so taper down slowly with a doctor.\nIt builds up: its active breakdown product (N-desmethylclobazam) has a half-life of about 3 to 3.5 days, so daily use takes 1 to 2 weeks to level off and it stays in the body for days after the last dose.\nRare but serious skin reactions (Stevens-Johnson syndrome): a spreading rash, blisters, or sores in the mouth or eyes need a doctor straight away. They are most likely in the first 8 weeks.",
+    "notes": "Frisium tablets are 10 mg. Onfi has 10 and 20 mg tablets and a 2.5 mg/ml liquid; Sympazan films are 5, 10 and 20 mg. For anxiety the label dose is 20-30 mg a day (up to 60 mg in hospital, 10-20 mg in older people), for epilepsy 5-40 mg a day split into two doses. 20 mg clobazam is about as strong as 10 mg diazepam.\nCannabidiol (Epidiolex or high-dose CBD oil) and stiripentol raise the level of its active breakdown product several times, which makes people much sleepier. Fluconazole, fluvoxamine, ticlopidine and omeprazole do the same to a smaller degree, and so does being a CYP2C19 poor metabolizer.\nIt can make hormonal birth control pills work less well, so use another method too.",
+    "interactions": {
+      "dangerous": [
+        "Alcohol",
+        "Opioids",
+        "GHB",
+        "GBL",
+        "Barbiturates",
+        "Gabapentinoids",
+        "Z-drugs",
+        "Phenibut"
+      ],
+      "unsafe": [
+        "Ketamine",
+        "DXM",
+        "MXE",
+        "PCP"
+      ],
+      "uncertain": [
+        "Stimulants",
+        "Sedating antihistamines",
+        "Cannabis"
+      ]
+    },
+    "route": "oral",
+    "units": "mg",
+    "dose": {
+      "light": {
+        "min": 5,
+        "max": 10
+      },
+      "common": {
+        "min": 10,
+        "max": 20
+      },
+      "strong": {
+        "min": 20,
+        "max": 30
+      },
+      "heavy": 40,
+      "threshold": 2.5
+    },
+    "durations": {
+      "onset": 0.5,
+      "comeup": 1,
+      "peak": 2.5,
+      "comedown": 3,
+      "comedownLevel": 0.4,
+      "offset": 4
+    }
+  },
+  {
     "key": "etizolam",
     "name": "Etilaam (etizolam)",
     "ingredient": "Etizolam",
@@ -967,6 +1037,10 @@
     "key": "codeine-paracetamol",
     "name": "Co-codamol (codeine + paracetamol)",
     "ingredient": "Codeine + paracetamol",
+    "contents": [
+      {"name": "Codeine", "amount": 30, "unit": "mg", "psychoactive": true, "note": "Common strengths are 8, 15 and 30 mg."},
+      {"name": "Paracetamol", "amount": 500, "unit": "mg", "psychoactive": false, "note": "More than 4 g a day can damage the liver."}
+    ],
     "aliases": [
       "Co-codamol",
       "Solpadeine",
@@ -1043,6 +1117,10 @@
     "key": "hydrocodone-paracetamol",
     "name": "Norco (hydrocodone + paracetamol)",
     "ingredient": "Hydrocodone + paracetamol",
+    "contents": [
+      {"name": "Hydrocodone", "amount": 10, "unit": "mg", "psychoactive": true, "note": "Common strengths are 5, 7.5 and 10 mg."},
+      {"name": "Paracetamol", "amount": 325, "unit": "mg", "psychoactive": false, "note": "More than 4 g a day can damage the liver."}
+    ],
     "aliases": [
       "Norco",
       "Vicodin",

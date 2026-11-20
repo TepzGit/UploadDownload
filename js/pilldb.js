@@ -1,7 +1,8 @@
 // ============================================================
 // pilldb.js: the Pill Database page (/Pills, mommy 2026-11-05).
-// Members add pictures of pills with what they are said to contain;
-// an admin checks each one (pending, approved, rejected). Contents are
+// Members add pictures of pills with what they are said to contain.
+// They are public at once (mommy 2026-11-20); an admin can mark one
+// verified, or hide it (rejected). Contents are
 // always shown as reported, apart from what an admin marks lab confirmed.
 // Server: /pilldb/api/list, item, save, action (UploadDownload.go).
 // ============================================================
@@ -9,7 +10,7 @@ import { avatar, paintName, profileLink, rankBadge, postTime } from "/forum.js";
 
 const $ = (id) => document.getElementById(id);
 const toast = (msg, bad) => window.xnToast && window.xnToast(msg, bad);
-const STATUS = { pending: "Waiting for a check", approved: "Approved", rejected: "Rejected" };
+const STATUS = { pending: "Shown", approved: "Shown", rejected: "Hidden by an admin" };
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
 
 const state = { view: "all", items: [], offset: 0, more: false, admin: false, choices: null, open: null, category: "" };
@@ -31,6 +32,7 @@ function query(offset) {
   if (q) p.set("q", q);
   for (const [id, key] of [["pdColor", "color"], ["pdShape", "shape"], ["pdKind", "form"]]) if ($(id).value) p.set(key, $(id).value);
   if ($("pdLab").checked) p.set("lab", "1");
+  if ($("pdVerified").checked) p.set("verified", "1");
   if (state.category) p.set("category", state.category);
   if (state.view === "mine") p.set("mine", "1");
   if (state.view === "check") p.set("status", $("pdStatus").value);
@@ -113,6 +115,16 @@ function fillChoices(data) {
   add(form.elements.form, state.choices.form);
 }
 
+// Verified badge (mommy 2026-11-20): an admin checked this entry.
+const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.3 1.7 2.8-.2 1 2.7 2.4 1.5-.6 2.8 1.2 2.6-2 2 .1 2.8-2.7.8-1.4 2.5-2.8-.6-2.3 1.6-2.3-1.6-2.8.6-1.4-2.5-2.7-.8.1-2.8-2-2 1.2-2.6-.6-2.8 2.4-1.5 1-2.7 2.8.2z"/><path d="m8.3 12.2 2.5 2.4 4.9-5" fill="none" stroke="#0b0b0d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function verifiedChip(long) {
+  const s = document.createElement("span");
+  s.className = "pd-chip pd-chip-verified";
+  s.innerHTML = CHECK_SVG;
+  s.append(long ? "Verified by an admin" : "Verified");
+  return s;
+}
+
 function chip(text, kind) {
   const s = document.createElement("span");
   s.className = "pd-chip pd-chip-" + kind;
@@ -152,7 +164,8 @@ function card(p) {
   img.loading = "lazy";
   img.decoding = "async";
   pic.append(img);
-  if (p.status !== "approved") pic.append(chip(p.status === "pending" ? "Waiting" : "Rejected", p.status));
+  if (p.status === "rejected") pic.append(chip("Hidden", "rejected"));
+  else if (p.verified) pic.append(verifiedChip());
   const text = document.createElement("span");
   text.className = "pd-card-text";
   const title = document.createElement("strong");
@@ -179,7 +192,7 @@ function card(p) {
 
 function draw(total) {
   grid.replaceChildren(...state.items.map(card));
-  const filtered = state.category || $("pdQ").value.trim() || $("pdColor").value || $("pdShape").value || $("pdKind").value || $("pdLab").checked;
+  const filtered = state.category || $("pdQ").value.trim() || $("pdColor").value || $("pdShape").value || $("pdKind").value || $("pdLab").checked || $("pdVerified").checked;
   $("pdCount").textContent = total ? (total === 1 ? "1 pill" : total + " pills") : "";
   const empty = $("pdEmpty");
   empty.hidden = state.items.length > 0;
@@ -225,7 +238,8 @@ function openView(p) {
   h.textContent = p.brand + (p.strength ? " " + p.strength : "");
   const chips = document.createElement("div");
   chips.className = "pd-view-chips";
-  if (p.status !== "approved") chips.append(chip(STATUS[p.status] || p.status, p.status));
+  if (p.status === "rejected") chips.append(chip(STATUS.rejected, "rejected"));
+  chips.append(p.verified ? verifiedChip(true) : chip("Not verified yet", "unverified"));
   chips.append(p.labContents ? chip("Lab confirmed", "lab") : chip("Reported, not lab tested", "reported"));
 
   const said = document.createElement("div");
@@ -304,16 +318,16 @@ function openView(p) {
     const act = (action, label, primary) => button(label, primary ? "xn-btn-primary" : "", async () => {
       try {
         const next = await api("/pilldb/api/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, id: p.id, note: noteIn.value }) });
-        toast(action === "approve" ? "Approved." : action === "reject" ? "Rejected." : "Back to waiting.");
+        toast({ verify: "Verified.", unverify: "No longer verified.", approve: "Shown again.", reject: "Hidden." }[action] || "Saved.");
         openView(next);
         load(false);
       } catch (e) { toast(e.message, true); }
     });
     const btns = document.createElement("div");
     btns.className = "pd-mod-btns";
-    if (p.status !== "approved") btns.append(act("approve", "Approve", true));
-    if (p.status !== "rejected") btns.append(act("reject", "Reject"));
-    if (p.status !== "pending") btns.append(act("pending", "Back to waiting"));
+    btns.append(p.verified ? act("unverify", "Remove verified") : act("verify", "Verify", true));
+    if (p.status === "rejected") btns.append(act("approve", "Show again"));
+    else btns.append(act("reject", "Hide"));
     mod.append(noteIn, btns);
     main.append(mod);
   }
@@ -376,7 +390,7 @@ function openEdit(p) {
   form.reset();
   $("pdFormError").hidden = true;
   $("pdEditTitle").textContent = p ? "Change this pill" : "Add a pill";
-  $("pdSave").textContent = state.admin ? "Save" : "Send for checking";
+  $("pdSave").textContent = "Save";
   if (p) for (const k of ["brand", "strength", "contents", "imprint", "color", "shape", "form", "country", "notes", "labContents", "labSource"]) if (form.elements[k]) form.elements[k].value = p[k] || "";
   setPicture(p ? p.picture : "");
   $("pdEdit").showModal();
@@ -430,7 +444,7 @@ form.addEventListener("submit", async (e) => {
   try {
     const p = await api("/pilldb/api/save", { method: "POST", body });
     $("pdEdit").close();
-    toast(p.status === "approved" ? "Saved." : "Sent. An admin checks it before others can see it.");
+    toast(p.status === "rejected" ? "Saved. It stays hidden until an admin shows it again." : editing && !state.admin && editing.verified ? "Saved. An admin can verify it again." : "Saved. Everyone can see it now.");
     load(false);
     openView(p);
   } catch (err) {
@@ -457,8 +471,130 @@ document.querySelectorAll(".pd-tab").forEach((tab) => {
 });
 let typing = 0;
 $("pdQ").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(() => load(false), 250); });
-for (const id of ["pdColor", "pdShape", "pdKind", "pdLab", "pdStatus"]) $(id).addEventListener("change", () => load(false));
+for (const id of ["pdColor", "pdShape", "pdKind", "pdLab", "pdVerified", "pdStatus"]) $(id).addEventListener("change", () => load(false));
 $("pdMore").addEventListener("click", () => load(true));
+
+// ---------------- Pill identifier (mommy 2026-11-20) ----------------
+const SWATCH = { white: "#f4f4f2", "off-white": "#ebe3cf", yellow: "#f2d04b", orange: "#f0883e", red: "#d63b3b", pink: "#f29bc0", purple: "#9b6be0", blue: "#4d8ef0", green: "#4caf6a", brown: "#8a5a3b", grey: "#9a9aa2", black: "#1c1c20", "multi-color": "linear-gradient(135deg, #d63b3b 0 33%, #f2d04b 33% 66%, #4d8ef0 66%)", other: "repeating-linear-gradient(45deg, #3a3a44 0 4px, #24242c 4px 8px)" };
+// Each shape drawn in a 32x24 box (rounded, no circles: mommy's rule).
+const SHAPE_SVG = {
+  round: '<rect x="6" y="2" width="20" height="20" rx="10"/>',
+  oval: '<rect x="3" y="4" width="26" height="16" rx="8"/>',
+  oblong: '<rect x="2" y="6" width="28" height="12" rx="5"/>',
+  capsule: '<rect x="2" y="6" width="28" height="12" rx="6"/><path d="M16 6v12"/>',
+  triangle: '<path d="M16 3 29 21H3z"/>',
+  square: '<rect x="6" y="2" width="20" height="20" rx="3"/>',
+  rectangle: '<rect x="3" y="5" width="26" height="14" rx="3"/>',
+  diamond: '<path d="M16 2 28 12 16 22 4 12z"/>',
+  hexagon: '<path d="M10 3h12l6 9-6 9H10l-6-9z"/>',
+  heart: '<path d="M16 21S5 14.5 5 8.5A5 5 0 0 1 16 6a5 5 0 0 1 11 2.5C27 14.5 16 21 16 21z"/>',
+  other: '<path d="M6 12h4M14 12h4M22 12h4"/>',
+};
+const idState = { color: "", shape: "", timer: 0, ticket: 0 };
+function radioRow(box, values, current, make, onPick) {
+  box.replaceChildren(...values.map((v) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(v === current));
+    b.dataset.value = v;
+    make(b, v);
+    b.addEventListener("click", () => {
+      const next = b.getAttribute("aria-checked") === "true" ? "" : v; // pressing again clears it
+      box.querySelectorAll("[role=radio]").forEach((x) => x.setAttribute("aria-checked", String(x.dataset.value === next)));
+      onPick(next);
+    });
+    return b;
+  }));
+}
+function fillIdentifier() {
+  const ch = state.choices || { color: Object.keys(SWATCH), shape: Object.keys(SHAPE_SVG) };
+  radioRow($("pdIdColors"), ch.color.length ? ch.color : Object.keys(SWATCH), idState.color, (b, v) => {
+    b.className = "pd-swatch";
+    b.title = cap(v);
+    b.setAttribute("aria-label", cap(v));
+    const i = document.createElement("i");
+    i.style.background = SWATCH[v] || "#666";
+    b.append(i);
+  }, (v) => { idState.color = v; identify(); });
+  radioRow($("pdIdShapes"), ch.shape.length ? ch.shape : Object.keys(SHAPE_SVG), idState.shape, (b, v) => {
+    b.className = "pd-shape";
+    b.innerHTML = '<svg viewBox="0 0 32 24" aria-hidden="true">' + (SHAPE_SVG[v] || SHAPE_SVG.other) + "</svg>";
+    const t = document.createElement("span");
+    t.textContent = cap(v);
+    b.append(t);
+  }, (v) => { idState.shape = v; identify(); });
+}
+async function identify() {
+  const imprint = $("pdIdImprint").value.trim();
+  const list = $("pdIdList");
+  const note = $("pdIdNote");
+  if (!imprint && !idState.color && !idState.shape) {
+    list.replaceChildren();
+    note.textContent = "";
+    return;
+  }
+  const ticket = ++idState.ticket;
+  note.textContent = "Looking…";
+  try {
+    const p = new URLSearchParams();
+    if (imprint) p.set("imprint", imprint);
+    if (idState.color) p.set("color", idState.color);
+    if (idState.shape) p.set("shape", idState.shape);
+    const data = await api("/pilldb/api/identify?" + p);
+    if (ticket !== idState.ticket) return;
+    const items = data.items || [];
+    note.textContent = items.length ? (items.length === 1 ? "1 possible match." : items.length + " possible matches, closest first.") + " A match only means it looks the same." : "No pill in the database looks like that.";
+    list.replaceChildren(...items.map((it) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pd-id-hit";
+      const pic = document.createElement("span");
+      pic.className = "pd-id-pic";
+      const img = document.createElement("img");
+      img.src = it.picture;
+      img.alt = "";
+      img.loading = "lazy";
+      pic.append(img);
+      const txt = document.createElement("span");
+      txt.className = "pd-id-txt";
+      const t = document.createElement("strong");
+      t.textContent = it.brand + (it.strength ? " " + it.strength : "");
+      const c = document.createElement("span");
+      c.className = "pd-id-contents";
+      c.textContent = it.labContents || it.contents;
+      const why = document.createElement("span");
+      why.className = "pd-id-why";
+      const WHY = { imprint: "Imprint matches", color: "Same color", shape: "Same shape" };
+      (it.why || []).forEach((w) => why.append(chip(WHY[w] || cap(w), "why")));
+      if (it.verified) why.prepend(verifiedChip());
+      txt.append(t, c, why);
+      const score = document.createElement("span");
+      score.className = "pd-id-score";
+      score.style.setProperty("--s", it.score + "%");
+      score.innerHTML = "<b></b><small>match</small>";
+      score.querySelector("b").textContent = it.score + "%";
+      b.append(pic, txt, score);
+      b.addEventListener("click", () => openView(it));
+      li.append(b);
+      return li;
+    }));
+  } catch (e) {
+    if (ticket === idState.ticket) note.textContent = e.message;
+  }
+}
+$("pdIdBtn").addEventListener("click", () => {
+  const box = $("pdId");
+  box.hidden = !box.hidden;
+  $("pdIdBtn").setAttribute("aria-expanded", String(!box.hidden));
+  if (!box.hidden) {
+    fillIdentifier();
+    $("pdIdImprint").focus();
+  }
+});
+$("pdIdClose").addEventListener("click", () => { $("pdId").hidden = true; $("pdIdBtn").setAttribute("aria-expanded", "false"); $("pdIdBtn").focus(); });
+$("pdIdImprint").addEventListener("input", () => { clearTimeout(idState.timer); idState.timer = setTimeout(identify, 250); });
 
 const start = new URLSearchParams(location.search);
 if (start.get("q")) $("pdQ").value = start.get("q");

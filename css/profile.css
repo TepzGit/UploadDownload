@@ -1759,3 +1759,7 @@ html.pf-embed .xn-tabs, html.pf-embed .xn-fluid, html.pf-embed .xn-scene { displ
 
 /* Settings > Graph (the Graph page's own settings, mommy 2026-11-09). */
 .pf-embed-page.pfx-graph { max-width: 760px; }
+/* Currency for dose prices (Settings > Graph, mommy 2026-11-20). */
+.pr-cur { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-width: 260px; }
+.pr-cur .xn-label { margin: 0; }
+.pr-cur .xn-input { max-width: 120px; }

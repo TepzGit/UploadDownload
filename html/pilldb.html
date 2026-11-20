@@ -36,7 +36,7 @@
   <div class="pd-tabs" role="tablist" aria-label="Which pills">
     <button type="button" class="pd-tab" role="tab" id="tabAll" aria-selected="true" aria-controls="pdGrid" data-view="all">All pills</button>
     <button type="button" class="pd-tab" role="tab" id="tabMine" aria-selected="false" aria-controls="pdGrid" data-view="mine">My pills</button>
-    <button type="button" class="pd-tab" role="tab" id="tabCheck" aria-selected="false" aria-controls="pdGrid" data-view="check" hidden>To check <span class="pd-tab-count" id="pendingCount"></span></button>
+    <button type="button" class="pd-tab" role="tab" id="tabCheck" aria-selected="false" aria-controls="pdGrid" data-view="check" hidden>To verify <span class="pd-tab-count" id="pendingCount"></span></button>
   </div>
   <div class="pd-cats" id="pdCats" role="group" aria-label="Categories" hidden></div>
   </div>
@@ -50,12 +50,32 @@
     <label><span class="xn-label">Shape</span><select class="xn-input" id="pdShape"><option value="">Any</option></select></label>
     <label><span class="xn-label">Form</span><select class="xn-input" id="pdKind"><option value="">Any</option></select></label>
     <label class="pd-status" id="pdStatusBox" hidden><span class="xn-label">Status</span>
-      <select class="xn-input" id="pdStatus"><option value="pending">Waiting</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="all">All</option></select>
+      <select class="xn-input" id="pdStatus"><option value="unverified">Not verified</option><option value="approved">Shown</option><option value="rejected">Hidden</option><option value="all">All</option></select>
     </label>
     <label class="pd-check"><input type="checkbox" id="pdLab"> Lab confirmed only</label>
+    <label class="pd-check"><input type="checkbox" id="pdVerified"> Verified only</label>
+    <button type="button" class="xn-btn pd-id-btn" id="pdIdBtn" aria-expanded="false" aria-controls="pdId">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="13" height="13" rx="3"/><path d="m14.5 14.5 6 6"/></svg>Identify a pill
+    </button>
     <button type="button" class="xn-btn xn-btn-primary pd-add" id="pdAdd">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add a pill
     </button>
+  </section>
+
+  <!-- Pill identifier (mommy 2026-11-20): imprint, color and shape, best matches first (GET /pilldb/api/identify). -->
+  <section class="xn-card pd-id" id="pdId" aria-labelledby="pdIdTitle" hidden>
+    <div class="pd-id-head">
+      <h2 class="xn-h2" id="pdIdTitle">Identify a pill</h2>
+      <button type="button" class="pd-x pd-id-x" id="pdIdClose" aria-label="Close the identifier">×</button>
+    </div>
+    <p class="xn-sub">Type what is printed on it and pick its color and shape. The closest pills in the database show first.</p>
+    <div class="pd-id-form">
+      <label class="pd-id-imprint"><span class="xn-label">Imprint</span><input class="xn-input" id="pdIdImprint" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Letters and numbers on the pill" enterkeyhint="search" maxlength="40"></label>
+      <div><span class="xn-label" id="pdIdColorLabel">Color</span><div class="pd-swatches" id="pdIdColors" role="radiogroup" aria-labelledby="pdIdColorLabel"></div></div>
+      <div><span class="xn-label" id="pdIdShapeLabel">Shape</span><div class="pd-shapes" id="pdIdShapes" role="radiogroup" aria-labelledby="pdIdShapeLabel"></div></div>
+    </div>
+    <p class="pd-id-note" id="pdIdNote" aria-live="polite"></p>
+    <ol class="pd-id-list" id="pdIdList"></ol>
   </section>
 
   <p class="pd-count" id="pdCount" aria-live="polite"></p>
@@ -75,7 +95,7 @@
   <form class="pd-dlg-card pd-form" id="pdForm" novalidate>
     <button type="button" class="pd-x" data-close aria-label="Close">×</button>
     <h2 class="xn-h2 pd-form-title" id="pdEditTitle">Add a pill</h2>
-    <p class="xn-sub">An admin checks every new pill and every change before others can see it.</p>
+    <p class="xn-sub">New pills show up for everyone right away. An admin can mark a pill as verified once it has been checked.</p>
     <div class="pd-pic-pick">
       <button type="button" class="pd-pic-btn" id="pdPicBtn">
         <img id="pdPicPreview" alt="" hidden>
@@ -102,7 +122,7 @@
     <p class="pd-form-error" id="pdFormError" role="alert" hidden></p>
     <div class="pd-form-foot">
       <button type="button" class="xn-btn" data-close>Cancel</button>
-      <button type="submit" class="xn-btn xn-btn-primary" id="pdSave">Send for checking</button>
+      <button type="submit" class="xn-btn xn-btn-primary" id="pdSave">Save</button>
     </div>
   </form>
 </dialog>

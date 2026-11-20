@@ -2722,8 +2722,6 @@ html.xn-bar-side[data-side="slide"] .xn .xn-links { transition: width .22s cubic
 .xn-nt-face { display: grid; flex: none; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: var(--xn-pfp-r, 10px); background: rgba(var(--xn-accent-rgb), .18); color: var(--oled-text); font-weight: 700; }
 .xn-nt-face img { width: 100%; height: 100%; object-fit: cover; }
 .xn-nt-empty { margin: 4px 0 0; }
-/* The menu has your name and picture in its bottom row, so no Profile tile (mommy 2026-11-09). */
-html:is(.xn-menu, .xn-bar-side) .xn .xn-links > a[href="/Profile"]:not(.xn-foot-me) { display: none !important; }
 
 /* Scrollbars on the whole site (mommy 2026-11-09): slim and dark, the
    handle in the site color with rounded corners. */
@@ -2759,3 +2757,101 @@ html.xn-nav-notext.xn-side-notips .xn .xn-links a[data-name]:hover::before { dis
 
 html.xn-menu.xn-nav-notext .xn .xn-links a:not(.xn-foot-me) { position: relative; }
 html.xn-nav-notext .xn .xn-links a .xn-chat-count { position: absolute; top: 2px; right: 2px; margin: 0; }
+
+/* ---------- Achievements wall (js/achievements.js, mommy 2026-11-20) ---------- */
+.xa-head { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 2px 8px; }
+.xa-score { font-size: 20px; font-weight: 700; color: var(--oled-text); font-variant-numeric: tabular-nums; }
+.xa-score-sub { font-size: 12px; color: var(--oled-muted); }
+.xa-bar { display: block; position: relative; height: 6px; border-radius: 3px; background: var(--oled-surface-2); overflow: hidden; }
+.xa-bar i { position: absolute; inset: 0 auto 0 0; width: var(--p, 0%); border-radius: 3px; background: var(--oled-accent); }
+.xa-bar-big { grid-column: 1 / -1; height: 8px; margin-top: 6px; }
+.xa-next { margin: 12px 0 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--oled-muted); }
+.xa-done { margin: 10px 0 0; font-size: 12.5px; color: var(--oled-muted); }
+.xa-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.xa-list.is-compact { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+.xa-item { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); }
+.xa-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255, 255, 255, .04); color: var(--oled-muted); }
+.xa-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.xa-item[data-got="1"] { border-color: rgba(var(--xn-accent-rgb), .45); background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), .14), var(--oled-surface-2) 70%); }
+.xa-item[data-got="1"] .xa-ic { background: var(--oled-accent); color: #160f24; }
+.xa-item[data-got="0"] .xa-name { color: var(--oled-muted); }
+.xa-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xa-name { font-size: 13px; font-weight: 600; color: var(--oled-text); }
+.xa-desc { font-size: 11.5px; line-height: 1.35; color: var(--oled-muted); }
+.xa-txt .xa-bar { margin-top: 4px; }
+.xa-count { font-size: 10.5px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- Level up (nav.js showLevelUp, mommy 2026-11-20) ---------- */
+.xn-lvup { position: fixed; left: 50%; top: calc(var(--oled-nav-h) + env(safe-area-inset-top) + 14px); z-index: 120; width: min(380px, calc(100vw - 32px)); transform: translate(-50%, -18px); opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .45s cubic-bezier(.34, 1.56, .64, 1); }
+.xn-lvup.is-on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.xn-lvup-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid rgba(var(--xn-accent-rgb), .55); border-radius: 16px; background: linear-gradient(135deg, rgba(var(--xn-accent-rgb), .22), #0d0d11 65%); box-shadow: 0 14px 40px rgba(0, 0, 0, .55), 0 0 32px rgba(var(--xn-accent-rgb), .25); }
+.xn-lvup-badge { position: relative; z-index: 1; display: grid; place-items: center; }
+.xn-lvup-badge .xn-hexb { font-size: 54px; }
+.xn-lvup.is-on .xn-lvup-badge .xn-hexb { animation: xn-lvup-pop .8s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes xn-lvup-pop { 0% { transform: scale(.2) rotate(-200deg); opacity: 0; } 60% { transform: scale(1.18) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+.xn-lvup-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xn-lvup-kick { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--oled-accent); }
+.xn-lvup-txt strong { font-size: 16px; color: var(--oled-text); }
+.xn-lvup-rank { font-size: 12px; color: var(--oled-muted); }
+.xn-lvup-rank:empty { display: none; }
+.xn-lvup-x { align-self: start; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--oled-muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.xn-lvup-x:hover { background: rgba(255, 255, 255, .06); color: var(--oled-text); }
+.xn-lvup-fx { position: absolute; left: 43px; top: 50%; width: 0; height: 0; pointer-events: none; }
+.xn-lvup-fx i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 2px; opacity: 0; }
+.xn-lvup.is-on .xn-lvup-fx i { animation: xn-lvup-bit 1s var(--d, 0s) cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes xn-lvup-bit { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(.6); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .xn-lvup { transition: opacity .2s ease; transform: translate(-50%, 0); }
+  .xn-lvup.is-on .xn-lvup-badge .xn-hexb, .xn-lvup.is-on .xn-lvup-fx i { animation: none; }
+}
+
+/* ---------- Pill ratings (js/pillrate.js, mommy 2026-11-20) ---------- */
+.xp-row { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
+.xp-pill { display: block; flex: none; width: 18px; height: 9px; border: 1px solid var(--oled-line-strong); border-radius: 5px; background: var(--oled-surface-2); transform: rotate(-35deg); }
+.xp-row.is-small { gap: 1px; }
+.xp-row.is-small .xp-pill { width: 13px; height: 7px; border-radius: 4px; }
+.xp-pill[data-fill="full"] { border-color: transparent; background: linear-gradient(90deg, var(--oled-accent) 50%, color-mix(in srgb, var(--oled-accent) 55%, #fff) 50%); }
+.xp-pill[data-fill="half"] { background: linear-gradient(90deg, var(--oled-accent) 50%, var(--oled-surface-2) 50%); }
+.xp-pick { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.xp-row.is-pick { gap: 2px; padding: 6px 4px; border-radius: 8px; cursor: pointer; touch-action: manipulation; }
+.xp-row.is-pick .xp-pill { width: 22px; height: 11px; border-radius: 6px; }
+.xp-row.is-pick:focus-visible { outline: 2px solid var(--oled-accent); outline-offset: 2px; }
+.xp-out { min-width: 4.2em; font-size: 12px; color: var(--oled-muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- I've tried (Profile) ---------- */
+.tr-head { align-items: center; flex-wrap: wrap; }
+.tr-tools { display: inline-flex; align-items: center; gap: 8px; }
+.tr-add { min-height: 32px; padding: 0 10px; font-size: 12px; }
+.tr-add svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.tr-sort { min-height: 28px; padding: 0 8px; border: 1px solid var(--oled-line); border-radius: 7px; background: transparent; color: var(--oled-muted); font: inherit; font-size: 11px; cursor: pointer; }
+.tr-form { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--oled-line); border-radius: 10px; background: var(--oled-surface-2); }
+.tr-form[hidden] { display: none; }
+.tr-field .xn-label em { font-style: normal; opacity: .7; }
+.tr-note-in { min-height: 60px; padding: 8px 12px; resize: vertical; line-height: 1.45; }
+.tr-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tr-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; max-height: 420px; overflow-y: auto; }
+.tr-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 30px; align-items: center; gap: 4px 10px; min-height: 40px; padding: 4px 6px 4px 10px; border-radius: 8px; background: rgba(255, 255, 255, .025); }
+.tr-name { overflow: hidden; padding: 0; border: 0; background: none; color: var(--oled-text); font: inherit; font-size: 13px; font-weight: 600; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+button.tr-name { cursor: pointer; }
+button.tr-name:hover { color: var(--oled-accent); }
+.tr-score { display: inline-flex; align-items: center; gap: 8px; }
+.tr-num { min-width: 2.2em; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.tr-note-btn { grid-column: 3; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--oled-muted); cursor: pointer; }
+.tr-note-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.tr-note-btn:hover, .tr-note-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .06); color: var(--oled-accent); }
+.tr-note { grid-column: 1 / -1; margin: 0 0 4px; font-size: 12.5px; line-height: 1.5; color: var(--oled-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tr-note[hidden] { display: none; }
+.xa-box { margin-top: 20px; }
+.pf-more .xa-box { margin-top: 0; }
+.pf-more { margin-top: 20px; }
+@media (max-width: 520px) {
+  .tr-row { grid-template-columns: minmax(0, 1fr) 30px; }
+  .tr-score { grid-column: 1; grid-row: 2; }
+  .tr-note-btn { grid-column: 2; grid-row: 1 / span 2; }
+  .xp-row.is-pick .xp-pill { width: 19px; height: 10px; }
+}
+@media (max-width: 520px) {
+  .xa-list:not(.is-compact) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .xa-list:not(.is-compact) .xa-item { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px; }
+  .xa-list:not(.is-compact) .xa-ic { width: 34px; height: 34px; }
+}
